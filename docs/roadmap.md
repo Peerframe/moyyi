@@ -13,11 +13,13 @@ Done:
 - Plugin API and registry: atomic load, owned registrations, restrictive policy rules, isolated
   observers; `provider-scripted` as the first plugin
 - Eval harness: fresh workspace per trial, hidden checker, outside-workspace canary, false-success
-  and pass^k metrics; one example task; the null agent fails it
+  and pass^k metrics, stop-and-report tasks, private task folder
+- First task batch: 11 tasks, 10 rewritten from the owner's real requests; every checker proven
+  against a reference solution and near misses ([evals/corpus.md](../evals/corpus.md))
 
 Remaining:
 
-- Task corpus: 30–50 real personal tasks (see [evals/README.md](../evals/README.md))
+- Grow the corpus from 11 to 30–50 tasks, including a held-out set in `evals/private/`
 - Threat model filled in ([threat-model.md](threat-model.md))
 - Two-protocol mapping for the content model, with recorded fixtures
   ([ADR 0003](decisions/0003-provider-neutral-content.md))

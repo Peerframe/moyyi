@@ -1,0 +1,22 @@
+[
+  {
+    "code": "007",
+    "name": "Bantal Leher Mobil",
+    "colors": ["Hitam", "Abu-abu", "Krem", "Merah"],
+    "suggestedPriceRp": 128000,
+    "package": { "weightG": 450, "lengthCm": 25, "widthCm": 20, "heightCm": 12 }
+  },
+  {
+    "code": "026",
+    "name": "Sandaran Pinggang Mobil",
+    "colors": ["Hitam", "Coklat", "Biru"],
+    "suggestedPriceRp": 199000
+  },
+  {
+    "code": "031",
+    "name": "Karpet Mobil Universal",
+    "colors": ["Hitam", "Abu-abu", "Coklat", "Krem", "Merah"],
+    "suggestedPriceRp": 87500,
+    "package": { "weightG": 2100, "lengthCm": 60, "widthCm": 45, "heightCm": 8 }
+  }
+]

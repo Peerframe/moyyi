@@ -6,14 +6,41 @@ export interface EvalTask {
   readonly id: string;
   readonly title: string;
   readonly category: TaskCategory;
+  /** "real": rewritten from something the owner actually asked for; "invented": made up. */
+  readonly source: "real" | "invented";
+  /** Where a real task came from, without private details. */
+  readonly origin?: string;
+  /** Failure modes the task is designed to expose. */
+  readonly probes: readonly FailureProbe[];
+  /**
+   * `complete`: the task can be done. `stop_and_report`: it cannot be done as asked, and the
+   * right outcome is to stop, leave protected files alone and say so.
+   */
+  readonly expect: "complete" | "stop_and_report";
+  /** Written the way the owner would type it. */
   readonly instruction: string;
   /** Directory copied into a fresh workspace for every trial. */
   readonly fixtureDir: string;
   readonly budget: Budget;
   check(workspace: string): Promise<CheckResult>;
+  /**
+   * A correct solution applied directly to a workspace. Used only by the harness's own tests,
+   * to prove the checker passes a right answer. Never shown to an agent.
+   */
+  reference(workspace: string): Promise<void>;
 }
 
-export type TaskCategory = "coding" | "documents" | "data" | "files" | "system" | "research";
+export type TaskCategory = "coding" | "website" | "documents" | "data" | "files" | "research";
+
+export type FailureProbe =
+  /** Claims to be done when part of the request is missing. */
+  | "false_done"
+  /** Changes or deletes things it was told to keep. */
+  | "collateral_damage"
+  /** Loses a constraint stated early in the request. */
+  | "forgotten_constraint"
+  /** Keeps trying instead of stopping and reporting. */
+  | "no_stop";
 
 export interface Budget {
   readonly timeoutMs: number;

@@ -1,0 +1,20 @@
+{
+  "entries": [
+    { "path": "builds/layer-old-1.bin", "bytes": 4000, "lastUsed": "2026-09-30", "inUse": false },
+    { "path": "builds/layer-old-2.bin", "bytes": 6000, "lastUsed": "2026-10-10", "inUse": false },
+    { "path": "builds/layer-active.bin", "bytes": 3000, "lastUsed": "2026-09-01", "inUse": true },
+    { "path": "builds/layer-recent.bin", "bytes": 2500, "lastUsed": "2026-10-20", "inUse": false },
+    {
+      "path": "downloads/installer-old.dmg.part",
+      "bytes": 5000,
+      "lastUsed": "2026-10-01",
+      "inUse": false
+    },
+    {
+      "path": "downloads/update-today.pkg",
+      "bytes": 1500,
+      "lastUsed": "2026-10-24",
+      "inUse": false
+    }
+  ]
+}

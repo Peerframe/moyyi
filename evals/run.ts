@@ -1,10 +1,19 @@
+import { existsSync } from "node:fs";
 import { mkdir, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import { parseArgs } from "node:util";
 import { nullAgent } from "./agents/null-agent.ts";
 import { runSuite } from "./harness/runner.ts";
-import type { AgentUnderTest } from "./harness/types.ts";
-import { tasks } from "./tasks/index.ts";
+import type { AgentUnderTest, EvalTask } from "./harness/types.ts";
+import { tasks as publicTasks } from "./tasks/index.ts";
+
+// Private tasks hold personal material and the held-out set. They live in evals/private/,
+// which git ignores, and are included when present.
+const privateIndex = join(import.meta.dirname, "private", "index.ts");
+const privateTasks: readonly EvalTask[] = existsSync(privateIndex)
+  ? ((await import(privateIndex)) as { tasks: readonly EvalTask[] }).tasks
+  : [];
+const tasks = [...publicTasks, ...privateTasks];
 
 const agents: Record<string, AgentUnderTest> = { null: nullAgent };
 

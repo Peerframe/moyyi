@@ -5,3 +5,4 @@ coverage/
 evals/results/
 *.log
 .DS_Store
+evals/private/
