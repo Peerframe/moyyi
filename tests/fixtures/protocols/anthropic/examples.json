@@ -1,0 +1,787 @@
+{
+  "provenance": {
+    "kind": "handwritten-from-official-docs",
+    "retrievedAt": "2026-10-25",
+    "sources": [
+      "https://platform.claude.com/docs/en/api/messages/create",
+      "https://platform.claude.com/docs/en/api/versioning",
+      "https://platform.claude.com/docs/en/build-with-claude/streaming",
+      "https://platform.claude.com/docs/en/build-with-claude/thinking",
+      "https://platform.claude.com/docs/en/agents-and-tools/tool-use/handle-tool-calls",
+      "https://platform.claude.com/docs/en/agents-and-tools/tool-use/fine-grained-tool-streaming",
+      "https://platform.claude.com/docs/en/build-with-claude/prompt-caching",
+      "https://platform.claude.com/docs/en/build-with-claude/handling-stop-reasons",
+      "https://platform.claude.com/docs/en/build-with-claude/vision",
+      "https://platform.claude.com/docs/en/build-with-claude/citations",
+      "https://platform.claude.com/docs/en/agents-and-tools/tool-use/server-tools",
+      "https://platform.claude.com/docs/en/api/errors",
+      "https://platform.claude.com/docs/en/build-with-claude/compaction-on-demand"
+    ]
+  },
+  "requests": [
+    {
+      "id": "text-image-input",
+      "body": {
+        "model": "synthetic-claude-model",
+        "max_tokens": 2048,
+        "messages": [
+          {
+            "role": "user",
+            "content": [
+              {
+                "type": "image",
+                "source": {
+                  "type": "base64",
+                  "media_type": "image/png",
+                  "data": "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAIAAACQd1PeAAAADElEQVR4nGOwKp8IAAIxAUMtSJEZAAAAAElFTkSuQmCC"
+                }
+              },
+              {
+                "type": "text",
+                "text": "Describe this synthetic pixel."
+              }
+            ]
+          }
+        ],
+        "system": [
+          {
+            "type": "text",
+            "text": "Keep the answer brief."
+          }
+        ]
+      }
+    },
+    {
+      "id": "signed-tool-result-replay",
+      "body": {
+        "model": "synthetic-claude-model",
+        "max_tokens": 2048,
+        "messages": [
+          {
+            "role": "user",
+            "content": [
+              {
+                "type": "text",
+                "text": "Find two synthetic alpha notes."
+              }
+            ]
+          },
+          {
+            "role": "assistant",
+            "content": [
+              {
+                "type": "thinking",
+                "thinking": "I will consult the synthetic note index.",
+                "signature": "SYNTHETIC_SIGNATURE_NOT_VALID_FOR_API_REPLAY"
+              },
+              {
+                "type": "text",
+                "text": "I will look up the notes."
+              },
+              {
+                "type": "tool_use",
+                "id": "toolu_synthetic_lookup",
+                "name": "lookup_note",
+                "input": {
+                  "key": "alpha",
+                  "count": 2
+                }
+              }
+            ]
+          },
+          {
+            "role": "user",
+            "content": [
+              {
+                "type": "tool_result",
+                "tool_use_id": "toolu_synthetic_lookup",
+                "is_error": false,
+                "content": [
+                  {
+                    "type": "text",
+                    "text": "Two synthetic matches."
+                  },
+                  {
+                    "type": "image",
+                    "source": {
+                      "type": "base64",
+                      "media_type": "image/png",
+                      "data": "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAIAAACQd1PeAAAADElEQVR4nGOwKp8IAAIxAUMtSJEZAAAAAElFTkSuQmCC"
+                    }
+                  }
+                ]
+              }
+            ]
+          }
+        ],
+        "tools": [
+          {
+            "name": "lookup_note",
+            "description": "Look up a synthetic note by key.",
+            "input_schema": {
+              "type": "object",
+              "properties": {
+                "key": {
+                  "type": "string"
+                },
+                "count": {
+                  "type": "integer"
+                }
+              },
+              "required": ["key", "count"],
+              "additionalProperties": false
+            }
+          }
+        ],
+        "thinking": {
+          "type": "adaptive",
+          "display": "summarized"
+        }
+      }
+    },
+    {
+      "id": "redacted-tool-result-replay",
+      "body": {
+        "model": "synthetic-claude-model",
+        "max_tokens": 2048,
+        "messages": [
+          {
+            "role": "user",
+            "content": [
+              {
+                "type": "text",
+                "text": "Find two synthetic alpha notes."
+              }
+            ]
+          },
+          {
+            "role": "assistant",
+            "content": [
+              {
+                "type": "redacted_thinking",
+                "data": "SYNTHETIC_ENCRYPTED_DATA_NOT_VALID_FOR_API_REPLAY"
+              },
+              {
+                "type": "tool_use",
+                "id": "toolu_synthetic_lookup",
+                "name": "lookup_note",
+                "input": {
+                  "key": "alpha",
+                  "count": 2
+                }
+              }
+            ]
+          },
+          {
+            "role": "user",
+            "content": [
+              {
+                "type": "tool_result",
+                "tool_use_id": "toolu_synthetic_lookup",
+                "is_error": true,
+                "content": "Synthetic lookup failed."
+              }
+            ]
+          }
+        ],
+        "tools": [
+          {
+            "name": "lookup_note",
+            "description": "Look up a synthetic note by key.",
+            "input_schema": {
+              "type": "object",
+              "properties": {
+                "key": {
+                  "type": "string"
+                },
+                "count": {
+                  "type": "integer"
+                }
+              },
+              "required": ["key", "count"],
+              "additionalProperties": false
+            }
+          }
+        ],
+        "thinking": {
+          "type": "adaptive",
+          "display": "summarized"
+        }
+      }
+    },
+    {
+      "id": "document-citation-input",
+      "body": {
+        "model": "synthetic-claude-model",
+        "max_tokens": 2048,
+        "messages": [
+          {
+            "role": "user",
+            "content": [
+              {
+                "type": "document",
+                "title": "Synthetic note",
+                "source": {
+                  "type": "text",
+                  "media_type": "text/plain",
+                  "data": "Synthetic note: status ready."
+                },
+                "citations": {
+                  "enabled": true
+                }
+              },
+              {
+                "type": "text",
+                "text": "What is the status?"
+              }
+            ]
+          }
+        ]
+      }
+    }
+  ],
+  "responses": [
+    {
+      "id": "text-end-turn",
+      "body": {
+        "id": "msg_synthetic_text",
+        "type": "message",
+        "role": "assistant",
+        "model": "synthetic-claude-model",
+        "content": [
+          {
+            "type": "text",
+            "text": "A synthetic blue pixel."
+          }
+        ],
+        "stop_reason": "end_turn",
+        "stop_sequence": null,
+        "stop_details": null,
+        "usage": {
+          "input_tokens": 11,
+          "output_tokens": 7,
+          "cache_read_input_tokens": 40,
+          "cache_creation_input_tokens": 20
+        }
+      }
+    },
+    {
+      "id": "signed-thinking-tool-use",
+      "body": {
+        "id": "msg_synthetic_tool",
+        "type": "message",
+        "role": "assistant",
+        "model": "synthetic-claude-model",
+        "content": [
+          {
+            "type": "thinking",
+            "thinking": "I will consult the synthetic note index.",
+            "signature": "SYNTHETIC_SIGNATURE_NOT_VALID_FOR_API_REPLAY"
+          },
+          {
+            "type": "text",
+            "text": "I will look up the notes."
+          },
+          {
+            "type": "tool_use",
+            "id": "toolu_synthetic_lookup",
+            "name": "lookup_note",
+            "input": {
+              "key": "alpha",
+              "count": 2
+            }
+          }
+        ],
+        "stop_reason": "tool_use",
+        "stop_sequence": null,
+        "stop_details": null,
+        "usage": {
+          "input_tokens": 11,
+          "output_tokens": 31,
+          "cache_read_input_tokens": 0,
+          "cache_creation_input_tokens": 0,
+          "output_tokens_details": {
+            "thinking_tokens": 12
+          }
+        }
+      }
+    },
+    {
+      "id": "redacted-thinking-end-turn",
+      "body": {
+        "id": "msg_synthetic_redacted",
+        "type": "message",
+        "role": "assistant",
+        "model": "synthetic-claude-model",
+        "content": [
+          {
+            "type": "redacted_thinking",
+            "data": "SYNTHETIC_ENCRYPTED_DATA_NOT_VALID_FOR_API_REPLAY"
+          },
+          {
+            "type": "text",
+            "text": "The synthetic answer is ready."
+          }
+        ],
+        "stop_reason": "end_turn",
+        "stop_sequence": null,
+        "stop_details": null,
+        "usage": {
+          "input_tokens": 11,
+          "output_tokens": 7,
+          "cache_read_input_tokens": 0,
+          "cache_creation_input_tokens": 0
+        }
+      }
+    },
+    {
+      "id": "max-tokens",
+      "body": {
+        "id": "msg_synthetic_limit",
+        "type": "message",
+        "role": "assistant",
+        "model": "synthetic-claude-model",
+        "content": [
+          {
+            "type": "text",
+            "text": "A synthetic answer cut"
+          }
+        ],
+        "stop_reason": "max_tokens",
+        "stop_sequence": null,
+        "stop_details": null,
+        "usage": {
+          "input_tokens": 11,
+          "output_tokens": 7,
+          "cache_read_input_tokens": 0,
+          "cache_creation_input_tokens": 0
+        }
+      }
+    },
+    {
+      "id": "refusal",
+      "body": {
+        "id": "msg_synthetic_refusal",
+        "type": "message",
+        "role": "assistant",
+        "model": "synthetic-claude-model",
+        "content": [
+          {
+            "type": "text",
+            "text": "This synthetic request was declined."
+          }
+        ],
+        "stop_reason": "refusal",
+        "stop_sequence": null,
+        "stop_details": {
+          "type": "refusal",
+          "category": null,
+          "explanation": null
+        },
+        "usage": {
+          "input_tokens": 11,
+          "output_tokens": 7,
+          "cache_read_input_tokens": 0,
+          "cache_creation_input_tokens": 0
+        }
+      }
+    },
+    {
+      "id": "stop-sequence",
+      "body": {
+        "id": "msg_synthetic_sequence",
+        "type": "message",
+        "role": "assistant",
+        "model": "synthetic-claude-model",
+        "content": [
+          {
+            "type": "text",
+            "text": "Synthetic answer."
+          }
+        ],
+        "stop_reason": "stop_sequence",
+        "stop_sequence": "</done>",
+        "stop_details": null,
+        "usage": {
+          "input_tokens": 11,
+          "output_tokens": 7,
+          "cache_read_input_tokens": 0,
+          "cache_creation_input_tokens": 0
+        }
+      }
+    },
+    {
+      "id": "pause-server-tool",
+      "body": {
+        "id": "msg_synthetic_paused",
+        "type": "message",
+        "role": "assistant",
+        "model": "synthetic-claude-model",
+        "content": [
+          {
+            "type": "server_tool_use",
+            "id": "srvtoolu_synthetic_search",
+            "name": "web_search",
+            "input": {
+              "query": "synthetic example"
+            }
+          }
+        ],
+        "stop_reason": "pause_turn",
+        "stop_sequence": null,
+        "stop_details": null,
+        "usage": {
+          "input_tokens": 11,
+          "output_tokens": 7,
+          "cache_read_input_tokens": 0,
+          "cache_creation_input_tokens": 0
+        }
+      }
+    },
+    {
+      "id": "context-window-exceeded",
+      "body": {
+        "id": "msg_synthetic_context",
+        "type": "message",
+        "role": "assistant",
+        "model": "synthetic-claude-model",
+        "content": [
+          {
+            "type": "text",
+            "text": "Synthetic truncated context"
+          }
+        ],
+        "stop_reason": "model_context_window_exceeded",
+        "stop_sequence": null,
+        "stop_details": null,
+        "usage": {
+          "input_tokens": 11,
+          "output_tokens": 7,
+          "cache_read_input_tokens": 0,
+          "cache_creation_input_tokens": 0
+        }
+      }
+    },
+    {
+      "id": "cited-text",
+      "body": {
+        "id": "msg_synthetic_citation",
+        "type": "message",
+        "role": "assistant",
+        "model": "synthetic-claude-model",
+        "content": [
+          {
+            "type": "text",
+            "text": "The status is ready.",
+            "citations": [
+              {
+                "type": "char_location",
+                "cited_text": "Synthetic note: status ready.",
+                "document_index": 0,
+                "document_title": "Synthetic note",
+                "start_char_index": 0,
+                "end_char_index": 29
+              }
+            ]
+          }
+        ],
+        "stop_reason": "end_turn",
+        "stop_sequence": null,
+        "stop_details": null,
+        "usage": {
+          "input_tokens": 11,
+          "output_tokens": 7,
+          "cache_read_input_tokens": 0,
+          "cache_creation_input_tokens": 0
+        }
+      }
+    }
+  ],
+  "streams": [
+    {
+      "id": "signed-tool-success",
+      "events": [
+        {
+          "event": "message_start",
+          "data": {
+            "type": "message_start",
+            "message": {
+              "id": "msg_synthetic_stream_tool",
+              "type": "message",
+              "role": "assistant",
+              "model": "synthetic-claude-model",
+              "content": [],
+              "stop_reason": null,
+              "stop_sequence": null,
+              "stop_details": null,
+              "usage": {
+                "input_tokens": 11,
+                "output_tokens": 1,
+                "cache_read_input_tokens": 0,
+                "cache_creation_input_tokens": 0
+              }
+            }
+          }
+        },
+        {
+          "event": "ping",
+          "data": {
+            "type": "ping"
+          }
+        },
+        {
+          "event": "content_block_start",
+          "data": {
+            "type": "content_block_start",
+            "index": 0,
+            "content_block": {
+              "type": "thinking",
+              "thinking": "",
+              "signature": ""
+            }
+          }
+        },
+        {
+          "event": "content_block_delta",
+          "data": {
+            "type": "content_block_delta",
+            "index": 0,
+            "delta": {
+              "type": "thinking_delta",
+              "thinking": "I will consult the synthetic note index."
+            }
+          }
+        },
+        {
+          "event": "content_block_delta",
+          "data": {
+            "type": "content_block_delta",
+            "index": 0,
+            "delta": {
+              "type": "signature_delta",
+              "signature": "SYNTHETIC_SIGNATURE_NOT_VALID_FOR_API_REPLAY"
+            }
+          }
+        },
+        {
+          "event": "content_block_stop",
+          "data": {
+            "type": "content_block_stop",
+            "index": 0
+          }
+        },
+        {
+          "event": "content_block_start",
+          "data": {
+            "type": "content_block_start",
+            "index": 1,
+            "content_block": {
+              "type": "text",
+              "text": ""
+            }
+          }
+        },
+        {
+          "event": "content_block_delta",
+          "data": {
+            "type": "content_block_delta",
+            "index": 1,
+            "delta": {
+              "type": "text_delta",
+              "text": "I will look up the notes."
+            }
+          }
+        },
+        {
+          "event": "content_block_stop",
+          "data": {
+            "type": "content_block_stop",
+            "index": 1
+          }
+        },
+        {
+          "event": "content_block_start",
+          "data": {
+            "type": "content_block_start",
+            "index": 2,
+            "content_block": {
+              "type": "tool_use",
+              "id": "toolu_synthetic_lookup",
+              "name": "lookup_note",
+              "input": {}
+            }
+          }
+        },
+        {
+          "event": "content_block_delta",
+          "data": {
+            "type": "content_block_delta",
+            "index": 2,
+            "delta": {
+              "type": "input_json_delta",
+              "partial_json": "{\"key\":\"alpha\",\"count\":"
+            }
+          }
+        },
+        {
+          "event": "content_block_delta",
+          "data": {
+            "type": "content_block_delta",
+            "index": 2,
+            "delta": {
+              "type": "input_json_delta",
+              "partial_json": "2}"
+            }
+          }
+        },
+        {
+          "event": "content_block_stop",
+          "data": {
+            "type": "content_block_stop",
+            "index": 2
+          }
+        },
+        {
+          "event": "message_delta",
+          "data": {
+            "type": "message_delta",
+            "delta": {
+              "stop_reason": "tool_use",
+              "stop_sequence": null,
+              "stop_details": null
+            },
+            "usage": {
+              "output_tokens": 31,
+              "output_tokens_details": {
+                "thinking_tokens": 12
+              }
+            }
+          }
+        },
+        {
+          "event": "message_stop",
+          "data": {
+            "type": "message_stop"
+          }
+        }
+      ]
+    },
+    {
+      "id": "error-after-part",
+      "events": [
+        {
+          "event": "message_start",
+          "data": {
+            "type": "message_start",
+            "message": {
+              "id": "msg_synthetic_stream_error",
+              "type": "message",
+              "role": "assistant",
+              "model": "synthetic-claude-model",
+              "content": [],
+              "stop_reason": null,
+              "stop_sequence": null,
+              "stop_details": null,
+              "usage": {
+                "input_tokens": 11,
+                "output_tokens": 1,
+                "cache_read_input_tokens": 0,
+                "cache_creation_input_tokens": 0
+              }
+            }
+          }
+        },
+        {
+          "event": "content_block_start",
+          "data": {
+            "type": "content_block_start",
+            "index": 0,
+            "content_block": {
+              "type": "text",
+              "text": ""
+            }
+          }
+        },
+        {
+          "event": "content_block_delta",
+          "data": {
+            "type": "content_block_delta",
+            "index": 0,
+            "delta": {
+              "type": "text_delta",
+              "text": "Partial synthetic answer."
+            }
+          }
+        },
+        {
+          "event": "content_block_stop",
+          "data": {
+            "type": "content_block_stop",
+            "index": 0
+          }
+        },
+        {
+          "event": "error",
+          "data": {
+            "type": "error",
+            "error": {
+              "type": "overloaded_error",
+              "message": "Synthetic overload after a completed block."
+            }
+          }
+        }
+      ]
+    },
+    {
+      "id": "interrupted-tool-json",
+      "events": [
+        {
+          "event": "message_start",
+          "data": {
+            "type": "message_start",
+            "message": {
+              "id": "msg_synthetic_stream_interrupted",
+              "type": "message",
+              "role": "assistant",
+              "model": "synthetic-claude-model",
+              "content": [],
+              "stop_reason": null,
+              "stop_sequence": null,
+              "stop_details": null,
+              "usage": {
+                "input_tokens": 11,
+                "output_tokens": 1,
+                "cache_read_input_tokens": 0,
+                "cache_creation_input_tokens": 0
+              }
+            }
+          }
+        },
+        {
+          "event": "content_block_start",
+          "data": {
+            "type": "content_block_start",
+            "index": 0,
+            "content_block": {
+              "type": "tool_use",
+              "id": "toolu_synthetic_lookup",
+              "name": "lookup_note",
+              "input": {}
+            }
+          }
+        },
+        {
+          "event": "content_block_delta",
+          "data": {
+            "type": "content_block_delta",
+            "index": 0,
+            "delta": {
+              "type": "input_json_delta",
+              "partial_json": "{\"key\":\"alpha\",\"count\":"
+            }
+          }
+        }
+      ]
+    }
+  ]
+}

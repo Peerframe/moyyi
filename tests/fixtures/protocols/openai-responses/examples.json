@@ -1,0 +1,1628 @@
+{
+  "provenance": {
+    "kind": "handwritten-from-official-docs",
+    "retrievedAt": "2026-10-25",
+    "sources": [
+      "https://developers.openai.com/api/reference/resources/responses/methods/create",
+      "https://developers.openai.com/api/reference/resources/responses/streaming-events",
+      "https://developers.openai.com/api/docs/guides/reasoning",
+      "https://developers.openai.com/api/docs/guides/function-calling",
+      "https://developers.openai.com/api/docs/guides/images-vision",
+      "https://developers.openai.com/api/docs/guides/file-inputs",
+      "https://developers.openai.com/api/docs/guides/prompt-caching",
+      "https://developers.openai.com/api/docs/guides/audio"
+    ]
+  },
+  "requests": [
+    {
+      "id": "responses-multimodal-input",
+      "body": {
+        "model": "synthetic-responses-model",
+        "store": false,
+        "instructions": "Describe only the supplied synthetic material.",
+        "input": [
+          {
+            "role": "user",
+            "content": [
+              {
+                "type": "input_text",
+                "text": "Compare this image and file."
+              },
+              {
+                "type": "input_image",
+                "image_url": "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR4nGNgYGD4DwABBAEAX+XDSwAAAABJRU5ErkJggg==",
+                "detail": "low"
+              },
+              {
+                "type": "input_file",
+                "file_id": "file_synthetic_note"
+              }
+            ]
+          }
+        ],
+        "max_output_tokens": 256
+      }
+    },
+    {
+      "id": "responses-tool-reasoning-replay",
+      "body": {
+        "model": "synthetic-responses-model",
+        "store": false,
+        "include": ["reasoning.encrypted_content"],
+        "reasoning": {
+          "summary": "auto"
+        },
+        "input": [
+          {
+            "role": "user",
+            "content": "Inspect notes.txt and chart.png."
+          },
+          {
+            "id": "rs_synthetic_1",
+            "type": "reasoning",
+            "summary": [
+              {
+                "type": "summary_text",
+                "text": "Check the note and chart."
+              }
+            ],
+            "encrypted_content": "synthetic-encrypted-reasoning-not-replayable",
+            "status": "completed"
+          },
+          {
+            "type": "message",
+            "id": "msg_synthetic_commentary",
+            "status": "completed",
+            "role": "assistant",
+            "phase": "commentary",
+            "content": [
+              {
+                "type": "output_text",
+                "text": "I will inspect both inputs.",
+                "annotations": [],
+                "logprobs": []
+              }
+            ]
+          },
+          {
+            "id": "fc_synthetic_1",
+            "type": "function_call",
+            "status": "completed",
+            "call_id": "call_synthetic_1",
+            "name": "read_note",
+            "arguments": "{ \"path\": \"notes.txt\" }"
+          },
+          {
+            "id": "fc_synthetic_2",
+            "type": "function_call",
+            "status": "completed",
+            "call_id": "call_synthetic_2",
+            "name": "take_snapshot",
+            "arguments": "{\"path\":\"chart.png\"}"
+          },
+          {
+            "type": "function_call_output",
+            "call_id": "call_synthetic_1",
+            "output": "{\"ok\":true,\"text\":\"Synthetic note.\"}"
+          },
+          {
+            "type": "function_call_output",
+            "call_id": "call_synthetic_2",
+            "output": [
+              {
+                "type": "input_text",
+                "text": "Synthetic chart snapshot."
+              },
+              {
+                "type": "input_image",
+                "image_url": "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR4nGNgYGD4DwABBAEAX+XDSwAAAABJRU5ErkJggg==",
+                "detail": "low"
+              },
+              {
+                "type": "input_file",
+                "file_id": "file_synthetic_chart_data"
+              }
+            ]
+          }
+        ],
+        "tools": [
+          {
+            "type": "function",
+            "name": "read_note",
+            "description": "Read a synthetic note.",
+            "parameters": {
+              "type": "object",
+              "properties": {
+                "path": {
+                  "type": "string"
+                }
+              },
+              "required": ["path"],
+              "additionalProperties": false
+            },
+            "strict": true
+          },
+          {
+            "type": "function",
+            "name": "take_snapshot",
+            "description": "Return a synthetic chart image.",
+            "parameters": {
+              "type": "object",
+              "properties": {
+                "path": {
+                  "type": "string"
+                }
+              },
+              "required": ["path"],
+              "additionalProperties": false
+            },
+            "strict": true
+          }
+        ],
+        "parallel_tool_calls": true,
+        "max_output_tokens": 256
+      }
+    },
+    {
+      "id": "responses-refusal-replay",
+      "body": {
+        "model": "synthetic-responses-model",
+        "input": [
+          {
+            "role": "user",
+            "content": "Synthetic request that was refused."
+          },
+          {
+            "type": "message",
+            "id": "msg_synthetic_refusal",
+            "status": "completed",
+            "role": "assistant",
+            "phase": "final_answer",
+            "content": [
+              {
+                "type": "refusal",
+                "refusal": "I cannot provide the requested content."
+              }
+            ]
+          },
+          {
+            "role": "user",
+            "content": "Provide a safe general explanation instead."
+          }
+        ],
+        "max_output_tokens": 128
+      }
+    }
+  ],
+  "responses": [
+    {
+      "id": "responses-tool-calls",
+      "body": {
+        "id": "resp_synthetic_tools",
+        "object": "response",
+        "access_programs": null,
+        "created_at": 1792886400,
+        "status": "completed",
+        "error": null,
+        "incomplete_details": null,
+        "instructions": null,
+        "metadata": {},
+        "model": "synthetic-responses-model",
+        "output": [
+          {
+            "id": "rs_synthetic_1",
+            "type": "reasoning",
+            "summary": [
+              {
+                "type": "summary_text",
+                "text": "Check the note and chart."
+              }
+            ],
+            "encrypted_content": "synthetic-encrypted-reasoning-not-replayable",
+            "status": "completed"
+          },
+          {
+            "type": "message",
+            "id": "msg_synthetic_commentary",
+            "status": "completed",
+            "role": "assistant",
+            "phase": "commentary",
+            "content": [
+              {
+                "type": "output_text",
+                "text": "I will inspect both inputs.",
+                "annotations": [],
+                "logprobs": []
+              }
+            ]
+          },
+          {
+            "id": "fc_synthetic_1",
+            "type": "function_call",
+            "status": "completed",
+            "call_id": "call_synthetic_1",
+            "name": "read_note",
+            "arguments": "{ \"path\": \"notes.txt\" }"
+          },
+          {
+            "id": "fc_synthetic_2",
+            "type": "function_call",
+            "status": "completed",
+            "call_id": "call_synthetic_2",
+            "name": "take_snapshot",
+            "arguments": "{\"path\":\"chart.png\"}"
+          }
+        ],
+        "parallel_tool_calls": true,
+        "temperature": 1,
+        "tool_choice": "auto",
+        "tools": [
+          {
+            "type": "function",
+            "name": "read_note",
+            "description": "Read a synthetic note.",
+            "parameters": {
+              "type": "object",
+              "properties": {
+                "path": {
+                  "type": "string"
+                }
+              },
+              "required": ["path"],
+              "additionalProperties": false
+            },
+            "strict": true
+          },
+          {
+            "type": "function",
+            "name": "take_snapshot",
+            "description": "Return a synthetic chart image.",
+            "parameters": {
+              "type": "object",
+              "properties": {
+                "path": {
+                  "type": "string"
+                }
+              },
+              "required": ["path"],
+              "additionalProperties": false
+            },
+            "strict": true
+          }
+        ],
+        "top_p": 1,
+        "usage": {
+          "input_tokens": 100,
+          "input_tokens_details": {
+            "cached_tokens": 32,
+            "cache_write_tokens": 16
+          },
+          "output_tokens": 24,
+          "output_tokens_details": {
+            "reasoning_tokens": 8
+          },
+          "total_tokens": 124
+        }
+      }
+    },
+    {
+      "id": "responses-annotated-final",
+      "body": {
+        "id": "resp_synthetic_final",
+        "object": "response",
+        "access_programs": null,
+        "created_at": 1792886400,
+        "status": "completed",
+        "error": null,
+        "incomplete_details": null,
+        "instructions": null,
+        "metadata": {},
+        "model": "synthetic-responses-model",
+        "output": [
+          {
+            "type": "message",
+            "id": "msg_synthetic_final",
+            "status": "completed",
+            "role": "assistant",
+            "phase": "final_answer",
+            "content": [
+              {
+                "type": "output_text",
+                "text": "Synthetic source.",
+                "annotations": [
+                  {
+                    "type": "url_citation",
+                    "start_index": 0,
+                    "end_index": 16,
+                    "url": "https://example.invalid/source",
+                    "title": "Synthetic source"
+                  }
+                ],
+                "logprobs": []
+              }
+            ]
+          }
+        ],
+        "parallel_tool_calls": true,
+        "temperature": 1,
+        "tool_choice": "auto",
+        "tools": [],
+        "top_p": 1,
+        "usage": {
+          "input_tokens": 100,
+          "input_tokens_details": {
+            "cached_tokens": 32,
+            "cache_write_tokens": 16
+          },
+          "output_tokens": 24,
+          "output_tokens_details": {
+            "reasoning_tokens": 8
+          },
+          "total_tokens": 124
+        }
+      }
+    },
+    {
+      "id": "responses-refusal",
+      "body": {
+        "id": "resp_synthetic_refusal",
+        "object": "response",
+        "access_programs": null,
+        "created_at": 1792886400,
+        "status": "completed",
+        "error": null,
+        "incomplete_details": null,
+        "instructions": null,
+        "metadata": {},
+        "model": "synthetic-responses-model",
+        "output": [
+          {
+            "type": "message",
+            "id": "msg_synthetic_refusal",
+            "status": "completed",
+            "role": "assistant",
+            "phase": "final_answer",
+            "content": [
+              {
+                "type": "refusal",
+                "refusal": "I cannot provide the requested content."
+              }
+            ]
+          }
+        ],
+        "parallel_tool_calls": true,
+        "temperature": 1,
+        "tool_choice": "auto",
+        "tools": [],
+        "top_p": 1,
+        "usage": {
+          "input_tokens": 100,
+          "input_tokens_details": {
+            "cached_tokens": 32,
+            "cache_write_tokens": 16
+          },
+          "output_tokens": 24,
+          "output_tokens_details": {
+            "reasoning_tokens": 8
+          },
+          "total_tokens": 124
+        }
+      }
+    },
+    {
+      "id": "responses-max-tokens",
+      "body": {
+        "id": "resp_synthetic_limit",
+        "object": "response",
+        "access_programs": null,
+        "created_at": 1792886400,
+        "status": "incomplete",
+        "error": null,
+        "incomplete_details": {
+          "reason": "max_output_tokens"
+        },
+        "instructions": null,
+        "metadata": {},
+        "model": "synthetic-responses-model",
+        "output": [
+          {
+            "type": "message",
+            "id": "msg_synthetic_partial",
+            "status": "incomplete",
+            "role": "assistant",
+            "phase": "final_answer",
+            "content": [
+              {
+                "type": "output_text",
+                "text": "Partial answer",
+                "annotations": [],
+                "logprobs": []
+              }
+            ]
+          }
+        ],
+        "parallel_tool_calls": true,
+        "temperature": 1,
+        "tool_choice": "auto",
+        "tools": [],
+        "top_p": 1,
+        "usage": {
+          "input_tokens": 100,
+          "input_tokens_details": {
+            "cached_tokens": 32,
+            "cache_write_tokens": 16
+          },
+          "output_tokens": 24,
+          "output_tokens_details": {
+            "reasoning_tokens": 8
+          },
+          "total_tokens": 124
+        }
+      }
+    },
+    {
+      "id": "responses-content-filter",
+      "body": {
+        "id": "resp_synthetic_filter",
+        "object": "response",
+        "access_programs": null,
+        "created_at": 1792886400,
+        "status": "incomplete",
+        "error": null,
+        "incomplete_details": {
+          "reason": "content_filter"
+        },
+        "instructions": null,
+        "metadata": {},
+        "model": "synthetic-responses-model",
+        "output": [],
+        "parallel_tool_calls": true,
+        "temperature": 1,
+        "tool_choice": "auto",
+        "tools": [],
+        "top_p": 1,
+        "usage": {
+          "input_tokens": 100,
+          "input_tokens_details": {
+            "cached_tokens": 32,
+            "cache_write_tokens": 16
+          },
+          "output_tokens": 24,
+          "output_tokens_details": {
+            "reasoning_tokens": 8
+          },
+          "total_tokens": 124
+        }
+      }
+    },
+    {
+      "id": "responses-max-messages",
+      "body": {
+        "id": "resp_synthetic_messages",
+        "object": "response",
+        "access_programs": null,
+        "created_at": 1792886400,
+        "status": "incomplete",
+        "error": null,
+        "incomplete_details": {
+          "reason": "max_messages"
+        },
+        "instructions": null,
+        "metadata": {},
+        "model": "synthetic-responses-model",
+        "output": [],
+        "parallel_tool_calls": true,
+        "temperature": 1,
+        "tool_choice": "auto",
+        "tools": [],
+        "top_p": 1,
+        "usage": {
+          "input_tokens": 100,
+          "input_tokens_details": {
+            "cached_tokens": 32,
+            "cache_write_tokens": 16
+          },
+          "output_tokens": 24,
+          "output_tokens_details": {
+            "reasoning_tokens": 8
+          },
+          "total_tokens": 124
+        }
+      }
+    },
+    {
+      "id": "responses-steered",
+      "body": {
+        "id": "resp_synthetic_steered",
+        "object": "response",
+        "access_programs": null,
+        "created_at": 1792886400,
+        "status": "incomplete",
+        "error": null,
+        "incomplete_details": {
+          "reason": "steered"
+        },
+        "instructions": null,
+        "metadata": {},
+        "model": "synthetic-responses-model",
+        "output": [],
+        "parallel_tool_calls": true,
+        "temperature": 1,
+        "tool_choice": "auto",
+        "tools": [],
+        "top_p": 1,
+        "usage": {
+          "input_tokens": 100,
+          "input_tokens_details": {
+            "cached_tokens": 32,
+            "cache_write_tokens": 16
+          },
+          "output_tokens": 24,
+          "output_tokens_details": {
+            "reasoning_tokens": 8
+          },
+          "total_tokens": 124
+        }
+      }
+    },
+    {
+      "id": "responses-cancelled",
+      "body": {
+        "id": "resp_synthetic_cancelled",
+        "object": "response",
+        "access_programs": null,
+        "created_at": 1792886400,
+        "status": "cancelled",
+        "error": null,
+        "incomplete_details": null,
+        "instructions": null,
+        "metadata": {},
+        "model": "synthetic-responses-model",
+        "output": [],
+        "parallel_tool_calls": true,
+        "temperature": 1,
+        "tool_choice": "auto",
+        "tools": [],
+        "top_p": 1,
+        "usage": null
+      }
+    },
+    {
+      "id": "responses-failed",
+      "body": {
+        "id": "resp_synthetic_failed",
+        "object": "response",
+        "access_programs": null,
+        "created_at": 1792886400,
+        "status": "failed",
+        "error": {
+          "code": "server_error",
+          "message": "Synthetic generation failure."
+        },
+        "incomplete_details": null,
+        "instructions": null,
+        "metadata": {},
+        "model": "synthetic-responses-model",
+        "output": [],
+        "parallel_tool_calls": true,
+        "temperature": 1,
+        "tool_choice": "auto",
+        "tools": [],
+        "top_p": 1,
+        "usage": null
+      }
+    },
+    {
+      "id": "responses-hosted-image",
+      "body": {
+        "id": "resp_synthetic_image",
+        "object": "response",
+        "access_programs": null,
+        "created_at": 1792886400,
+        "status": "completed",
+        "error": null,
+        "incomplete_details": null,
+        "instructions": null,
+        "metadata": {},
+        "model": "synthetic-responses-model",
+        "output": [
+          {
+            "id": "ig_synthetic_1",
+            "type": "image_generation_call",
+            "status": "completed",
+            "result": "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR4nGNgYGD4DwABBAEAX+XDSwAAAABJRU5ErkJggg==",
+            "output_format": "png"
+          }
+        ],
+        "parallel_tool_calls": true,
+        "temperature": 1,
+        "tool_choice": "auto",
+        "tools": [
+          {
+            "type": "image_generation"
+          }
+        ],
+        "top_p": 1,
+        "usage": {
+          "input_tokens": 100,
+          "input_tokens_details": {
+            "cached_tokens": 32,
+            "cache_write_tokens": 16
+          },
+          "output_tokens": 24,
+          "output_tokens_details": {
+            "reasoning_tokens": 8
+          },
+          "total_tokens": 124
+        }
+      }
+    }
+  ],
+  "streams": [
+    {
+      "id": "responses-tool-success-stream",
+      "events": [
+        {
+          "event": "response.created",
+          "data": {
+            "type": "response.created",
+            "sequence_number": 0,
+            "response": {
+              "id": "resp_synthetic_tools",
+              "object": "response",
+              "access_programs": null,
+              "created_at": 1792886400,
+              "status": "in_progress",
+              "error": null,
+              "incomplete_details": null,
+              "instructions": null,
+              "metadata": {},
+              "model": "synthetic-responses-model",
+              "output": [],
+              "parallel_tool_calls": true,
+              "temperature": 1,
+              "tool_choice": "auto",
+              "tools": [
+                {
+                  "type": "function",
+                  "name": "read_note",
+                  "description": "Read a synthetic note.",
+                  "parameters": {
+                    "type": "object",
+                    "properties": {
+                      "path": {
+                        "type": "string"
+                      }
+                    },
+                    "required": ["path"],
+                    "additionalProperties": false
+                  },
+                  "strict": true
+                },
+                {
+                  "type": "function",
+                  "name": "take_snapshot",
+                  "description": "Return a synthetic chart image.",
+                  "parameters": {
+                    "type": "object",
+                    "properties": {
+                      "path": {
+                        "type": "string"
+                      }
+                    },
+                    "required": ["path"],
+                    "additionalProperties": false
+                  },
+                  "strict": true
+                }
+              ],
+              "top_p": 1,
+              "usage": null
+            }
+          }
+        },
+        {
+          "event": "response.in_progress",
+          "data": {
+            "type": "response.in_progress",
+            "sequence_number": 1,
+            "response": {
+              "id": "resp_synthetic_tools",
+              "object": "response",
+              "access_programs": null,
+              "created_at": 1792886400,
+              "status": "in_progress",
+              "error": null,
+              "incomplete_details": null,
+              "instructions": null,
+              "metadata": {},
+              "model": "synthetic-responses-model",
+              "output": [],
+              "parallel_tool_calls": true,
+              "temperature": 1,
+              "tool_choice": "auto",
+              "tools": [
+                {
+                  "type": "function",
+                  "name": "read_note",
+                  "description": "Read a synthetic note.",
+                  "parameters": {
+                    "type": "object",
+                    "properties": {
+                      "path": {
+                        "type": "string"
+                      }
+                    },
+                    "required": ["path"],
+                    "additionalProperties": false
+                  },
+                  "strict": true
+                },
+                {
+                  "type": "function",
+                  "name": "take_snapshot",
+                  "description": "Return a synthetic chart image.",
+                  "parameters": {
+                    "type": "object",
+                    "properties": {
+                      "path": {
+                        "type": "string"
+                      }
+                    },
+                    "required": ["path"],
+                    "additionalProperties": false
+                  },
+                  "strict": true
+                }
+              ],
+              "top_p": 1,
+              "usage": null
+            }
+          }
+        },
+        {
+          "event": "response.output_item.added",
+          "data": {
+            "type": "response.output_item.added",
+            "sequence_number": 2,
+            "output_index": 0,
+            "item": {
+              "id": "rs_synthetic_1",
+              "type": "reasoning",
+              "summary": [],
+              "status": "in_progress"
+            }
+          }
+        },
+        {
+          "event": "response.reasoning_summary_part.added",
+          "data": {
+            "type": "response.reasoning_summary_part.added",
+            "sequence_number": 3,
+            "item_id": "rs_synthetic_1",
+            "output_index": 0,
+            "summary_index": 0,
+            "part": {
+              "type": "summary_text",
+              "text": ""
+            }
+          }
+        },
+        {
+          "event": "response.reasoning_summary_text.delta",
+          "data": {
+            "type": "response.reasoning_summary_text.delta",
+            "sequence_number": 4,
+            "item_id": "rs_synthetic_1",
+            "output_index": 0,
+            "summary_index": 0,
+            "delta": "Check the note and chart."
+          }
+        },
+        {
+          "event": "response.reasoning_summary_text.done",
+          "data": {
+            "type": "response.reasoning_summary_text.done",
+            "sequence_number": 5,
+            "item_id": "rs_synthetic_1",
+            "output_index": 0,
+            "summary_index": 0,
+            "text": "Check the note and chart."
+          }
+        },
+        {
+          "event": "response.reasoning_summary_part.done",
+          "data": {
+            "type": "response.reasoning_summary_part.done",
+            "sequence_number": 6,
+            "item_id": "rs_synthetic_1",
+            "output_index": 0,
+            "summary_index": 0,
+            "part": {
+              "type": "summary_text",
+              "text": "Check the note and chart."
+            }
+          }
+        },
+        {
+          "event": "response.output_item.done",
+          "data": {
+            "type": "response.output_item.done",
+            "sequence_number": 7,
+            "output_index": 0,
+            "item": {
+              "id": "rs_synthetic_1",
+              "type": "reasoning",
+              "summary": [
+                {
+                  "type": "summary_text",
+                  "text": "Check the note and chart."
+                }
+              ],
+              "encrypted_content": "synthetic-encrypted-reasoning-not-replayable",
+              "status": "completed"
+            }
+          }
+        },
+        {
+          "event": "response.output_item.added",
+          "data": {
+            "type": "response.output_item.added",
+            "sequence_number": 8,
+            "output_index": 1,
+            "item": {
+              "type": "message",
+              "id": "msg_synthetic_commentary",
+              "status": "in_progress",
+              "role": "assistant",
+              "phase": "commentary",
+              "content": []
+            }
+          }
+        },
+        {
+          "event": "response.content_part.added",
+          "data": {
+            "type": "response.content_part.added",
+            "sequence_number": 9,
+            "item_id": "msg_synthetic_commentary",
+            "output_index": 1,
+            "content_index": 0,
+            "part": {
+              "type": "output_text",
+              "text": "",
+              "annotations": [],
+              "logprobs": []
+            }
+          }
+        },
+        {
+          "event": "response.output_text.delta",
+          "data": {
+            "type": "response.output_text.delta",
+            "sequence_number": 10,
+            "item_id": "msg_synthetic_commentary",
+            "output_index": 1,
+            "content_index": 0,
+            "delta": "I will inspect both inputs.",
+            "logprobs": []
+          }
+        },
+        {
+          "event": "response.output_text.done",
+          "data": {
+            "type": "response.output_text.done",
+            "sequence_number": 11,
+            "item_id": "msg_synthetic_commentary",
+            "output_index": 1,
+            "content_index": 0,
+            "text": "I will inspect both inputs.",
+            "logprobs": []
+          }
+        },
+        {
+          "event": "response.content_part.done",
+          "data": {
+            "type": "response.content_part.done",
+            "sequence_number": 12,
+            "item_id": "msg_synthetic_commentary",
+            "output_index": 1,
+            "content_index": 0,
+            "part": {
+              "type": "output_text",
+              "text": "I will inspect both inputs.",
+              "annotations": [],
+              "logprobs": []
+            }
+          }
+        },
+        {
+          "event": "response.output_item.done",
+          "data": {
+            "type": "response.output_item.done",
+            "sequence_number": 13,
+            "output_index": 1,
+            "item": {
+              "type": "message",
+              "id": "msg_synthetic_commentary",
+              "status": "completed",
+              "role": "assistant",
+              "phase": "commentary",
+              "content": [
+                {
+                  "type": "output_text",
+                  "text": "I will inspect both inputs.",
+                  "annotations": [],
+                  "logprobs": []
+                }
+              ]
+            }
+          }
+        },
+        {
+          "event": "response.output_item.added",
+          "data": {
+            "type": "response.output_item.added",
+            "sequence_number": 14,
+            "output_index": 2,
+            "item": {
+              "id": "fc_synthetic_1",
+              "type": "function_call",
+              "status": "in_progress",
+              "call_id": "call_synthetic_1",
+              "name": "read_note",
+              "arguments": ""
+            }
+          }
+        },
+        {
+          "event": "response.output_item.added",
+          "data": {
+            "type": "response.output_item.added",
+            "sequence_number": 15,
+            "output_index": 3,
+            "item": {
+              "id": "fc_synthetic_2",
+              "type": "function_call",
+              "status": "in_progress",
+              "call_id": "call_synthetic_2",
+              "name": "take_snapshot",
+              "arguments": ""
+            }
+          }
+        },
+        {
+          "event": "response.function_call_arguments.delta",
+          "data": {
+            "type": "response.function_call_arguments.delta",
+            "sequence_number": 16,
+            "output_index": 2,
+            "item_id": "fc_synthetic_1",
+            "delta": "{ \"path\": "
+          }
+        },
+        {
+          "event": "response.function_call_arguments.delta",
+          "data": {
+            "type": "response.function_call_arguments.delta",
+            "sequence_number": 17,
+            "output_index": 3,
+            "item_id": "fc_synthetic_2",
+            "delta": "{\"path\":"
+          }
+        },
+        {
+          "event": "response.function_call_arguments.delta",
+          "data": {
+            "type": "response.function_call_arguments.delta",
+            "sequence_number": 18,
+            "output_index": 2,
+            "item_id": "fc_synthetic_1",
+            "delta": "\"notes.txt\" }"
+          }
+        },
+        {
+          "event": "response.function_call_arguments.delta",
+          "data": {
+            "type": "response.function_call_arguments.delta",
+            "sequence_number": 19,
+            "output_index": 3,
+            "item_id": "fc_synthetic_2",
+            "delta": "\"chart.png\"}"
+          }
+        },
+        {
+          "event": "response.function_call_arguments.done",
+          "data": {
+            "type": "response.function_call_arguments.done",
+            "sequence_number": 20,
+            "output_index": 3,
+            "item_id": "fc_synthetic_2",
+            "arguments": "{\"path\":\"chart.png\"}"
+          }
+        },
+        {
+          "event": "response.output_item.done",
+          "data": {
+            "type": "response.output_item.done",
+            "sequence_number": 21,
+            "output_index": 3,
+            "item": {
+              "id": "fc_synthetic_2",
+              "type": "function_call",
+              "status": "completed",
+              "call_id": "call_synthetic_2",
+              "name": "take_snapshot",
+              "arguments": "{\"path\":\"chart.png\"}"
+            }
+          }
+        },
+        {
+          "event": "response.function_call_arguments.done",
+          "data": {
+            "type": "response.function_call_arguments.done",
+            "sequence_number": 22,
+            "output_index": 2,
+            "item_id": "fc_synthetic_1",
+            "arguments": "{ \"path\": \"notes.txt\" }"
+          }
+        },
+        {
+          "event": "response.output_item.done",
+          "data": {
+            "type": "response.output_item.done",
+            "sequence_number": 23,
+            "output_index": 2,
+            "item": {
+              "id": "fc_synthetic_1",
+              "type": "function_call",
+              "status": "completed",
+              "call_id": "call_synthetic_1",
+              "name": "read_note",
+              "arguments": "{ \"path\": \"notes.txt\" }"
+            }
+          }
+        },
+        {
+          "event": "response.completed",
+          "data": {
+            "type": "response.completed",
+            "sequence_number": 24,
+            "response": {
+              "id": "resp_synthetic_tools",
+              "object": "response",
+              "access_programs": null,
+              "created_at": 1792886400,
+              "status": "completed",
+              "error": null,
+              "incomplete_details": null,
+              "instructions": null,
+              "metadata": {},
+              "model": "synthetic-responses-model",
+              "output": [
+                {
+                  "id": "rs_synthetic_1",
+                  "type": "reasoning",
+                  "summary": [
+                    {
+                      "type": "summary_text",
+                      "text": "Check the note and chart."
+                    }
+                  ],
+                  "encrypted_content": "synthetic-encrypted-reasoning-not-replayable",
+                  "status": "completed"
+                },
+                {
+                  "type": "message",
+                  "id": "msg_synthetic_commentary",
+                  "status": "completed",
+                  "role": "assistant",
+                  "phase": "commentary",
+                  "content": [
+                    {
+                      "type": "output_text",
+                      "text": "I will inspect both inputs.",
+                      "annotations": [],
+                      "logprobs": []
+                    }
+                  ]
+                },
+                {
+                  "id": "fc_synthetic_1",
+                  "type": "function_call",
+                  "status": "completed",
+                  "call_id": "call_synthetic_1",
+                  "name": "read_note",
+                  "arguments": "{ \"path\": \"notes.txt\" }"
+                },
+                {
+                  "id": "fc_synthetic_2",
+                  "type": "function_call",
+                  "status": "completed",
+                  "call_id": "call_synthetic_2",
+                  "name": "take_snapshot",
+                  "arguments": "{\"path\":\"chart.png\"}"
+                }
+              ],
+              "parallel_tool_calls": true,
+              "temperature": 1,
+              "tool_choice": "auto",
+              "tools": [
+                {
+                  "type": "function",
+                  "name": "read_note",
+                  "description": "Read a synthetic note.",
+                  "parameters": {
+                    "type": "object",
+                    "properties": {
+                      "path": {
+                        "type": "string"
+                      }
+                    },
+                    "required": ["path"],
+                    "additionalProperties": false
+                  },
+                  "strict": true
+                },
+                {
+                  "type": "function",
+                  "name": "take_snapshot",
+                  "description": "Return a synthetic chart image.",
+                  "parameters": {
+                    "type": "object",
+                    "properties": {
+                      "path": {
+                        "type": "string"
+                      }
+                    },
+                    "required": ["path"],
+                    "additionalProperties": false
+                  },
+                  "strict": true
+                }
+              ],
+              "top_p": 1,
+              "usage": {
+                "input_tokens": 100,
+                "input_tokens_details": {
+                  "cached_tokens": 32,
+                  "cache_write_tokens": 16
+                },
+                "output_tokens": 24,
+                "output_tokens_details": {
+                  "reasoning_tokens": 8
+                },
+                "total_tokens": 124
+              }
+            }
+          }
+        }
+      ]
+    },
+    {
+      "id": "responses-refusal-stream",
+      "events": [
+        {
+          "event": "response.created",
+          "data": {
+            "type": "response.created",
+            "sequence_number": 0,
+            "response": {
+              "id": "resp_synthetic_refusal",
+              "object": "response",
+              "access_programs": null,
+              "created_at": 1792886400,
+              "status": "in_progress",
+              "error": null,
+              "incomplete_details": null,
+              "instructions": null,
+              "metadata": {},
+              "model": "synthetic-responses-model",
+              "output": [],
+              "parallel_tool_calls": true,
+              "temperature": 1,
+              "tool_choice": "auto",
+              "tools": [],
+              "top_p": 1,
+              "usage": null
+            }
+          }
+        },
+        {
+          "event": "response.output_item.added",
+          "data": {
+            "type": "response.output_item.added",
+            "sequence_number": 1,
+            "output_index": 0,
+            "item": {
+              "type": "message",
+              "id": "msg_synthetic_refusal",
+              "status": "in_progress",
+              "role": "assistant",
+              "phase": "final_answer",
+              "content": []
+            }
+          }
+        },
+        {
+          "event": "response.content_part.added",
+          "data": {
+            "type": "response.content_part.added",
+            "sequence_number": 2,
+            "item_id": "msg_synthetic_refusal",
+            "output_index": 0,
+            "content_index": 0,
+            "part": {
+              "type": "refusal",
+              "refusal": ""
+            }
+          }
+        },
+        {
+          "event": "response.refusal.delta",
+          "data": {
+            "type": "response.refusal.delta",
+            "sequence_number": 3,
+            "item_id": "msg_synthetic_refusal",
+            "output_index": 0,
+            "content_index": 0,
+            "delta": "I cannot provide the requested content."
+          }
+        },
+        {
+          "event": "response.refusal.done",
+          "data": {
+            "type": "response.refusal.done",
+            "sequence_number": 4,
+            "item_id": "msg_synthetic_refusal",
+            "output_index": 0,
+            "content_index": 0,
+            "refusal": "I cannot provide the requested content."
+          }
+        },
+        {
+          "event": "response.content_part.done",
+          "data": {
+            "type": "response.content_part.done",
+            "sequence_number": 5,
+            "item_id": "msg_synthetic_refusal",
+            "output_index": 0,
+            "content_index": 0,
+            "part": {
+              "type": "refusal",
+              "refusal": "I cannot provide the requested content."
+            }
+          }
+        },
+        {
+          "event": "response.output_item.done",
+          "data": {
+            "type": "response.output_item.done",
+            "sequence_number": 6,
+            "output_index": 0,
+            "item": {
+              "type": "message",
+              "id": "msg_synthetic_refusal",
+              "status": "completed",
+              "role": "assistant",
+              "phase": "final_answer",
+              "content": [
+                {
+                  "type": "refusal",
+                  "refusal": "I cannot provide the requested content."
+                }
+              ]
+            }
+          }
+        },
+        {
+          "event": "response.completed",
+          "data": {
+            "type": "response.completed",
+            "sequence_number": 7,
+            "response": {
+              "id": "resp_synthetic_refusal",
+              "object": "response",
+              "access_programs": null,
+              "created_at": 1792886400,
+              "status": "completed",
+              "error": null,
+              "incomplete_details": null,
+              "instructions": null,
+              "metadata": {},
+              "model": "synthetic-responses-model",
+              "output": [
+                {
+                  "type": "message",
+                  "id": "msg_synthetic_refusal",
+                  "status": "completed",
+                  "role": "assistant",
+                  "phase": "final_answer",
+                  "content": [
+                    {
+                      "type": "refusal",
+                      "refusal": "I cannot provide the requested content."
+                    }
+                  ]
+                }
+              ],
+              "parallel_tool_calls": true,
+              "temperature": 1,
+              "tool_choice": "auto",
+              "tools": [],
+              "top_p": 1,
+              "usage": {
+                "input_tokens": 100,
+                "input_tokens_details": {
+                  "cached_tokens": 32,
+                  "cache_write_tokens": 16
+                },
+                "output_tokens": 24,
+                "output_tokens_details": {
+                  "reasoning_tokens": 8
+                },
+                "total_tokens": 124
+              }
+            }
+          }
+        }
+      ]
+    },
+    {
+      "id": "responses-incomplete-stream",
+      "events": [
+        {
+          "event": "response.created",
+          "data": {
+            "type": "response.created",
+            "sequence_number": 0,
+            "response": {
+              "id": "resp_synthetic_limit",
+              "object": "response",
+              "access_programs": null,
+              "created_at": 1792886400,
+              "status": "in_progress",
+              "error": null,
+              "incomplete_details": null,
+              "instructions": null,
+              "metadata": {},
+              "model": "synthetic-responses-model",
+              "output": [],
+              "parallel_tool_calls": true,
+              "temperature": 1,
+              "tool_choice": "auto",
+              "tools": [],
+              "top_p": 1,
+              "usage": null
+            }
+          }
+        },
+        {
+          "event": "response.output_item.added",
+          "data": {
+            "type": "response.output_item.added",
+            "sequence_number": 1,
+            "output_index": 0,
+            "item": {
+              "type": "message",
+              "id": "msg_synthetic_partial",
+              "status": "in_progress",
+              "role": "assistant",
+              "phase": "final_answer",
+              "content": []
+            }
+          }
+        },
+        {
+          "event": "response.content_part.added",
+          "data": {
+            "type": "response.content_part.added",
+            "sequence_number": 2,
+            "item_id": "msg_synthetic_partial",
+            "output_index": 0,
+            "content_index": 0,
+            "part": {
+              "type": "output_text",
+              "text": "",
+              "annotations": [],
+              "logprobs": []
+            }
+          }
+        },
+        {
+          "event": "response.output_text.delta",
+          "data": {
+            "type": "response.output_text.delta",
+            "sequence_number": 3,
+            "item_id": "msg_synthetic_partial",
+            "output_index": 0,
+            "content_index": 0,
+            "delta": "Partial answer",
+            "logprobs": []
+          }
+        },
+        {
+          "event": "response.output_text.done",
+          "data": {
+            "type": "response.output_text.done",
+            "sequence_number": 4,
+            "item_id": "msg_synthetic_partial",
+            "output_index": 0,
+            "content_index": 0,
+            "text": "Partial answer",
+            "logprobs": []
+          }
+        },
+        {
+          "event": "response.content_part.done",
+          "data": {
+            "type": "response.content_part.done",
+            "sequence_number": 5,
+            "item_id": "msg_synthetic_partial",
+            "output_index": 0,
+            "content_index": 0,
+            "part": {
+              "type": "output_text",
+              "text": "Partial answer",
+              "annotations": [],
+              "logprobs": []
+            }
+          }
+        },
+        {
+          "event": "response.output_item.done",
+          "data": {
+            "type": "response.output_item.done",
+            "sequence_number": 6,
+            "output_index": 0,
+            "item": {
+              "type": "message",
+              "id": "msg_synthetic_partial",
+              "status": "incomplete",
+              "role": "assistant",
+              "phase": "final_answer",
+              "content": [
+                {
+                  "type": "output_text",
+                  "text": "Partial answer",
+                  "annotations": [],
+                  "logprobs": []
+                }
+              ]
+            }
+          }
+        },
+        {
+          "event": "response.incomplete",
+          "data": {
+            "type": "response.incomplete",
+            "sequence_number": 7,
+            "response": {
+              "id": "resp_synthetic_limit",
+              "object": "response",
+              "access_programs": null,
+              "created_at": 1792886400,
+              "status": "incomplete",
+              "error": null,
+              "incomplete_details": {
+                "reason": "max_output_tokens"
+              },
+              "instructions": null,
+              "metadata": {},
+              "model": "synthetic-responses-model",
+              "output": [
+                {
+                  "type": "message",
+                  "id": "msg_synthetic_partial",
+                  "status": "incomplete",
+                  "role": "assistant",
+                  "phase": "final_answer",
+                  "content": [
+                    {
+                      "type": "output_text",
+                      "text": "Partial answer",
+                      "annotations": [],
+                      "logprobs": []
+                    }
+                  ]
+                }
+              ],
+              "parallel_tool_calls": true,
+              "temperature": 1,
+              "tool_choice": "auto",
+              "tools": [],
+              "top_p": 1,
+              "usage": {
+                "input_tokens": 100,
+                "input_tokens_details": {
+                  "cached_tokens": 32,
+                  "cache_write_tokens": 16
+                },
+                "output_tokens": 24,
+                "output_tokens_details": {
+                  "reasoning_tokens": 8
+                },
+                "total_tokens": 124
+              }
+            }
+          }
+        }
+      ]
+    },
+    {
+      "id": "responses-error-stream",
+      "events": [
+        {
+          "event": "error",
+          "data": {
+            "type": "error",
+            "sequence_number": 0,
+            "code": "rate_limit_exceeded",
+            "message": "Synthetic rate limit.",
+            "param": null
+          }
+        }
+      ]
+    },
+    {
+      "id": "responses-failed-stream",
+      "events": [
+        {
+          "event": "response.created",
+          "data": {
+            "type": "response.created",
+            "sequence_number": 0,
+            "response": {
+              "id": "resp_synthetic_failed",
+              "object": "response",
+              "access_programs": null,
+              "created_at": 1792886400,
+              "status": "in_progress",
+              "error": null,
+              "incomplete_details": null,
+              "instructions": null,
+              "metadata": {},
+              "model": "synthetic-responses-model",
+              "output": [],
+              "parallel_tool_calls": true,
+              "temperature": 1,
+              "tool_choice": "auto",
+              "tools": [],
+              "top_p": 1,
+              "usage": null
+            }
+          }
+        },
+        {
+          "event": "response.failed",
+          "data": {
+            "type": "response.failed",
+            "sequence_number": 1,
+            "response": {
+              "id": "resp_synthetic_failed",
+              "object": "response",
+              "access_programs": null,
+              "created_at": 1792886400,
+              "status": "failed",
+              "error": {
+                "code": "server_error",
+                "message": "Synthetic generation failure."
+              },
+              "incomplete_details": null,
+              "instructions": null,
+              "metadata": {},
+              "model": "synthetic-responses-model",
+              "output": [],
+              "parallel_tool_calls": true,
+              "temperature": 1,
+              "tool_choice": "auto",
+              "tools": [],
+              "top_p": 1,
+              "usage": null
+            }
+          }
+        }
+      ]
+    }
+  ]
+}
