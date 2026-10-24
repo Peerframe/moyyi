@@ -1,0 +1,1 @@
+{"name":"synthetic-history","private":true,"type":"module","scripts":{"test":"node --test slug.test.mjs"}}

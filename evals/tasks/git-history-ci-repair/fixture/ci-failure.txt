@@ -1,0 +1,3 @@
+Synthetic CI run
+FAIL slug('  A   B\tC  '): expected a-b-c
+The earlier implementation worked. Review git history; keep apiVersion = 2.

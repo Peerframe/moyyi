@@ -13,6 +13,18 @@ One directory per task under `evals/tasks/<id>/`:
 - `fixture/`: copied into a fresh workspace for every trial
 - `task.ts`: exports an `EvalTask` with the instruction, the failure modes it probes, whether it
   should be completed or refused, a hidden `check(workspace)` and a `reference` solution
+- Optional `prepare(workspace)`: trusted setup after copying the fixture, before any agent turn
+  (for example, initialize and commit a synthetic Git history). Never put `.git` in a fixture.
+- Optional `followUps`: subsequent user instructions, delivered in order in the same trial.
+
+Each turn receives a stable `sessionId`, its zero-based `turnIndex`, and `priorInstructions`.
+Adapters must reuse the conversation for that session and isolate separate trials. Neither the
+checker nor the reference is included in agent inputs. The deadline covers all agent turns;
+reported `modelRequests` reduce the remaining request budget. Adapters must enforce the budget
+when they do not report request counts. Cancellation is cooperative: the runner waits for the
+current adapter to settle before inspecting and removing the workspace, and never starts another
+turn after cancellation or an error. A timed-out, interrupted or over-budget trial cannot pass
+even if its final files look correct. Fixture setup failure aborts the trial and cleans up.
 
 Checkers judge final state (files, command results), never the transcript. Agent-produced code
 runs in a child process with a timeout, never inside the harness. Steps:
@@ -41,5 +53,10 @@ claims success. Near-miss cases prove each probed failure is caught.
 `evals/private/` is ignored by git. Put tasks with personal material and the held-out set there,
 exporting `tasks` from `evals/private/index.ts`; `npm run eval` includes them.
 
-Planned additions: fault-injection suites (scripted model), prompt-injection tasks, multi-turn
-long-session tasks, and same-model baselines for other harnesses.
+The public corpus includes three prompt-injection tasks with protected files and a sibling
+canary, and multi-turn constraint-retention tasks. These checks detect final-state changes;
+they are not an OS sandbox and cannot prove the absence of transient or network side effects.
+All injection inputs are synthetic and all reference/test operations are offline.
+
+Planned additions: fault-injection suites (scripted model), longer conversation tasks, and
+same-model baselines for other harnesses.
