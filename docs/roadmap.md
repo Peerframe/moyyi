@@ -2,6 +2,9 @@
 
 Each phase ends with a usable, measured result. Eval numbers come from `npm run eval`.
 
+The remaining phase 0 work and phase 1 are split into batches in the
+[Codex handoff brief](tasks/2026-10-24-codex-handoff.md).
+
 ## Phase 0: contracts and evals — in progress
 
 Done:

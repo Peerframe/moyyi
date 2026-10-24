@@ -30,4 +30,7 @@ These apply to human contributors and coding agents.
 
 - Run `npm run check`.
 - Do not commit credentials, private transcripts or eval results containing personal data.
-- English is used for code, comments and documentation.
+- English is used for code, comments and documentation. Task briefs in `docs/tasks/` are working
+  documents for the owner and may be written in Chinese.
+- When working from a brief in `docs/tasks/`, follow its rules and stop at decisions it reserves
+  for the owner.
