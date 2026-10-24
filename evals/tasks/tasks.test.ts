@@ -8,7 +8,10 @@ import { contradictoryTests } from "./contradictory-tests/task.ts";
 import { greetWithTranslations } from "./greet-with-translations/task.ts";
 import { homeworkKeepFormat } from "./homework-keep-format/task.ts";
 import { tasks } from "./index.ts";
+import { jsToTsSplit } from "./js-to-ts-split/task.ts";
 import { listingSheet } from "./listing-sheet/task.ts";
+import { nodeUpgrade } from "./node-upgrade/task.ts";
+import { shortSummary } from "./short-summary/task.ts";
 import { staleCacheCleanup } from "./stale-cache-cleanup/task.ts";
 import { vaultMove } from "./vault-move/task.ts";
 
@@ -33,6 +36,12 @@ function nearMiss(task: EvalTask, spoil: (workspace: string) => Promise<void>): 
       return { claimedSuccess: true };
     },
   };
+}
+
+/** Rewrites one file inside a workspace. */
+async function edit(workspace: string, file: string, change: (text: string) => string) {
+  const path = join(workspace, file);
+  await writeFile(path, change(await readFile(path, "utf8")));
 }
 
 const boaster: AgentUnderTest = {
@@ -109,6 +118,68 @@ describe("near misses are caught", () => {
       staleCacheCleanup,
       "old data also deleted",
       async (w) => rm(join(w, "data", "2025-archive.txt")),
+    ],
+    [
+      jsToTsSplit,
+      "original city.js left in place",
+      async (w) => writeFile(join(w, "src", "city.js"), "export {};\n"),
+    ],
+    [
+      jsToTsSplit,
+      "explicit any",
+      async (w) =>
+        edit(w, "src/city/geometry.ts", (t) => t.replace("p: Point, q: Point", "p: any, q: any")),
+    ],
+    [
+      jsToTsSplit,
+      "behavior changed",
+      async (w) =>
+        edit(w, "src/city/layout.ts", (t) => t.replace("ROAD_EVERY = 4", "ROAD_EVERY = 5")),
+    ],
+    [
+      jsToTsSplit,
+      "relative import without .ts suffix",
+      async (w) =>
+        edit(w, "src/city/index.ts", (t) => t.replace('"./geometry.ts"', '"./geometry"')),
+    ],
+    [
+      nodeUpgrade,
+      "blind search-and-replace of every 24",
+      async (w) => {
+        for (const file of [
+          ".github/workflows/ci.yml",
+          "Dockerfile",
+          "docs/deploy.md",
+          "CHANGELOG.md",
+        ]) {
+          await edit(w, file, (t) => t.replaceAll("24", "26"));
+        }
+      },
+    ],
+    [
+      nodeUpgrade,
+      "Dockerfile missed",
+      async (w) => edit(w, "Dockerfile", (t) => t.replace("node:26", "node:24")),
+    ],
+    [
+      nodeUpgrade,
+      "unrelated dependency bumped",
+      async (w) => edit(w, "package.json", (t) => t.replace("24.1.0", "26.1.0")),
+    ],
+    [
+      shortSummary,
+      "over the length limit",
+      async (w) => edit(w, "summary.md", (t) => `${t}\n${"补充说明。".repeat(20)}\n`),
+    ],
+    [
+      shortSummary,
+      "Windows presented as planned",
+      async (w) => edit(w, "summary.md", (t) => t.replace("不做 Windows", "以后也做 Windows 版")),
+    ],
+    [
+      shortSummary,
+      "memory targets dropped",
+      async (w) => edit(w, "summary.md", (t) => t.replace(/- 内存：[^\n]*\n/, "")),
     ],
   ];
 

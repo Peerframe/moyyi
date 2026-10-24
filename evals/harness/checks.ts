@@ -1,7 +1,8 @@
 import { execFile } from "node:child_process";
 import { createHash } from "node:crypto";
 import { readdir, readFile, stat } from "node:fs/promises";
-import { join, relative } from "node:path";
+import { createRequire } from "node:module";
+import { dirname, join, relative } from "node:path";
 import { promisify } from "node:util";
 import type { CheckResult } from "./types.ts";
 
@@ -74,6 +75,23 @@ export async function runProbe(script: string, args: readonly string[]): Promise
   });
   const lines = stdout.trim().split("\n");
   return JSON.parse(lines[lines.length - 1] ?? "null");
+}
+
+/** Type-checks a workspace project with moyyi's own pinned TypeScript. */
+export async function runTsc(projectDir: string): Promise<{ ok: boolean; output: string }> {
+  // The package's exports hide bin/, so locate it through package.json and its bin entry.
+  const manifest = createRequire(import.meta.url).resolve("typescript/package.json");
+  const { bin } = JSON.parse(await readFile(manifest, "utf8")) as { bin: { tsc: string } };
+  const tsc = join(dirname(manifest), bin.tsc);
+  try {
+    await run(process.execPath, [tsc, "-p", join(projectDir, "tsconfig.json")], {
+      timeout: 60_000,
+    });
+    return { ok: true, output: "" };
+  } catch (error) {
+    const { stdout = "", message } = error as { stdout?: string; message: string };
+    return { ok: false, output: (stdout || message).trim().split("\n").slice(0, 3).join(" | ") };
+  }
 }
 
 /** RFC 4180 CSV: quoted fields, doubled quotes, CRLF or LF. Enough for checker inputs. */
