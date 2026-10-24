@@ -39,3 +39,7 @@ npm run check
 
 Start with [docs/architecture.md](docs/architecture.md). Common changes have step-by-step
 recipes in [docs/recipes/](docs/recipes/).
+
+## License
+
+Licensed under the [Apache License, Version 2.0](LICENSE).
