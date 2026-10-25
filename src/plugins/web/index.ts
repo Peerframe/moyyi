@@ -70,7 +70,11 @@ function tool(kind: "fetch" | "search", searchOrigin?: string): ToolDefinition {
             content: [
               {
                 type: "text",
-                text: `HTML text extraction failed: ${error instanceof Error ? error.message : "invalid HTML"}`,
+                text: `HTML text extraction failed: ${
+                  error instanceof Error && error.message.startsWith("HTML text extraction")
+                    ? error.message
+                    : "HTML could not be parsed safely"
+                }`,
               },
             ],
             evidence: `Observed HTTP ${response.status}; bounded text extraction failed. No raw HTML fallback or second request.`,
