@@ -177,7 +177,11 @@ export class PluginRegistry {
     for (const [name, contributions] of this.#loaded) {
       for (const listener of contributions.listeners) {
         try {
-          listener(event);
+          const returned: unknown = listener(event);
+          if (returned instanceof Promise)
+            void returned.catch(() => {
+              this.#diagnostics.push(`plugin "${name}" observer rejected on ${event.type}`);
+            });
         } catch (error) {
           this.#diagnostics.push(
             `plugin "${name}" observer failed on ${event.type}: ${message(error)}`,

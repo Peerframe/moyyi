@@ -26,7 +26,7 @@ Done:
 - Accepted D1–D5 decisions; implementation gates remain in the handoff brief
 - D2 v1 amendment on [PR #6](https://github.com/Peerframe/moyyi/pull/6): refusal/reasoning,
   usage and termination provenance, bounded hash/origin-bound replay; local checks and CI
-  passed before batch 3 started. It is awaiting owner review/merge
+  passed before batch 3 started. It was reviewed and merged on 2026-10-25
 
 Remaining:
 
@@ -34,16 +34,21 @@ Remaining:
   checker results do not yet measure real-agent performance
 - Validate the accepted security design ([threat-model.md](threat-model.md),
   [ADR 0006](decisions/0006-security-boundaries.md)) in the relevant implementation phases
-- Review/merge the D2 and dependent storage PRs; these branches are not automatically merged
+- Review the batch 4 implementation PR; it is not automatically merged
 
 ## Phase 1: read-only loop
 
 Core loop, `provider-deepseek` ([ADR 0007](decisions/0007-first-model-provider.md)),
 `project-instructions`, read and search tools in `fs`, SQLite store, record/replay,
-plugin hot reload in development mode. The batch 3 review branch now implements the store
-using `node:sqlite`: transactions, blobs, writer locks, workspace leases and backup/restore.
-The runtime is not wired to it yet; the loop, recovery and context remain batch 4 work and
-have not started. See the [current handoff](tasks/2026-10-25-v1-and-storage.md).
+plugin hot reload in development mode. Batch 3 was reviewed and merged in
+[PR #7](https://github.com/Peerframe/moyyi/pull/7), after retargeting to main and passing fresh CI.
+The store uses `node:sqlite`: transactions, blobs, writer locks, workspace leases and backup/restore.
+The batch 4 review branch adds the executable core, runtime wiring, context, policy, approvals,
+cancellation, budgets and startup reconciliation. `npm run demo:scripted` exercises the complete
+model → tool → model loop locally; `npm run eval:core` checks deterministic safety/lifecycle
+scenarios. These do not measure real-model task competence. See [core.md](core.md) and the
+[current handoff](tasks/2026-10-25-batch-4-core.md).
+Batch 5 file tools, the real model provider and the interactive CLI have not started.
 Run the read-only subset of the corpus. Qwen and shasha training are deferred directions,
 not requirements for this phase or the first release.
 

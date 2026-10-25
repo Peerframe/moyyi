@@ -1,5 +1,9 @@
 # D2 v1 amendment and batch 3 storage
 
+Historical delivery record: PRs #6 and #7 were subsequently reviewed and merged under a new
+owner authorization. The current work is recorded in [batch 4](2026-10-25-batch-4-core.md).
+The original scope and evidence below do not override that later authorization.
+
 Owner authorization: 2026-10-25. Implement D2 first, then batch 3. Changes to
 `src/contracts/persisted` are explicitly authorized for this one-time amendment. Deliver two
 branches/PRs without merging them. The owner explicitly permits the storage PR to depend on the

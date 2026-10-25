@@ -1,21 +1,50 @@
-import type {
-  Clock,
-  ContextBuilder,
-  IdSource,
-  ModelClient,
-  ModelProfile,
-  PermissionPolicy,
-  SessionStore,
-  ToolDefinition,
+import {
+  type ActionHasher,
+  type ArgumentValidator,
+  type ClientCommand,
+  type Clock,
+  type ContentPart,
+  type ContextBuilder,
+  type ContextSection,
+  canonicalizeJson,
+  type EffectId,
+  type EffectRecord,
+  type EntryBody,
+  type EntryId,
+  type IdSource,
+  isTerminal,
+  type ModelClient,
+  type ModelProfile,
+  type PermissionPolicy,
+  type PreconditionVerifier,
+  type PreparedAction,
+  type RunId,
+  type RunLimits,
+  type RunOutcome,
+  type RuntimeEvent,
+  type Scheduler,
+  type SessionId,
+  type SessionSnapshot,
+  type SessionStore,
+  type ToolCallPart,
+  type ToolDefinition,
+  type ToolResultPart,
+  type TranscriptEntry,
 } from "../contracts/index.ts";
+import { type ExecutionHost, executeCalls } from "./executor.ts";
+import { recoverSession } from "./recovery.ts";
+import { consumeResponse, type Response } from "./response.ts";
 
-/**
- * The agent core: run loop, tool scheduling, approvals, budgets, cancellation, error
- * classification, retries and recovery. It performs no I/O of its own; everything external
- * arrives through these ports, which keeps every behavior reproducible with fakes.
- *
- * Not implemented yet; see docs/roadmap.md, phase 1.
- */
+export const DEFAULT_LIMITS: RunLimits = Object.freeze({
+  maxModelRequests: 12,
+  timeoutMs: 60_000,
+  maxInputBytes: 64 * 1024,
+  maxModelResponseBytes: 1024 * 1024,
+  maxToolOutputBytes: 32 * 1024,
+  maxRetries: 2,
+  maxParallelReads: 4,
+});
+
 export interface CoreDeps {
   readonly model: ModelClient;
   readonly profile: ModelProfile;
@@ -23,6 +52,593 @@ export interface CoreDeps {
   readonly store: SessionStore;
   readonly context: ContextBuilder;
   readonly policy: PermissionPolicy;
+  readonly validator: ArgumentValidator;
+  readonly preconditions: PreconditionVerifier;
+  readonly hasher: ActionHasher;
+  readonly scheduler: Scheduler;
   readonly clock: Clock;
   readonly ids: IdSource;
+  readonly emit: (event: RuntimeEvent) => void;
+  readonly collect?: (workspaceRoot: string) => Promise<readonly ContextSection[]>;
+  readonly limits?: Partial<RunLimits>;
+}
+
+interface Running {
+  readonly id: RunId;
+  readonly sessionId: SessionId;
+  readonly workspaceRoot: string;
+  readonly controller: AbortController;
+  readonly effects: Map<EffectId, EffectRecord>;
+  readonly resultIds: Set<string>;
+  head: EntryId | null;
+  queue: Promise<void>;
+  done: Promise<void>;
+  deadlineExpired: boolean;
+  requests: number;
+  leased: boolean;
+  finishing: boolean;
+  steeringRevision: number;
+  pendingSteering: number;
+  stopTimer: () => void;
+}
+interface PendingApproval {
+  readonly run: Running;
+  readonly digest: string;
+  readonly revision: number;
+  readonly resolve: (accepted: boolean) => void;
+}
+
+/** Owns execution and persistence ordering. External work is reached only through ports. */
+export class AgentCore {
+  readonly #deps: CoreDeps;
+  readonly #limits: RunLimits;
+  readonly #running = new Map<RunId, Running>();
+  readonly #starting = new Set<SessionId>();
+  readonly #approvals = new Map<EffectId, PendingApproval>();
+  #closed = false;
+
+  constructor(deps: CoreDeps) {
+    this.#deps = deps;
+    this.#limits = { ...DEFAULT_LIMITS, ...deps.limits };
+    for (const [name, value] of Object.entries(this.#limits)) {
+      if (!Number.isSafeInteger(value) || value < (name === "maxRetries" ? 0 : 1))
+        throw new Error(`Invalid limit: ${name}`);
+    }
+    if (this.#limits.maxToolOutputBytes < 64)
+      throw new Error("Tool output limit must be at least 64 bytes");
+    if (new Set(deps.tools.map((tool) => tool.name)).size !== deps.tools.length)
+      throw new Error("Duplicate tool names");
+  }
+
+  async recover(): Promise<void> {
+    if (this.#running.size) throw new Error("Recovery cannot run while active");
+    for (const sessionId of await this.#deps.store.listSessions()) {
+      const snapshot = await this.#deps.store.loadSession(sessionId);
+      if (snapshot) await recoverSession(snapshot, this.#deps, this.#limits);
+    }
+  }
+
+  async send(command: ClientCommand): Promise<void> {
+    try {
+      if (this.#closed) throw new Error("Runtime is closed");
+      switch (command.type) {
+        case "session.create": {
+          const sessionId = this.#deps.ids.next("session") as SessionId;
+          await this.#deps.store.commit({
+            entries: [],
+            effects: [],
+            durability: "normal",
+            sessions: [{ sessionId, workspaceRoot: command.workspaceRoot, headEntryId: null }],
+          });
+          this.#emit({ type: "session.ready", sessionId });
+          break;
+        }
+        case "session.load": {
+          const snapshot = await this.#session(command.sessionId);
+          this.#emit({ type: "session.ready", sessionId: snapshot.sessionId });
+          for (const entry of snapshot.entries) this.#emit({ type: "entry.appended", entry });
+          break;
+        }
+        case "run.start":
+          await this.#start(command.sessionId, command.input);
+          break;
+        case "run.cancel":
+          this.#run(command.runId).controller.abort();
+          break;
+        case "run.steer": {
+          const run = this.#run(command.runId);
+          if (run.controller.signal.aborted || run.finishing) throw new Error("Run is stopping");
+          const content = userContent(command.input, this.#limits.maxInputBytes);
+          run.pendingSteering++;
+          try {
+            await this.#append(run, { kind: "user_message", steering: true, content });
+          } finally {
+            run.pendingSteering--;
+          }
+          break;
+        }
+        case "approval.respond": {
+          const pending = this.#approvals.get(command.effectId);
+          if (!pending || pending.digest !== command.digest)
+            throw new Error("Unknown or stale approval digest");
+          if (
+            pending.run.controller.signal.aborted ||
+            pending.revision !== (this.#deps.policy.revision?.() ?? 0)
+          ) {
+            pending.resolve(false);
+            throw new Error("Approval was revoked or cancelled");
+          }
+          if (command.decision !== "approve" && command.decision !== "deny")
+            throw new Error("Invalid approval decision");
+          pending.resolve(command.decision === "approve");
+          break;
+        }
+      }
+    } catch (error) {
+      this.#emit({ type: "command.rejected", command: command.type, reason: errorMessage(error) });
+    }
+  }
+
+  async idle(): Promise<void> {
+    while (this.#running.size)
+      await Promise.all([...this.#running.values()].map((run) => run.done));
+  }
+  async close(): Promise<void> {
+    this.#closed = true;
+    for (const run of this.#running.values()) run.controller.abort();
+    await this.idle();
+  }
+  async #session(id: SessionId): Promise<SessionSnapshot> {
+    const snapshot = await this.#deps.store.loadSession(id);
+    if (!snapshot) throw new Error("Session does not exist");
+    return snapshot;
+  }
+  #run(id: RunId): Running {
+    const run = this.#running.get(id);
+    if (!run) throw new Error("Run is not active");
+    return run;
+  }
+
+  async #start(sessionId: SessionId, input: readonly ContentPart[]): Promise<void> {
+    if (
+      this.#starting.has(sessionId) ||
+      [...this.#running.values()].some((run) => run.sessionId === sessionId)
+    )
+      throw new Error("Session already has an active run");
+    this.#starting.add(sessionId);
+    try {
+      const content = userContent(input, this.#limits.maxInputBytes);
+      const snapshot = await this.#session(sessionId);
+      if (snapshot.runs.some((run) => run.status === "active"))
+        throw new Error("Session requires startup recovery");
+      if (this.#closed) throw new Error("Runtime is closing");
+      const id = this.#deps.ids.next("run") as RunId;
+      const run: Running = {
+        id,
+        sessionId,
+        workspaceRoot: snapshot.workspaceRoot,
+        head: snapshot.headEntryId,
+        controller: new AbortController(),
+        effects: new Map(),
+        resultIds: new Set(),
+        queue: Promise.resolve(),
+        done: Promise.resolve(),
+        deadlineExpired: false,
+        requests: 0,
+        leased: false,
+        finishing: false,
+        steeringRevision: 0,
+        pendingSteering: 0,
+        stopTimer: () => {},
+      };
+      const entry = this.#entry(run, { kind: "user_message", steering: false, content });
+      await this.#deps.store.commit({
+        entries: [entry],
+        effects: [],
+        durability: "normal",
+        sessions: [{ sessionId, workspaceRoot: run.workspaceRoot, headEntryId: entry.id }],
+        runs: [{ runId: id, sessionId, status: "active" }],
+      });
+      run.head = entry.id;
+      this.#running.set(id, run);
+      run.stopTimer = this.#deps.scheduler.deadline(this.#limits.timeoutMs, () => {
+        run.deadlineExpired = true;
+        run.controller.abort();
+      });
+      run.done = Promise.resolve()
+        .then(() => this.#drive(run))
+        .finally(() => {
+          run.stopTimer();
+          this.#running.delete(id);
+        });
+      this.#emit({ type: "entry.appended", entry });
+      this.#emit({ type: "run.started", runId: id, sessionId });
+    } finally {
+      this.#starting.delete(sessionId);
+    }
+  }
+
+  async #drive(run: Running): Promise<void> {
+    let outcome: RunOutcome;
+    try {
+      outcome = await this.#loop(run);
+    } catch (error) {
+      outcome = { kind: "failed", reason: errorMessage(error) };
+    }
+    run.finishing = true;
+    run.stopTimer();
+    if (run.deadlineExpired) outcome = { kind: "budget_exhausted", budget: "time" };
+    try {
+      await run.queue;
+      const snapshot = await this.#session(run.sessionId);
+      for (const effect of snapshot.effects.filter((effect) => effect.runId === run.id)) {
+        run.effects.set(effect.id, effect);
+        if (!isTerminal(effect.state) && effect.state !== "unknown") {
+          await this.#record(run, {
+            ...effect,
+            state: effect.state === "started" ? "unknown" : "cancelled",
+            updatedAt: this.#deps.clock.now(),
+            evidence: "Run stopped before settlement",
+          });
+        }
+      }
+      const latest = await this.#session(run.sessionId);
+      for (const entry of latest.entries) {
+        if (entry.runId === run.id && entry.body.kind === "tool_results")
+          for (const result of entry.body.results) run.resultIds.add(result.callId);
+      }
+      const byCall = new Map([...run.effects.values()].map((effect) => [effect.callId, effect]));
+      const missing: ToolResultPart[] = [];
+      for (const entry of latest.entries) {
+        if (entry.runId !== run.id || entry.body.kind !== "assistant_message") continue;
+        for (const part of entry.body.content) {
+          if (part.type !== "tool_call" || run.resultIds.has(part.callId)) continue;
+          const effect = byCall.get(part.callId);
+          missing.push({
+            type: "tool_result",
+            callId: part.callId,
+            status:
+              effect?.state === "unknown" || effect?.state === "started" ? "unknown" : "cancelled",
+            content: [
+              {
+                type: "text",
+                text: "Run stopped; no automatic retry. Verify unknown effects before trying again.",
+              },
+            ],
+          });
+        }
+      }
+      if (missing.length) await this.#append(run, { kind: "tool_results", results: missing });
+      const unsettled = [...run.effects.values()].some((effect) => !isTerminal(effect.state));
+      if (unsettled && outcome.kind === "completed")
+        outcome = { kind: "failed", reason: "An effect outcome is unknown" };
+      const keepLease = [...run.effects.values()].some(
+        (effect) =>
+          !isTerminal(effect.state) &&
+          ["workspace_write", "process"].includes(effect.profile.class),
+      );
+      await this.#deps.store.commit({
+        entries: [],
+        effects: [],
+        durability: "normal",
+        runs: [
+          {
+            runId: run.id,
+            sessionId: run.sessionId,
+            status: outcome.kind === "completed" ? "completed" : "interrupted",
+          },
+        ],
+        leases:
+          run.leased && !keepLease
+            ? [{ kind: "release", runId: run.id, workspaceRoot: run.workspaceRoot }]
+            : [],
+      });
+    } catch (error) {
+      outcome = { kind: "failed", reason: `Persistence/settlement failed: ${errorMessage(error)}` };
+    }
+    if (run.deadlineExpired) outcome = { kind: "budget_exhausted", budget: "time" };
+    this.#emit({ type: "run.finished", runId: run.id, outcome });
+  }
+
+  async #loop(run: Running): Promise<RunOutcome> {
+    let retries = 0;
+    while (!run.controller.signal.aborted) {
+      if (run.requests >= this.#limits.maxModelRequests) {
+        run.finishing = true;
+        return { kind: "budget_exhausted", budget: "model_requests" };
+      }
+      await run.queue;
+      const snapshot = await this.#session(run.sessionId);
+      const consumedSteering = snapshot.entries.filter(
+        (entry) =>
+          entry.runId === run.id && entry.body.kind === "user_message" && entry.body.steering,
+      ).length;
+      const sections = (await this.#deps.collect?.(run.workspaceRoot)) ?? [];
+      if (run.controller.signal.aborted) break;
+      const { request } = this.#deps.context.build({
+        path: pathToHead(snapshot),
+        profile: this.#deps.profile,
+        tools: this.#deps.tools.map(({ name, description, inputSchema }) => ({
+          name,
+          description,
+          inputSchema,
+        })),
+        sections,
+        unsettledEffects: snapshot.effects.filter((effect) => !isTerminal(effect.state)),
+      });
+      const blob = (value: unknown) =>
+        this.#deps.store.putBlob(new TextEncoder().encode(canonicalizeJson(value)));
+      const rendered = {
+        rendererVersion: "moyyi-core-v1",
+        system: await blob({
+          origin: request.origin,
+          maxOutputTokens: request.maxOutputTokens,
+          content: request.system,
+        }),
+        tools: await blob(request.tools),
+        messages: await Promise.all(request.messages.map(blob)),
+      };
+      if (run.controller.signal.aborted) break;
+      run.requests++;
+      const response = await consumeResponse(
+        this.#deps.model,
+        request,
+        run.controller.signal,
+        this.#limits.maxModelResponseBytes,
+        (text) => this.#emit({ type: "assistant.delta", runId: run.id, text }),
+      );
+      const used = new Set(
+        snapshot.entries.flatMap((entry) =>
+          entry.body.kind === "assistant_message"
+            ? entry.body.content
+                .filter((part) => part.type === "tool_call")
+                .map((part) => part.callId)
+            : [],
+        ),
+      );
+      rejectRepeatedCalls(response, used);
+      // Every attempted request retains its usage and request reference, including retries.
+      const interrupted = !!response.error || run.controller.signal.aborted;
+      await this.#append(run, {
+        kind: "assistant_message",
+        origin: this.#deps.profile.origin,
+        content: response.parts,
+        stopReason: interrupted ? "interrupted" : response.stopReason,
+        providerStopReason: response.providerStopReason,
+        usage: response.usage,
+        request: rendered,
+        ...(!interrupted && response.replay ? { replay: response.replay } : {}),
+      });
+      if (
+        response.error &&
+        !response.partial &&
+        !response.error.partialOutput &&
+        !run.controller.signal.aborted &&
+        ["rate_limited", "overloaded", "network"].includes(response.error.kind) &&
+        retries < this.#limits.maxRetries
+      ) {
+        retries++;
+        await this.#append(run, {
+          kind: "notice",
+          code: "model_retry",
+          text: `Retry ${retries}: ${response.error.kind}`,
+        });
+        const delay = response.error.retryAfterMs ?? 100 * 2 ** (retries - 1);
+        try {
+          await this.#deps.scheduler.sleep(
+            Math.max(0, Math.min(30_000, Number.isFinite(delay) ? delay : 100)),
+            run.controller.signal,
+          );
+        } catch (error) {
+          if (run.controller.signal.aborted) break;
+          throw error;
+        }
+        continue;
+      }
+      const calls = response.parts.filter(
+        (part): part is ToolCallPart => part.type === "tool_call",
+      );
+      if (interrupted || response.stopReason !== "tool_use") {
+        if (calls.length)
+          await this.#append(run, {
+            kind: "tool_results",
+            results: calls.map((call) => ({
+              type: "tool_result",
+              callId: call.callId,
+              status: run.controller.signal.aborted ? "cancelled" : "failed",
+              content: [
+                {
+                  type: "text",
+                  text: "Tool was not executed: assistant did not complete a tool-use turn.",
+                },
+              ],
+            })),
+          });
+        if (run.controller.signal.aborted) break;
+        if (!response.error) {
+          await run.queue;
+          if (run.pendingSteering > 0 || run.steeringRevision > consumedSteering) {
+            retries = 0;
+            continue;
+          }
+        }
+        run.finishing = true;
+        return response.error
+          ? { kind: "failed", reason: response.error.message }
+          : { kind: "completed" };
+      }
+      retries = 0;
+      const host: ExecutionHost = {
+        runId: run.id,
+        workspaceRoot: run.workspaceRoot,
+        signal: run.controller.signal,
+        tools: this.#deps.tools,
+        policy: this.#deps.policy,
+        validator: this.#deps.validator,
+        preconditions: this.#deps.preconditions,
+        hasher: this.#deps.hasher,
+        limits: this.#limits,
+        now: () => this.#deps.clock.now(),
+        nextEffectId: () => this.#deps.ids.next("effect") as EffectId,
+        record: (effect, result) => this.#record(run, effect, result),
+        ensureLease: () => this.#ensureLease(run),
+        approve: (effect, action) => this.#approve(run, effect, action),
+      };
+      const results = await executeCalls(calls, host);
+      const missing = results.filter((result) => !run.resultIds.has(result.callId));
+      if (missing.length) await this.#append(run, { kind: "tool_results", results: missing });
+      if (results.some((result) => result.status === "unknown"))
+        return { kind: "failed", reason: "Tool outcome unknown; verify before retrying" };
+    }
+    return run.deadlineExpired
+      ? { kind: "budget_exhausted", budget: "time" }
+      : { kind: "cancelled" };
+  }
+
+  #entry(run: Running, body: EntryBody): TranscriptEntry {
+    return {
+      id: this.#deps.ids.next("entry") as EntryId,
+      parentId: run.head,
+      sessionId: run.sessionId,
+      runId: run.id,
+      createdAt: this.#deps.clock.now(),
+      body,
+    };
+  }
+  #serialize(run: Running, operation: () => Promise<void>): Promise<void> {
+    const result = run.queue.then(operation);
+    run.queue = result.catch(() => {});
+    return result;
+  }
+  #append(run: Running, body: EntryBody): Promise<void> {
+    return this.#serialize(run, async () => {
+      const entry = this.#entry(run, body);
+      await this.#deps.store.commit({
+        entries: [entry],
+        effects: [],
+        durability: "normal",
+        sessions: [
+          { sessionId: run.sessionId, workspaceRoot: run.workspaceRoot, headEntryId: entry.id },
+        ],
+      });
+      run.head = entry.id;
+      if (body.kind === "user_message" && body.steering) run.steeringRevision++;
+      if (body.kind === "tool_results")
+        for (const result of body.results) run.resultIds.add(result.callId);
+      this.#emit({ type: "entry.appended", entry });
+    });
+  }
+  #record(run: Running, effect: EffectRecord, result?: ToolResultPart): Promise<void> {
+    return this.#serialize(run, async () => {
+      const entry = result
+        ? this.#entry(run, { kind: "tool_results", results: [result] })
+        : undefined;
+      await this.#deps.store.commit({
+        entries: entry ? [entry] : [],
+        effects: [effect],
+        durability: effect.state === "started" ? "before_side_effect" : "normal",
+        ...(entry
+          ? {
+              sessions: [
+                {
+                  sessionId: run.sessionId,
+                  workspaceRoot: run.workspaceRoot,
+                  headEntryId: entry.id,
+                },
+              ],
+            }
+          : {}),
+      });
+      run.effects.set(effect.id, effect);
+      if (entry && result) {
+        run.head = entry.id;
+        run.resultIds.add(result.callId);
+        this.#emit({ type: "entry.appended", entry });
+      }
+      this.#emit({ type: "effect.updated", effect });
+    });
+  }
+  #ensureLease(run: Running): Promise<void> {
+    return this.#serialize(run, async () => {
+      if (run.leased) return;
+      await this.#deps.store.commit({
+        entries: [],
+        effects: [],
+        durability: "normal",
+        leases: [{ kind: "acquire", runId: run.id, workspaceRoot: run.workspaceRoot }],
+      });
+      run.leased = true;
+    });
+  }
+  #approve(run: Running, effect: EffectRecord, action: PreparedAction): Promise<boolean> {
+    if (run.controller.signal.aborted) return Promise.resolve(false);
+    return new Promise((resolve) => {
+      const finish = (accepted: boolean) => {
+        this.#approvals.delete(effect.id);
+        run.controller.signal.removeEventListener("abort", abort);
+        resolve(accepted);
+      };
+      const abort = () => finish(false);
+      this.#approvals.set(effect.id, {
+        run,
+        digest: action.digest,
+        revision: this.#deps.policy.revision?.() ?? 0,
+        resolve: finish,
+      });
+      run.controller.signal.addEventListener("abort", abort, { once: true });
+      this.#emit({
+        type: "approval.requested",
+        effectId: effect.id,
+        digest: action.digest,
+        summary: action.summary,
+        ...(action.preview === undefined ? {} : { preview: action.preview }),
+      });
+    });
+  }
+  #emit(event: RuntimeEvent): void {
+    this.#deps.emit(event);
+  }
+}
+
+export function pathToHead(snapshot: SessionSnapshot): readonly TranscriptEntry[] {
+  const map = new Map(snapshot.entries.map((entry) => [entry.id, entry]));
+  const path: TranscriptEntry[] = [],
+    seen = new Set<EntryId>();
+  let cursor = snapshot.headEntryId;
+  while (cursor !== null) {
+    const entry = map.get(cursor);
+    if (!entry || seen.has(cursor)) throw new Error("Broken session path");
+    seen.add(cursor);
+    path.push(entry);
+    cursor = entry.parentId;
+  }
+  return path.reverse();
+}
+function userContent(input: readonly ContentPart[], maximum: number): readonly ContentPart[] {
+  const encoded = canonicalizeJson(input);
+  if (!input.length || new TextEncoder().encode(encoded).byteLength > maximum)
+    throw new Error("User input exceeds limits or is empty");
+  if (input.some((part) => part.type !== "text" && part.type !== "image"))
+    throw new Error("User input accepts only text and images");
+  return JSON.parse(encoded) as ContentPart[];
+}
+function rejectRepeatedCalls(response: Response, seen: Set<string>): void {
+  response.parts = response.parts.map((part) => {
+    if (part.type !== "tool_call") return part;
+    if (!seen.has(part.callId)) {
+      seen.add(part.callId);
+      return part;
+    }
+    response.error = {
+      kind: "protocol",
+      message: "Repeated tool call identity",
+      partialOutput: true,
+      usage: response.usage,
+    };
+    response.partial = true;
+    return { type: "text", text: `Rejected repeated tool call: ${canonicalizeJson(part)}` };
+  });
+}
+export function errorMessage(error: unknown): string {
+  return (error instanceof Error ? error.message : String(error)).slice(0, 1024);
 }

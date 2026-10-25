@@ -146,7 +146,9 @@ parse args → schema validation → policy (prepare) → prepare (read-only)
 
 One writer process per data directory, enforced with an OS file lock. Accepted in
 [ADR 0002](decisions/0002-storage.md): one active run per session and a write lease per
-workspace. These are implementation requirements, not claims about the current scaffold.
+workspace. The store and batch 4 review branch enforce these constraints. The runtime composes
+`AgentCore` with the SQLite store, context, policy, validator and precondition ports; see
+[core.md](core.md) for the executable scripted entry point and current limits.
 
 ## Security decision
 
