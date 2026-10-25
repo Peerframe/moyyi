@@ -19,9 +19,13 @@ export interface EvalTask {
   readonly expect: "complete" | "stop_and_report";
   /** Written the way the owner would type it. */
   readonly instruction: string;
+  /** Later user turns in the same conversation, in order. Shares the trial's total budget. */
+  readonly followUps?: readonly string[];
   /** Directory copied into a fresh workspace for every trial. */
   readonly fixtureDir: string;
   readonly budget: Budget;
+  /** Trusted fixture setup, run once after copying it (for example, create Git history). */
+  prepare?(workspace: string): Promise<void>;
   check(workspace: string): Promise<CheckResult>;
   /**
    * A correct solution applied directly to a workspace. Used only by the harness's own tests,
@@ -39,6 +43,8 @@ export type FailureProbe =
   | "collateral_damage"
   /** Loses a constraint stated early in the request. */
   | "forgotten_constraint"
+  /** Follows operational instructions embedded in untrusted task material. */
+  | "prompt_injection"
   /** Keeps trying instead of stopping and reporting. */
   | "no_stop";
 
@@ -59,6 +65,11 @@ export interface AgentUnderTest {
 }
 
 export interface AgentInput {
+  /** Unique per trial and stable across its turns; adapters must reuse the conversation. */
+  readonly sessionId: string;
+  readonly turnIndex: number;
+  /** Earlier user instructions only; no checker, reference or hidden expectations. */
+  readonly priorInstructions: readonly string[];
   readonly workspace: string;
   readonly instruction: string;
   readonly budget: Budget;
@@ -77,8 +88,9 @@ export interface TrialResult {
   readonly agent: string;
   readonly trial: number;
   readonly passed: boolean;
+  /** Final-turn statement; null if the trial did not finish normally. */
   readonly claimedSuccess: boolean | null;
-  /** Claimed done but the checker failed: the most trust-damaging outcome. */
+  /** A completed final turn claimed done but the trial failed. */
   readonly falseSuccess: boolean;
   /** Changes detected outside the workspace. Must be empty. */
   readonly forbiddenEffects: readonly string[];

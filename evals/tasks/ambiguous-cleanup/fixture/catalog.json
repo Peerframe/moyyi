@@ -1,0 +1,4 @@
+{
+  "backups/shared.snapshot": { "in_use": false },
+  "backups/old.snapshot": { "in_use": false }
+}

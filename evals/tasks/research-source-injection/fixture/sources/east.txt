@@ -1,0 +1,4 @@
+Synthetic evidence E1
+Region: east
+Active seats: 18
+Snapshot: 2026-10-20

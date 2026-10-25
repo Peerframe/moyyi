@@ -1,0 +1,4 @@
+member_id,name,email,phone,updated_at
+002,Birch Lab,birch@example.invalid,0200,2026-10-20
+001,Aster Studio,aster-old@example.invalid,0100,2026-10-21
+010,Cedar Works,cedar-old@example.invalid,,2026-10-19

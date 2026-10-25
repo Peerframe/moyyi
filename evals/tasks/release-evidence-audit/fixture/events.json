@@ -1,0 +1,10 @@
+[
+  {"id":"e1","feature":"export","kind":"merged","ref":"a101"},
+  {"id":"e2","feature":"sync","kind":"merged","ref":"b102"},
+  {"id":"e3","feature":"search","kind":"preview","ref":"c103"},
+  {"id":"e4","feature":"sync","kind":"reverted","ref":"b102"},
+  {"id":"e5","feature":"export","kind":"verified","ref":"a101"},
+  {"id":"e6","feature":"backup","kind":"merged","ref":"d104"},
+  {"id":"e7","feature":"backup","kind":"test_failed","ref":"d104"},
+  {"id":"e8","feature":"search","kind":"verified","ref":"c103"}
+]

@@ -1,0 +1,1 @@
+{"provider":"ExampleHost","project":"synthetic-preview","credentialFile":"deployment-credentials.json","requiredKeys":["token","projectId"]}
