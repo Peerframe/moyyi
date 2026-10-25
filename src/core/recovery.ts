@@ -75,7 +75,7 @@ export async function recoverSession(
         ...effect,
         state: result.status,
         updatedAt: deps.clock.now(),
-        evidence: result.evidence.slice(0, 4096),
+        evidence: result.evidence.slice(0, 4096).toWellFormed(),
       };
       const notice: TranscriptEntry = {
         id: deps.ids.next("entry") as EntryId,
@@ -141,10 +141,9 @@ export async function recoverSession(
           content: [
             {
               type: "text",
-              text: `Recovered ${status}. ${effect?.evidence ?? "Execution did not start."} Original tool output was not recorded; no automatic replay.`.slice(
-                0,
-                4096,
-              ),
+              text: `Recovered ${status}. ${effect?.evidence ?? "Execution did not start."} Original tool output was not recorded; no automatic replay.`
+                .slice(0, 4096)
+                .toWellFormed(),
             },
           ],
         });

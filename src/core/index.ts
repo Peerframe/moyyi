@@ -640,5 +640,9 @@ function rejectRepeatedCalls(response: Response, seen: Set<string>): void {
   });
 }
 export function errorMessage(error: unknown): string {
-  return (error instanceof Error ? error.message : String(error)).slice(0, 1024);
+  try {
+    return (error instanceof Error ? error.message : String(error)).slice(0, 1024).toWellFormed();
+  } catch {
+    return "Unreportable runtime error";
+  }
 }

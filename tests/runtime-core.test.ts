@@ -4,6 +4,7 @@ import { join } from "node:path";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import {
   type ActionDigest,
+  canonicalizeJson,
   type EffectClass,
   type ModelStreamEvent,
   type Plugin,
@@ -188,6 +189,69 @@ afterEach(async () => {
 });
 
 describe("runtime core with real SQLite persistence", () => {
+  it.each(["provider", "context"])(
+    "emits one usable run.finished event for a long emoji error from %s",
+    async (source) => {
+      const message = `a${String.fromCodePoint(0x1f600).repeat(600)}`;
+      const extras: Plugin[] =
+        source === "context"
+          ? [
+              {
+                name: "failing-context",
+                apiVersion: 1,
+                setup(host) {
+                  host.registerContextSource({
+                    id: "failing",
+                    async collect() {
+                      throw Error(message);
+                    },
+                  });
+                },
+              },
+            ]
+          : [];
+      const test = await harness([], undefined, {}, extras);
+      if (source === "provider")
+        test.client.stream = () => {
+          throw Error(message);
+        };
+      await test.start();
+      const outcome = await test.finish();
+      expect(outcome.kind).toBe("failed");
+      if (outcome.kind !== "failed") throw Error("Expected a failed outcome");
+      expect(outcome.reason.isWellFormed()).toBe(true);
+      expect(outcome.reason.length).toBeLessThanOrEqual(1024);
+      const finished = test.events.filter((event) => event.type === "run.finished");
+      expect(finished).toHaveLength(1);
+      expect(() => canonicalizeJson(finished)).not.toThrow();
+      expect((await test.snapshot()).runs[0]?.status).toBe("interrupted");
+    },
+  );
+
+  it("persists the original completed call when a later event attempts to replace it", async () => {
+    const selected = syntheticTool();
+    const test = await harness(
+      [
+        [
+          { type: "part_completed", index: 0, part: call() },
+          { type: "part_completed", index: 0, part: call("late_replacement") },
+          done,
+        ],
+      ],
+      [selected],
+    );
+    await test.start();
+    expect((await test.finish()).kind).toBe("failed");
+    const snapshot = await test.snapshot();
+    const assistant = snapshot.entries.find((entry) => entry.body.kind === "assistant_message");
+    expect(assistant?.body).toMatchObject({ stopReason: "interrupted", content: [call()] });
+    expect(results(snapshot).map((result) => [result.callId, result.status])).toEqual([
+      ["call_1", "failed"],
+    ]);
+    expect(selected.execute).not.toHaveBeenCalled();
+    expect(snapshot.effects).toEqual([]);
+  });
+
   it("completes a model → tool → model turn and preserves the exact request blobs", async () => {
     const test = await harness([toolTurn(call()), finalTurn()]);
     await test.start();
