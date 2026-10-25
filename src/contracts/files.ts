@@ -3,7 +3,7 @@ import type { ReconcileOutcome } from "./tools.ts";
 
 /** Read-only, runtime-confined capabilities. Paths are relative to the selected workspace. */
 export interface WorkspaceFiles {
-  read(path: string, options?: { readonly maxBytes?: number }): Promise<FileRead>;
+  read(path: string, options?: FileReadOptions): Promise<FileRead>;
   list(path: string, options?: { readonly maxEntries?: number }): Promise<FileList>;
   search(
     path: string,
@@ -12,11 +12,24 @@ export interface WorkspaceFiles {
   ): Promise<FileSearch>;
 }
 
+export interface FileReadOptions {
+  readonly maxBytes?: number;
+  /** Supplying either line option selects an LF-delimited range; defaults are 1 and 200. */
+  readonly startLine?: number;
+  readonly maxLines?: number;
+}
+
 export interface FileRead {
   readonly path: string;
   readonly text: string;
   readonly bytesRead: number;
   readonly truncated: boolean;
+  /** Present only for range reads. Completeness concerns the selected range, not the whole file. */
+  readonly lineRange?: {
+    readonly startLine: number;
+    readonly endLine: number | null;
+    readonly complete: boolean;
+  };
 }
 
 export interface FileList {

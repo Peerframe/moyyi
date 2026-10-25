@@ -153,6 +153,123 @@ describe("runtime workspace file capability", () => {
     expect(unicode.truncated).toBe(true);
     expect((await t.files.search(".", "needle")).truncated).toBe(true);
   });
+  it("reads the requested source lines with original UTF-8 and CRLF delimiters", async () => {
+    const t = setup({ "source.txt": "first\r\n第二行😀\r\nthird\nlast" });
+    const text = "第二行😀\r\n";
+    expect(await t.files.read("source.txt", { startLine: 2, maxLines: 1 })).toEqual({
+      path: "source.txt",
+      text,
+      bytesRead: Buffer.byteLength(text),
+      truncated: true,
+      lineRange: { startLine: 2, endLine: 2, complete: true },
+    });
+    expect(await t.files.read("source.txt", { maxLines: 1 })).toMatchObject({
+      text: "first\r\n",
+      lineRange: { startLine: 1, endLine: 1, complete: true },
+    });
+    expect(await t.files.read("source.txt", { startLine: 3 })).toMatchObject({
+      text: "third\nlast",
+      lineRange: { startLine: 3, endLine: 4, complete: true },
+    });
+  });
+  it("preserves a non-file-leading BOM character at the selected line boundary", async () => {
+    const t = setup({ "source.txt": "first\n\ufeffsecond\nthird" });
+    const text = "\ufeffsecond\n";
+    expect(await t.files.read("source.txt", { startLine: 2, maxLines: 1 })).toEqual({
+      path: "source.txt",
+      text,
+      bytesRead: Buffer.byteLength(text),
+      truncated: true,
+      lineRange: { startLine: 2, endLine: 2, complete: true },
+    });
+  });
+  it.each([
+    { source: "a\n\n", startLine: 2, text: "\n", endLine: 2, truncated: true },
+    { source: "a\n\n", startLine: 3, text: "", endLine: null, truncated: true },
+    { source: "a", startLine: 2, text: "", endLine: null, truncated: true },
+    { source: "a\n", startLine: 1000000, text: "", endLine: null, truncated: true },
+    { source: "", startLine: 1, text: "", endLine: null, truncated: false },
+    { source: "\n", startLine: 1, text: "\n", endLine: 1, truncated: false },
+    { source: "a\nb", startLine: 1, text: "a\nb", endLine: 2, truncated: false },
+  ])("reports EOF without a phantom trailing line: %j", async (test) => {
+    const t = setup({ "lines.txt": test.source });
+    expect(await t.files.read("lines.txt", { startLine: test.startLine, maxLines: 10 })).toEqual({
+      path: "lines.txt",
+      text: test.text,
+      bytesRead: Buffer.byteLength(test.text),
+      truncated: test.truncated,
+      lineRange: { startLine: test.startLine, endLine: test.endLine, complete: true },
+    });
+  });
+  it("distinguishes a byte-cut range from a complete range that omits other file lines", async () => {
+    const t = setup({ "lines.txt": "skipped\nαβ😀\nnext\n", "emoji.txt": "😀\n" });
+    expect(await t.files.read("lines.txt", { startLine: 2, maxLines: 2, maxBytes: 7 })).toEqual({
+      path: "lines.txt",
+      text: "αβ",
+      bytesRead: 4,
+      truncated: true,
+      lineRange: { startLine: 2, endLine: 2, complete: false },
+    });
+    expect(
+      await t.files.read("lines.txt", { startLine: 2, maxLines: 2, maxBytes: 9 }),
+    ).toMatchObject({
+      text: "αβ😀\n",
+      lineRange: { startLine: 2, endLine: 2, complete: false },
+    });
+    expect(await t.files.read("emoji.txt", { startLine: 1, maxBytes: 1 })).toMatchObject({
+      text: "",
+      bytesRead: 0,
+      truncated: true,
+      lineRange: { startLine: 1, endLine: null, complete: false },
+    });
+  });
+  it("defaults line count to 200 and rejects incomplete full-file scans", async () => {
+    const t = setup({
+      "many.txt": "line\n".repeat(300),
+      "exact.txt": "x".repeat(1024 * 1024),
+      "oversized.txt": "x".repeat(1024 * 1024 + 1),
+    });
+    expect(await t.files.read("many.txt", { startLine: 2 })).toMatchObject({
+      text: "line\n".repeat(200),
+      truncated: true,
+      lineRange: { startLine: 2, endLine: 201, complete: true },
+    });
+    expect(await t.files.read("exact.txt", { startLine: 1, maxBytes: 1 })).toMatchObject({
+      text: "x",
+      lineRange: { startLine: 1, endLine: 1, complete: false },
+    });
+    await expect(
+      t.files.read("oversized.txt", { startLine: 1, maxLines: 1, maxBytes: 1 }),
+    ).rejects.toThrow(/within 1 MiB/);
+  });
+  it("range reads retain protected-path, link and complete UTF-8 validation", async () => {
+    const t = setup({
+      ".env": "synthetic protected value",
+      "private-store/blob": "synthetic session",
+      "broken.txt": new Uint8Array([65, 10, 0xff]),
+    });
+    writeFileSync(join(t.root, "outside.txt"), "outside synthetic canary");
+    symlinkSync("../outside.txt", join(t.workspace, "escape"));
+    linkSync(join(t.root, "outside.txt"), join(t.workspace, "linked.txt"));
+    for (const path of [".env", "private-store/blob", "escape", "linked.txt", "../outside.txt"])
+      await expect(t.files.read(path, { startLine: 1, maxLines: 1 })).rejects.toThrow();
+    await expect(t.files.read("broken.txt", { startLine: 1, maxLines: 1 })).rejects.toThrow(
+      /UTF-8/,
+    );
+  });
+  it.each([
+    { startLine: 0 },
+    { startLine: 1000001 },
+    { startLine: 1.5 },
+    { startLine: Infinity },
+    { maxLines: 0 },
+    { maxLines: 1001 },
+    { maxLines: -1 },
+    { maxLines: NaN },
+  ])("rejects invalid line limits before accessing the target: %j", async (options) => {
+    const t = setup();
+    await expect(t.files.read("absent.txt", options)).rejects.toThrow(/Limit/);
+  });
   it("caps listings and matches, reports line numbers, and treats queries literally", async () => {
     const t = setup({ "a.txt": "first\na.*b\nNEEDLE\n", "b.txt": "needle", "c.txt": "other" });
     expect(await t.files.list(".", { maxEntries: 1 })).toMatchObject({
@@ -239,6 +356,13 @@ describe("runtime workspace file capability", () => {
     else t.revoke();
     await expect(pending).rejects.toThrow(/cancelled|revoked/);
     await expect(t.files.list(".")).rejects.toThrow(/cancelled|revoked/);
+  });
+  it.each(["abort", "revoke"])("discards an in-flight range scan on %s", async (kind) => {
+    const t = setup({ "a.txt": "must not be returned\n".repeat(1000) });
+    const pending = t.files.read("a.txt", { startLine: 500, maxLines: 2 });
+    if (kind === "abort") t.controller.abort();
+    else t.revoke();
+    await expect(pending).rejects.toThrow(/cancelled|revoked/);
   });
   it("rejects replacement of the workspace identity between operations", async () => {
     const t = setup({ "a.txt": "original" });

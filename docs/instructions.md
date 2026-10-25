@@ -4,6 +4,16 @@ moyyi supplies a small default working prompt: inspect relevant evidence, carry 
 work, preserve unrelated changes, verify the result, and report what actually happened. It uses
 the user's language and does not treat a tool description or a document as permission.
 
+Analysis guidance prioritizes evidence for each requested conclusion. It follows known paths and
+symbols through transformations, consumers, error handling and configuration lifetimes, using
+bounded line reads around search hits instead of repeatedly fetching long file prefixes. Before
+answering, the model is asked to check each claim against returned evidence, correct contradictions,
+cite sources and identify unfinished verification. Sending a value, granting a permission and
+refreshing configuration are distinct claims. These are model instructions, not an automatic
+fact checker or a guarantee of correctness; they use the existing request budget.
+The scope and validation limits are recorded in
+[ADR 0022](decisions/0022-evidence-guidance-and-focused-reads.md).
+
 The runtime also adds a recorded request-budget notice on each attempt. It states the remaining
 requests including the current one and reserves the last for an answer based on existing evidence.
 That final request disables new tool calls; it must distinguish verified findings from unfinished

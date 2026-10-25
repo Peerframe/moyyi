@@ -143,6 +143,79 @@ describe("fs plugin", () => {
     expect(body(result).entries).toEqual([{ path: "a.txt", type: "file" }]);
     expect(body(result).truncated).toBe(false);
   });
+  it("forwards exact line selection with the reduced byte budget and retains range evidence", async () => {
+    const files = capability(),
+      ctx = context(files),
+      tool = await selected("read");
+    const evidence: FileRead = {
+      path: "source.ts",
+      text: "second\nthird\n",
+      bytesRead: 13,
+      truncated: true,
+      lineRange: { startLine: 2, endLine: 3, complete: true },
+    };
+    files.read.mockResolvedValue(evidence);
+    const args = { path: "source.ts", startLine: 2, maxLines: 2, maxBytes: 65536 };
+    const action = await tool.prepare(args, ctx);
+    args.startLine = 7;
+    const result = await tool.execute(action, ctx);
+    expect(files.read).toHaveBeenCalledExactlyOnceWith("source.ts", {
+      startLine: 2,
+      maxLines: 2,
+      maxBytes: 1024,
+    });
+    expect(body(result)).toEqual(evidence);
+  });
+  it.each([{ startLine: 2 }, { maxLines: 5 }])(
+    "preserves unspecified range defaults for the capability: %j",
+    async (options) => {
+      const files = capability(),
+        ctx = context(files),
+        tool = await selected("read");
+      await tool.execute(await tool.prepare({ path: "source.ts", ...options }, ctx), ctx);
+      expect(files.read).toHaveBeenCalledExactlyOnceWith("source.ts", {
+        maxBytes: 1024,
+        ...options,
+      });
+    },
+  );
+  it.each([
+    { startLine: 0 },
+    { startLine: 1000001 },
+    { startLine: 1.5 },
+    { startLine: "1" },
+    { maxLines: 0 },
+    { maxLines: 1001 },
+    { maxLines: null },
+    { startLine: 1, maxLines: 2, bypassScan: true },
+  ])("rejects invalid range arguments before capability use: %j", async (options) => {
+    const files = capability(),
+      tool = await selected("read");
+    await expect(tool.prepare({ path: "source.ts", ...options }, context(files))).rejects.toThrow();
+    expect(files.read).not.toHaveBeenCalled();
+  });
+  it("drops range endpoints if serialized output clipping shortens the returned text", async () => {
+    const files = capability(),
+      ctx = context(files, undefined, 256),
+      tool = await selected("read");
+    files.read.mockResolvedValue({
+      path: "source.ts",
+      text: "line\n".repeat(100),
+      bytesRead: 500,
+      truncated: false,
+      lineRange: { startLine: 1, endLine: 100, complete: true },
+    });
+    const result = await tool.execute(
+      await tool.prepare({ path: "source.ts", startLine: 1, maxLines: 100 }, ctx),
+      ctx,
+    );
+    expect(result.status).toBe("succeeded");
+    expect(body(result).truncated).toBe(true);
+    expect(body(result)).not.toHaveProperty("lineRange");
+    expect(new TextEncoder().encode(JSON.stringify(result.content)).byteLength).toBeLessThanOrEqual(
+      256,
+    );
+  });
   it("searches a literal query with case controls and no regex or ignore override", async () => {
     const files = capability(),
       ctx = context(files),

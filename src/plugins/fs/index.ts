@@ -17,6 +17,8 @@ type Operation = "read" | "list" | "search";
 interface Arguments {
   readonly path: string;
   readonly maxBytes?: number;
+  readonly startLine?: number;
+  readonly maxLines?: number;
   readonly maxEntries?: number;
   readonly query?: string;
   readonly maxMatches?: number;
@@ -32,7 +34,12 @@ const pathSchema = { type: "string", minLength: 1, maxLength: 4096 };
 const schemas: Record<Operation, JsonSchema> = {
   read: {
     type: "object",
-    properties: { path: pathSchema, maxBytes: { type: "integer", minimum: 1, maximum: 65536 } },
+    properties: {
+      path: pathSchema,
+      maxBytes: { type: "integer", minimum: 1, maximum: 65536 },
+      startLine: { type: "integer", minimum: 1, maximum: 1000000 },
+      maxLines: { type: "integer", minimum: 1, maximum: 1000 },
+    },
     required: ["path"],
     additionalProperties: false,
   },
@@ -54,10 +61,10 @@ const schemas: Record<Operation, JsonSchema> = {
   },
 };
 const descriptions: Record<Operation, string> = {
-  read: "Read bounded UTF-8 text from a workspace-relative file. Binary or protected files fail; truncated means only a prefix was returned.",
+  read: "Read workspace UTF-8; default prefix 16384 bytes, capped by output budget. For search hits use startLine/maxLines (1-based; defaults 1/200). Range mode needs a complete file <=1 MiB. lineRange.complete concerns the window; truncated means file content omitted. Protected/binary files fail.",
   list: "List bounded entries of a workspace-relative directory (default .). The host enforces protected paths; truncated means the listing is incomplete.",
   search:
-    "Search workspace text for a literal string, respecting scoped .gitignore rules. Default path is . and matching is case-sensitive. No regex; truncated means the search is incomplete.",
+    "Search an existing directory (default .) for one literal string, case-sensitive by default; obey .gitignore. No regex/alternation. Results give paths/lines for read startLine/maxLines. truncated/skippedFiles cannot prove absence.",
 };
 
 export const fsPlugin: Plugin = {
@@ -98,6 +105,8 @@ function tool(operation: Operation): ToolDefinition {
         if (operation === "read") {
           result = await context.files.read(args.path, {
             maxBytes: Math.max(1, Math.min(args.maxBytes ?? 16384, Math.floor(budget / 8))),
+            ...(args.startLine === undefined ? {} : { startLine: args.startLine }),
+            ...(args.maxLines === undefined ? {} : { maxLines: args.maxLines }),
           });
         } else if (operation === "list") {
           result = await context.files.list(args.path, {
@@ -157,7 +166,14 @@ function argumentsFor(operation: Operation, value: unknown): Arguments {
   };
   if (operation === "read") {
     const maxBytes = optionalLimit("maxBytes", 65536);
-    return { path, ...(maxBytes === undefined ? {} : { maxBytes }) };
+    const startLine = optionalLimit("startLine", 1_000_000);
+    const maxLines = optionalLimit("maxLines", 1_000);
+    return {
+      path,
+      ...(maxBytes === undefined ? {} : { maxBytes }),
+      ...(startLine === undefined ? {} : { startLine }),
+      ...(maxLines === undefined ? {} : { maxLines }),
+    };
   }
   if (operation === "list") {
     const maxEntries = optionalLimit("maxEntries", 200);
@@ -193,7 +209,9 @@ function outcome(status: ToolOutcome["status"], result: Result, budget: number):
   let limited: unknown = { truncated: true };
   const base = { ...result, truncated: true };
   if ("text" in result) {
-    limited = { ...base, text: prefix(result.text, (text) => fits({ ...base, text })) };
+    // Generic serialized-output clipping cannot preserve the host's exact line endpoint.
+    const { lineRange: _lineRange, ...readBase } = { ...result, truncated: true };
+    limited = { ...readBase, text: prefix(result.text, (text) => fits({ ...readBase, text })) };
   } else if ("entries" in result) {
     limited = {
       ...base,

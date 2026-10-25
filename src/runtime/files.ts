@@ -5,6 +5,7 @@ import ignore, { type Ignore } from "ignore";
 import type {
   FileList,
   FileRead,
+  FileReadOptions,
   FileSearch,
   ToolContext,
   WorkspaceFiles,
@@ -79,7 +80,7 @@ export class NodeWorkspaceFiles implements WorkspaceFilesFactory {
   create(context: ToolContext, assertAuthorized: () => void): WorkspaceFiles {
     const scope = new ReadScope(context, assertAuthorized, this.excluded);
     return Object.freeze({
-      read: (path: string, options?: { maxBytes?: number }) => scope.read(path, options?.maxBytes),
+      read: (path: string, options?: FileReadOptions) => scope.read(path, options),
       list: (path: string, options?: { maxEntries?: number }) =>
         scope.list(path, options?.maxEntries),
       search: (
@@ -249,10 +250,49 @@ class ReadScope {
     });
   }
 
-  read(path: string, maximum?: number): Promise<FileRead> {
-    return this.operation(async (root) =>
-      this.readFile(root, path, bounded(maximum, 64 * 1024, MAX_FILE_BYTES)),
-    );
+  read(path: string, options?: FileReadOptions): Promise<FileRead> {
+    return this.operation(async (root) => {
+      const cap = bounded(options?.maxBytes, 64 * 1024, MAX_FILE_BYTES);
+      if (options?.startLine === undefined && options?.maxLines === undefined)
+        return this.readFile(root, path, cap);
+      const startLine = bounded(options.startLine, 1, 1_000_000);
+      const maxLines = bounded(options.maxLines, 200, 1_000);
+      // Locate lines only in a complete bounded scan through the same guarded descriptor path.
+      // A prefix cannot prove an EOF or the line positions beyond its scan limit.
+      const full = await this.readFile(root, path, MAX_FILE_BYTES);
+      if (full.truncated)
+        throw new FileAccessError("unavailable", "Line-range reads require a file within 1 MiB");
+      let from = 0;
+      for (let line = 1; line < startLine && from < full.text.length; line++) {
+        const newline = full.text.indexOf("\n", from);
+        from = newline < 0 ? full.text.length : newline + 1;
+      }
+      let to = from;
+      for (let line = 0; line < maxLines && to < full.text.length; line++) {
+        const newline = full.text.indexOf("\n", to);
+        to = newline < 0 ? full.text.length : newline + 1;
+      }
+      const selected = Buffer.from(full.text.slice(from, to));
+      const complete = selected.length <= cap;
+      const text = new TextDecoder("utf-8", { fatal: true, ignoreBOM: true }).decode(
+        selected.subarray(0, cap),
+        { stream: !complete },
+      );
+      this.guard();
+      return {
+        path: full.path,
+        text,
+        bytesRead: Buffer.byteLength(text),
+        truncated: from > 0 || to < full.text.length || !complete,
+        lineRange: {
+          startLine,
+          endLine: text.length
+            ? startLine + text.split("\n").length - (text.endsWith("\n") ? 2 : 1)
+            : null,
+          complete,
+        },
+      };
+    });
   }
   private async readFile(root: Root, input: string, cap: number): Promise<FileRead> {
     const target = await this.target(root, input);
