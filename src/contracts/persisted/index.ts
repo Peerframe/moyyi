@@ -9,4 +9,5 @@ export const PERSISTED_FORMAT_VERSION = 1;
 export type * from "./content.ts";
 export * from "./effects.ts";
 export type * from "./ids.ts";
+export * from "./replay.ts";
 export type * from "./transcript.ts";

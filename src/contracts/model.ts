@@ -1,4 +1,11 @@
-import type { ContentPart, ModelOrigin, StopReason, Usage } from "./persisted/index.ts";
+import type {
+  ContentPart,
+  JsonValue,
+  ModelOrigin,
+  ReplayEnvelope,
+  StopReason,
+  Usage,
+} from "./persisted/index.ts";
 import type { JsonSchema } from "./tools.ts";
 
 /** A fully rendered request, produced by the ContextBuilder. */
@@ -13,6 +20,7 @@ export interface ModelRequest {
 export interface ModelMessage {
   readonly role: "user" | "assistant";
   readonly content: readonly ContentPart[];
+  readonly replay?: ReplayEnvelope;
 }
 
 export interface ToolSpec {
@@ -35,19 +43,33 @@ export interface ModelClient {
 
 export type ModelStreamEvent =
   | { readonly type: "text_delta"; readonly index: number; readonly text: string }
-  | { readonly type: "reasoning_delta"; readonly index: number; readonly text: string }
+  | { readonly type: "refusal_delta"; readonly index: number; readonly text: string }
+  | {
+      readonly type: "reasoning_delta";
+      readonly index: number;
+      readonly kind: "visible" | "summary";
+      readonly text: string;
+    }
   | { readonly type: "tool_call_delta"; readonly index: number; readonly argumentsDelta: string }
   /** A part is final and may be persisted. Tool calls are only acted upon after `completed`. */
   | { readonly type: "part_completed"; readonly index: number; readonly part: ContentPart }
-  | { readonly type: "completed"; readonly stopReason: StopReason; readonly usage: Usage }
+  | {
+      readonly type: "completed";
+      readonly stopReason: StopReason;
+      readonly providerStopReason: JsonValue;
+      readonly usage: Usage;
+      readonly replay?: ReplayEnvelope;
+    }
   | { readonly type: "error"; readonly error: ModelError };
 
 export interface ModelError {
   readonly kind: ModelErrorKind;
   readonly message: string;
   readonly retryAfterMs?: number;
-  /** Whether any part was completed before the error; affects whether a retry is safe. */
+  /** Any content delta or completed part was emitted, including incomplete argument deltas. */
   readonly partialOutput: boolean;
+  /** Available usage on interrupted/error streams, including an explicitly unknown record. */
+  readonly usage: Usage;
 }
 
 export type ModelErrorKind =
