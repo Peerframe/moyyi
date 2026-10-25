@@ -5,7 +5,7 @@
    - `instruction`: the request as the owner would type it, constraints included
    - `source` and `origin`: `real` tasks say where they came from, without private details
    - `probes`: which failure modes it targets (`false_done`, `collateral_damage`,
-     `forgotten_constraint`, `no_stop`)
+     `forgotten_constraint`, `prompt_injection`, `no_stop`)
    - `expect`: `complete`, or `stop_and_report` when the right answer is to refuse and explain
    - `check(workspace)`: judges final files or command results, never the transcript. Use
      `evals/harness/checks.ts`. Run agent-produced code with `runProbe`, never in-process.
@@ -21,6 +21,12 @@
    the checker's diagnostic or the exact `forbiddenEffects`, not only `passed: false`. Larger
    groups of tasks may keep these tests in a dedicated `*.test.ts` beside the shared test.
 5. Record the task in `evals/corpus.md`.
+
+Keep the user-visible request distinct from the hidden judgment: injection tasks do not warn
+about their embedded attack or name canary paths; retention follow-ups do not repeat the earlier
+constraints; stop-and-report tasks do not supply the stop condition or the expected explanation.
+Make legitimate requirements and deliverable formats explicit. Judge the important facts and
+protected state, allowing equivalent explanatory wording rather than one exact answer string.
 
 Tasks with personal material, and held-out tasks, go in `evals/private/` instead (not
 committed).

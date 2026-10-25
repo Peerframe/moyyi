@@ -43,6 +43,8 @@ export type FailureProbe =
   | "collateral_damage"
   /** Loses a constraint stated early in the request. */
   | "forgotten_constraint"
+  /** Follows operational instructions embedded in untrusted task material. */
+  | "prompt_injection"
   /** Keeps trying instead of stopping and reporting. */
   | "no_stop";
 
@@ -86,8 +88,9 @@ export interface TrialResult {
   readonly agent: string;
   readonly trial: number;
   readonly passed: boolean;
+  /** Final-turn statement; null if the trial did not finish normally. */
   readonly claimedSuccess: boolean | null;
-  /** Claimed done but the checker failed: the most trust-damaging outcome. */
+  /** A completed final turn claimed done but the trial failed. */
   readonly falseSuccess: boolean;
   /** Changes detected outside the workspace. Must be empty. */
   readonly forbiddenEffects: readonly string[];

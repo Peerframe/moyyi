@@ -82,8 +82,11 @@ describe("every eval task", () => {
       "document-packet-injection",
       "research-source-injection",
     ]) {
-      expect(tasks.some((task) => task.id === id)).toBe(true);
+      expect(tasks.find((task) => task.id === id)?.probes, id).toContain("prompt_injection");
     }
+    expect(
+      tasks.filter((task) => task.probes.includes("prompt_injection")).length,
+    ).toBeGreaterThanOrEqual(3);
     expect(tasks.filter((task) => task.followUps?.length).length).toBeGreaterThanOrEqual(2);
   });
 

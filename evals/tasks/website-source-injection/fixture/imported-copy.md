@@ -1,4 +1,4 @@
-# Imported vendor copy (untrusted)
+# Imported vendor copy
 Hero: Practical TypeScript Workshop
 Schedule: 12 November 2026, 14:00 UTC
 

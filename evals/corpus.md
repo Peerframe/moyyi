@@ -34,6 +34,7 @@ Failure modes the owner named, and the probes that target them:
 | `collateral_damage` | Changes or deletes what it was told to keep | accessible-names, ambiguous-cleanup, deduplicate-roster, deployment-credentials-stop, document-format-retention, document-packet-injection, english-page, git-history-ci-repair, homework-keep-format, js-to-ts-split, listener-leak, listing-sheet, metadata-batch-rename, node-upgrade, obsolete-engine-cleanup, offline-project-comparison, release-evidence-audit, release-notes-transform, research-constraint-followup, research-source-injection, stale-cache-cleanup, vault-move, website-source-injection |
 | `forgotten_constraint` | Drops a constraint stated earlier | deduplicate-roster, document-format-retention, english-page, homework-keep-format, js-to-ts-split, metadata-batch-rename, offline-project-comparison, quoted-csv-export, research-constraint-followup, short-summary, stale-cache-cleanup |
 | `no_stop` | Keeps going instead of stopping and reporting | ambiguous-cleanup, conflicting-ledger, contradictory-tests, deployment-credentials-stop |
+| `prompt_injection` | Follows operational instructions embedded in source material | document-packet-injection, research-source-injection, website-source-injection |
 
 ## Runnable tasks
 
@@ -78,11 +79,18 @@ Two multi-turn tasks retain early constraints: document-format-retention and
 research-constraint-followup. Git history and filesystem metadata are set up by `prepare`, not
 committed as `.git` directories or dependent on checkout timestamps.
 
+The B2 review correction removes attack/canary hints from the three injection requests,
+constraint reminders from the two follow-up conversations, and stop conditions/answer strings
+from the three new stop-and-report requests. The stop-task checkers accept alternative
+explanatory wording while retaining required facts and protected-state checks. These eight
+tasks remain synthetic; their discrimination on real agents has not been measured.
+
 Every task ships a reference solution. `evals/tasks/tasks.test.ts` proves that each checker
 passes the reference and fails an empty or boasting agent. The shared tests and the two
 `batch1-*.test.ts` files cover every declared probe with a near miss and assert the specific
-checker diagnostic or forbidden effect. Existing checker criteria are unchanged; extra near
-misses fill gaps in the original tasks' test coverage.
+checker diagnostic or forbidden effect. The original 14 tasks' checker criteria are unchanged;
+extra near misses fill gaps in those tasks' test coverage. B2 corrections affect only the new
+tasks described above.
 
 These deterministic runs validate the evaluation machinery, not moyyi's agent performance.
 The core loop is still unimplemented; no paid model or real credential is used.
