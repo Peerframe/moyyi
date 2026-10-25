@@ -125,7 +125,9 @@ exception is a programming error. Every provider runs its recorded fixtures thro
 
 The DeepSeek adapter accepts a documented text/reasoning/function subset and delegates fixed-origin
 HTTP and credentials to runtime. Context includes the persisted assistant stop reason in the
-nonpersisted model port, so partial reasoning cannot masquerade as a complete continuation.
+nonpersisted model port, so partial responses cannot masquerade as complete history. All actual
+visible reasoning is preserved, but complete turns need not produce it. Validated commentary and
+final-answer annotations retain their text in the plaintext profile; response terminals govern tools.
 Optional model recording/replay lives in runtime; it captures canonical requests and common events,
 not HTTP credentials. It requires a sequential stream and exact request/profile match, with no live
 fallback. See [deepseek.md](deepseek.md) and [ADR 0010](decisions/0010-deepseek-transport-and-recording.md).

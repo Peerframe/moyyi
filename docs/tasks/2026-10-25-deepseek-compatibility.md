@@ -1,6 +1,59 @@
 # DeepSeek 真实响应兼容性修复
 
-## 当前范围：final_answer 输出兼容
+## 当前范围：工具前说明与完整明文续接（2026-10-26）
+
+基线为已合并并安装 #18 的 `main@a603346`；当前分支 `codex/deepseek-tool-continuation`。
+Owner 同意逐步推进，第一步只修 DeepSeek 工具路径，按独立 PR 交付。
+**本轮实现期间真实请求为 0，不自动合并、不替换安装、不正式发布。**
+不改 persisted v1、core、权限、重试、依赖、API profile ID、分层规则和公共题判分，D1–D6 不变。
+项目指令、Skills、OpenBot 产品能力迁移不在本轮。
+
+### 已确认的触发与实现
+
+上一轮获准的只读任务最多 3 请求、零自动重试，实际仅发 1 请求，HTTP 200；累计历史请求为 4。
+同一 assistant message 从 added 的 `final_answer` 变为 done 的 `commentary`，随后开始 read 调用。
+旧解析器因明确不支持 commentary 而关闭流，工具执行为 0。私有捕获为 13,961 字节、15 个事件的
+前缀，没有 response terminal，用量和账单未知。不得补造终态或把前缀写成真实完成的工具任务。
+
+- 逐个快照验证 absent/null/final_answer/commentary；added 是暂态，允许它与 done 不同。
+- done 和 terminal 都给出具体 phase 时必须一致；缺失/null 可出现或消失。
+  文字、身份、状态、参数及其顺序一致性规则保持。
+- 所有文字、实际 visible reasoning、函数调用与结果进入既有明文续接；不伪造 reasoning。
+  完整且没产生 reasoning 的助手消息可继续；工具历史仍必须有成功 stopReason 和严格调用配对。
+- phase 仅为受支持输出注解，不进入 common content 或后续请求；只有 response terminal 决定
+  end_turn/tool_use/截断/失败。EOF、取消、未知 phase、summary/opaque 与辅助密文无明文的拒绝边界保持。
+- D2 没有被绕过：没有新 envelope，也不拿滚动别名冒充确切 model revision。DeepSeek phase 敏感
+  续接是否需要更多元数据仍未经实时验证；依据与适用范围见 [ADR 0010](../decisions/0010-deepseek-transport-and-recording.md#tool-commentary-and-complete-history-2026-10-26)。
+
+诊断准备也有两项本机错误：第一次工具描述断言误把“显示工具”当成“授予工具权限”，该次 HTTP 0；
+测试工作区放在受保护的 `.moyyi` 下，即使解析成功也会被拒绝。已离线验证原目录拒绝、外部临时目录
+读取成功。后续真实验收必须先以 synthetic transport 验证外部合成工作区，私有存储/录制另放；
+不修改权限规则。上述本机原始响应、工作区和凭据均不进入仓库。
+
+### 验收证据
+
+- `npm exec -- vitest run src/plugins/provider-deepseek/tool-continuation.test.ts`：**56/56**。
+- `npm run eval:deepseek`：**17/17**。有/无 reasoning 的说明→真实临时文件读取→无 reasoning 最终回答
+  均通过 SQLite 与录制重放；前缀/截断/拒绝/失败/明确 phase 矛盾均不执行提出的工具。
+- 私有前缀按 13 字节分块离线解析：已安装版报 `Unsupported assistant phase`，修复源码越过它后
+  正确报 `stream_interrupted`，`checkModelStream` 通过，真实 runtime effects/tool results 都为 0。
+  旧完整捕获仍得到 `OK`、end_turn 和最终用量 34/11（含 reasoning 9）。网络与凭据读取均为 0。
+- 独立源码与测试审查未发现阻断；没有把主控私有捕获验证冒充另一次独立运行。
+- `npm run check -- -- --maxWorkers=4`：typecheck、Biome **206 files**、**1,522/1,522 tests in 68 files**。
+  没有修改测试断言、超时、配置或 CI 命令；只限制本次本机测试并发。默认并发的全量检查曾两次在
+  未改动的 development watcher 异步回调测试上超时；该文件与兼容回归单独执行为 **61/61**。
+  独立原生 Node 诊断也复现了“注册后立即写文件偶发无通知”，且文件指纹确已改变；具体 OS 原因
+  尚未证实，不把降低并发后的通过写成修好了 watcher。后续开发热重载应单独修复，现有 `/reload`
+  可手动使用。本轮不改监听器或放宽其测试。
+- Markdown 相对路径 **72** 项检查通过，`git diff --check` 通过；精确提交的 CI 结果在 PR 验收区记录。
+
+### 未完成与 owner 决定
+
+真实 DeepSeek 工具结果续接、phase 敏感行为、普通任务质量/耗时/费用仍未验收。当前本机安装仍为 #18。
+本轮没有新增需要 owner 选择的架构事项；PR 合并、安装更新及下一次有界付费验收仍按 owner 授权推进。
+当前前缀不能独立验证完整真实成功；旧 normalized error recording 仍重放原错误，不改旧数据或哈希。
+
+## PR #18 历史证据：final_answer 输出兼容
 
 基线为已合并并安装 #17 的 `main@85bc5f5`；当前分支 `codex/deepseek-final-answer-phase`，
 按独立 PR 到 main 交付。只修 DeepSeek 插件的输出解码，并补合成回归、已有 eval 与文档。

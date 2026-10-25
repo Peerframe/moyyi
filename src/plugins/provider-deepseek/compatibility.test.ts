@@ -197,14 +197,17 @@ describe("DeepSeek auxiliary reasoning compatibility", () => {
 });
 
 describe("DeepSeek request reasoning remains visible-only", () => {
-  it.each(["opaque content", "replay-only reasoning", "auxiliary field on visible content"])(
+  it.each(["opaque content", "opaque reasoning with replay", "auxiliary field on visible content"])(
     "rejects %s in completed assistant history",
     (variant) => {
       const content: ContentPart[] =
         variant === "opaque content"
           ? [{ type: "reasoning", kind: "opaque" }]
-          : variant === "replay-only reasoning"
-            ? [{ type: "text", text: "Synthetic answer." }]
+          : variant === "opaque reasoning with replay"
+            ? [
+                { type: "reasoning", kind: "opaque" },
+                { type: "text", text: "Synthetic answer." },
+              ]
             : [
                 {
                   type: "reasoning",
@@ -235,7 +238,7 @@ describe("DeepSeek request reasoning remains visible-only", () => {
           },
         ],
         tools:
-          variant === "replay-only reasoning"
+          variant === "opaque reasoning with replay"
             ? [{ name: "read", description: "Read text", inputSchema: { type: "object" } }]
             : [],
         maxOutputTokens: 512,
@@ -243,4 +246,39 @@ describe("DeepSeek request reasoning remains visible-only", () => {
       expect(() => buildDeepSeekRequest(request)).toThrow();
     },
   );
+  it("does not infer missing reasoning from an unused opaque payload on complete text", () => {
+    const built = buildDeepSeekRequest({
+      origin: deepSeekProfile.origin,
+      system: [],
+      messages: [
+        {
+          role: "assistant",
+          stopReason: "end_turn",
+          content: [{ type: "text", text: "Complete synthetic answer." }],
+          replay: {
+            version: 1,
+            payloadVersion: 1,
+            origin: {
+              ...deepSeekProfile.origin,
+              modelRevision: null,
+              apiProfile: "synthetic-profile",
+            },
+            contentHash: "synthetic-hash",
+            payload: JSON.stringify({ encrypted_content: opaque }),
+          },
+        },
+      ],
+      tools: [{ name: "read", description: "Read text", inputSchema: { type: "object" } }],
+      maxOutputTokens: 512,
+    });
+    expect(built.input).toEqual([
+      {
+        type: "message",
+        role: "assistant",
+        content: [{ type: "output_text", text: "Complete synthetic answer." }],
+      },
+    ]);
+    expect(JSON.stringify(built)).not.toContain(opaque);
+    expect(JSON.stringify(built)).not.toContain("replay");
+  });
 });
