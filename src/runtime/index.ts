@@ -38,6 +38,7 @@ import {
   type DeepSeekTransport,
 } from "../plugins/provider-deepseek/index.ts";
 import { shellPlugin } from "../plugins/shell/index.ts";
+import { skillsPlugin } from "../plugins/skills/index.ts";
 import { createWebPlugin } from "../plugins/web/index.ts";
 import {
   ReadOnlyPolicy,
@@ -54,6 +55,7 @@ import { FileRecordingSink, RecordingModelClient, ReplayModelClient } from "./mo
 import { type PluginEntry, PluginRegistry, type PluginStatus } from "./plugins.ts";
 import { WorkspacePreconditions } from "./preconditions.ts";
 import { NodeWorkspaceProcesses } from "./processes.ts";
+import { type SkillSelection, selectSkills } from "./skills.ts";
 import { AjvArgumentValidator } from "./validation.ts";
 import { NodeWebAccess, type WebAccessOptions } from "./web.ts";
 import type { WebHttpDependencies } from "./web-http.ts";
@@ -94,6 +96,8 @@ export interface DevelopmentPlugin {
 }
 
 export interface RuntimeOptions {
+  /** Explicit trusted library root and activated names; no automatic scanning or installation. */
+  readonly skills?: SkillSelection;
   /** Disable automatic root AGENTS.md reads. Default working instructions remain enabled. */
   readonly projectInstructions?: false;
   readonly developmentPlugins?: readonly DevelopmentPlugin[];
@@ -153,6 +157,7 @@ export async function createRuntime(
   options: RuntimeOptions = {},
   services: RuntimeServices = {},
 ): Promise<Runtime> {
+  const skills = selectSkills(options.skills);
   if (options.developmentPlugins?.length && (options.modelRecording || options.modelReplay))
     throw Error("Development reload cannot be combined with recording or replay");
   if (
@@ -247,6 +252,7 @@ export async function createRuntime(
   const startup = [
     { plugin: defaultInstructionsPlugin },
     ...(options.projectInstructions === false ? [] : [{ plugin: projectInstructionsPlugin }]),
+    ...(skills?.enabled.length ? [{ plugin: skillsPlugin }] : []),
     { plugin: fsPlugin },
     { plugin: shellPlugin },
     { plugin: createWebPlugin(options.web?.search?.origin) },
@@ -482,6 +488,7 @@ export async function createRuntime(
           profile,
           signal,
           options.projectInstructions !== false,
+          skills,
         ),
       ...(options.limits === undefined ? {} : { limits: options.limits }),
     });

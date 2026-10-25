@@ -68,6 +68,14 @@ export class NodeWorkspaceFiles implements WorkspaceFilesFactory {
     return new ReadScope(context, assertAuthorized, this.excluded).readProjectInstructions();
   }
 
+  readSkillDocument(
+    context: Pick<ToolContext, "workspaceRoot" | "signal">,
+    name: string,
+    assertAuthorized: () => void,
+  ): Promise<FileRead> {
+    return new ReadScope(context, assertAuthorized, this.excluded).readSkillDocument(name);
+  }
+
   create(context: ToolContext, assertAuthorized: () => void): WorkspaceFiles {
     const scope = new ReadScope(context, assertAuthorized, this.excluded);
     return Object.freeze({
@@ -209,6 +217,34 @@ class ReadScope {
         throw new FileAccessError("denied", "Project instructions changed during access");
       if (result.truncated)
         throw new FileAccessError("unavailable", "Project instructions exceed the 16 KiB limit");
+      return result;
+    });
+  }
+
+  readSkillDocument(name: string): Promise<FileRead> {
+    if (name.length > 64 || !/^[a-z0-9]+(?:-[a-z0-9]+)*$/u.test(name))
+      return Promise.reject(new FileAccessError("denied", "Invalid skill name"));
+    return this.operation(async (root) => {
+      const directory = resolve(root.path, name);
+      const parent = await this.io(() => lstat(directory));
+      if (!parent.isDirectory() || parent.isSymbolicLink())
+        throw new FileAccessError("denied", "Skill directory must not be an alias");
+      const path = `${name}/SKILL.md`;
+      const before = await this.io(() => lstat(resolve(root.path, path)));
+      if (!before.isFile() || before.isSymbolicLink() || before.nlink !== 1)
+        throw new FileAccessError("denied", "Skill must be a regular unlinked file");
+      const result = await this.readFile(root, path, 12 * 1024);
+      const after = await this.io(() => lstat(resolve(root.path, path)));
+      const afterParent = await this.io(() => lstat(directory));
+      if (
+        after.isSymbolicLink() ||
+        afterParent.isSymbolicLink() ||
+        !same(before, after) ||
+        !same(parent, afterParent) ||
+        result.path !== path ||
+        result.truncated
+      )
+        throw new FileAccessError("denied", "Skill changed or exceeds its complete-file limit");
       return result;
     });
   }

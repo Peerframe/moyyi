@@ -52,11 +52,24 @@ export interface ContextSourceInput {
   readonly workspaceRoot: string;
   readonly profile: ModelProfile;
   readonly signal: AbortSignal;
+  /** Host-selected SKILL.md files only; expires with collection; no discovery or executable access. */
+  readonly skills?: {
+    readEnabled(): Promise<readonly SkillSource[]>;
+  };
   /** Fixed-path, read-only capability; expires when this collection finishes. */
   readonly projectInstructions?: {
     readRoot(): Promise<ProjectInstructionsResult>;
   };
 }
+
+export type SkillSource =
+  | { readonly kind: "blocked"; readonly name: string }
+  | {
+      readonly kind: "loaded";
+      readonly name: string;
+      readonly text: string;
+      readonly sha256: string;
+    };
 
 export type ProjectInstructionsResult =
   | { readonly kind: "absent" }

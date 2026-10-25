@@ -1,4 +1,5 @@
 import { createHash } from "node:crypto";
+import { resolve } from "node:path";
 import type {
   ContextSection,
   ContextSource,
@@ -6,8 +7,10 @@ import type {
   ModelProfile,
   PermissionPolicy,
   ProjectInstructionsResult,
+  SkillSource,
 } from "../contracts/index.ts";
 import type { NodeWorkspaceFiles } from "./files.ts";
+import type { SkillSelection } from "./skills.ts";
 
 const readProfile: EffectProfile = Object.freeze({
   class: "read",
@@ -24,6 +27,7 @@ export async function collectContext(
   profile: ModelProfile,
   signal: AbortSignal,
   enabled: boolean,
+  skills?: SkillSelection,
 ): Promise<readonly ContextSection[]> {
   const controller = new AbortController();
   const scopeSignal = AbortSignal.any([signal, controller.signal]);
@@ -80,6 +84,69 @@ export async function collectContext(
     guard();
     return result;
   };
+  let skillPending: Promise<readonly SkillSource[]> | undefined;
+  let skillRevision: number | undefined;
+  const readPaths = new Set<string>();
+  const skillAllowed = (path: string) => {
+    try {
+      return (
+        policy.beforeContextRead?.(path).kind === "allow" &&
+        policy.beforePrepare("read", readProfile, { path }).kind === "allow"
+      );
+    } catch {
+      return false;
+    }
+  };
+  const skillGuard = () => {
+    live();
+    if (policy.revision?.() !== skillRevision || [...readPaths].some((path) => !skillAllowed(path)))
+      throw Error("Skill read permission changed");
+  };
+  const readEnabled = async (): Promise<readonly SkillSource[]> => {
+    live();
+    if (!skillPending) {
+      skillRevision = policy.revision?.();
+      skillPending = (async () => {
+        const result: SkillSource[] = [];
+        let total = 0;
+        for (const name of skills?.enabled ?? []) {
+          live();
+          const path = resolve(skills?.root ?? "", name, "SKILL.md");
+          if (!skillAllowed(path)) {
+            result.push(Object.freeze({ kind: "blocked", name }));
+            continue;
+          }
+          readPaths.add(path);
+          try {
+            const file = await files.readSkillDocument(
+              { workspaceRoot: skills?.root ?? "", signal: scopeSignal },
+              name,
+              skillGuard,
+            );
+            total += file.bytesRead;
+            if (total > 48 * 1024) throw Error("Skill collection exceeds budget");
+            skillGuard();
+            result.push(
+              Object.freeze({
+                kind: "loaded",
+                name,
+                text: file.text,
+                sha256: createHash("sha256").update(file.text).digest("hex"),
+              }),
+            );
+          } catch {
+            throw Error(
+              "Cannot load selected SKILL.md safely: check read grants, regular files, UTF-8 and 12 KiB each / 48 KiB total limits",
+            );
+          }
+        }
+        return Object.freeze(result);
+      })();
+    }
+    const result = await skillPending;
+    skillGuard();
+    return result;
+  };
   let removeAbort = () => {};
   const cancelled = new Promise<never>((_, reject) => {
     const abort = () => reject(Error("Context collection cancelled"));
@@ -96,6 +163,7 @@ export async function collectContext(
             profile,
             signal: scopeSignal,
             ...(enabled ? { projectInstructions: Object.freeze({ readRoot }) } : {}),
+            ...(skills?.enabled.length ? { skills: Object.freeze({ readEnabled }) } : {}),
           }),
         ),
       ),
@@ -103,6 +171,7 @@ export async function collectContext(
     ]);
     live();
     if (pending) guard();
+    if (skillPending) skillGuard();
     return sections.flat();
   } finally {
     active = false;

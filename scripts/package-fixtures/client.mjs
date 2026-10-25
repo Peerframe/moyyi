@@ -21,6 +21,12 @@ assert.equal(typeof ANTHROPIC_API_PROFILE, "string");
 const directory = mkdtempSync(join(tmpdir(), "moyyi-installed-client-"));
 const workspace = join(directory, "workspace");
 const dataDirectory = join(directory, "private-data");
+const skillRoot = join(directory, "skills-library");
+const skillDirectory = join(skillRoot, "package-review");
+mkdirSync(skillDirectory, { recursive: true });
+const skillDocument = (body) =>
+  `---\nname: package-review\ndescription: Inspect package fixtures\nallowed-tools: shell\n---\n${body}\n`;
+writeFileSync(join(skillDirectory, "SKILL.md"), skillDocument("INSTALLED_SKILL_FIRST"));
 mkdirSync(workspace);
 writeFileSync(join(workspace, "protected.txt"), "UNCHANGED");
 writeFileSync(join(workspace, "AGENTS.md"), "INSTALLED_ROOT_GUIDANCE_FIRST");
@@ -98,6 +104,7 @@ let disposals = 0;
 const options = {
   model: origin,
   dataDirectory,
+  skills: { root: skillRoot, enabled: ["package-review"] },
   plugins: [{ plugin }],
   workspaceWrites: { roots: [workspace], approval: "ask" },
   developmentPlugins: [
@@ -221,6 +228,16 @@ try {
   assert(!JSON.stringify(requests.at(-1).system).includes("INSTALLED_ROOT_GUIDANCE_FIRST"));
   rmSync(join(workspace, "AGENTS.md"));
   cases.push("installed-root-instructions-refresh");
+
+  assert(JSON.stringify(requests.at(-1).system).includes("INSTALLED_SKILL_FIRST"));
+  writeFileSync(join(skillDirectory, "SKILL.md"), skillDocument("INSTALLED_SKILL_CHANGED"));
+  steps.push(answer("Skills refreshed in the installed runtime."));
+  await turn("Continue with the changed selected skill.");
+  assert(JSON.stringify(requests.at(-1).system).includes("INSTALLED_SKILL_CHANGED"));
+  assert(!JSON.stringify(requests.at(-1).system).includes("INSTALLED_SKILL_FIRST"));
+  assert(!JSON.stringify(requests.at(-1).system).includes(skillRoot));
+  assert(runtime.plugins.some((plugin) => plugin.name === "skills" && plugin.state === "loaded"));
+  cases.push("installed-selected-skill-refresh");
 
   steps.push(
     tool("create", { path: "created.txt", text: "APPROVED_CONTENT" }),

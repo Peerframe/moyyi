@@ -38,4 +38,16 @@ write tools were synthetic; phase 2 introduces an explicit runtime write grant. 
 
 | moyyi path | OpenBot source | Revision | Notes |
 |---|---|---|---|
-| — | — | — | nothing copied yet |
+| `src/plugins/skills/parse.ts` | `packages/employee-publisher/src/agent-skills.ts` | `010439bb9002fabb7e1facd8450ee85edbafa309` | Adapted bounded YAML AST-validation approach (aliases, anchors/tags, scalar keys, node/depth caps); rewritten schema checks and moyyi plugin/port, no publisher or authority code. MIT notice in `THIRD_PARTY_NOTICES.md` |
+
+## Skills boundary experience
+
+Reviewed the same OpenBot revision's `apps/server-python/src/openbot_server/employee_knowledge_inputs.py`
+and `apps/server-python/tests/test_skill_yaml.py`. The scalar-type cases (block/folded strings,
+comments, YAML 1.2 strings and numeric/boolean/null rejection), duplicate-key cases and inert
+`allowed-tools` boundary are independently rewritten in
+[src/plugins/skills/parse.test.ts](../src/plugins/skills/parse.test.ts). OpenBot's secret-text heuristic,
+publication schemas, author/publisher identity and control plane are not imported. No OpenBot
+worktree file was modified. The reviewed source files matched that commit despite unrelated local
+OpenBot changes. The runtime reader, request recording, permission and cancellation mechanisms
+remain moyyi's existing implementations; see [ADR 0019](decisions/0019-explicit-skills-context.md).

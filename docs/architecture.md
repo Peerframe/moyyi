@@ -50,7 +50,7 @@ core through five fixed points and can be added or removed without touching anyt
 | `shell` | tools | merged in phase 3 |
 | `provider-anthropic` | model provider | merged in phase 5; live acceptance pending |
 | `web` (fetch, search) | tools; runtime capability and base policy | merged in phase 5 |
-| `skills` (Agent Skills format) | context source | later |
+| `skills` (explicitly activated Agent Skills documents) | context source | implemented; refreshed per request |
 | `mcp` (bridge to MCP servers) | tools, policy rule | later |
 | `memory` (Hermes Agent–inspired learning) | context source, event observer | later |
 
@@ -89,6 +89,12 @@ approval-required reads do not load text. It expires after collection and follow
 and policy revocation. The plugins import no I/O. Root instructions refresh before each model
 request, have a 16 KiB complete-file limit and retain source/hash in the recorded request. There
 is no automatic nested/parent/home discovery. See [usage and limits](instructions.md).
+
+[ADR 0019](decisions/0019-explicit-skills-context.md) adds explicit host-selected skills through
+the same context-source lifecycle. A trusted host chooses one library root and at most eight
+activated names; runtime exposes only their fixed SKILL.md documents after read-policy checks.
+The plugin validates bounded YAML and renders source/hash/text as guidance. No discovery,
+references, scripts or permissions are imported. See [Skills setup](skills.md).
 
 | Kind | Runs | Trusted | Example |
 |---|---|---|---|
