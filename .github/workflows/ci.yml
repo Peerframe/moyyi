@@ -42,3 +42,9 @@ jobs:
 
       - name: Long-session conformance
         run: npm run eval:long-sessions
+
+      - name: Anthropic offline conformance
+        run: npm run eval:anthropic
+
+      - name: Web authority conformance
+        run: npm run eval:web

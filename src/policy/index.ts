@@ -158,3 +158,60 @@ export class WorkspaceProcessPolicy implements PermissionPolicy {
     return decision.kind === "allow" ? { kind: this.approval } : decision;
   }
 }
+
+/** Web traffic has an independent, revocable grant; local reads and model APIs do not grant it. */
+export class WebPolicy implements PermissionPolicy {
+  private allowed = true;
+  private epoch = 0;
+  private readonly previous: PermissionPolicy;
+  private readonly approval: "ask" | "allow";
+  private readonly tools: ReadonlySet<string>;
+
+  constructor(
+    options: {
+      readonly previous?: PermissionPolicy;
+      readonly approval?: "ask" | "allow";
+      readonly fetch?: boolean;
+      readonly search?: boolean;
+    } = {},
+  ) {
+    this.previous = options.previous ?? new ReadOnlyPolicy();
+    this.approval = options.approval ?? "ask";
+    if (!["ask", "allow"].includes(this.approval)) throw Error("Invalid web approval mode");
+    this.tools = new Set([
+      ...(options.fetch ? ["web_fetch"] : []),
+      ...(options.search ? ["web_search"] : []),
+    ]);
+  }
+  grant(): void {
+    this.allowed = true;
+    this.epoch++;
+  }
+  revoke(): void {
+    this.allowed = false;
+    this.epoch++;
+  }
+  revision(): number {
+    return this.epoch + (this.previous.revision?.() ?? 0);
+  }
+  beforePrepare(tool: string, profile: EffectProfile, args: unknown): PolicyDecision {
+    if (profile.class !== "external") return this.previous.beforePrepare(tool, profile, args);
+    if (!this.allowed || !this.tools.has(tool))
+      return { kind: "deny", reason: "Web operation has no active grant" };
+    if (profile.reversibility !== "none" || profile.verification !== "none")
+      return { kind: "deny", reason: "Web requests cannot claim rollback or inferred recovery" };
+    return { kind: "allow" };
+  }
+  beforeExecute(
+    tool: string,
+    profile: EffectProfile,
+    action: PreparedAction,
+    effectId: EffectId,
+    args?: unknown,
+  ): PolicyDecision {
+    if (profile.class !== "external")
+      return this.previous.beforeExecute(tool, profile, action, effectId, args);
+    const decision = this.beforePrepare(tool, profile, args);
+    return decision.kind === "allow" ? { kind: this.approval } : decision;
+  }
+}

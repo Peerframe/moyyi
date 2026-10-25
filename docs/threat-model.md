@@ -2,8 +2,8 @@
 
 Status: D3 boundaries accepted on 2026-10-25 in
 [ADR 0006](decisions/0006-security-boundaries.md); read-only workspace enforcement is merged from batch 5.
-The phase 2 branch adds tested controlled writes and snapshots (see [ADR 0012](decisions/0012-controlled-workspace-writes.md)).
-The phase 3 branch adds native process/file/network confinement under [ADR 0013](decisions/0013-native-process-sandbox.md).
+Merged phase 2 adds tested controlled writes and snapshots (see [ADR 0012](decisions/0012-controlled-workspace-writes.md)).
+Merged phase 3 adds native process/file/network confinement under [ADR 0013](decisions/0013-native-process-sandbox.md).
 Credential-store integration still requires its own verification.
 The batch 7 CLI uses explicit trusted host callbacks, not a new credential-store adapter.
 It escapes terminal control/bidirectional text and accepts approvals only for displayed digests;
@@ -68,3 +68,21 @@ explicit development modules remain trusted in-process code, not a sandbox.
 
 These items belong to their implementation briefs. D3 is decided, but no later batch is started
 or authorized merely by accepting this document.
+
+
+## Phase 5 web boundary
+
+[ADR 0015](decisions/0015-anthropic-and-web.md) implements tool networking independently of model
+API credentials. Exact host grants and per-action approvals bind destination/query; preparation
+has no DNS/network effects. Runtime verifies all resolved public IPv4 addresses and pins the actual
+TLS connection with ordinary certificate checks. No redirects, ambient proxy, cookie, provider key
+or local file capability accompanies a web invocation. Revocation/cancellation closes in-flight
+requests; uncertain external effects stay unknown and do not replay on restart.
+
+HTML/search snippets remain untrusted data. The injection conformance eval deliberately attempts
+secret reads, writes and ungranted egress, checking actual canaries and request counts. It proves
+those enforced boundaries, not universal model resistance or prevention of disclosure through an
+already authorized URL/query. Host-installed modules remain trusted; test-only transport injection
+cannot establish production network isolation. See [web scope/limits](web.md). Provider API requests
+still transmit the selected model context under their own explicit connection; web restrictions do
+not constrain that separate channel. No live provider/search task quality is claimed.

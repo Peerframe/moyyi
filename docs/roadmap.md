@@ -34,7 +34,7 @@ Remaining:
   checker results do not yet measure real-agent performance
 - Validate the accepted security design ([threat-model.md](threat-model.md),
   [ADR 0006](decisions/0006-security-boundaries.md)) in the relevant implementation phases
-- D6 accepted: native sandbox default, Docker optional; phase 3 merged; phase 4 authorized, no phase 5
+- D6 accepted: native sandbox default, Docker optional; phases 3–4 merged; phase 5 authorized, no phase 6
 
 ## Phase 1: read-only loop
 
@@ -89,16 +89,23 @@ and the [historical handoff](tasks/2026-10-25-phase-3-shell.md).
 ## Phase 4: recovery and long sessions
 
 Crash tests at journal boundaries, explicit model-assisted `/compact`, cache-aware context and
-long-session offline evals are implemented on the phase 4 branch. Original history is retained;
+long-session offline evals are merged in [PR #14](https://github.com/Peerframe/moyyi/pull/14). Original history is retained;
 recent turns and unresolved actions remain visible. Summary requests are bounded, cancellable
 and auditable; recovery is itself restartable. Persisted v1 and previous checkers are unchanged.
 See [usage](long-sessions.md), [ADR 0014](decisions/0014-recovery-and-compaction.md) and
-[current handoff](tasks/2026-10-25-phase-4-long-sessions.md). The new PR awaits review/merge.
-Live summary quality and provider cache savings remain unmeasured. Phase 5 is not started.
+[historical handoff](tasks/2026-10-25-phase-4-long-sessions.md). Fixed-head review, 64 focused tests,
+PR CI and merged-main CI passed. Live summary quality and provider cache savings remain unmeasured.
 
 ## Phase 5: second provider and web
 
-`provider-anthropic` wired to a real model; the `web` plugin with prompt-injection evals.
+`provider-anthropic` targets the direct Messages API with signed-reasoning replay, compaction
+fallback and fixed-origin host HTTP. The `web` plugin provides separately granted fetch/search
+with exact-origin approvals, public-address DNS pinning and bounded HTTPS. Implemented on the
+phase 5 branch; the new PR awaits review/merge. Offline provider and prompt-injection authority
+scenarios pass; live Anthropic and deployed SearXNG acceptance remain unverified. No paid call
+was made. See [Anthropic usage](anthropic.md), [web usage](web.md),
+[ADR 0015](decisions/0015-anthropic-and-web.md) and
+[current handoff](tasks/2026-10-25-phase-5-anthropic-web.md). Phase 6 is not started.
 
 ## Phase 6: release
 

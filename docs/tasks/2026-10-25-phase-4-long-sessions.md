@@ -1,5 +1,11 @@
 # Phase 4: recovery and long sessions
 
+Historical delivery record. PR #14 was reviewed at `9c93707` and merged as `25aff55` after
+64 focused tests and [head CI](https://github.com/Peerframe/moyyi/actions/runs/40179377387) passed.
+[Merged main CI](https://github.com/Peerframe/moyyi/actions/runs/40179790747) passed too.
+The original scope/evidence below is retained; current authorization is in the
+[phase 5 handoff](2026-10-25-phase-5-anthropic-web.md).
+
 ## Authorization and checkout
 
 Owner authorized review/merge of PR #13, then phase 4 on a new branch/PR. The new PR must not

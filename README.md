@@ -9,8 +9,10 @@ offline terminal with `npm run moyyi -- --demo`, or explicitly connect a trusted
 `--host FILE`. The demo is a finite script, not an LLM; live DeepSeek acceptance remains pending.
 See [docs/cli.md](docs/cli.md), [docs/deepseek.md](docs/deepseek.md) and
 [docs/roadmap.md](docs/roadmap.md). Controlled writes and opt-in native sandboxed commands are merged;
-see [docs/shell.md](docs/shell.md). The phase 4 branch adds explicit conversation compaction and
-expanded crash recovery checks; see [docs/long-sessions.md](docs/long-sessions.md). Its PR awaits review.
+see [docs/shell.md](docs/shell.md). Phase 4 compaction and crash recovery are merged in
+[PR #14](https://github.com/Peerframe/moyyi/pull/14); see [docs/long-sessions.md](docs/long-sessions.md).
+The phase 5 branch adds opt-in [Anthropic](docs/anthropic.md) and separately authorized
+[web fetch/search](docs/web.md). Its PR awaits review; live Anthropic/search acceptance is pending.
 
 ## Setup
 
@@ -36,6 +38,8 @@ npm run check
 | `npm run demo:deepseek-replay` | Demonstrate synthetic DeepSeek SSE, real file tools and exact model replay |
 | `npm run eval:shell` | Run seven offline scenarios through real sandboxed processes |
 | `npm run eval:long-sessions` | Run four offline long-history and summary-rejection scenarios |
+| `npm run eval:anthropic` | Run five offline Anthropic tools/replay/compaction/failure scenarios |
+| `npm run eval:web` | Run seven offline web authority and injection-attempt scenarios |
 | `npm run demo:scripted` | Demonstrate a complete scripted agent loop using disposable storage |
 | `npm run build` | Compile to `dist/` |
 
@@ -48,7 +52,7 @@ npm run check
 | `src/core` | Run loop, tool executor, approvals, cancellation, budgets and recovery |
 | `src/store`, `src/context`, `src/policy` | Persistence, context assembly and base permissions |
 | `src/runtime` | Plugin registry, wiring, client protocol |
-| `src/plugins/<name>` | One plugin per folder; currently `provider-scripted`, `provider-deepseek`, `fs` and `shell` |
+| `src/plugins/<name>` | One plugin per folder; currently `provider-scripted`, `provider-deepseek`, `provider-anthropic`, `fs`, `shell` and `web` |
 | `src/cli` | Terminal client |
 | `evals/` | Task suite and harness |
 | `docs/` | Architecture, roadmap, threat model, decisions, recipes |
@@ -64,4 +68,4 @@ Controlled file creation, editing, snapshots and undo are merged in phase 2,
 with explicit workspace grants. See [write usage](docs/writes.md) and
 [acceptance status](docs/tasks/2026-10-25-phase-2-writes.md). Run `npm run eval:writes` for
 eight offline scenarios with real filesystem and SQLite effects in disposable workspaces.
-Phase 3 follows accepted D6: native sandbox default, Docker optional. Phase 5 is not started.
+Phase 3 follows accepted D6: native sandbox default, Docker optional. Phase 6 is not started.

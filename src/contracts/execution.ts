@@ -2,6 +2,7 @@ import type { WorkspaceFiles, WorkspaceWrites } from "./files.ts";
 import type { ActionDigest, EffectRecord } from "./persisted/index.ts";
 import type { WorkspaceProcesses } from "./processes.ts";
 import type { JsonSchema, Precondition, PreparedAction, ToolContext } from "./tools.ts";
+import type { WebAccess } from "./web.ts";
 
 export type ValidationResult =
   | { readonly valid: true; readonly value: unknown }
@@ -44,6 +45,10 @@ export interface WorkspaceProcessesFactory {
     assertAuthorized: () => void,
     scope: WorkspaceWriteScope,
   ): WorkspaceProcesses;
+}
+
+export interface WebAccessFactory {
+  create(context: ToolContext, assertAuthorized: () => void, scope: WorkspaceWriteScope): WebAccess;
 }
 
 /** Time and hashing remain injected so core code has no package or I/O dependency. */

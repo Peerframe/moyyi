@@ -26,13 +26,25 @@ import {
 import { AgentCore } from "../core/index.ts";
 import { fsPlugin } from "../plugins/fs/index.ts";
 import {
+  ANTHROPIC_API_PROFILE,
+  type AnthropicTransport,
+  createAnthropicPlugin,
+} from "../plugins/provider-anthropic/index.ts";
+import {
   createDeepSeekPlugin,
   DEEPSEEK_API_PROFILE,
   type DeepSeekTransport,
 } from "../plugins/provider-deepseek/index.ts";
 import { shellPlugin } from "../plugins/shell/index.ts";
-import { ReadOnlyPolicy, WorkspaceProcessPolicy, WorkspaceWritePolicy } from "../policy/index.ts";
+import { createWebPlugin } from "../plugins/web/index.ts";
+import {
+  ReadOnlyPolicy,
+  WebPolicy,
+  WorkspaceProcessPolicy,
+  WorkspaceWritePolicy,
+} from "../policy/index.ts";
 import { SqliteSessionStore } from "../store/index.ts";
+import { type AnthropicHttpOptions, anthropicHttpTransport } from "./anthropic-http.ts";
 import { type DeepSeekHttpOptions, deepSeekHttpTransport } from "./deepseek-http.ts";
 import { NodeWorkspaceFiles } from "./files.ts";
 import { FileRecordingSink, RecordingModelClient, ReplayModelClient } from "./model-recording.ts";
@@ -40,6 +52,8 @@ import { type PluginEntry, PluginRegistry, type PluginStatus } from "./plugins.t
 import { WorkspacePreconditions } from "./preconditions.ts";
 import { NodeWorkspaceProcesses } from "./processes.ts";
 import { AjvArgumentValidator } from "./validation.ts";
+import { NodeWebAccess, type WebAccessOptions } from "./web.ts";
+import type { WebHttpDependencies } from "./web-http.ts";
 import { NodeWorkspaceWrites } from "./writes.ts";
 
 export type { PluginEntry, PluginStatus } from "./plugins.ts";
@@ -96,6 +110,11 @@ export interface RuntimeOptions {
   };
   /** Explicit host connection only; no environment lookup or network before a model request. */
   readonly deepseek?: DeepSeekHttpOptions | { readonly transport: DeepSeekTransport };
+  readonly anthropic?:
+    | AnthropicHttpOptions
+    | { readonly transport: AnthropicTransport; readonly accountScope: string };
+  /** Separate tool-network grant; never inferred from a selected model or workspace. */
+  readonly web?: WebAccessOptions & { readonly approval?: "ask" | "allow" };
   /** Opt-in diagnostic recording, limited to one sequential request stream per runtime. */
   readonly modelRecording?: {
     readonly sink: ModelRecordingSink;
@@ -109,14 +128,34 @@ export interface RuntimeOptions {
   };
 }
 
-export async function createRuntime(options: RuntimeOptions = {}): Promise<Runtime> {
+/** Trusted test-only I/O substitutions; not host-file settings or model/tool arguments. */
+export interface RuntimeServices {
+  readonly webHttp?: WebHttpDependencies;
+}
+
+export async function createRuntime(
+  options: RuntimeOptions = {},
+  services: RuntimeServices = {},
+): Promise<Runtime> {
   if (options.developmentPlugins?.length && (options.modelRecording || options.modelReplay))
     throw Error("Development reload cannot be combined with recording or replay");
-  if ((options.modelRecording && options.modelReplay) || (options.modelReplay && options.deepseek))
+  if (
+    (options.modelRecording && options.modelReplay) ||
+    (options.modelReplay && (options.deepseek || options.anthropic))
+  )
     throw Error("Replay cannot be combined with live connection or recording options");
-  if ((options.modelRecording || options.modelReplay || options.deepseek) && !options.model)
+  if (
+    (options.modelRecording || options.modelReplay || options.deepseek || options.anthropic) &&
+    !options.model
+  )
     throw Error("Model transport/recording requires an explicitly selected model");
   for (const recording of [options.modelRecording, options.modelReplay]) {
+    if (
+      recording &&
+      options.model?.provider === "anthropic" &&
+      recording.apiProfile !== ANTHROPIC_API_PROFILE
+    )
+      throw Error("Anthropic recording profile does not match the configured adapter");
     if (
       recording &&
       options.model?.provider === "deepseek" &&
@@ -138,6 +177,22 @@ export async function createRuntime(options: RuntimeOptions = {}): Promise<Runti
             }),
         )
       : undefined;
+  const anthropicTransport = options.anthropic
+    ? "transport" in options.anthropic
+      ? options.anthropic.transport
+      : anthropicHttpTransport(options.anthropic)
+    : undefined;
+  const anthropic =
+    anthropicTransport || (options.modelReplay && options.model?.provider === "anthropic")
+      ? createAnthropicPlugin(
+          anthropicTransport ??
+            (async () => {
+              throw Error("Replay cannot access the network");
+            }),
+          { accountScope: options.anthropic?.accountScope ?? "offline-replay" },
+        )
+      : undefined;
+  const web = options.web ? new NodeWebAccess(options.web, services.webHttp) : undefined;
   const writeRoots = options.workspaceWrites?.roots.map((root) => {
     if (!isAbsolute(root) || !lstatSync(root).isDirectory() || lstatSync(root).isSymbolicLink())
       throw Error("Write grants require absolute, real workspace directories");
@@ -147,14 +202,22 @@ export async function createRuntime(options: RuntimeOptions = {}): Promise<Runti
   const filePolicy = options.workspaceWrites
     ? new WorkspaceWritePolicy({ approval: options.workspaceWrites.approval ?? "ask" })
     : new ReadOnlyPolicy();
+  const localPolicy = options.workspaceProcesses
+    ? new WorkspaceProcessPolicy({
+        files: filePolicy,
+        approval: options.workspaceProcesses.approval ?? "ask",
+      })
+    : filePolicy;
   const base =
     options.policy ??
-    (options.workspaceProcesses
-      ? new WorkspaceProcessPolicy({
-          files: filePolicy,
-          approval: options.workspaceProcesses.approval ?? "ask",
+    (options.web
+      ? new WebPolicy({
+          previous: localPolicy,
+          approval: options.web.approval ?? "ask",
+          fetch: options.web.allowedOrigins.length > 0,
+          search: !!options.web.search,
         })
-      : filePolicy);
+      : localPolicy);
   const stricter = (
     first: PolicyDecision,
     second: Exclude<PolicyDecision, { kind: "allow" }> | null,
@@ -168,6 +231,8 @@ export async function createRuntime(options: RuntimeOptions = {}): Promise<Runti
   const startup = [
     { plugin: fsPlugin },
     { plugin: shellPlugin },
+    { plugin: createWebPlugin(options.web?.search?.origin) },
+    ...(anthropic ? [{ plugin: anthropic }] : []),
     ...(deepseek ? [{ plugin: deepseek }] : []),
     ...(options.plugins ?? []),
   ];
@@ -342,6 +407,7 @@ export async function createRuntime(options: RuntimeOptions = {}): Promise<Runti
       validator: new AjvArgumentValidator(),
       preconditions: options.preconditions ?? new WorkspacePreconditions(),
       files: new NodeWorkspaceFiles(excluded),
+      ...(web ? { web } : {}),
       ...(processes ? { processes } : {}),
       ...(writes
         ? {

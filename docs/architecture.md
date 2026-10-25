@@ -46,9 +46,9 @@ core through five fixed points and can be added or removed without touching anyt
 | `provider-deepseek` (Responses subset; [ADR 0007](decisions/0007-first-model-provider.md)) | model provider | merged in batch 6; live acceptance pending |
 | `project-instructions` (AGENTS.md and similar) | context source | 1 |
 | `fs` (read, list, search; create, edit, undo) | tools | read-only merged in batch 5; writes merged in phase 2 |
-| `shell` | tools | 3 |
-| `provider-anthropic` | model provider | 5 |
-| `web` (fetch, search) | tools, policy rule | 5 |
+| `shell` | tools | merged in phase 3 |
+| `provider-anthropic` | model provider | phase 5 branch; live acceptance pending |
+| `web` (fetch, search) | tools; runtime capability and base policy | phase 5 branch |
 | `skills` (Agent Skills format) | context source | later |
 | `mcp` (bridge to MCP servers) | tools, policy rule | later |
 | `memory` (Hermes Agent–inspired learning) | context source, event observer | later |
@@ -184,7 +184,7 @@ transcript/effect v1 is unchanged. Undo is a new approved effect and refuses lat
 Recovery only inspects recorded pre/post-state and never replays a mutation. See
 [ADR 0012](decisions/0012-controlled-workspace-writes.md) and [usage](writes.md).
 
-## Sandboxed commands (phase 3 branch)
+## Sandboxed commands (merged phase 3)
 
 [ADR 0013](decisions/0013-native-process-sandbox.md) records accepted D6: native OS sandbox by
 default, Docker optional. `ToolContext.processes` adds a per-invocation process capability only
@@ -211,3 +211,19 @@ conservative budget and represented entry IDs. No live cache-hit rate is inferre
 run status, notice/result pairing and lease decision commit together, so a crash during recovery
 can be retried. See [ADR 0014](decisions/0014-recovery-and-compaction.md) and
 [usage](long-sessions.md); persisted v1 and layer import boundaries are unchanged.
+
+## Anthropic and tool network authority (phase 5 branch)
+
+[ADR 0015](decisions/0015-anthropic-and-web.md) adds a second provider through the existing model
+port. Anthropic-specific prefix/account replay bindings stay opaque to the core, in the existing
+D2 envelope. Direct HTTP and credentials remain runtime responsibilities. No shared persisted
+format or dependency changes are required.
+
+`ToolContext.web` is a separate port for external tools. The executor supplies it only to external
+invocations and withholds their local file capabilities. Runtime enforces exact-origin grants,
+no-I/O preparation, frozen action/digest/run binding, durable-start ordering and single execution.
+The default `WebPolicy` asks before network execution; installed policy rules can only restrict it.
+Production HTTPS validates all A records then pins the connection, verifies TLS, refuses redirects
+and bounds output/time. Search uses an explicitly configured SearXNG endpoint. Page content and
+search links are untrusted data without authority. Unknown external effects are never replayed.
+See [web usage and limits](web.md) and [Anthropic usage](anthropic.md).

@@ -3,6 +3,7 @@ import type {
   ArgumentValidator,
   PreconditionVerifier,
   RunLimits,
+  WebAccessFactory,
   WorkspaceFilesFactory,
   WorkspaceProcessesFactory,
   WorkspaceWritesFactory,
@@ -39,6 +40,7 @@ export interface ExecutionHost {
   readonly files?: WorkspaceFilesFactory;
   readonly processes?: WorkspaceProcessesFactory;
   readonly writes?: WorkspaceWritesFactory;
+  readonly web?: WebAccessFactory;
   now(): Timestamp;
   nextEffectId(): EffectId;
   record(effect: EffectRecord, result?: ToolResultPart): Promise<void>;
@@ -222,7 +224,7 @@ async function executeCall(call: ToolCallPart, host: ExecutionHost): Promise<Too
         throw new Error("Capability expired, cancelled or revoked");
       const decision = phase === "execute" ? executePolicy() : undefined;
       if (
-        !["read", "workspace_write", "process"].includes(profile.class) ||
+        !["read", "workspace_write", "process", "external"].includes(profile.class) ||
         preparePolicy().kind !== "allow" ||
         decision?.kind === "deny" ||
         (decision?.kind === "ask" && grant !== "ask")
@@ -231,7 +233,18 @@ async function executeCall(call: ToolCallPart, host: ExecutionHost): Promise<Too
     };
     const scoped: ToolContext = {
       ...context,
-      ...(host.files ? { files: host.files.create(context, guard) } : {}),
+      ...(host.files && profile.class !== "external"
+        ? { files: host.files.create(context, guard) }
+        : {}),
+      ...(host.web && profile.class === "external"
+        ? {
+            web: host.web.create(context, guard, {
+              phase,
+              ...(effect ? { effect } : {}),
+              ...(action ? { action } : {}),
+            }),
+          }
+        : {}),
       ...(host.writes && profile.class === "workspace_write"
         ? {
             writes: host.writes.create(context, guard, {
