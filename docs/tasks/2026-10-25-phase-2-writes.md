@@ -1,4 +1,8 @@
-# Phase 2: controlled writes — current handoff
+# Phase 2: controlled writes — historical handoff
+
+PR #12 was reviewed and merged as `801175f` on 2026-10-25 after its head CI passed;
+merged main CI passed. Current work is the [phase 3 decision handoff](2026-10-25-phase-3-shell.md).
+The evidence below preserves the original phase 2 delivery.
 
 ## Authorization and baseline
 

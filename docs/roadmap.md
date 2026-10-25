@@ -34,7 +34,7 @@ Remaining:
   checker results do not yet measure real-agent performance
 - Validate the accepted security design ([threat-model.md](threat-model.md),
   [ADR 0006](decisions/0006-security-boundaries.md)) in the relevant implementation phases
-- Phase 2 PR review; no automatic merge or phase 3 authorization
+- Phase 3 backend decision D6 after the requested upstream comparison; no phase 4 authorization
 
 ## Phase 1: read-only loop
 
@@ -61,7 +61,7 @@ offline script; `--host FILE` connects an explicitly trusted runtime configurati
 [cli.md](cli.md) and the [current handoff](tasks/2026-10-25-batch-7-cli.md).
 Live acceptance remains owner-run. The planned `project-instructions` plugin is not delivered by
 these batches; implicit workspace instructions/config discovery is not enabled. Phase 1 acceptance
-is not claimed. The owner separately authorized phase 2; its branch is under review.
+is not claimed. Phase 2 was separately authorized and merged; phase 3 backend selection remains pending.
 Run the read-only subset of the corpus. Qwen and shasha training are deferred directions,
 not requirements for this phase or the first release.
 
@@ -69,15 +69,19 @@ not requirements for this phase or the first release.
 
 Confined workspace file access in `ToolContext`; edit and create with hash preconditions,
 approval bound to digests, workspace snapshots and undo, effect journal; fault-injection tests.
-Implemented on `codex/phase-2-controlled-writes` with explicit grants, schema 2 snapshot migration
-and read-only recovery. See [usage](writes.md), [ADR 0012](decisions/0012-controlled-workspace-writes.md)
-and the [current handoff](tasks/2026-10-25-phase-2-writes.md). The new PR is not automatically merged.
-Phase 3 is not started.
+Reviewed and merged in [PR #12](https://github.com/Peerframe/moyyi/pull/12), with explicit grants,
+schema 2 snapshot migration and read-only recovery. See [usage](writes.md),
+[ADR 0012](decisions/0012-controlled-workspace-writes.md) and the
+[historical handoff](tasks/2026-10-25-phase-2-writes.md).
 
 ## Phase 3: shell and reliable stop
 
 Sandboxed processes in `ToolContext`, the `shell` plugin, process-group cancellation, bounded
 output, unknown-effect handling. Start same-model comparisons against other harnesses.
+The owner authorized progression, then requested an [upstream comparison](research/phase-3-execution-backends.md)
+before choosing D6. No command tool is implemented or enabled yet. The research-only branch
+`codex/phase-3-sandboxed-shell` awaits the backend/lifecycle choice; see the
+[current handoff](tasks/2026-10-25-phase-3-shell.md). No paid model comparisons or phase 4 work.
 
 ## Phase 4: recovery and long sessions
 

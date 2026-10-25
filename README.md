@@ -8,7 +8,7 @@ merged, including the interactive CLI and idle-only development reload. Start an
 offline terminal with `npm run moyyi -- --demo`, or explicitly connect a trusted host using
 `--host FILE`. The demo is a finite script, not an LLM; live DeepSeek acceptance remains pending.
 See [docs/cli.md](docs/cli.md), [docs/deepseek.md](docs/deepseek.md) and
-[docs/roadmap.md](docs/roadmap.md). Controlled writes are on the phase 2 branch for review; phase 3 is not started.
+[docs/roadmap.md](docs/roadmap.md). Controlled writes are merged. Phase 3 is at backend selection; command execution is not enabled.
 
 ## Setup
 
@@ -56,8 +56,9 @@ recipes in [docs/recipes/](docs/recipes/).
 
 Licensed under the [Apache License, Version 2.0](LICENSE).
 
-Controlled file creation, editing, snapshots and undo are implemented on the phase 2 branch,
+Controlled file creation, editing, snapshots and undo are merged in phase 2,
 with explicit workspace grants. See [write usage](docs/writes.md) and
 [acceptance status](docs/tasks/2026-10-25-phase-2-writes.md). Run `npm run eval:writes` for
 eight offline scenarios with real filesystem and SQLite effects in disposable workspaces.
-Phase 3 is not started.
+Phase 3 [backend research](docs/research/phase-3-execution-backends.md) is available for review;
+implementation awaits the owner decision. Phase 4 is not started.

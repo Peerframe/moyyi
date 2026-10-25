@@ -4,11 +4,12 @@
 #2–#5，并整合交接；本次文档整合的 main 基线为已合入 #1–#4 的 `26f2e41`。由 Claude 起草，
 审查者由 owner 指定；每个 PR 的实际提交、检查与合并记录以其页面为准。
 
-**2026-10-25 最新授权：审查并合并 #11，再推进 phase 2。** #11 固定 head 审查、70 项定向测试、
-5 项真实 PTY 流程及 CI 通过后，已合并为 `cda24d4`，main CI 通过。
-本轮从该最新 main 开 `codex/phase-2-controlled-writes`，**新 PR 不自动合并，phase 3 先不开始**。
+**2026-10-25 最新授权：审查并合并 #12，再推进 phase 3。** #12 固定 head 审查、122 项定向测试
+（含 13 项真实 SIGKILL）及 CI 通过后，已合并为 `801175f`，main CI 通过。
+本轮从该最新 main 开 `codex/phase-3-sandboxed-shell`，**新 PR 不自动合并，phase 4 先不开始**。
+Owner 随后要求先研究优秀项目，尚未选择 D6；当前仅完成执行后端对比，未实现或开放命令工具。
 不做付费调用，不访问真实凭据，不直接推送 main。
-当前范围和证据见 [phase 2 记录](2026-10-25-phase-2-writes.md)；[批次 7 记录](2026-10-25-batch-7-cli.md)、
+当前范围和证据见 [phase 3 记录](2026-10-25-phase-3-shell.md)；[phase 2 记录](2026-10-25-phase-2-writes.md)、[批次 7 记录](2026-10-25-batch-7-cli.md)、
 [批次 6](2026-10-25-batch-6-deepseek.md)、[批次 5](2026-10-25-batch-5-files.md)、
 [批次 4](2026-10-25-batch-4-core.md)和[D2／批次 3](2026-10-25-v1-and-storage.md)记录保留历史证据。
 
@@ -21,9 +22,9 @@
 
 ## 1. 现在有什么
 
-已合入 #1–#10 的 main `8fce38e` 为本轮基线，包含：
+已合入 #1–#12 的 main `801175f` 为本轮基线，包含：
 
-- Node 26、TypeScript 7、Biome、Vitest；最新 main 基线检查包含类型检查、lint 和 889 项测试
+- Node 26、TypeScript 7、Biome、Vitest；最新 main 基线检查包含类型检查、lint 和 1,081 项测试
 - 持久化格式 `src/contracts/persisted`，版本 1，由 `fixtures/v1.ts` 锁定
 - 模型、工具、插件、客户端协议契约和端口；`checkModelStream`
 - 插件注册表（原子加载、归属清理、只能更严格的权限规则、隔离的事件监听）；`provider-scripted`
@@ -40,7 +41,7 @@ DeepSeek Responses 文本/推理/函数调用适配器、固定地址 HTTP、录
 以及显式开发插件的空闲重载。`npm run moyyi -- --demo` 可运行有限的离线脚本，真实模型通过
 显式 `--host FILE` 配置；不自动发现工作区配置，不新增凭据后端。原有 DeepSeek 离线 demo/eval 保留。
 这些不证明远端 API 已接受请求或真实 Agent 任务能力。真实冒烟及 phase 1 能力评测仍待 owner。
-phase 2 分支增加受控创建/编辑/撤销与快照；命令工具和 phase 3 不开始。
+phase 2 已合并，提供受控创建/编辑/撤销与快照。phase 3 处于后端选择研究，D6 未定前不实现命令工具。
 计划中的 project-instructions 插件仍未交付；本轮离线结果不替代 phase 1 真实模型验收。
 
 | PR | 已核对的合并记录 | 结果与后续 |
@@ -56,6 +57,7 @@ phase 2 分支增加受控创建/编辑/撤销与快照；命令工具和 phase 
 | [#9：批次 5 文件](https://github.com/Peerframe/moyyi/pull/9) | `15ac933` | 固定 head 审查、88 个文件测试、原 head CI 与合并后 main CI 通过 |
 | [#10：批次 6 模型](https://github.com/Peerframe/moyyi/pull/10) | `8fce38e` | 固定 head 审查与 153 项定向检查通过，原 head CI 和 main CI 均通过 |
 | [#11：批次 7 CLI](https://github.com/Peerframe/moyyi/pull/11) | `cda24d4` | 固定 diff 审查、70 项定向测试、5 项 PTY、原 head 与 main CI 通过 |
+| [#12：phase 2 写入](https://github.com/Peerframe/moyyi/pull/12) | `801175f` | 固定 diff 审查、122 项定向测试、原 head 与 main CI 通过 |
 
 [给 Claude 的交接](2026-10-25-claude-review-handoff.md)保留原始独立分支的历史验收，已标为历史快照。
 其中缺 fixture、未有 CI 和 D2 未定等状态不再是当前状态；不把旧的覆盖文件诊断冒充新检查结果。
@@ -64,7 +66,7 @@ phase 2 分支增加受控创建/编辑/撤销与快照；命令工具和 phase 
 
 - **分支与 PR**：每批一个分支 `codex/<批次名>`，从最新 `main` 切出，开一个 PR 到 `main`。不要基于另一个
   未合并的分支开 PR；D2／存储的依赖 PR 例外已结束。不直接推送 `main`，不改仓库设置。
-  #11 已按最新授权合并；phase 2 的新 PR 不自动合并，phase 3 不开始。
+  #12 已按最新授权合并；phase 3 的新 PR 不自动合并，phase 4 不开始。D6 未定前先交付研究。
 - **检查**：每个 PR 的 `npm run check` 必须全绿。新行为要有测试，包括拒绝、取消和中断的情况。
 - **边界**：`tests/boundaries.ts` 报错时改导入，不改规则。确实要改规则，就同时改 `architecture.md`，并在
   PR 里说明原因。
@@ -104,7 +106,7 @@ PR #5 完成交接冲突和 D1/D3/D5 文档整合；最终 head CI 与合并后�
 
 **当前状态：两项均已完成并合入。** PR #6 完成格式修订，PR #7 完成存储及故障验收；
 #7 转向 main 后的新 CI 及合并后的 main CI 均通过。以下条目保留当时的执行顺序及格式边界；
-本轮最新授权已推进至 phase 2，见文档开头与 phase 2 记录。
+本轮最新授权已推进至 phase 3 的后端研究，见文档开头与 phase 3 记录。
 
 1. **独立完成 D2 的 v1 修订。** 依已授权的本轮任务书确认尚无真实存储数据；按 B 方案修订
    契约与 `fixtures/v1.ts`，补齐需要持久化的用量、终止原因、拒绝、参数来源及推理/重放信息，并验收。
@@ -121,6 +123,14 @@ SQLite 驱动比较、建表/迁移、blob、事务和锁实现，以及存储�
 
 命令沙箱、后续写入能力、第二模型、自部署、Qwen/shasha、模型训练和会话加密，不是批次 3 的前置实现。
 具体平台的隔离方案与验收需在相应能力开放前完成，不能以暂缓实现为由提前开放未隔离的命令。
+
+### 3.2 Phase 3 的 D6 待定
+
+Owner 要求先研究成熟项目，而非同意 Docker。已完成
+[Codex / Claude / OpenCode / OpenHands / Goose 对比](../research/phase-3-execution-backends.md)。
+当前建议改为原生 OS 沙箱默认、容器后端可选；不能把普通 shell 或进程组取消当作更强隔离承诺。
+需明确执行后端、真实工作区与副本模式、停止保证，保留 D3 的文件/网络强制边界。
+按本节规则在研究 PR 描述列出选项和建议，决定前不开始依赖它的产品实现。
 
 ## 4. 批次
 
@@ -240,7 +250,7 @@ SQLite 驱动比较、建表/迁移、blob、事务和锁实现，以及存储�
 
 ## 5. 不在本次交接里
 
-当前不包含 phase 3–6（命令和沙箱、长会话、第二个供应商和网页、发布）。
-phase 2 已获最新授权，并有独立任务书；不因此宣布 phase 1 真实模型验收完成。
+当前不包含 phase 4–6（长会话、第二个供应商和网页、发布）。phase 3 已获推进授权，
+但 owner 要求先看研究，D6 尚未确定；不因此宣布 phase 1 真实模型验收完成。
 
 Qwen 和 shasha 仅保留为未来方向。当前不训练模型、不选训练底座或购买/租用算力；先把 Agent 做好。
