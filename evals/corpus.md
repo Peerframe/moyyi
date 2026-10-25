@@ -93,7 +93,8 @@ extra near misses fill gaps in those tasks' test coverage. B2 corrections affect
 tasks described above.
 
 These deterministic runs validate the evaluation machinery, not moyyi's agent performance.
-The core loop is still unimplemented; no paid model or real credential is used.
+The core loop is now implemented; separate scripted core/file conformance runs do not measure
+real-agent performance. No paid model or real credential is used.
 
 ## Candidates
 

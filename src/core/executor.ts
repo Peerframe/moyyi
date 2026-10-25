@@ -3,6 +3,7 @@ import type {
   ArgumentValidator,
   PreconditionVerifier,
   RunLimits,
+  WorkspaceFilesFactory,
 } from "../contracts/execution.ts";
 import type {
   EffectId,
@@ -33,6 +34,7 @@ export interface ExecutionHost {
   readonly preconditions: PreconditionVerifier;
   readonly hasher: ActionHasher;
   readonly limits: RunLimits;
+  readonly files?: WorkspaceFilesFactory;
   now(): Timestamp;
   nextEffectId(): EffectId;
   record(effect: EffectRecord, result?: ToolResultPart): Promise<void>;
@@ -183,6 +185,7 @@ async function executeCall(call: ToolCallPart, host: ExecutionHost): Promise<Too
   let grant: "allow" | "ask" | undefined;
   let grantEpoch: number | undefined;
   const epoch = () => host.policy.revision?.() ?? 0;
+  const capabilityEpoch = epoch();
   const preparePolicy = (): PolicyDecision => {
     try {
       return host.policy.beforePrepare(tool.name, profile, args);
@@ -201,6 +204,32 @@ async function executeCall(call: ToolCallPart, host: ExecutionHost): Promise<Too
       );
     } catch {
       return { kind: "deny", reason: "Permission policy failed." };
+    }
+  };
+  // A fresh capability belongs to exactly one prepare/execute invocation. Retaining it in
+  // installed code cannot extend its lifetime or reuse a grant after revoke + regrant.
+  const invoke = async <T>(
+    phase: "prepare" | "execute",
+    operation: (context: ToolContext) => Promise<T>,
+  ): Promise<T> => {
+    let live = true;
+    const guard = () => {
+      if (!live || host.signal.aborted || epoch() !== capabilityEpoch)
+        throw new Error("File capability expired, cancelled or revoked");
+      const decision = phase === "execute" ? executePolicy() : undefined;
+      if (
+        profile.class !== "read" ||
+        preparePolicy().kind !== "allow" ||
+        decision?.kind === "deny" ||
+        (decision?.kind === "ask" && grant !== "ask")
+      )
+        throw new Error("File access is not authorized");
+    };
+    const scoped = host.files ? { ...context, files: host.files.create(context, guard) } : context;
+    try {
+      return await operation(scoped);
+    } finally {
+      live = false;
     }
   };
   function stopped(): Stop | undefined {
@@ -285,7 +314,7 @@ async function executeCall(call: ToolCallPart, host: ExecutionHost): Promise<Too
   const before = stopped();
   if (before) return finish(before.status, before.message);
   try {
-    action = checkedAction(await tool.prepare(args, context));
+    action = checkedAction(await invoke("prepare", (context) => tool.prepare(args, context)));
   } catch (error) {
     return say(
       host.signal.aborted ? "cancelled" : "failed",
@@ -366,7 +395,7 @@ async function executeCall(call: ToolCallPart, host: ExecutionHost): Promise<Too
         );
       let updated: PreparedAction;
       try {
-        updated = checkedAction(await tool.prepare(args, context));
+        updated = checkedAction(await invoke("prepare", (context) => tool.prepare(args, context)));
       } catch (error) {
         return finish("failed", `Re-preparation failed: ${message(error)}`);
       }
@@ -386,7 +415,8 @@ async function executeCall(call: ToolCallPart, host: ExecutionHost): Promise<Too
       return finish("denied", "Permission now requires approval; nothing executed.");
     let outcome: ToolOutcome;
     try {
-      outcome = await tool.execute(action, context);
+      const executing = action;
+      outcome = await invoke("execute", (context) => tool.execute(executing, context));
       // Observe cancellation/revocation even after execution, but do not rewrite a known
       // outcome as cancellation: the action may already have changed the world.
       stopped();

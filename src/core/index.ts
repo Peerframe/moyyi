@@ -30,6 +30,7 @@ import {
   type ToolDefinition,
   type ToolResultPart,
   type TranscriptEntry,
+  type WorkspaceFilesFactory,
 } from "../contracts/index.ts";
 import { type ExecutionHost, executeCalls } from "./executor.ts";
 import { recoverSession } from "./recovery.ts";
@@ -61,6 +62,7 @@ export interface CoreDeps {
   readonly emit: (event: RuntimeEvent) => void;
   readonly collect?: (workspaceRoot: string) => Promise<readonly ContextSection[]>;
   readonly limits?: Partial<RunLimits>;
+  readonly files?: WorkspaceFilesFactory;
 }
 
 interface Running {
@@ -478,6 +480,7 @@ export class AgentCore {
         preconditions: this.#deps.preconditions,
         hasher: this.#deps.hasher,
         limits: this.#limits,
+        ...(this.#deps.files ? { files: this.#deps.files } : {}),
         now: () => this.#deps.clock.now(),
         nextEffectId: () => this.#deps.ids.next("effect") as EffectId,
         record: (effect, result) => this.#record(run, effect, result),

@@ -3,10 +3,11 @@
 A personal, general-purpose agent with a small, self-owned core. Capabilities such as model
 providers and tools are plugins.
 
-Status: the batch 4 review branch has a working self-owned core, SQLite persistence and a
-programmatic runtime. Run `npm run demo:scripted` to see a complete model → tool → model loop.
-The model and tool are synthetic; real model providers, file tools and the interactive CLI
-remain later batches. See [docs/core.md](docs/core.md) and [docs/roadmap.md](docs/roadmap.md).
+Status: the self-owned core and SQLite runtime are merged. The batch 5 review branch adds
+real read-only workspace file tools. Run `npm run demo:files` for a complete scripted-model
+list/search/read workflow with real files and persisted results. Real model providers and the
+interactive CLI remain later batches. See [docs/files.md](docs/files.md),
+[docs/core.md](docs/core.md) and [docs/roadmap.md](docs/roadmap.md).
 
 ## Setup
 
@@ -25,6 +26,8 @@ npm run check
 | `npm run check` | Typecheck, lint, tests (including layer boundaries and the format lock) |
 | `npm run eval` | Run the eval suite |
 | `npm run eval:core` | Run eight deterministic core conformance/fault scenarios (no paid model) |
+| `npm run eval:files` | Run eight deterministic real-file capability scenarios |
+| `npm run demo:files` | Demonstrate real list/search/read with scripted responses and disposable files |
 | `npm run demo:scripted` | Demonstrate a complete scripted agent loop using disposable storage |
 | `npm run build` | Compile to `dist/` |
 
@@ -37,7 +40,7 @@ npm run check
 | `src/core` | Run loop, tool executor, approvals, cancellation, budgets and recovery |
 | `src/store`, `src/context`, `src/policy` | Persistence, context assembly and base permissions |
 | `src/runtime` | Plugin registry, wiring, client protocol |
-| `src/plugins/<name>` | One plugin per folder; currently `provider-scripted` |
+| `src/plugins/<name>` | One plugin per folder; currently `provider-scripted` and `fs` |
 | `src/cli` | Terminal client |
 | `evals/` | Task suite and harness |
 | `docs/` | Architecture, roadmap, threat model, decisions, recipes |

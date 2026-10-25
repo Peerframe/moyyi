@@ -45,7 +45,7 @@ core through five fixed points and can be added or removed without touching anyt
 | `provider-scripted` | model provider | exists (tests and evals) |
 | `provider-deepseek` (Responses subset; [ADR 0007](decisions/0007-first-model-provider.md)) | model provider | 1 |
 | `project-instructions` (AGENTS.md and similar) | context source | 1 |
-| `fs` (read, list, search, edit, write) | tools | 1–2 |
+| `fs` (read, list, search; edit/write later) | tools | read-only in batch 5 review |
 | `shell` | tools | 3 |
 | `provider-anthropic` | model provider | 5 |
 | `web` (fetch, search) | tools, policy rule | 5 |
@@ -146,9 +146,11 @@ parse args → schema validation → policy (prepare) → prepare (read-only)
 
 One writer process per data directory, enforced with an OS file lock. Accepted in
 [ADR 0002](decisions/0002-storage.md): one active run per session and a write lease per
-workspace. The store and batch 4 review branch enforce these constraints. The runtime composes
+workspace. The merged store and core enforce these constraints. The runtime composes
 `AgentCore` with the SQLite store, context, policy, validator and precondition ports; see
-[core.md](core.md) for the executable scripted entry point and current limits.
+[core.md](core.md) for the executable core entry point and [files.md](files.md) for runtime-confined
+read capabilities. The executor owns capability lifetime and permission checks; runtime performs
+filesystem I/O. File tools cannot access Node filesystem APIs directly.
 
 ## Security decision
 

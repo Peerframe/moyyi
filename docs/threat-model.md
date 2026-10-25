@@ -1,8 +1,8 @@
 # Threat model
 
 Status: D3 boundaries accepted on 2026-10-25 in
-[ADR 0006](decisions/0006-security-boundaries.md); implementation and platform verification
-pending. The accepted design is not a claim that the current runtime enforces these defenses.
+[ADR 0006](decisions/0006-security-boundaries.md); read-only workspace enforcement is implemented in the batch 5 review branch.
+Later write, process, network and credential defenses still require their own verification.
 
 ## Assets
 
@@ -47,9 +47,9 @@ pending. The accepted design is not a claim that the current runtime enforces th
 
 ## Remaining implementation and validation
 
-- During batch 5, before exposing file tools: define protected-path rules and grant/revocation
-  behavior, and test out-of-scope access, symlink/path traversal, output limits and denied reads.
-  Keep phase 1 read-only.
+- Batch 5 implements read-only path checks and revocable per-invocation file capabilities;
+  [files.md](files.md) defines protected paths, limits and tested behavior. No write or process
+  authority is exposed. The hostile same-user race limit in T4 remains unchanged.
 - Before writes/shell: select and verify containment for each claimed platform; test connection
   restrictions, cancellation, interruption and filesystem races. Resolve any proposed threat-model
   expansion with the owner rather than claiming it implicitly.

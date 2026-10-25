@@ -34,7 +34,7 @@ Remaining:
   checker results do not yet measure real-agent performance
 - Validate the accepted security design ([threat-model.md](threat-model.md),
   [ADR 0006](decisions/0006-security-boundaries.md)) in the relevant implementation phases
-- Review the batch 4 implementation PR; it is not automatically merged
+- Review the batch 5 file-tool PR; it is not automatically merged
 
 ## Phase 1: read-only loop
 
@@ -43,12 +43,15 @@ Core loop, `provider-deepseek` ([ADR 0007](decisions/0007-first-model-provider.m
 plugin hot reload in development mode. Batch 3 was reviewed and merged in
 [PR #7](https://github.com/Peerframe/moyyi/pull/7), after retargeting to main and passing fresh CI.
 The store uses `node:sqlite`: transactions, blobs, writer locks, workspace leases and backup/restore.
-The batch 4 review branch adds the executable core, runtime wiring, context, policy, approvals,
-cancellation, budgets and startup reconciliation. `npm run demo:scripted` exercises the complete
-model → tool → model loop locally; `npm run eval:core` checks deterministic safety/lifecycle
-scenarios. These do not measure real-model task competence. See [core.md](core.md) and the
-[current handoff](tasks/2026-10-25-batch-4-core.md).
-Batch 5 file tools, the real model provider and the interactive CLI have not started.
+The batch 4 core was reviewed, corrected and merged in [PR #8](https://github.com/Peerframe/moyyi/pull/8)
+after its 648-test check and corrected-head CI passed. It provides runtime wiring, context,
+policy, approvals, cancellation, budgets and startup reconciliation.
+The batch 5 review branch adds real `read`, `list` and `search`, a scoped runtime file capability,
+revocation/lifetime guards and bounded ignore-aware search. `npm run demo:files` uses a scripted
+model with real files and SQLite; `npm run eval:files` checks eight deterministic scenarios.
+These do not measure real-model task competence. See [files.md](files.md) and the
+[current handoff](tasks/2026-10-25-batch-5-files.md).
+The real provider (batch 6) and interactive CLI have not started.
 Run the read-only subset of the corpus. Qwen and shasha training are deferred directions,
 not requirements for this phase or the first release.
 

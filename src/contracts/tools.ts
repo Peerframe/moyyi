@@ -1,3 +1,4 @@
+import type { WorkspaceFiles } from "./files.ts";
 import type {
   ActionDigest,
   EffectProfile,
@@ -59,9 +60,8 @@ export type ReconcileOutcome =
 /**
  * Capabilities handed to a tool. Tools never reach the store, the model or the policy.
  *
- * File and process access will be added here as confined capabilities (phase 2: workspace
- * files with symlink-safe resolution; phase 3: sandboxed processes). Built-in plugins may not
- * import node:fs or node:child_process, so confinement is implemented once, in the core.
+ * Runtime-confined read capabilities expire when the current prepare/execute call ends.
+ * Built-in plugins may not import node:fs or node:child_process. Process access remains gated.
  */
 export interface ToolContext {
   readonly runId: RunId;
@@ -69,4 +69,6 @@ export interface ToolContext {
   readonly signal: AbortSignal;
   /** Output limits the tool must enforce; oversized output is truncated, not dropped. */
   readonly limits: { readonly maxOutputBytes: number };
+  /** Absent in hosts without file support; never fall back to direct host access. */
+  readonly files?: WorkspaceFiles;
 }

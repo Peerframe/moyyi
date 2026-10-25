@@ -1,6 +1,6 @@
 # Running the self-owned core
 
-The batch 4 branch provides a working programmatic agent loop with deterministic models and
+The merged batch 4 core provides a working programmatic agent loop with deterministic models and
 synthetic tools. Start with:
 
 ```sh
@@ -23,7 +23,8 @@ It does not load `evals/private`, change public-task checkers, or claim a public
 
 Use `createRuntime` with `plugins`, an explicitly selected `{provider, model}`, and either
 `dataDirectory` or an injected `SessionStore`. The runtime owns a store it creates; callers
-close injected stores themselves. Plugins still load atomically and report their status.
+close injected stores themselves. Plugins still load atomically and report their status. The batch 5 runtime registers the built-in
+`fs` plugin before additional plugins; duplicate tool/plugin names fail instead of replacing it.
 Without model/storage configuration, commands fail closed. The ordinary CLI is not yet an
 interactive client; that remains batch 7.
 
@@ -89,10 +90,10 @@ conservative text capacity estimate; images fail explicitly until provider-speci
 exists. Opaque replay stays opaque and unchanged for its originating adapter to validate.
 See [ADR 0008](decisions/0008-core-execution.md) for the validator choice and precondition scope.
 
-There are no file or shell plugins, no real model provider, no interactive terminal, and no
-hot reload in this batch. The precondition verifier tests symlinks/protected paths/hashes, but
-does not provide file capabilities or atomic writes. Batch 5 still requires operation-time
-confinement. No physical power-loss, hostile-plugin CPU isolation, provider API compatibility
+Batch 5 now provides operation-time read-only capabilities and the `fs` plugin; see
+[files.md](files.md) for limits and revocation. There are still no shell or write tools, real
+model provider, interactive terminal or hot reload. The precondition verifier is a separate
+preflight port, not an atomic write primitive. No physical power-loss, hostile-plugin CPU isolation, provider API compatibility
 or real-agent task-performance claim is made.
 
 Relevant checks: `npm run check`, `npm run eval:core`, `npm run demo:scripted` and

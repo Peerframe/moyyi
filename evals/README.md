@@ -78,3 +78,11 @@ It covers eight deterministic core scenarios and writes synthetic evidence to
 It checks committed events and entries loaded through the public runtime protocol; direct
 database, cancellation-race and SIGKILL recovery assertions remain in integration tests.
 Its pass count measures conformance to those scenarios, not a model's ability to solve tasks.
+
+## Real-file capability conformance
+
+`npm run eval:files` uses the public runtime protocol, a scripted model, disposable real files
+and SQLite. Eight scenarios cover the list/search/read loop, ignore rules, protected paths,
+traversal/symlink denial, truncation and input limits. It writes ignored synthetic output to
+`evals/results/files.json`, does not load private tasks and does not alter public-task checkers.
+It measures execution/authority conformance, not real-model task competence.

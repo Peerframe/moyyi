@@ -125,7 +125,7 @@ function assertWithin(root: string, path: string): void {
     throw new Error("Path escapes the authorized workspace or narrower root");
 }
 
-function assertUnprotected(path: string): void {
+export function assertUnprotected(path: string): void {
   for (const component of path.split(sep)) {
     const name = component.toLowerCase();
     if (
