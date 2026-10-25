@@ -43,8 +43,9 @@ Responses reasoning items with synthetic fixtures; do not assume another provide
 rules. D2's common content and origin/hash-bound replay information still apply. If required
 replay state is invalidated, proceed only with a documented valid request representation;
 otherwise stop with an explicit error or use a separately specified context rebuild. Never
-repair stale state or automatically repeat an action. Reconcile this fallback wording in
-ADR 0003 as part of the separate pre-storage amendment brief.
+repair stale state or automatically repeat an action. This matches the clarified invalidation
+rule in [ADR 0003](0003-provider-neutral-content.md); the separate pre-storage amendment brief
+must turn it into explicit fields and validation cases.
 
 The model name is a rolling alias, not a pinned model artifact. Acceptance records must include
 the requested name, date, API profile and any reported server model version; unknown version
