@@ -51,7 +51,22 @@ export interface ContextSource {
 export interface ContextSourceInput {
   readonly workspaceRoot: string;
   readonly profile: ModelProfile;
+  readonly signal: AbortSignal;
+  /** Fixed-path, read-only capability; expires when this collection finishes. */
+  readonly projectInstructions?: {
+    readRoot(): Promise<ProjectInstructionsResult>;
+  };
 }
+
+export type ProjectInstructionsResult =
+  | { readonly kind: "absent" }
+  | { readonly kind: "blocked" }
+  | {
+      readonly kind: "loaded";
+      readonly path: "AGENTS.md";
+      readonly text: string;
+      readonly sha256: string;
+    };
 
 export interface ContextSection {
   readonly id: string;

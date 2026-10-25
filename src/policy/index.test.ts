@@ -1,6 +1,11 @@
 import { describe, expect, it } from "vitest";
 import type { ActionDigest, EffectId, EffectProfile, PreparedAction } from "../contracts/index.ts";
-import { ReadOnlyPolicy, WorkspaceProcessPolicy } from "./index.ts";
+import {
+  ReadOnlyPolicy,
+  WebPolicy,
+  WorkspaceProcessPolicy,
+  WorkspaceWritePolicy,
+} from "./index.ts";
 
 const profile: EffectProfile = { class: "read", reversibility: "none", verification: "none" };
 const action: PreparedAction = {
@@ -10,6 +15,39 @@ const action: PreparedAction = {
   payload: {},
 };
 const effect = "eff_test" as EffectId;
+
+describe("automatic instruction read policy", () => {
+  it("keeps read approval and revocation applicable without manufacturing a tool action", () => {
+    const policy = new ReadOnlyPolicy({ requireApproval: ["read"] });
+    expect(policy.beforeContextRead("AGENTS.md")).toEqual({ kind: "ask" });
+    policy.revoke();
+    expect(policy.beforeContextRead("AGENTS.md").kind).toBe("deny");
+    policy.grant();
+    expect(policy.beforeContextRead("AGENTS.md").kind).toBe("ask");
+  });
+  it("delegates through write, process and web policy without granting reads through other grants", () => {
+    const denied = new WorkspaceWritePolicy({ readAllowed: false });
+    const process = new WorkspaceProcessPolicy({ files: denied });
+    const web = new WebPolicy({ previous: process, fetch: true });
+    for (const policy of [denied, process, web])
+      expect(policy.beforeContextRead("AGENTS.md").kind).toBe("deny");
+    const ask = new WorkspaceWritePolicy({ requireApproval: ["read"] });
+    expect(new WorkspaceProcessPolicy({ files: ask }).beforeContextRead("AGENTS.md").kind).toBe(
+      "ask",
+    );
+    expect(new WebPolicy({ previous: ask }).beforeContextRead("AGENTS.md").kind).toBe("ask");
+  });
+  it("does not infer automatic read consent from a legacy custom policy", () => {
+    const custom = {
+      beforePrepare: () => ({ kind: "allow" as const }),
+      beforeExecute: () => ({ kind: "allow" as const }),
+    };
+    expect(new WorkspaceProcessPolicy({ files: custom }).beforeContextRead("AGENTS.md").kind).toBe(
+      "deny",
+    );
+    expect(new WebPolicy({ previous: custom }).beforeContextRead("AGENTS.md").kind).toBe("deny");
+  });
+});
 
 describe("ReadOnlyPolicy", () => {
   it("allows reads by default in both phases", () => {

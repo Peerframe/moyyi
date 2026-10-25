@@ -4,15 +4,17 @@
 #2–#5，并整合交接；本次文档整合的 main 基线为已合入 #1–#4 的 `26f2e41`。由 Claude 起草，
 审查者由 owner 指定；每个 PR 的实际提交、检查与合并记录以其页面为准。
 
-**2026-10-26 最新状态：#18 已合并并安装为 `a603346`，main CI 通过。**
-此前三次单请求探针定位了辅助 reasoning 与 final_answer 字段问题，其中一次完整回答 `OK`。
-随后获准的只读任务实际仅发 1 次 HTTP 请求（累计 4），返回 200，但在工具前 `commentary` 消息处
-被旧适配器拒绝，未执行工具；捕获是无终态前缀，用量/费用未知，没有自动重试。
-本轮按 owner“逐步推进”的授权先修完整 DeepSeek 工具路径，分支 `codex/deepseek-tool-continuation`。
-新增实现阶段模型请求为 **0**；按 PR 交付，**不自动合并、不替换本机安装、暂不正式发布**。
-不直接推送 main，不改 persisted v1／分层规则／公共题判分，D1–D6 保持已定结论。
-当前范围、离线验证与真实工具续接仍未验证的限制见 [DeepSeek 兼容性记录](2026-10-25-deepseek-compatibility.md)。
-项目指令和 OpenBot 产品能力复用留在后续步骤，本轮不开始。
+**2026-10-26 最新状态：#19 已合并并安装，main 基线为 `87a239f`。**
+PR 与 [main CI](https://github.com/Peerframe/moyyi/actions/runs/40214266397) 通过。
+安装后的新授权只读验收通过：实际 2 次 HTTP 请求、0 重试，1 次真实文件读取，工具结果回传后
+完整回答；真实来源录制的离线重放通过（0 网络）。仅使用合成文件，不代表日常项目任务已全部通过。
+截至该次验收历史累计 6 次请求；该授权已经结束。原始响应、凭据及本机证据不入仓库。
+
+Owner 继续授权下一步：**默认工作指令 + 工作区根 AGENTS.md 自动读取**，
+分支 `codex/project-instructions`，从上述最新 main 创建，按独立 PR 交付。
+本轮不做付费调用、不自动合并、不更新本机安装、不正式发布；不改 persisted v1、分层边界或公共题判分。
+D1–D6 保持已定结论；方案、限定范围和证据见 [ADR 0017](../decisions/0017-working-and-project-instructions.md)
+与 [本轮记录](2026-10-26-project-instructions.md)。自动 nested/JIT、Skills 和 OpenBot 能力迁入不在本轮。
 [phase 6 记录](2026-10-25-phase-6-candidate.md)保留打包与安装历史证据。
 [phase 5](2026-10-25-phase-5-anthropic-web.md)、[phase 4](2026-10-25-phase-4-long-sessions.md)、[phase 3](2026-10-25-phase-3-shell.md)、[phase 2](2026-10-25-phase-2-writes.md)、
 [批次 7](2026-10-25-batch-7-cli.md)、[批次 6](2026-10-25-batch-6-deepseek.md)、
@@ -28,7 +30,7 @@
 
 ## 1. 现在有什么
 
-已合入 #1–#18 的 main `a603346` 为本轮基线，包含：
+已合入 #1–#19 的 main `87a239f` 为本轮基线，包含：
 
 - Node 26、TypeScript 7、Biome、Vitest；main 的类型检查、lint、Linux CI 已通过；#15 本机交付基线为 1,365 项测试通过（各平台证据以 CI 为准）
 - 持久化格式 `src/contracts/persisted`，版本 1，由 `fixtures/v1.ts` 锁定
@@ -47,12 +49,12 @@ DeepSeek Responses 文本/推理/函数调用适配器、固定地址 HTTP、录
 以及显式开发插件的空闲重载。`npm run moyyi -- --demo` 可运行有限的离线脚本，真实模型通过
 显式 `--host FILE` 配置；不自动发现工作区配置，不新增凭据后端。原有 DeepSeek 离线 demo/eval 保留。
 已用一次最小真实回答确认接口返回 `OK`；修复源码已离线完整解析该捕获，但没有新实时运行。
-最新工具冒烟暴露了 commentary 兼容问题，本轮先离线修复；真实工具续接及 Agent 任务能力仍未验证。
-再次真实验收与 phase 1 能力评测仍需明确调用预算。
+commentary 与完整工具历史兼容修复经 #19 合入；其安装版基础合成文件工具续接与录制重放已真实通过。
+更广泛的真实项目任务和 phase 1 能力评测仍需明确调用预算。
 phase 2 已合并，提供受控创建/编辑/撤销与快照。phase 3 原生沙箱命令工具已按 D6 合并，验收和平台限制见 phase 3 记录。
 phase 4 显式压缩、恢复故障测试与长会话离线验收已通过 #14 合并。
 phase 5 Anthropic 与独立授权 web 已通过 #15 合并，真实服务验收和公网 DNS 限制保留。
-计划中的 project-instructions 插件仍未交付；本轮离线结果不替代 phase 1 真实模型验收。
+本轮实现 project-instructions 的 root-only 自动读取和默认工作指令；离线结果不替代 phase 1 真实模型验收。
 
 | PR | 已核对的合并记录 | 结果与后续 |
 |---|---|---|
@@ -74,6 +76,9 @@ phase 5 Anthropic 与独立授权 web 已通过 #15 合并，真实服务验收�
 | [#16：phase 6 安装候选](https://github.com/Peerframe/moyyi/pull/16) | `b0bdaa8` | 独立审查、PR 与 main CI 通过；合并后安装验收通过，本机已安装 |
 | [#17：DeepSeek 辅助 reasoning 字段](https://github.com/Peerframe/moyyi/pull/17) | `85bc5f5` | 独立审查、PR 与 main CI 通过；本机已更新并通过离线验证 |
 
+| [#18：DeepSeek final_answer](https://github.com/Peerframe/moyyi/pull/18) | `a603346` | 已审查合并安装；PR 与 main CI 通过 |
+| [#19：DeepSeek 工具续接](https://github.com/Peerframe/moyyi/pull/19) | `87a239f` | 已审查合并安装；PR/main CI 与包验收通过；新授权 2 次真实请求读文件及离线重放通过 |
+
 [给 Claude 的交接](2026-10-25-claude-review-handoff.md)保留原始独立分支的历史验收，已标为历史快照。
 其中缺 fixture、未有 CI 和 D2 未定等状态不再是当前状态；不把旧的覆盖文件诊断冒充新检查结果。
 
@@ -81,7 +86,7 @@ phase 5 Anthropic 与独立授权 web 已通过 #15 合并，真实服务验收�
 
 - **分支与 PR**：每批一个分支 `codex/<批次名>`，从最新 `main` 切出，开一个 PR 到 `main`。不要基于另一个
   未合并的分支开 PR；D2／存储的依赖 PR 例外已结束。不直接推送 `main`，不改仓库设置。
-  #17 已按授权合并；DeepSeek final_answer 兼容性新 PR 不自动合并，暂不正式发布。
+  #19 已按授权合并；本轮项目指令 PR 不自动合并，暂不正式发布。
 - **检查**：每个 PR 的 `npm run check` 必须全绿。新行为要有测试，包括拒绝、取消和中断的情况。
 - **边界**：`tests/boundaries.ts` 报错时改导入，不改规则。确实要改规则，就同时改 `architecture.md`，并在
   PR 里说明原因。
@@ -89,7 +94,7 @@ phase 5 Anthropic 与独立授权 web 已通过 #15 合并，真实服务验收�
   之后不兼容变更必须升版本和迁移。phase 2 快照使用独立 SQLite schema 2 增量迁移，不改已锁定格式。
 - **不替 owner 做决定**：第 3 节的事项由 owner 决定。依赖这些决定的批次，在决定之前不开始；遇到新的同类
   问题，在 PR 描述里列出选项和建议，然后停下。
-- **模型调用**：默认不做付费调用。Owner 三次单请求授权均已使用，后续调用需另行明确授权；不得自动重试。真实 key 仅由本机受控凭据回调读取，不进入工具输出、源码、提交或 PR。
+- **模型调用**：默认不做付费调用。Owner 既有真实验收已结束（累计 6 次 HTTP 请求），后续调用需另行明确授权；不得自动重试。真实 key 仅由本机受控凭据回调读取，不进入工具输出、源码、提交或 PR。
 - **新依赖**：按 AGENTS.md 的研究要求比较候选，选发布满两周的确切版本，把候选、版本和理由写进 ADR 或
   PR 描述。
 - **复用代码**：不复制 OpenBot 或其他项目的源码；确实要复制，按 [openbot-provenance.md](../openbot-provenance.md)

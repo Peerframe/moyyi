@@ -122,7 +122,7 @@ try {
   );
   for (const [key, count] of [
     ["cli", 10],
-    ["client", 8],
+    ["client", 9],
   ] as const) {
     const result = checks[key] as {
       passed: boolean;

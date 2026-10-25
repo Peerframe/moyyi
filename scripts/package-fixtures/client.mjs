@@ -23,6 +23,7 @@ const workspace = join(directory, "workspace");
 const dataDirectory = join(directory, "private-data");
 mkdirSync(workspace);
 writeFileSync(join(workspace, "protected.txt"), "UNCHANGED");
+writeFileSync(join(workspace, "AGENTS.md"), "INSTALLED_ROOT_GUIDANCE_FIRST");
 writeFileSync(join(directory, "outside.txt"), "OUTSIDE_UNCHANGED");
 const cases = [];
 const events = [];
@@ -212,6 +213,15 @@ try {
   removeBadObserver();
   cases.push("session-stream-observer-isolation");
 
+  assert(JSON.stringify(requests.at(-1).system).includes("INSTALLED_ROOT_GUIDANCE_FIRST"));
+  writeFileSync(join(workspace, "AGENTS.md"), "INSTALLED_ROOT_GUIDANCE_CHANGED");
+  steps.push(answer("Instructions refreshed in the installed runtime."));
+  await turn("Continue with the updated project guidance.");
+  assert(JSON.stringify(requests.at(-1).system).includes("INSTALLED_ROOT_GUIDANCE_CHANGED"));
+  assert(!JSON.stringify(requests.at(-1).system).includes("INSTALLED_ROOT_GUIDANCE_FIRST"));
+  rmSync(join(workspace, "AGENTS.md"));
+  cases.push("installed-root-instructions-refresh");
+
   steps.push(
     tool("create", { path: "created.txt", text: "APPROVED_CONTENT" }),
     answer("Recorded creation."),
@@ -249,6 +259,7 @@ try {
     });
     await runtime.idle();
     assert.equal(lastOutcome(), "completed");
+    assert(!JSON.stringify(requests.at(-1).system).includes("INSTALLED_ROOT_GUIDANCE_CHANGED"));
     assert.equal(readFileSync(join(workspace, "created.txt"), "utf8"), "APPROVED_CONTENT");
     assert(
       events.some(

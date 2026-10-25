@@ -61,6 +61,13 @@ export class NodeWorkspaceFiles implements WorkspaceFilesFactory {
     });
   }
 
+  readProjectInstructions(
+    context: Pick<ToolContext, "workspaceRoot" | "signal">,
+    assertAuthorized: () => void,
+  ): Promise<FileRead | null> {
+    return new ReadScope(context, assertAuthorized, this.excluded).readProjectInstructions();
+  }
+
   create(context: ToolContext, assertAuthorized: () => void): WorkspaceFiles {
     const scope = new ReadScope(context, assertAuthorized, this.excluded);
     return Object.freeze({
@@ -78,10 +85,14 @@ export class NodeWorkspaceFiles implements WorkspaceFilesFactory {
 
 class ReadScope {
   private rootIdentity?: Root;
-  private readonly context: ToolContext;
+  private readonly context: Pick<ToolContext, "workspaceRoot" | "signal">;
   private readonly authorized: () => void;
   private readonly excluded: readonly string[];
-  constructor(context: ToolContext, authorized: () => void, excluded: readonly string[]) {
+  constructor(
+    context: Pick<ToolContext, "workspaceRoot" | "signal">,
+    authorized: () => void,
+    excluded: readonly string[],
+  ) {
     this.context = context;
     this.authorized = authorized;
     this.excluded = excluded;
@@ -174,6 +185,32 @@ class ReadScope {
     const current = await this.target(root, portable(relative(root.path, target.lexical)) || ".");
     if (current.path !== target.path || !same(current.stat, target.stat))
       throw new FileAccessError("denied", "Target changed during access");
+  }
+
+  readProjectInstructions(): Promise<FileRead | null> {
+    return this.operation(async (root) => {
+      let stat: Stats;
+      try {
+        stat = await this.io(() => lstat(resolve(root.path, "AGENTS.md")));
+      } catch (error) {
+        // Only an absent leaf is optional. Permission errors and dangling links are not absence.
+        if (isMissing(error)) {
+          await this.root();
+          return null;
+        }
+        throw error;
+      }
+      if (!stat.isFile() || stat.isSymbolicLink() || stat.nlink !== 1)
+        throw new FileAccessError("denied", "Project instructions must be a regular unlinked file");
+      const result = await this.readFile(root, "AGENTS.md", 16 * 1024);
+      // Auto-discovery never follows an alias, even one the ordinary explicit read tool permits.
+      const after = await this.io(() => lstat(resolve(root.path, "AGENTS.md")));
+      if (after.isSymbolicLink() || !same(stat, after) || result.path !== "AGENTS.md")
+        throw new FileAccessError("denied", "Project instructions changed during access");
+      if (result.truncated)
+        throw new FileAccessError("unavailable", "Project instructions exceed the 16 KiB limit");
+      return result;
+    });
   }
 
   read(path: string, maximum?: number): Promise<FileRead> {

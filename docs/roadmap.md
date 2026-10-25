@@ -60,9 +60,11 @@ Batch 7 was reviewed and merged in [PR #11](https://github.com/Peerframe/moyyi/p
 steering/resume and explicit development-plugin reload through the protocol. `--demo` is a finite
 offline script; `--host FILE` connects an explicitly trusted runtime configuration. See
 [cli.md](cli.md) and the [current handoff](tasks/2026-10-25-batch-7-cli.md).
-Live acceptance remains owner-run. The planned `project-instructions` plugin is not delivered by
-these batches; implicit workspace instructions/config discovery is not enabled. Phase 1 acceptance
-is not claimed. Phase 2 was separately authorized and merged; phase 3 is merged under accepted D6.
+PR #19 was merged and installed; a bounded synthetic-file live read/tool-result/answer task and
+offline replay passed on 2026-10-26. Broader model task quality remains unmeasured. The current
+project-instructions branch adds original working guidance and automatic root AGENTS.md loading
+under existing permissions; nested files still require explicit reads. Executable workspace config
+is never discovered. See [instructions](instructions.md). Phase 1 acceptance is not claimed. Phase 2 was separately authorized and merged; phase 3 is merged under accepted D6.
 Run the read-only subset of the corpus. Qwen and shasha training are deferred directions,
 not requirements for this phase or the first release.
 

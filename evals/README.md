@@ -81,6 +81,13 @@ Its pass count measures conformance to those scenarios, not a model's ability to
 
 ## Real-file capability conformance
 
+`npm run eval:instructions` exercises default/project instructions through the public runtime,
+real disposable UTF-8 files and SQLite. It covers request audit, per-request refresh, root-only
+scope, permissions, malicious guidance, cancellation, file limits and exact record/replay. The
+model is scripted, no credentials/network are used, and the report is synthetic. It establishes
+context/authority conformance, not instruction-following quality. Existing public-task checkers
+are unchanged. See [instructions](../docs/instructions.md).
+
 `npm run eval:files` uses the public runtime protocol, a scripted model, disposable real files
 and SQLite. Eight scenarios cover the list/search/read loop, ignore rules, protected paths,
 traversal/symlink denial, truncation and input limits. It writes ignored synthetic output to

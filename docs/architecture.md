@@ -44,7 +44,8 @@ core through five fixed points and can be added or removed without touching anyt
 |---|---|---|
 | `provider-scripted` | model provider | exists (tests and evals) |
 | `provider-deepseek` (Responses subset; [ADR 0007](decisions/0007-first-model-provider.md)) | model provider | merged in batch 6; live acceptance pending |
-| `project-instructions` (AGENTS.md and similar) | context source | 1 |
+| `default-instructions` (original working guidance) | context source | implemented; static |
+| `project-instructions` (workspace root AGENTS.md only) | context source | implemented; refreshed per request |
 | `fs` (read, list, search; create, edit, undo) | tools | read-only merged in batch 5; writes merged in phase 2 |
 | `shell` | tools | merged in phase 3 |
 | `provider-anthropic` | model provider | merged in phase 5; live acceptance pending |
@@ -80,6 +81,14 @@ See [CLI usage](cli.md) and [ADR 0011](decisions/0011-interactive-cli-and-develo
 Development reload is incompatible with recording/replay and refreshes only explicit ESM entries.
 
 ### Trust
+
+[ADR 0017](decisions/0017-working-and-project-instructions.md) adds original default working
+guidance and root AGENTS.md context. Runtime supplies a fixed-path, read-only capability under
+an explicit `beforeContextRead` policy decision and restrictive plugin rules; missing grants or
+approval-required reads do not load text. It expires after collection and follows run cancellation
+and policy revocation. The plugins import no I/O. Root instructions refresh before each model
+request, have a 16 KiB complete-file limit and retain source/hash in the recorded request. There
+is no automatic nested/parent/home discovery. See [usage and limits](instructions.md).
 
 | Kind | Runs | Trusted | Example |
 |---|---|---|---|
