@@ -37,6 +37,7 @@
     "docs/writes.md",
     "docs/shell.md",
     "docs/long-sessions.md",
+    "docs/instructions.md",
     "docs/web.md"
   ],
   "scripts": {
@@ -60,7 +61,8 @@
     "eval:shell": "node evals/shell/run.ts",
     "eval:long-sessions": "node evals/long-sessions/run.ts",
     "eval:anthropic": "node evals/anthropic/run.ts",
-    "eval:web": "node evals/web/run.ts"
+    "eval:web": "node evals/web/run.ts",
+    "eval:instructions": "node evals/instructions/run.ts"
   },
   "devDependencies": {
     "@biomejs/biome": "2.5.15",

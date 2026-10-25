@@ -2,7 +2,13 @@
 
 The CLI connects the existing agent runtime to a terminal: continuous sessions, streamed text,
 explicit approvals, cancellation, steering and history resume. The default policy remains read-only.
-DeepSeek and opt-in Anthropic adapters are available; their live acceptance remains pending.
+DeepSeek and opt-in Anthropic adapters are available. A bounded DeepSeek file-read task has passed
+live acceptance; broader task quality and Anthropic live acceptance remain unverified.
+
+Default working guidance and the selected workspace's root `AGENTS.md` now enter model context.
+Automatic reads honor the read policy and a 16 KiB complete-file limit; nested instructions require
+ordinary explicit reads. This discovers text, never executable workspace configuration. See
+[project instructions and opt-out](instructions.md).
 
 ## Try the offline client
 

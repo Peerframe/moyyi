@@ -1,0 +1,56 @@
+# Working and project instructions
+
+moyyi supplies a small default working prompt: inspect relevant evidence, carry out authorized
+work, preserve unrelated changes, verify the result, and report what actually happened. It uses
+the user's language and does not treat a tool description or a document as permission.
+
+Place project guidance in **`AGENTS.md` at the selected workspace root**. For example:
+
+```markdown
+# Project conventions
+Use the existing modules before adding new ones.
+Preserve unrelated changes. Run the affected tests and report their results.
+Explain any verification that could not be completed.
+```
+
+The next model request reads the current root file. Editing or deleting it takes effect at the
+next request, including after session restart or compaction. Files in parent/home directories,
+`AGENTS.override.md`, `CLAUDE.md`, Markdown links and imports are not automatically loaded.
+Nested AGENTS.md files are **not automatically loaded**: the default prompt directs the model
+to discover/read applicable ones using ordinary file tools before work in that subtree. This
+is guidance, not a guarantee of model obedience or a path-aware nested loader.
+
+Project guidance is subordinate to explicit user instructions and host permissions. The model
+request carries a JSON source block with `path`, `scope`, `sha256` and `text`. Content cannot enable
+writes, shell, web or approval. Other file and web content remains task data.
+
+Automatic reads require the normal read grant plus an explicit automatic-context-read policy
+decision. If reads need approval, the file is not silently read; context says its rules are
+unavailable. The ordinary `read` tool still follows the existing approval flow. Custom policies
+must implement `beforeContextRead(path)` to opt into automatic reads. A throwing/invalid decision
+denies automatic access. Restrictive plugin policy rules still apply in both phases.
+
+The root file must be a regular UTF-8 file with a single hardlink, no symlink and at most **16 KiB**.
+Missing/empty is valid. Invalid, oversized, inaccessible or protected files stop context collection
+before a provider request, with a safe diagnostic; they are never silently truncated. Private
+runtime data, host-protected paths and existing secret-path exclusions remain inaccessible.
+`.gitignore` affects normal discovery/search; this explicitly named root file uses the explicit
+read boundary. A complete request must also fit the model's existing context budget.
+
+A trusted host can disable root-file discovery while retaining default working instructions:
+
+```ts
+const runtime = await createRuntime({
+  // Existing provider, model and storage options go here.
+  projectInstructions: false,
+});
+```
+
+The stored rendered request records exactly what the model received. Old recordings with different
+instructions fail exact replay matching; there is no live fallback. Changing instructions does
+not edit stored transcripts or the persisted format. Automatic reads have no tool effects and
+do not approve any action; loaded text is captured in the request audit instead.
+
+Run `npm run eval:instructions` for deterministic context/authority conformance. No credentials,
+network or real model are used; this does not measure real-model task quality. See
+[ADR 0017](decisions/0017-working-and-project-instructions.md) for sources and tradeoffs.

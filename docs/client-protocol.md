@@ -5,6 +5,11 @@ The local candidate exposes `moyyi/runtime` (`createRuntime` and host/runtime ty
 the same `send`/`subscribe` protocol. This is an in-process API for trusted host code; it does not
 add an HTTP endpoint, JSON-RPC server, authenticated remote boundary or a GUI.
 
+Runtime defaults include working guidance and bounded root AGENTS.md loading. Trusted hosts may
+set `projectInstructions: false`; custom policies must explicitly implement `beforeContextRead`
+to permit automatic loading. This does not alter the client protocol or grant tool authority.
+See [instructions](instructions.md).
+
 ## Lifecycle
 
 Create a runtime with an explicit model, private data directory and trusted startup plugins or

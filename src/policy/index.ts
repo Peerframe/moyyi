@@ -34,6 +34,18 @@ export class ReadOnlyPolicy implements PermissionPolicy {
     return this.epoch;
   }
 
+  beforeContextRead(_path: string): PolicyDecision {
+    return this.decide(
+      "read",
+      {
+        class: "read",
+        reversibility: "not_applicable",
+        verification: "not_applicable",
+      },
+      true,
+    );
+  }
+
   beforePrepare(tool: string, profile: EffectProfile, _args: unknown): PolicyDecision {
     return this.decide(tool, profile, false);
   }
@@ -78,6 +90,9 @@ export class WorkspaceWritePolicy implements PermissionPolicy {
   }
   revision(): number {
     return this.epoch;
+  }
+  beforeContextRead(path: string): PolicyDecision {
+    return this.reads.beforeContextRead(path);
   }
   beforePrepare(tool: string, profile: EffectProfile, args: unknown): PolicyDecision {
     if (profile.class === "read") return this.reads.beforePrepare(tool, profile, args);
@@ -134,6 +149,14 @@ export class WorkspaceProcessPolicy implements PermissionPolicy {
   }
   revision(): number {
     return this.epoch + (this.files.revision?.() ?? 0);
+  }
+  beforeContextRead(path: string): PolicyDecision {
+    return (
+      this.files.beforeContextRead?.(path) ?? {
+        kind: "deny",
+        reason: "No automatic context read grant",
+      }
+    );
   }
   beforePrepare(tool: string, profile: EffectProfile, args: unknown): PolicyDecision {
     if (profile.class !== "process") return this.files.beforePrepare(tool, profile, args);
@@ -193,6 +216,14 @@ export class WebPolicy implements PermissionPolicy {
   }
   revision(): number {
     return this.epoch + (this.previous.revision?.() ?? 0);
+  }
+  beforeContextRead(path: string): PolicyDecision {
+    return (
+      this.previous.beforeContextRead?.(path) ?? {
+        kind: "deny",
+        reason: "No automatic context read grant",
+      }
+    );
   }
   beforePrepare(tool: string, profile: EffectProfile, args: unknown): PolicyDecision {
     if (profile.class !== "external") return this.previous.beforePrepare(tool, profile, args);

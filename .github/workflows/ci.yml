@@ -52,5 +52,8 @@ jobs:
       - name: Web authority conformance
         run: npm run eval:web
 
+      - name: Project instruction conformance
+        run: npm run eval:instructions
+
       - name: Installable candidate and client protocol
         run: npm run verify:package

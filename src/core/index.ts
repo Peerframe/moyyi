@@ -66,7 +66,10 @@ export interface CoreDeps {
   readonly clock: Clock;
   readonly ids: IdSource;
   readonly emit: (event: RuntimeEvent) => void;
-  readonly collect?: (workspaceRoot: string) => Promise<readonly ContextSection[]>;
+  readonly collect?: (
+    workspaceRoot: string,
+    signal: AbortSignal,
+  ) => Promise<readonly ContextSection[]>;
   readonly limits?: Partial<RunLimits>;
   readonly files?: WorkspaceFilesFactory;
   readonly processes?: WorkspaceProcessesFactory;
@@ -389,6 +392,15 @@ export class AgentCore {
     };
   }
 
+  async #collect(run: Running): Promise<readonly ContextSection[]> {
+    try {
+      return (await this.#deps.collect?.(run.workspaceRoot, run.controller.signal)) ?? [];
+    } catch (error) {
+      if (run.controller.signal.aborted) return [];
+      throw error;
+    }
+  }
+
   async #compact(run: Running): Promise<RunOutcome> {
     const snapshot = await this.#session(run.sessionId);
     const input: ContextInput = {
@@ -399,7 +411,7 @@ export class AgentCore {
         description,
         inputSchema,
       })),
-      sections: (await this.#deps.collect?.(run.workspaceRoot)) ?? [],
+      sections: await this.#collect(run),
       unsettledEffects: snapshot.effects.filter((effect) => !isTerminal(effect.state)),
     };
     if (run.controller.signal.aborted) return { kind: "cancelled" };
@@ -532,7 +544,7 @@ export class AgentCore {
         (entry) =>
           entry.runId === run.id && entry.body.kind === "user_message" && entry.body.steering,
       ).length;
-      const sections = (await this.#deps.collect?.(run.workspaceRoot)) ?? [];
+      const sections = await this.#collect(run);
       if (run.controller.signal.aborted) break;
       const { request } = this.#deps.context.build({
         path: pathToHead(snapshot),

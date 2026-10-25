@@ -24,7 +24,9 @@ import {
   type Timestamp,
 } from "../contracts/index.ts";
 import { AgentCore } from "../core/index.ts";
+import { defaultInstructionsPlugin } from "../plugins/default-instructions/index.ts";
 import { fsPlugin } from "../plugins/fs/index.ts";
+import { projectInstructionsPlugin } from "../plugins/project-instructions/index.ts";
 import {
   ANTHROPIC_API_PROFILE,
   type AnthropicTransport,
@@ -47,6 +49,7 @@ import { SqliteSessionStore } from "../store/index.ts";
 import { type AnthropicHttpOptions, anthropicHttpTransport } from "./anthropic-http.ts";
 import { type DeepSeekHttpOptions, deepSeekHttpTransport } from "./deepseek-http.ts";
 import { NodeWorkspaceFiles } from "./files.ts";
+import { collectContext } from "./instructions.ts";
 import { FileRecordingSink, RecordingModelClient, ReplayModelClient } from "./model-recording.ts";
 import { type PluginEntry, PluginRegistry, type PluginStatus } from "./plugins.ts";
 import { WorkspacePreconditions } from "./preconditions.ts";
@@ -91,6 +94,8 @@ export interface DevelopmentPlugin {
 }
 
 export interface RuntimeOptions {
+  /** Disable automatic root AGENTS.md reads. Default working instructions remain enabled. */
+  readonly projectInstructions?: false;
   readonly developmentPlugins?: readonly DevelopmentPlugin[];
   readonly plugins?: readonly PluginEntry[];
   readonly model?: ModelOrigin;
@@ -240,6 +245,8 @@ export async function createRuntime(
   const registry = new PluginRegistry();
   const plugins: PluginStatus[] = [];
   const startup = [
+    { plugin: defaultInstructionsPlugin },
+    ...(options.projectInstructions === false ? [] : [{ plugin: projectInstructionsPlugin }]),
     { plugin: fsPlugin },
     { plugin: shellPlugin },
     { plugin: createWebPlugin(options.web?.search?.origin) },
@@ -329,6 +336,28 @@ export async function createRuntime(
 
   const policy: PermissionPolicy = {
     revision: () => base.revision?.() ?? 0,
+    beforeContextRead: (path) => {
+      try {
+        const initial = base.beforeContextRead?.(path);
+        if (!initial || !["allow", "ask", "deny"].includes(initial.kind))
+          return { kind: "deny", reason: "Automatic context reads are not granted" };
+        const profile = {
+          class: "read",
+          reversibility: "not_applicable",
+          verification: "not_applicable",
+        } as const;
+        const args = { path };
+        return stricter(
+          stricter(
+            initial,
+            registry.evaluatePolicy({ tool: "read", profile, args, phase: "prepare" }),
+          ),
+          registry.evaluatePolicy({ tool: "read", profile, args, phase: "execute" }),
+        );
+      } catch {
+        return { kind: "deny", reason: "Automatic context reads are not granted" };
+      }
+    },
     beforePrepare: (tool, profile, args) =>
       stricter(
         base.beforePrepare(tool, profile, args),
@@ -408,6 +437,7 @@ export async function createRuntime(
     const processes = options.workspaceProcesses
       ? new NodeWorkspaceProcesses({ ...options.workspaceProcesses, protectedPaths: excluded })
       : undefined;
+    const files = new NodeWorkspaceFiles(excluded);
     core = new AgentCore({
       model: selectedClient,
       profile,
@@ -417,7 +447,7 @@ export async function createRuntime(
       context: new MinimalContextBuilder(),
       validator: new AjvArgumentValidator(),
       preconditions: options.preconditions ?? new WorkspacePreconditions(),
-      files: new NodeWorkspaceFiles(excluded),
+      files,
       ...(web ? { web } : {}),
       ...(processes ? { processes } : {}),
       ...(writes
@@ -443,12 +473,16 @@ export async function createRuntime(
       clock: options.clock ?? { now: () => new Date().toISOString() as Timestamp },
       ids: options.ids ?? { next: (prefix) => `${prefix}_${randomUUID()}` },
       emit,
-      collect: async (workspaceRoot) =>
-        (
-          await Promise.all(
-            registry.contextSources.map((source) => source.collect({ workspaceRoot, profile })),
-          )
-        ).flat(),
+      collect: (workspaceRoot, signal) =>
+        collectContext(
+          registry.contextSources,
+          files,
+          policy,
+          workspaceRoot,
+          profile,
+          signal,
+          options.projectInstructions !== false,
+        ),
       ...(options.limits === undefined ? {} : { limits: options.limits }),
     });
     if (!recovered) {
