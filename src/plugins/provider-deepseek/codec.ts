@@ -25,6 +25,7 @@ const encoder = new TextEncoder();
 const MAX_ITEMS = 1024;
 const MAX_PARTS = 1024;
 const MAX_BYTES = 16 * 1024 * 1024;
+const MAX_AUXILIARY_REASONING_BYTES = 64 * 1024;
 type ObjectValue = Record<string, unknown>;
 
 /** Render only the documented text/function subset. Replay payloads have no authority here. */
@@ -197,6 +198,7 @@ type ItemState = {
   arguments: string;
   argumentsDeltas: boolean;
   argumentsDone: boolean;
+  sawAuxiliaryReasoning: boolean;
   done?: ObjectValue;
 };
 
@@ -250,6 +252,17 @@ export async function* decodeDeepSeekEvents(
     reportedModel = model;
     return value;
   };
+  const requireVisibleReasoning = (item: ItemState, raw: unknown, full: ObjectValue): void => {
+    if (item.kind !== "reasoning") return;
+    item.sawAuxiliaryReasoning ||= auxiliaryReasoning(object(raw));
+    // Added metadata may disappear before completion. It never substitutes for the full
+    // visible reasoning this stateless input profile needs, or authorizes a tool call.
+    if (item.sawAuxiliaryReasoning)
+      requireCondition(
+        array(full.content).some((part) => string(object(part).text).trim().length > 0),
+        "Auxiliary reasoning metadata requires visible reasoning content",
+      );
+  };
   const completeItem = (output: number, raw: unknown): ModelStreamEvent[] => {
     const item = items.get(output);
     requireCondition(item !== undefined && !item.done, "Unknown or completed output item");
@@ -262,6 +275,7 @@ export async function* decodeDeepSeekEvents(
       value.status === "completed" || value.status === "incomplete",
       "Item is not final",
     );
+    requireVisibleReasoning(item, raw, value);
     const result: ModelStreamEvent[] = [];
     if (item.kind === "function_call") {
       requireCondition(
@@ -370,6 +384,7 @@ export async function* decodeDeepSeekEvents(
           arguments: "",
           argumentsDeltas: false,
           argumentsDone: false,
+          sawAuxiliaryReasoning: kind === "reasoning" && auxiliaryReasoning(object(event.item)),
         };
         if (kind === "function_call") {
           item.callId = identifier(value.call_id);
@@ -489,6 +504,7 @@ export async function* decodeDeepSeekEvents(
           const item = items.get(index);
           requireCondition(item !== undefined, "Unknown terminal item");
           const full = normalizeItem(rawItem);
+          if (status !== "failed") requireVisibleReasoning(item, rawItem, full);
           if (item.done)
             requireCondition(
               canonicalizeJson(full) === canonicalizeJson(item.done),
@@ -643,10 +659,10 @@ function normalizeItem(raw: unknown): ObjectValue {
     );
   } else {
     emptyOptionalArray(value.summary, "Reasoning summaries are unsupported");
-    requireCondition(
-      value.encrypted_content === undefined || value.encrypted_content === null,
-      "Encrypted reasoning is unsupported",
-    );
+    // DeepSeek can attach opaque output metadata to a visible reasoning stream. The
+    // documented input profile uses plaintext only; validate and discard this field.
+    // Its value can change across added/done, so it is not part of content equality.
+    auxiliaryReasoning(value);
   }
   const content = array(value.content);
   requireCondition(content.length <= MAX_PARTS, "Too many content parts");
@@ -657,6 +673,15 @@ function normalizeItem(raw: unknown): ObjectValue {
     ...(type === "message" ? { role: "assistant" } : {}),
     content: content.map((part) => normalizePart(part, type)),
   };
+}
+function auxiliaryReasoning(value: ObjectValue): boolean {
+  if (value.encrypted_content === undefined || value.encrypted_content === null) return false;
+  const text = string(value.encrypted_content);
+  requireCondition(
+    encoder.encode(text).byteLength <= MAX_AUXILIARY_REASONING_BYTES,
+    "Auxiliary reasoning metadata exceeds byte limit",
+  );
+  return text.length > 0;
 }
 function normalizePart(raw: unknown, itemKind: string): ObjectValue {
   const value = object(raw);

@@ -2,7 +2,9 @@
 
 Batch 6 adds a programmatic DeepSeek provider and deterministic record/replay. The subsequent
 batch 7 [CLI](cli.md) connects it through explicit trusted host configuration. The default runtime still makes no network request without explicit configuration.
-All development evidence uses synthetic protocol responses; live API acceptance remains pending.
+Automated checks use synthetic protocol responses. An owner-authorized minimal diagnostic received
+HTTP 200 and exposed a reasoning-metadata incompatibility; full live response and tool-continuation
+acceptance remain pending. See the [compatibility follow-up](tasks/2026-10-25-deepseek-compatibility.md).
 
 ## Offline entry points
 
@@ -34,8 +36,13 @@ secret-bearing network diagnostics. The provider handles text, full visible reas
 function calls; the runtime's existing policy controls file tools. It does not grant tool network,
 write or shell access. Only the core can retry a qualifying model error.
 
-The supported request profile is intentionally narrow. Images, encrypted/summarized reasoning,
+The supported request profile is intentionally narrow. Images, opaque-only/summarized reasoning,
 refusal content items, assistant phases, hosted tools and stored server conversations are rejected.
+An auxiliary `encrypted_content` string in reasoning output is accepted only alongside visible
+reasoning, bounded to 64 KiB UTF-8, and discarded. It is not a replacement for plaintext or a replay
+credential. An item that carries it must finish with nonblank visible reasoning, even when the
+field disappears at completion. The documented stateless input sends only full visible reasoning;
+the auxiliary field never reaches normalized recordings, context or a later request.
 The adapter also refuses incomplete or unproven prior reasoning when tools are present. A cancelled
 or truncated conversation may therefore require a new session; automatic context rebuilding is not
 implemented. No partial reasoning is silently presented as a complete continuation.
@@ -106,7 +113,12 @@ command is run by the batch 6 tests, demo or implementation process.
    known server revision, and actual usage/charge. A reported alias alone means the underlying model
    revision remains **unknown**. Keep raw private records local and report only sanitized evidence.
 
-Service acceptance, real-agent pass@1/pass^k, cost, latency and model quality remain unverified.
+The earlier three-request smoke above has not been executed. Two separately authorized one-request
+connectivity/diagnostic probes have received HTTP 200; neither established a complete normalized
+answer. The second exposed the auxiliary-field rejection and captured a partial stream. After the
+fix, that prefix emits a visible delta and correctly ends as interrupted, not completed. No further
+paid request is authorized by this documentation. Real-agent pass@1/pass^k, full-response usage/cost,
+normal task latency and model quality remain unverified.
 The CLI, controlled writes, native commands, compaction and second provider are merged.
 The local installable candidate is described in [installation.md](installation.md); no official
 release or live acceptance is implied.
