@@ -53,7 +53,10 @@ copy/import workflow, persistent terminal or arbitrary-network capability.
 The first Linux CI failed before command launch because Ubuntu AppArmor blocked bubblewrap
 loopback setup (run `40176393792`: 21 failures). The scoped distribution profile is now loaded
 in CI, while all original assertions remain; denial probes additionally require proof that the
-shell started. Linux acceptance still awaits the corrected-head run.
+shell started. The next run (`40176679021`) launched correctly and passed 1,145 tests, but
+three assertions caught writes to bubblewrap's private synthetic root. The host canary was not
+modified; the root mount is now made read-only so outside-workspace writes fail consistently
+instead of creating misleading private aliases. Linux acceptance awaits the corrected-head run.
 
 The first full-gate attempt encountered a temporary SessionId typing error in an in-progress
 new crash fixture. It was corrected before the successful full run; no check was relaxed.

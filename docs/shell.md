@@ -32,7 +32,8 @@ No interactive stdin, persistent terminal or background-service API is provided.
 - Read required system binaries/libraries. Additional toolchain executables and libraries require
   explicit host `executablePaths` (exact executable files) and `readOnlyPaths` grants. A Homebrew
   or custom Node installation is not automatically exposed with the rest of the host home.
-- Network is denied, including provider API credentials/environment inheritance. Shell does not
+- Host/external network access is denied. Linux uses an isolated network namespace; its own
+  loopback/IPC is not a connection to host services. Shell does not
   receive the model connection's keys, SSH agent socket, proxy settings or arbitrary parent env.
 - Credential names, `.git`, moyyi state and explicit `protectedPaths` are protected. Outside
   symlinks do not grant outside data. Pre-existing hard-linked ordinary files and special files

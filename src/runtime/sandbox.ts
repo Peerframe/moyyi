@@ -276,6 +276,9 @@ export async function prepareNativeSandbox(
     if (isDirectory) args.push("--perms", "0000", "--tmpfs", path, "--remount-ro", path);
     else if (mask) args.push("--ro-bind", mask, path);
   }
+  // The synthetic namespace parents must not become an additional writable filesystem.
+  // This is non-recursive: the explicit workspace/scratch bind mounts retain write access.
+  args.push("--remount-ro", "/");
   for (const [key, value] of Object.entries(env)) args.push("--setenv", key, value);
   args.push("--chdir", cwd, "--", "/bin/sh", "-c", options.commandText);
   return { command, args, env, backend: "bubblewrap" };
