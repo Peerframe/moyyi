@@ -18,10 +18,10 @@
 
 ## 1. 现在有什么
 
-合入 #4 后的 main `26f2e41` 已有：
+已合入 #1–#5 的 main `1470a69` 为本轮基线，包含：
 
 - Node 26、TypeScript 7、Biome、Vitest；`npm run check` 包含类型检查、lint 和 271 项测试
-- 持久化格式 `src/contracts/persisted`，版本 1，由 `fixtures/v1.ts` 锁定；D2 修订尚未执行
+- 持久化格式 `src/contracts/persisted`，版本 1，由 `fixtures/v1.ts` 锁定
 - 模型、工具、插件、客户端协议契约和端口；`checkModelStream`
 - 插件注册表（原子加载、归属清理、只能更严格的权限规则、隔离的事件监听）；`provider-scripted`
 - 分层边界检查 `tests/boundaries.ts`
@@ -29,7 +29,12 @@
 - PR 和 main push 的 CI；缺失的 `remaining-work/fixture/progress.log` 已跟踪，不再依赖本地补件
 - 三种协议的内容映射、手写合成样例和完整性测试；D2 选 B 的 ADR 已合入
 
-还没有：核心循环、存储、上下文组装、基础权限策略、文件和命令插件、真实模型供应商。
+本轮分支新增：D2 修订已在 [PR #6](https://github.com/Peerframe/moyyi/pull/6) 完成，本地 354 项
+测试和该提交 CI 通过后才开始批次 3；依赖分支 `codex/batch-3-store` 已实现事务存储、blob、
+写进程锁、工作区租约和备份。两项仍待 owner 审阅合并，未推送 main。
+精确成果与验收见[本轮记录](2026-10-25-v1-and-storage.md)。
+
+还没有：核心循环、上下文组装、基础权限策略、文件和命令插件、真实模型供应商，以及运行时存储接线。
 `createRuntime` 目前对所有命令回复 "not implemented"。合成评测和协议样例不等于真实 Agent 能力或 API 验收。
 
 | PR | 已核对的合并记录 | 结果与后续 |
@@ -38,7 +43,7 @@
 | [#2：批次 1](https://github.com/Peerframe/moyyi/pull/2) | `b030053` | 30 道题、B1/B2 修复已合入；原有 14 题标准未改，合并前 262 项测试及 CI 通过 |
 | [#3：批次 2](https://github.com/Peerframe/moyyi/pull/3) | `9bc5476` | 协议研究已合入；与 #2 联合检查为 271 项通过，CI 通过 |
 | [#4：D2 ADR](https://github.com/Peerframe/moyyi/pull/4) | `26f2e41` | B 方案及重放失效边界已合入；集成检查及最终 head CI 通过；v1 修订仍未执行 |
-| [#5：D1/D3/D5 与交接整合](https://github.com/Peerframe/moyyi/pull/5) | 本次文档整合 | 保留全部已定决定；最终 head、CI、合并记录和 main 验收见 PR 页面 |
+| [#5：D1/D3/D5 与交接整合](https://github.com/Peerframe/moyyi/pull/5) | `1470a69` | 保留全部已定决定；PR CI 和合并后的 main 检查均通过 |
 
 [给 Claude 的交接](2026-10-25-claude-review-handoff.md)保留原始独立分支的历史验收，已标为历史快照。
 其中缺 fixture、未有 CI 和 D2 未定等状态不再是当前状态；不把旧的覆盖文件诊断冒充新检查结果。
@@ -75,7 +80,7 @@
 
 本次同步保留了 #4 的 D2、D4 和本 PR 的 D1、D3、D5。ADR 0003 已澄清：重放信息作废后，只有
 统一内容仍能形成受支持的合法请求时才能继续，否则明确拒绝或使用另行定义并验证的上下文重建；
-不修补旧重放信息，不自动重做工具动作。字段和适配器实现仍属于后续独立任务。
+不修补旧重放信息，不自动重做工具动作。字段修订已交付 PR #6；真实供应商适配器仍属批次 6。
 
 ### 3.1 开始批次 3 之前
 
@@ -84,6 +89,9 @@
 既有通过证据可以复用，但新提交的检查标准不能降低。
 
 文档整合已在 main `1470a69` 验收（271 项测试及 CI 通过）。Owner 已授权依次完成以下两项：
+
+**当前状态：第 1 项已完成**（PR #6，`095d894`，354 项本地测试和 CI 通过）；第 2 项的代码与
+故障验收在依赖分支交付，具体状态见本轮任务书。以下条目保留执行顺序及格式边界，不是新的审批要求。
 
 1. **独立完成 D2 的 v1 修订。** 依已授权的本轮任务书确认尚无真实存储数据；按 B 方案修订
    契约与 `fixtures/v1.ts`，补齐需要持久化的用量、终止原因、拒绝、参数来源及推理/重放信息，并验收。

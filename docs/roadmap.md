@@ -24,6 +24,9 @@ Done:
 - Three-protocol content mapping with synthetic fixtures and integrity tests
   ([content-model-mapping.md](research/content-model-mapping.md)); no live API acceptance
 - Accepted D1–D5 decisions; implementation gates remain in the handoff brief
+- D2 v1 amendment on [PR #6](https://github.com/Peerframe/moyyi/pull/6): refusal/reasoning,
+  usage and termination provenance, bounded hash/origin-bound replay; local checks and CI
+  passed before batch 3 started. It is awaiting owner review/merge
 
 Remaining:
 
@@ -31,14 +34,16 @@ Remaining:
   checker results do not yet measure real-agent performance
 - Validate the accepted security design ([threat-model.md](threat-model.md),
   [ADR 0006](decisions/0006-security-boundaries.md)) in the relevant implementation phases
-- Finish the separately authorized D2 v1 amendment
-  before storage writes data; see the [batch 3 prerequisites](tasks/2026-10-24-codex-handoff.md#31-开始批次-3-之前)
+- Review/merge the D2 and dependent storage PRs; these branches are not automatically merged
 
 ## Phase 1: read-only loop
 
 Core loop, `provider-deepseek` ([ADR 0007](decisions/0007-first-model-provider.md)),
-`project-instructions`, read and search tools in `fs`, SQLite store (driver comparison in
-batch 3; `node:sqlite` first candidate), record/replay, plugin hot reload in development mode.
+`project-instructions`, read and search tools in `fs`, SQLite store, record/replay,
+plugin hot reload in development mode. The batch 3 review branch now implements the store
+using `node:sqlite`: transactions, blobs, writer locks, workspace leases and backup/restore.
+The runtime is not wired to it yet; the loop, recovery and context remain batch 4 work and
+have not started. See the [current handoff](tasks/2026-10-25-v1-and-storage.md).
 Run the read-only subset of the corpus. Qwen and shasha training are deferred directions,
 not requirements for this phase or the first release.
 
