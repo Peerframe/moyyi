@@ -196,3 +196,18 @@ Runtime owns Seatbelt/bubblewrap adaptation, bounded output, deadline and proces
 Non-exited/uncertain results become unknown and stop the run; recovery never reruns commands.
 macOS detached descendants and host-SIGKILL cleanup limits are explicit. Docker is a future
 optional adapter, not an implicit dependency or fallback. See [usage and limits](shell.md).
+
+## Long sessions and recovery
+
+Phase 4 adds optional `ContextBuilder.planCompaction` and `session.compact` to the existing
+ports/protocol. The context layer chooses a safe settled prefix and renders an ordinary bounded
+model request; core runs it without tools under normal lifecycle limits. An immutable compaction
+entry and its selected head are committed together with a sibling request/usage audit entry.
+Only the selected path enters subsequent model context. The replaced span's replay is omitted;
+untouched messages retain provenance, and unsettled effects stay independently visible.
+
+Stable section/tool order preserves prefix reuse opportunities. Context reports expose the
+conservative budget and represented entry IDs. No live cache-hit rate is inferred. Recovery's
+run status, notice/result pairing and lease decision commit together, so a crash during recovery
+can be retried. See [ADR 0014](decisions/0014-recovery-and-compaction.md) and
+[usage](long-sessions.md); persisted v1 and layer import boundaries are unchanged.

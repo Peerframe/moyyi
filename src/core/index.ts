@@ -5,6 +5,7 @@ import {
   type Clock,
   type ContentPart,
   type ContextBuilder,
+  type ContextInput,
   type ContextSection,
   canonicalizeJson,
   type EffectId,
@@ -15,9 +16,11 @@ import {
   isTerminal,
   type ModelClient,
   type ModelProfile,
+  type ModelRequest,
   type PermissionPolicy,
   type PreconditionVerifier,
   type PreparedAction,
+  type RenderedRequestRef,
   type RunId,
   type RunLimits,
   type RunOutcome,
@@ -70,6 +73,7 @@ export interface CoreDeps {
 }
 
 interface Running {
+  readonly kind: "conversation" | "compaction";
   readonly id: RunId;
   readonly sessionId: SessionId;
   readonly workspaceRoot: string;
@@ -145,6 +149,9 @@ export class AgentCore {
           for (const entry of snapshot.entries) this.#emit({ type: "entry.appended", entry });
           break;
         }
+        case "session.compact":
+          await this.#start(command.sessionId, [], true);
+          break;
         case "run.start":
           await this.#start(command.sessionId, command.input);
           break;
@@ -153,6 +160,8 @@ export class AgentCore {
           break;
         case "run.steer": {
           const run = this.#run(command.runId);
+          if (run.kind === "compaction")
+            throw new Error("Compaction cannot accept steering; wait or cancel it");
           if (run.controller.signal.aborted || run.finishing) throw new Error("Run is stopping");
           const content = userContent(command.input, this.#limits.maxInputBytes);
           run.pendingSteering++;
@@ -205,7 +214,11 @@ export class AgentCore {
     return run;
   }
 
-  async #start(sessionId: SessionId, input: readonly ContentPart[]): Promise<void> {
+  async #start(
+    sessionId: SessionId,
+    input: readonly ContentPart[],
+    compact = false,
+  ): Promise<void> {
     if (
       this.#starting.has(sessionId) ||
       [...this.#running.values()].some((run) => run.sessionId === sessionId)
@@ -213,13 +226,14 @@ export class AgentCore {
       throw new Error("Session already has an active run");
     this.#starting.add(sessionId);
     try {
-      const content = userContent(input, this.#limits.maxInputBytes);
+      const content = compact ? [] : userContent(input, this.#limits.maxInputBytes);
       const snapshot = await this.#session(sessionId);
       if (snapshot.runs.some((run) => run.status === "active"))
         throw new Error("Session requires startup recovery");
       if (this.#closed) throw new Error("Runtime is closing");
       const id = this.#deps.ids.next("run") as RunId;
       const run: Running = {
+        kind: compact ? "compaction" : "conversation",
         id,
         sessionId,
         workspaceRoot: snapshot.workspaceRoot,
@@ -237,15 +251,19 @@ export class AgentCore {
         pendingSteering: 0,
         stopTimer: () => {},
       };
-      const entry = this.#entry(run, { kind: "user_message", steering: false, content });
+      const entry = compact
+        ? undefined
+        : this.#entry(run, { kind: "user_message", steering: false, content });
       await this.#deps.store.commit({
-        entries: [entry],
+        entries: entry ? [entry] : [],
         effects: [],
         durability: "normal",
-        sessions: [{ sessionId, workspaceRoot: run.workspaceRoot, headEntryId: entry.id }],
+        sessions: [
+          { sessionId, workspaceRoot: run.workspaceRoot, headEntryId: entry?.id ?? run.head },
+        ],
         runs: [{ runId: id, sessionId, status: "active" }],
       });
-      run.head = entry.id;
+      if (entry) run.head = entry.id;
       this.#running.set(id, run);
       run.stopTimer = this.#deps.scheduler.deadline(this.#limits.timeoutMs, () => {
         run.deadlineExpired = true;
@@ -257,7 +275,7 @@ export class AgentCore {
           run.stopTimer();
           this.#running.delete(id);
         });
-      this.#emit({ type: "entry.appended", entry });
+      if (entry) this.#emit({ type: "entry.appended", entry });
       this.#emit({ type: "run.started", runId: id, sessionId });
     } finally {
       this.#starting.delete(sessionId);
@@ -267,13 +285,17 @@ export class AgentCore {
   async #drive(run: Running): Promise<void> {
     let outcome: RunOutcome;
     try {
-      outcome = await this.#loop(run);
+      outcome = run.kind === "compaction" ? await this.#compact(run) : await this.#loop(run);
     } catch (error) {
       outcome = { kind: "failed", reason: errorMessage(error) };
     }
+    // Once the summary/head transaction succeeds, a deadline during that commit cannot
+    // turn the published result into a claim that compaction was prevented.
+    const compactionPublished = run.kind === "compaction" && outcome.kind === "completed";
     run.finishing = true;
     run.stopTimer();
-    if (run.deadlineExpired) outcome = { kind: "budget_exhausted", budget: "time" };
+    if (run.deadlineExpired && !compactionPublished)
+      outcome = { kind: "budget_exhausted", budget: "time" };
     try {
       await run.queue;
       const snapshot = await this.#session(run.sessionId);
@@ -342,8 +364,157 @@ export class AgentCore {
     } catch (error) {
       outcome = { kind: "failed", reason: `Persistence/settlement failed: ${errorMessage(error)}` };
     }
-    if (run.deadlineExpired) outcome = { kind: "budget_exhausted", budget: "time" };
+    if (run.deadlineExpired && !compactionPublished)
+      outcome = { kind: "budget_exhausted", budget: "time" };
     this.#emit({ type: "run.finished", runId: run.id, outcome });
+  }
+
+  async #recordRequest(
+    request: ModelRequest,
+    rendererVersion: string,
+  ): Promise<RenderedRequestRef> {
+    const blob = (value: unknown) =>
+      this.#deps.store.putBlob(new TextEncoder().encode(canonicalizeJson(value)));
+    return {
+      rendererVersion,
+      system: await blob({
+        origin: request.origin,
+        maxOutputTokens: request.maxOutputTokens,
+        content: request.system,
+      }),
+      tools: await blob(request.tools),
+      messages: await Promise.all(request.messages.map(blob)),
+    };
+  }
+
+  async #compact(run: Running): Promise<RunOutcome> {
+    const snapshot = await this.#session(run.sessionId);
+    const input: ContextInput = {
+      path: pathToHead(snapshot),
+      profile: this.#deps.profile,
+      tools: this.#deps.tools.map(({ name, description, inputSchema }) => ({
+        name,
+        description,
+        inputSchema,
+      })),
+      sections: (await this.#deps.collect?.(run.workspaceRoot)) ?? [],
+      unsettledEffects: snapshot.effects.filter((effect) => !isTerminal(effect.state)),
+    };
+    if (run.controller.signal.aborted) return { kind: "cancelled" };
+    const plan = this.#deps.context.planCompaction?.(input);
+    if (!plan)
+      throw new Error(
+        "No safe older history to compact; latest two user turns and unresolved actions are retained",
+      );
+    const rendered = await this.#recordRequest(plan.request, "moyyi-compaction-v1");
+    if (run.controller.signal.aborted) return { kind: "cancelled" };
+    if (run.requests >= this.#limits.maxModelRequests)
+      return { kind: "budget_exhausted", budget: "model_requests" };
+    run.requests++;
+    const response = await consumeResponse(
+      this.#deps.model,
+      plan.request,
+      run.controller.signal,
+      this.#limits.maxModelResponseBytes,
+      () => {},
+    );
+    const cancelled = run.controller.signal.aborted;
+    const audit = this.#entry(run, {
+      kind: "assistant_message",
+      origin: this.#deps.profile.origin,
+      content: response.parts,
+      stopReason: response.error || cancelled ? "interrupted" : response.stopReason,
+      providerStopReason: response.providerStopReason,
+      usage: response.usage,
+      request: rendered,
+      ...(!response.error && !cancelled && response.replay ? { replay: response.replay } : {}),
+    });
+    const entries: TranscriptEntry[] = [audit];
+    // Even a protocol-violating summary call is paired in its audit branch, never executed.
+    const calls = response.parts.filter((part): part is ToolCallPart => part.type === "tool_call");
+    if (calls.length)
+      entries.push({
+        ...this.#entry(run, {
+          kind: "tool_results",
+          results: calls.map((call) => ({
+            type: "tool_result",
+            callId: call.callId,
+            status: "cancelled",
+            content: [{ type: "text", text: "Compaction never executes tools." }],
+          })),
+        }),
+        parentId: audit.id,
+      });
+    let outcome: RunOutcome = cancelled
+      ? { kind: "cancelled" }
+      : {
+          kind: "failed",
+          reason:
+            response.error?.message ??
+            "Compaction requires complete text, optional reasoning, and no tools or refusal",
+        };
+    let compaction: TranscriptEntry | undefined;
+    if (
+      !cancelled &&
+      !response.error &&
+      response.stopReason === "end_turn" &&
+      response.parts.length > 0 &&
+      response.parts.every((part) => part.type === "text" || part.type === "reasoning") &&
+      response.parts.some((part) => part.type === "text" && part.text.trim().length > 0)
+    ) {
+      const candidate = this.#entry(run, {
+        kind: "compaction",
+        replaces: plan.replaces,
+        summary: response.parts.filter((part) => part.type === "text"),
+        producedBy: { origin: this.#deps.profile.origin, promptVersion: plan.promptVersion },
+      });
+      try {
+        const projected = this.#deps.context.build({ ...input, path: [...input.path, candidate] });
+        if (
+          projected.report.estimatedTokens === undefined ||
+          projected.report.estimatedTokens >= plan.originalTokens
+        )
+          throw new Error("Summary does not reduce the context; history was not changed");
+        compaction = candidate;
+        outcome = { kind: "completed" };
+      } catch (error) {
+        outcome = { kind: "failed", reason: errorMessage(error) };
+      }
+    }
+    // The summary response is an audit sibling, not part of the current conversation path.
+    // Publish its compaction and session head together, or retain the old head in full.
+    await this.#serialize(run, async () => {
+      const current = await this.#session(run.sessionId);
+      if (current.headEntryId !== snapshot.headEntryId) {
+        compaction = undefined;
+        outcome = {
+          kind: "failed",
+          reason: "Session changed during compaction; history was not replaced",
+        };
+      }
+      if (run.controller.signal.aborted) {
+        compaction = undefined;
+        outcome = { kind: "cancelled" };
+      }
+      if (compaction) entries.push(compaction);
+      await this.#deps.store.commit({
+        entries,
+        effects: [],
+        durability: "normal",
+        sessions: compaction
+          ? [
+              {
+                sessionId: run.sessionId,
+                workspaceRoot: run.workspaceRoot,
+                headEntryId: compaction.id,
+              },
+            ]
+          : [],
+      });
+      if (compaction) run.head = compaction.id;
+      for (const entry of entries) this.#emit({ type: "entry.appended", entry });
+    });
+    return outcome;
   }
 
   async #loop(run: Running): Promise<RunOutcome> {
@@ -372,18 +543,7 @@ export class AgentCore {
         sections,
         unsettledEffects: snapshot.effects.filter((effect) => !isTerminal(effect.state)),
       });
-      const blob = (value: unknown) =>
-        this.#deps.store.putBlob(new TextEncoder().encode(canonicalizeJson(value)));
-      const rendered = {
-        rendererVersion: "moyyi-core-v1",
-        system: await blob({
-          origin: request.origin,
-          maxOutputTokens: request.maxOutputTokens,
-          content: request.system,
-        }),
-        tools: await blob(request.tools),
-        messages: await Promise.all(request.messages.map(blob)),
-      };
+      const rendered = await this.#recordRequest(request, "moyyi-core-v1");
       if (run.controller.signal.aborted) break;
       run.requests++;
       const response = await consumeResponse(

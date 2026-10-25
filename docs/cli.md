@@ -65,6 +65,7 @@ keep them outside a repository. The runtime protects its store from ordinary fil
 | `/resume SESSION_ID` / `--session SESSION_ID` | Load persisted history; requires the matching data directory |
 | `/approve EFFECT_ID` / `/deny EFFECT_ID` | Respond only to a currently displayed approval using its exact digest |
 | `/reload NAME` | Reload an explicitly configured development plugin while idle |
+| `/compact` | Summarize older turns with one request to the selected model; idle only; cancellable |
 | `/help` | Show controls |
 | `/exit` / terminal EOF | Cancel any active run, wait for cleanup and close storage |
 
@@ -146,8 +147,8 @@ while a run is awaiting approval. Exit with Ctrl-D and reopen the same store to 
 
 The merged batch 7 record is [here](tasks/2026-10-25-batch-7-cli.md). Phase 2 adds
 [controlled writes](writes.md) through explicit host configuration, using the same displayed-digest
-approvals. Shell execution, dependency-graph reload and live model evaluation remain outside scope.
-The current handoff is [phase 2](tasks/2026-10-25-phase-2-writes.md).
+approvals. Dependency-graph reload and live model evaluation remain outside scope.
+The current handoff is [phase 4](tasks/2026-10-25-phase-4-long-sessions.md).
 
 ## Native command opt-in
 
@@ -156,3 +157,12 @@ The CLI displays exact command approvals through the existing protocol and Ctrl-
 owned process group. File-write grants alone do not grant shell access. The default demo remains
 read-only. See [shell configuration and platform limits](shell.md); unknown interrupted command
 effects are not retried automatically and may require manual workspace inspection.
+
+## Explicit conversation compaction
+
+`/compact` retains recent turns and summarizes an eligible older prefix with the selected model.
+It is a model call, can incur the configured provider's cost, and is never automatic. `/cancel`
+stops it. Originals remain available; the CLI labels summary-request audit records separately
+from normal answers. See [long-session behavior and limits](long-sessions.md). The finite offline
+`--demo` script does not generate summaries; `npm run eval:long-sessions` checks the feature with
+purpose-built synthetic responses.

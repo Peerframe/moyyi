@@ -39,3 +39,6 @@ jobs:
 
       - name: Native shell conformance
         run: npm run eval:shell
+
+      - name: Long-session conformance
+        run: npm run eval:long-sessions

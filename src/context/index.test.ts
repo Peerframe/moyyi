@@ -33,26 +33,34 @@ const input = (change: Partial<ContextInput> = {}): ContextInput => ({
 });
 
 describe("MinimalContextBuilder", () => {
-  it("preserves every entry, assistant content and opaque replay without applying recorded compaction", () => {
+  it("projects recorded compaction without sending replaced replay or hiding unsettled effects", () => {
     const result = new MinimalContextBuilder().build(input());
-    expect(result.report.includedEntryIds).toEqual(entries.map((entry) => entry.id));
-    expect(result.request.messages).toHaveLength(entries.length + 1);
-    expect(result.request.messages[0]?.role).toBe("user");
-    const assistant = textPath[1]?.body;
-    if (assistant?.kind !== "assistant_message") throw new Error("fixture");
-    expect(result.request.messages[1]).toEqual({
-      role: "assistant",
-      content: assistant.content,
-      stopReason: assistant.stopReason,
-      replay: assistant.replay,
-    });
-    expect(result.request.messages[1]?.replay).toBe(assistant.replay);
-    expect(result.request.messages[2]?.content[0]?.type).toBe("tool_result");
-    expect(JSON.stringify(result.request.messages[3])).toContain("User asked to fix range.js.");
-    expect(JSON.stringify(result.request.messages[4])).toContain("run_interrupted");
-    expect(result.request.messages[6]?.content[0]?.type).toBe("refusal");
+    expect(result.report.includedEntryIds).toEqual(entries.slice(3).map((entry) => entry.id));
+    expect(result.request.messages).toHaveLength(entries.length - 2);
+    expect(JSON.stringify(result.request.messages[0])).toContain("User asked to fix range.js.");
+    expect(JSON.stringify(result.request.messages)).not.toContain("signed_state");
     expect(JSON.stringify(result.request.messages.at(-1))).toContain(effects[0]?.id);
     expect(JSON.stringify(result.request.messages.at(-1))).toContain("Verify before retrying");
+    expect(textPath).toHaveLength(entries.length);
+  });
+
+  it("retains replay on untouched assistant messages", () => {
+    const result = new MinimalContextBuilder().build(input({ path: textPath.slice(0, 3) }));
+    const assistant = textPath[1]?.body;
+    if (assistant?.kind !== "assistant_message") throw new Error("fixture");
+    expect(result.request.messages[1]?.replay).toBe(assistant.replay);
+  });
+
+  it("keeps tool definitions in deterministic name order", () => {
+    const tools = ["z", "a"].map((name) => ({
+      name,
+      description: name,
+      inputSchema: { type: "object" },
+    }));
+    const builder = new MinimalContextBuilder();
+    expect(builder.build(input({ tools })).request).toEqual(
+      builder.build(input({ tools: [...tools].reverse() })).request,
+    );
   });
 
   it("orders sections by stability while keeping registration order within each group", () => {
@@ -123,7 +131,7 @@ describe("MinimalContextBuilder", () => {
   });
 
   it("rejects images until a provider-specific image budget exists", () => {
-    expect(() => new MinimalContextBuilder().build(input({ path: entries }))).toThrow(
+    expect(() => new MinimalContextBuilder().build(input({ path: entries.slice(0, 3) }))).toThrow(
       "Image context",
     );
   });
@@ -137,5 +145,94 @@ describe("MinimalContextBuilder", () => {
         ),
       ).toThrow("positive safe integers");
     },
+  );
+});
+
+function plannerPath(
+  firstTool: "none" | "paired" | "unpaired" | "unknown" = "none",
+): readonly TranscriptEntry[] {
+  const template = textPath[0];
+  const assistant = textPath[1]?.body;
+  if (!template || assistant?.kind !== "assistant_message") throw Error("fixture");
+  const path: TranscriptEntry[] = [];
+  const add = (body: TranscriptEntry["body"]) =>
+    path.push({
+      ...template,
+      id: `plan_${path.length}` as TranscriptEntry["id"],
+      parentId: path.at(-1)?.id ?? null,
+      body,
+    });
+  const call = assistant.content.find((part) => part.type === "tool_call");
+  if (!call) throw Error("fixture call");
+  for (let turn = 0; turn < 5; turn++) {
+    add({
+      kind: "user_message",
+      steering: false,
+      content: [{ type: "text", text: `User turn ${turn}` }],
+    });
+    if (turn === 0 && firstTool !== "none") {
+      add({ ...assistant, content: [call], stopReason: "tool_use" });
+      if (firstTool !== "unpaired")
+        add({
+          kind: "tool_results",
+          results: [
+            {
+              type: "tool_result",
+              callId: call.callId,
+              status: firstTool === "unknown" ? "unknown" : "succeeded",
+              content: [{ type: "text", text: "Exact observed output" }],
+            },
+          ],
+        });
+    }
+    add({
+      ...assistant,
+      content: [{ type: "text", text: `Answer ${turn}: ${"detail ".repeat(200)}` }],
+      stopReason: "end_turn",
+    });
+  }
+  return path;
+}
+
+it("plans complete tool pairs while stripping replay only from the quoted summary input", () => {
+  const path = plannerPath("paired");
+  const plan = new MinimalContextBuilder().planCompaction(input({ path, unsettledEffects: [] }));
+  expect(plan).not.toBeNull();
+  expect(JSON.stringify(plan?.request)).toContain("tool_call");
+  expect(JSON.stringify(plan?.request)).toContain("Exact observed output");
+  expect(JSON.stringify(plan?.request)).not.toContain("signed_state");
+  expect(JSON.stringify(plan?.request)).not.toContain("User turn 3");
+  expect(JSON.stringify(path)).toContain("signed_state");
+});
+
+it.each(["unpaired", "unknown"] as const)("does not summarize a turn with %s calls", (status) => {
+  const path = plannerPath(status);
+  expect(
+    new MinimalContextBuilder().planCompaction(input({ path, unsettledEffects: [] })),
+  ).toBeNull();
+});
+
+it("retains an entire unsettled-action turn despite an earlier persisted result", () => {
+  const path = plannerPath("paired");
+  expect(new MinimalContextBuilder().planCompaction(input({ path }))).toBeNull();
+});
+
+it("rejects crossing compaction spans instead of guessing which history disappeared", () => {
+  const original = textPath[3];
+  if (original?.body.kind !== "compaction") throw Error("fixture");
+  const crossing: TranscriptEntry = {
+    ...original,
+    id: "crossing" as TranscriptEntry["id"],
+    parentId: textPath.at(-1)?.id ?? null,
+    body: {
+      ...original.body,
+      replaces: {
+        fromEntryId: textPath[1]?.id ?? original.id,
+        toEntryId: textPath[4]?.id ?? original.id,
+      },
+    },
+  };
+  expect(() => new MinimalContextBuilder().build(input({ path: [...textPath, crossing] }))).toThrow(
+    "Crossing compaction",
   );
 });

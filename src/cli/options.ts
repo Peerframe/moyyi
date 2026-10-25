@@ -20,7 +20,8 @@ Options:
       --dev              Enable development-only plugin loading and reload
       --dev-plugin N=P   Explicit plugin name and local module path (repeatable)
 
-Commands: /help /new /resume ID /cancel /exit /approve EFFECT_ID /deny EFFECT_ID
+Commands: /help /new /resume ID /compact /cancel /exit /approve EFFECT_ID /deny EFFECT_ID
+Compaction: /compact makes one request to the selected model; originals remain in history.
 Development: /reload NAME. Ctrl-C cancels an active run, or exits when idle.
 No workspace configuration, environment credential or plugin is auto-discovered.`;
 

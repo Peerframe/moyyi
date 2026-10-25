@@ -69,8 +69,8 @@ stop condition or report answers. Their checks retain protected-state and factua
 while accepting different wording for the explanation. Free-form explanations are checked for
 presence, not semantically graded; blocker facts are checked through structured report fields.
 
-Planned additions: fault-injection suites (scripted model), longer conversation tasks, and
-same-model baselines for other harnesses.
+Fault-injection and long-session offline suites are available below; real-model long-session
+quality and same-model baselines for other harnesses remain future measurements.
 
 The batch 4 branch adds `npm run eval:core`, an independent scripted protocol/lifecycle suite.
 It covers eight deterministic core scenarios and writes synthetic evidence to
@@ -103,3 +103,15 @@ and the runtime protocol. It verifies actual file results, denial, protected/out
 timeout unknown handling and bounded output. It does not load private tasks or change existing
 corpus checkers. [Same-model comparison protocol](../docs/research/harness-comparison.md) defines
 future measurements; the scripted scenarios are not live model or harness-quality scores.
+
+## Long-session offline conformance
+
+`npm run eval:long-sessions` runs four deterministic scenarios, including a 24-turn history,
+compaction, restart, a real read tool and repeated compaction, plus tool-call/refusal/truncation
+rejection. It checks original entries, selected head, request sizes, tool-free summary calls,
+canary files and continued model context through the public runtime protocol. SQLite integrity
+and atomic-head checks remain in integration tests. It writes only synthetic ignored output to
+`evals/results/long-sessions.json`. It does not load private tasks or change the 30 public-task
+checkers. The scripted summary contains known facts by construction: these results establish
+context/lifecycle behavior, not a real model's recall quality, task score or cache savings.
+Real SIGKILL and recovery-of-recovery checks run in the normal test gate.

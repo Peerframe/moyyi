@@ -1,5 +1,5 @@
 import { type ChildProcess, fork } from "node:child_process";
-import { mkdirSync, mkdtempSync, readFileSync, realpathSync, rmSync } from "node:fs";
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, realpathSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -9,6 +9,7 @@ import {
   type EntryId,
   type RunId,
   type SessionId,
+  type SessionSnapshot,
   type SessionStore,
   type StoreBatch,
   type ToolDefinition,
@@ -34,84 +35,292 @@ afterEach(async () => {
   for (const root of roots.splice(0)) rmSync(root, { recursive: true, force: true });
 });
 
-it.each(["started", "settled"])(
-  "recovers a real process killed after %s without replaying any action",
-  async (mode) => {
-    const root = realpathSync(mkdtempSync(join(tmpdir(), "moyyi-core-crash-")));
-    roots.push(root);
-    const workspace = join(root, "workspace"),
-      directory = join(root, "store");
-    mkdirSync(workspace);
-    const child = fork(
-      fileURLToPath(new URL("./fixtures/core-process-child.ts", import.meta.url)),
-      [mode, directory, workspace],
-      { execArgv: [], stdio: ["ignore", "pipe", "pipe", "ipc"] },
+interface CrashCheckpoint {
+  readonly checkpoint: string;
+  readonly requests: number;
+  readonly batch?: StoreBatch;
+}
+
+async function killAt(
+  mode: string,
+  directory: string,
+  workspace: string,
+): Promise<CrashCheckpoint> {
+  const child = fork(
+    fileURLToPath(new URL("./fixtures/core-process-child.ts", import.meta.url)),
+    [mode, directory, workspace],
+    { execArgv: [], stdio: ["ignore", "pipe", "pipe", "ipc"] },
+  );
+  const closed = new Promise<void>((resolve) => child.once("close", () => resolve()));
+  children.push({ child, closed });
+  const checkpoint = await new Promise<CrashCheckpoint>((resolve, reject) => {
+    let stdout = "",
+      stderr = "";
+    const timer = setTimeout(
+      () => reject(new Error(`Child did not reach ${mode}: ${stderr}`)),
+      10_000,
     );
-    const closed = new Promise<void>((resolve) => child.once("close", () => resolve()));
-    children.push({ child, closed });
-    await new Promise<void>((resolve, reject) => {
-      let stdout = "",
-        stderr = "";
-      const timer = setTimeout(
-        () => reject(new Error(`Child did not reach checkpoint: ${stderr}`)),
-        10_000,
-      );
-      child.stderr?.on("data", (value) => {
-        stderr += String(value);
-      });
-      child.stdout?.on("data", (value) => {
-        stdout += String(value);
-        if (stdout.includes("ready\n")) {
-          clearTimeout(timer);
-          resolve();
+    child.stderr?.on("data", (value) => {
+      stderr = (stderr + String(value)).slice(-8_192);
+    });
+    child.stdout?.on("data", (value) => {
+      stdout += String(value);
+      if (stdout.includes("\nready\n")) {
+        clearTimeout(timer);
+        try {
+          resolve(JSON.parse(stdout.split("\n")[0] as string) as CrashCheckpoint);
+        } catch (error) {
+          reject(error);
         }
-      });
-      child.once("error", (error) => {
-        clearTimeout(timer);
-        reject(error);
-      });
-      child.once("close", () => {
-        clearTimeout(timer);
-        if (!stdout.includes("ready\n")) reject(new Error(stderr));
-      });
+      }
     });
-    child.kill("SIGKILL");
-    await closed;
-    const store = new SqliteSessionStore(directory);
-    stores.push(store);
-    const provider = scriptedProvider([]);
-    const runtime = await createRuntime({
-      store,
-      model: { provider: "scripted", model: "scripted" },
-      plugins: [{ plugin: provider.plugin }],
+    child.once("error", (error) => {
+      clearTimeout(timer);
+      reject(error);
     });
-    runtimes.push(runtime);
-    const [sessionId] = await store.listSessions();
-    if (!sessionId) throw new Error("Missing persisted session");
-    const snapshot = await store.loadSession(sessionId);
-    expect(snapshot?.runs.map((run) => run.status)).toEqual(["interrupted"]);
-    expect(snapshot?.effects.map((effect) => effect.state)).toEqual([
-      mode === "started" ? "unknown" : "succeeded",
-    ]);
-    const results = snapshot?.entries.flatMap((entry) =>
-      entry.body.kind === "tool_results" ? entry.body.results : [],
+    child.once("close", () => {
+      clearTimeout(timer);
+      if (!stdout.includes("\nready\n")) reject(new Error(`Exited before ${mode}: ${stderr}`));
+    });
+  });
+  child.kill("SIGKILL");
+  await closed;
+  expect(child.signalCode).toBe("SIGKILL");
+  return checkpoint;
+}
+
+function disposable() {
+  const root = realpathSync(mkdtempSync(join(tmpdir(), "moyyi-core-crash-")));
+  roots.push(root);
+  const workspace = join(root, "workspace"),
+    directory = join(root, "store");
+  mkdirSync(workspace);
+  return { directory, workspace };
+}
+function executionCount(workspace: string) {
+  const path = join(workspace, "execution-count");
+  return existsSync(path) ? readFileSync(path, "utf8") : "";
+}
+function calls(snapshot: SessionSnapshot) {
+  return snapshot.entries.flatMap((entry) =>
+    entry.body.kind === "assistant_message"
+      ? entry.body.content.filter((part) => part.type === "tool_call")
+      : [],
+  );
+}
+function results(snapshot: SessionSnapshot) {
+  return snapshot.entries.flatMap((entry) =>
+    entry.body.kind === "tool_results" ? entry.body.results : [],
+  );
+}
+function recoveredNotices(snapshot: SessionSnapshot) {
+  return snapshot.entries.filter(
+    (entry) => entry.body.kind === "notice" && entry.body.code === "run_recovered",
+  );
+}
+async function openStore(directory: string) {
+  const store = new SqliteSessionStore(directory);
+  stores.push(store);
+  const [sessionId] = await store.listSessions();
+  if (!sessionId) throw new Error("Missing persisted session");
+  const snapshot = await store.loadSession(sessionId);
+  if (!snapshot) throw new Error("Missing persisted snapshot");
+  return { store, sessionId, snapshot };
+}
+async function boot(store: SqliteSessionStore) {
+  const provider = scriptedProvider([]);
+  const prepare = vi.fn(async () => {
+    throw new Error("Recovery must never prepare an available action");
+  });
+  const execute = vi.fn(async () => {
+    throw new Error("Recovery must never execute an available action");
+  });
+  const runtime = await createRuntime({
+    store,
+    model: { provider: "scripted", model: "scripted" },
+    plugins: [
+      { plugin: provider.plugin },
+      {
+        plugin: {
+          name: "synthetic-recovery-observer",
+          apiVersion: 1,
+          setup(host) {
+            host.registerTool({
+              name: "synthetic_write",
+              description: "Available only to detect accidental recovery replay",
+              inputSchema: { type: "object" },
+              effect: { class: "workspace_write", reversibility: "none", verification: "none" },
+              prepare,
+              execute,
+              reconcile: async () => ({ resolved: false, reason: "No new evidence" }),
+            });
+          },
+        },
+      },
+    ],
+    policy: {
+      beforePrepare: () => ({ kind: "allow" }),
+      beforeExecute: () => ({ kind: "allow" }),
+    },
+  });
+  runtimes.push(runtime);
+  expect(provider.client.requests).toEqual([]);
+  expect(prepare).not.toHaveBeenCalled();
+  expect(execute).not.toHaveBeenCalled();
+  return runtime;
+}
+
+const crashMatrix = [
+  { mode: "session-created", run: false, call: false, effect: null, executed: false, lease: false },
+  { mode: "run-started", run: true, call: false, effect: null, executed: false, lease: false },
+  { mode: "assistant-call", run: true, call: true, effect: null, executed: false, lease: false },
+  { mode: "intended", run: true, call: true, effect: "intended", executed: false, lease: false },
+  {
+    mode: "awaiting_approval",
+    run: true,
+    call: true,
+    effect: "awaiting_approval",
+    executed: false,
+    lease: false,
+  },
+  { mode: "approved", run: true, call: true, effect: "approved", executed: false, lease: false },
+  {
+    mode: "lease-acquired",
+    run: true,
+    call: true,
+    effect: "approved",
+    executed: false,
+    lease: true,
+  },
+  {
+    mode: "started-barrier",
+    run: true,
+    call: true,
+    effect: "started",
+    executed: false,
+    lease: true,
+  },
+  { mode: "started", run: true, call: true, effect: "started", executed: true, lease: true },
+  { mode: "settled", run: true, call: true, effect: "succeeded", executed: true, lease: true },
+  {
+    mode: "assistant-final",
+    run: true,
+    call: true,
+    effect: "succeeded",
+    executed: true,
+    lease: true,
+  },
+  {
+    mode: "run-finalized",
+    run: true,
+    call: true,
+    effect: "succeeded",
+    executed: true,
+    lease: false,
+  },
+] as const;
+
+it.each(crashMatrix)(
+  "recovers SIGKILL after $mode without losing pairing or replaying an action",
+  async (row) => {
+    const { directory, workspace } = disposable();
+    const checkpoint = await killAt(row.mode, directory, workspace);
+    const { store, sessionId, snapshot: before } = await openStore(directory);
+    const completed = row.mode === "run-finalized";
+    expect(before.runs.map((run) => run.status)).toEqual(
+      row.run ? [completed ? "completed" : "active"] : [],
     );
-    expect(results).toHaveLength(1);
-    expect(results?.[0]?.status).toBe(mode === "started" ? "unknown" : "succeeded");
-    if (mode === "settled")
-      expect(results?.[0]?.content).toEqual([{ type: "text", text: "exact durable result" }]);
-    expect(snapshot?.leases).toHaveLength(mode === "started" ? 1 : 0);
-    expect(provider.client.requests).toHaveLength(0);
-    expect(readFileSync(join(workspace, "execution-count"), "utf8")).toBe("1");
+    expect(before.effects.map((effect) => effect.state)).toEqual(row.effect ? [row.effect] : []);
+    expect(before.leases).toHaveLength(row.lease ? 1 : 0);
+    if (row.lease)
+      expect(before.leases).toEqual([{ workspaceRoot: workspace, runId: before.runs[0]?.runId }]);
+    expect(calls(before)).toHaveLength(row.call ? 1 : 0);
+    expect(results(before)).toHaveLength(row.effect === "succeeded" ? 1 : 0);
+    expect(executionCount(workspace)).toBe(row.executed ? "1" : "");
+    if (row.mode === "started-barrier")
+      expect(checkpoint.batch?.durability).toBe("before_side_effect");
+    if (row.mode === "settled") {
+      expect(checkpoint.batch?.effects.map((effect) => effect.state)).toEqual(["succeeded"]);
+      expect(checkpoint.batch?.entries.map((entry) => entry.body.kind)).toEqual(["tool_results"]);
+    }
+    if (completed)
+      expect(checkpoint.batch?.leases?.map((lease) => lease.kind)).toEqual(["release"]);
+    const runtime = await boot(store);
+    const after = await store.loadSession(sessionId);
+    if (!after) throw new Error("Session disappeared");
+    const recoveredState =
+      row.effect === "started" ? "unknown" : row.effect === "succeeded" ? "succeeded" : "cancelled";
+    expect(after.runs.map((run) => run.status)).toEqual(
+      row.run ? [completed ? "completed" : "interrupted"] : [],
+    );
+    expect(after.effects.map((effect) => effect.state)).toEqual(row.effect ? [recoveredState] : []);
+    expect(results(after).map((result) => [result.callId, result.status])).toEqual(
+      row.call ? [["call_crash", recoveredState]] : [],
+    );
+    expect(after.leases).toEqual(row.effect === "started" ? before.leases : []);
+    expect(recoveredNotices(after)).toHaveLength(row.run && !completed ? 1 : 0);
+    expect(after.entries.slice(0, before.entries.length)).toEqual(before.entries);
+    if (row.effect === "succeeded")
+      expect(results(after)[0]?.content).toEqual([{ type: "text", text: "exact durable result" }]);
+    if (completed || !row.run) expect(after).toEqual(before);
+    expect(executionCount(workspace)).toBe(row.executed ? "1" : "");
     expect(store.diagnostics().integrity).toBe("ok");
     await runtime.close();
-    const again = await createRuntime({
-      store,
-      model: { provider: "scripted", model: "scripted" },
-      plugins: [{ plugin: scriptedProvider([]).plugin }],
-    });
-    runtimes.push(again);
-    expect(await store.loadSession(sessionId)).toEqual(snapshot);
+    await boot(store);
+    expect(await store.loadSession(sessionId)).toEqual(after);
+    expect(executionCount(workspace)).toBe(row.executed ? "1" : "");
+  },
+);
+
+it.each([
+  { initial: "run-started", recovery: "recovery-normalized", status: null, count: "" },
+  { initial: "lease-acquired", recovery: "recovery-normalized", status: "cancelled", count: "" },
+  { initial: "started", recovery: "recovery-normalized", status: "unknown", count: "1" },
+  { initial: "settled", recovery: "recovery-normalized", status: "succeeded", count: "1" },
+  { initial: "started", recovery: "recovery-finalized", status: "unknown", count: "1" },
+  { initial: "started", recovery: "recovery-reconciled", status: "succeeded", count: "1" },
+])(
+  "recovery survives another SIGKILL at $initial / $recovery",
+  async ({ initial, recovery, status, count }) => {
+    const { directory, workspace } = disposable();
+    await killAt(initial, directory, workspace);
+    const checkpoint = await killAt(recovery, directory, workspace);
+    expect(checkpoint.requests).toBe(0);
+    const { store, sessionId, snapshot: partial } = await openStore(directory);
+    const runtime = await boot(store);
+    const final = await store.loadSession(sessionId);
+    if (!final) throw new Error("Session disappeared");
+    expect(final.runs.map((run) => run.status)).toEqual(["interrupted"]);
+    expect(final.effects.map((effect) => effect.state)).toEqual(status ? [status] : []);
+    expect(results(final).map((result) => [result.callId, result.status])).toEqual(
+      status ? [["call_crash", status]] : [],
+    );
+    expect(recoveredNotices(final)).toHaveLength(1);
+    expect(final.leases).toHaveLength(status === "unknown" ? 1 : 0);
+    if (status === "unknown") expect(final.leases).toEqual(partial.leases);
+    expect(final.entries.slice(0, partial.entries.length)).toEqual(partial.entries);
+    expect(executionCount(workspace)).toBe(count);
+    if (recovery === "recovery-reconciled") {
+      expect(checkpoint.batch?.effects.map((effect) => effect.state)).toEqual(["succeeded"]);
+      expect(checkpoint.batch?.entries.map((entry) => entry.body.kind)).toEqual(["notice"]);
+      expect(
+        final.entries.filter(
+          (entry) => entry.body.kind === "notice" && entry.body.code === "effect_reconciled",
+        ),
+      ).toHaveLength(1);
+    }
+    if (recovery === "recovery-finalized") {
+      expect(checkpoint.batch?.runs).toEqual(final.runs);
+      expect(checkpoint.batch?.entries.map((entry) => entry.body.kind)).toEqual([
+        "tool_results",
+        "notice",
+      ]);
+    }
+    expect(store.diagnostics().integrity).toBe("ok");
+    await runtime.close();
+    await boot(store);
+    expect(await store.loadSession(sessionId)).toEqual(final);
+    expect(executionCount(workspace)).toBe(count);
   },
 );
 

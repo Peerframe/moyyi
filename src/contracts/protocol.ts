@@ -17,6 +17,7 @@ export type ClientCommand =
   | { readonly type: "plugin.reload"; readonly name: string }
   | { readonly type: "session.create"; readonly workspaceRoot: string }
   | { readonly type: "session.load"; readonly sessionId: SessionId }
+  | { readonly type: "session.compact"; readonly sessionId: SessionId }
   | {
       readonly type: "run.start";
       readonly sessionId: SessionId;
