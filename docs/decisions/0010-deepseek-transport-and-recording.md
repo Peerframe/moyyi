@@ -45,14 +45,15 @@ keys, invalid Unicode, nonfinite numbers and oversized/deep input consistently.
 The adapter renders complete stateless history from common content; opaque replay payloads are
 not read. It emits full visible reasoning, text and function calls with verbatim arguments and
 provider IDs. Tool results carry their status and common text in a JSON string. Assistant history
-with tools requires explicit `end_turn`/`tool_use` and nonempty visible reasoning. The nonpersisted
+with tools or calls requires explicit `end_turn`/`tool_use`; all actual visible reasoning is retained,
+but a complete response need not contain reasoning. The nonpersisted
 `ModelMessage.stopReason` port preserves the already-stored completion status through context
 assembly. Missing, interrupted, truncated or unsupported history fails locally before HTTP.
 
 The supported profile is `deepseek-responses-text-v1-2026-10-25`, with `deepseek-flash`, high
 reasoning effort, a 1,000,000-token context declaration and a deliberately conservative **8,192**
 output-token limit. This is lower than the reviewed service limit, not a claim about its maximum.
-Images, summaries, opaque-only reasoning, commentary/unknown assistant phases, refusal content items, hosted tools,
+Images, summaries, opaque-only reasoning, unknown assistant phases, refusal content items, hosted tools,
 server-stored conversations and vendor-specific request options are outside this profile.
 No `parallel_tool_calls` or `max_tool_calls` promise is delegated to the server; moyyi's existing
 execution limits apply. Unsupported cases fail closed and may need a later adapter profile.
@@ -82,7 +83,7 @@ the profile identifier, D2 envelopes, persisted v1 and authority boundaries do n
 source or private response text was copied. Offline replay closes this first rejection only; the
 captured prefix ends before a terminal event and is correctly reported as interrupted.
 
-### Final-answer output annotation compatibility (2026-10-25)
+### Final-answer output annotation compatibility (2026-10-25; extended below)
 
 A subsequent separately authorized minimal request returned HTTP 200 and a complete private wire
 capture: visible reasoning, an assistant message with `phase: "final_answer"` in added/done/terminal
@@ -109,6 +110,54 @@ Synthetic regressions cover lifecycle variants, terminal authority and rejected 
 tool execution. The existing runtime/SQLite record-replay eval confirms that normalized recordings
 and reconstructed input omit the annotation. Offline decoding of the entire private wire returns
 the final answer and reported usage. No upstream implementation was copied or dependency added.
+
+### Tool commentary and complete history (2026-10-26)
+
+The owner's subsequent read-only smoke made one HTTP request, received 200, and stopped before
+executing a tool. The same assistant message started with `phase: "final_answer"` and completed
+with `phase: "commentary"`, followed by the start of a function call. The adapter's intentional
+commentary rejection closed the stream. This private prefix has no response terminal and cannot
+establish completed reasoning, tool arguments, usage or a successful continuation. This change
+uses synthetic regressions; no private response content is copied into the repository.
+
+Extend the existing plaintext profile to validate absent/null/`commentary`/`final_answer` on every
+message snapshot. Added annotations are provisional. Two explicit phases at item done and response
+terminal must agree; missing/null annotations do not contradict an explicit one. All other identity,
+status, argument and visible-content comparisons remain unchanged. Common content retains every
+text/reasoning/call part in output order. Phase is not persisted or resent and never selects the
+stop reason: only the complete response terminal can authorize a tool turn. EOF, cancellation,
+incomplete and failed responses retain their previous handling.
+
+Remove the separate assumption that every tool-enabled assistant history has nonempty reasoning.
+Require successful `end_turn`/`tool_use` provenance and consistent paired calls/results, including
+historical calls when the next request advertises no tools. Render all reasoning that actually
+exists; do not create reasoning or drop it. Summary/opaque parts remain unsupported, and a reasoning
+item that ever carried nonempty auxiliary encrypted metadata still needs nonblank visible content.
+Neither the absence of reasoning nor a token counter proves truncation; response lifecycle and
+content consistency checks provide that evidence.
+
+Targeted primary evidence checked on 2026-10-26:
+
+- [DeepSeek input items](https://api-docs.deepseek.com/guides/responses_api/#input-items) document
+  stateless message text and merge full reasoning/function items into adjacent assistant content.
+  Neither that table nor the [API schema](https://api-docs.deepseek.com/api/create-response/) specifies
+  a phase requirement. [Thinking](https://api-docs.deepseek.com/guides/thinking_mode/#tool-calls) requires
+  preserving actual reasoning, not inventing nonempty reasoning on every complete response.
+- [DeepSeek inserted tool calls](https://api-docs.deepseek.com/guides/tool_calls/#inserting-tool-calls-mid-conversation)
+  are supported in Responses. Tool-call presence alone is not evidence that visible reasoning exists.
+- [OpenAI phase guidance](https://developers.openai.com/api/docs/guides/reasoning) concerns specific
+  OpenAI models; it is not evidence that DeepSeek must replay phase or that DeepSeek ignores it.
+- The already-reviewed [openai 7.32.0 accumulator](https://github.com/openai/openai-node/blob/2b12eabd29733c8de495bb183b41632e091b4994/src/internal/responses/response-accumulator.ts#L652)
+  replaces the added item with the done item. This supports treating added metadata as provisional;
+  it does not settle DeepSeek history semantics. No SDK source was copied.
+
+Keep the self-owned decoder and common-only input profile. An SDK substitution would not settle
+the vendor-specific history rules. Existing accepted request encodings/common events do not change,
+so the profile ID stays the same; old normalized recordings are not rewritten and still replay
+their original outcomes. No D2 envelope, fake model revision, hash exception, dependency, core or
+persisted-v1 change is needed. The rolling alias's underlying model revision remains unknown.
+Phase-sensitive behavior and real tool continuation remain unverified; if service evidence requires
+phase replay, reopen that limited choice under D2 rather than silently weakening its bindings.
 
 ## Recording and replay
 

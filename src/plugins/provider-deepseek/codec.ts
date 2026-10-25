@@ -70,18 +70,13 @@ export function buildDeepSeekRequest(request: ModelRequest): Record<string, unkn
     if (message.role === "assistant") {
       requireCondition(pending.size === 0, "Tool results must precede the next assistant");
       const complete = message.stopReason === "end_turn" || message.stopReason === "tool_use";
+      const hasCall = message.content.some((part) => part.type === "tool_call");
       requireCondition(
-        tools.length ? complete : message.stopReason === undefined || complete,
+        tools.length || hasCall ? complete : message.stopReason === undefined || complete,
         "Interrupted or unproven assistant history cannot be continued",
       );
-      if (tools.length)
-        requireCondition(
-          message.content.some(
-            (part) => part.type === "reasoning" && part.kind === "visible" && part.text.length > 0,
-          ),
-          "Complete visible reasoning is required for tool-enabled history",
-        );
-      const hasCall = message.content.some((part) => part.type === "tool_call");
+      // A successful terminal proves completion, not the presence of reasoning. Preserve
+      // every actual visible part below; a complete response may contain no reasoning.
       requireCondition(
         (message.stopReason !== "tool_use" || hasCall) &&
           (message.stopReason !== "end_turn" || !hasCall),
@@ -505,12 +500,20 @@ export async function* decodeDeepSeekEvents(
           requireCondition(item !== undefined, "Unknown terminal item");
           const full = normalizeItem(rawItem);
           if (status !== "failed") requireVisibleReasoning(item, rawItem, full);
-          if (item.done)
+          if (item.done) {
+            const { phase: previousPhase, ...previous } = item.done;
+            const { phase, ...current } = full;
+            // Optional annotation snapshots may omit phase. Two explicit final values
+            // must agree; content/identity/status still compare independently in full.
             requireCondition(
-              canonicalizeJson(full) === canonicalizeJson(item.done),
+              !phase || !previousPhase || phase === previousPhase,
+              "Terminal phase changed a completed item",
+            );
+            requireCondition(
+              canonicalizeJson(current) === canonicalizeJson(previous),
               "Terminal output changed a completed item",
             );
-          else if (status !== "failed") {
+          } else if (status !== "failed") {
             for (const event of completeItem(index, rawItem)) {
               active();
               yield event;
@@ -653,10 +656,14 @@ function normalizeItem(raw: unknown): ObjectValue {
     };
   if (type === "message") {
     requireCondition(value.role === "assistant", "Invalid output role");
-    // This output annotation does not complete the response or authorize tools. Normalize
-    // final-answer text to the existing stateless history; commentary remains unsupported.
+    // Added phase is provisional; done/terminal consistency is checked on this normalized
+    // snapshot. Neither phase completes a response or authorizes a tool. Common history
+    // retains the text under DeepSeek's documented stateless plaintext input profile.
     requireCondition(
-      value.phase === undefined || value.phase === null || value.phase === "final_answer",
+      value.phase === undefined ||
+        value.phase === null ||
+        value.phase === "final_answer" ||
+        value.phase === "commentary",
       "Unsupported assistant phase",
     );
   } else {
@@ -672,7 +679,7 @@ function normalizeItem(raw: unknown): ObjectValue {
     type,
     id,
     status,
-    ...(type === "message" ? { role: "assistant" } : {}),
+    ...(type === "message" ? { role: "assistant", phase: value.phase ?? null } : {}),
     content: content.map((part) => normalizePart(part, type)),
   };
 }

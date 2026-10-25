@@ -216,8 +216,23 @@ describe("DeepSeek request codec", () => {
       ).toThrow("unproven");
     },
   );
+  it("accepts a complete text answer without inventing reasoning", () => {
+    const built = buildDeepSeekRequest(
+      request({
+        messages: [
+          {
+            role: "assistant",
+            stopReason: "end_turn",
+            content: [{ type: "text", text: "Answer" }],
+          },
+        ],
+      }),
+    );
+    expect(built.input).toEqual([
+      { type: "message", role: "assistant", content: [{ type: "output_text", text: "Answer" }] },
+    ]);
+  });
   it.each([
-    { type: "text", text: "No reasoning" },
     { type: "reasoning", kind: "summary", text: "Only summary" },
     { type: "reasoning", kind: "opaque" },
     { type: "image", mediaType: "image/png", blob: "sha256:synthetic" },
@@ -592,7 +607,7 @@ describe("DeepSeek semantic stream codec", () => {
       if (variant === "phase") {
         item.type = "message";
         item.role = "assistant";
-        item.phase = "commentary";
+        item.phase = "unsupported_phase";
       }
       if (variant === "annotation")
         (at(wire, "response.content_part.added").part as Record<string, unknown>).annotations = [

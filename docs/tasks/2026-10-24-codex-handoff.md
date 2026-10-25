@@ -4,16 +4,15 @@
 #2–#5，并整合交接；本次文档整合的 main 基线为已合入 #1–#4 的 `26f2e41`。由 Claude 起草，
 审查者由 owner 指定；每个 PR 的实际提交、检查与合并记录以其页面为准。
 
-**2026-10-25 最新状态：#17 已审查合并为 `85bc5f5`，本机候选已更新。**
-[合并后的 CI](https://github.com/Peerframe/moyyi/actions/runs/40204280703) 通过。
-三个分别获准的最小 DeepSeek HTTP 请求均收到 200，没有自动重试。前两个定位了
-`encrypted_content` 辅助字段拒绝，已由 #17 修复；第三个完整捕获 23 个事件、答案 `OK` 与
-45 tokens 用量，但安装版在 `phase: "final_answer"` 处拒绝。本轮在
-`codex/deepseek-final-answer-phase` 离线修复并按新 PR 交付，新增网络请求为 0。
-此前多次钥匙串读取等待结束均未发 HTTP，不计入实际调用数。
-**新 PR 不自动合并，不再发起付费调用，暂不正式发布。**
+**2026-10-26 最新状态：#18 已合并并安装为 `a603346`，main CI 通过。**
+此前三次单请求探针定位了辅助 reasoning 与 final_answer 字段问题，其中一次完整回答 `OK`。
+随后获准的只读任务实际仅发 1 次 HTTP 请求（累计 4），返回 200，但在工具前 `commentary` 消息处
+被旧适配器拒绝，未执行工具；捕获是无终态前缀，用量/费用未知，没有自动重试。
+本轮按 owner“逐步推进”的授权先修完整 DeepSeek 工具路径，分支 `codex/deepseek-tool-continuation`。
+新增实现阶段模型请求为 **0**；按 PR 交付，**不自动合并、不替换本机安装、暂不正式发布**。
 不直接推送 main，不改 persisted v1／分层规则／公共题判分，D1–D6 保持已定结论。
-当前范围、完整捕获的离线验证与真实工具续接仍未验证的限制见 [DeepSeek 兼容性记录](2026-10-25-deepseek-compatibility.md)。
+当前范围、离线验证与真实工具续接仍未验证的限制见 [DeepSeek 兼容性记录](2026-10-25-deepseek-compatibility.md)。
+项目指令和 OpenBot 产品能力复用留在后续步骤，本轮不开始。
 [phase 6 记录](2026-10-25-phase-6-candidate.md)保留打包与安装历史证据。
 [phase 5](2026-10-25-phase-5-anthropic-web.md)、[phase 4](2026-10-25-phase-4-long-sessions.md)、[phase 3](2026-10-25-phase-3-shell.md)、[phase 2](2026-10-25-phase-2-writes.md)、
 [批次 7](2026-10-25-batch-7-cli.md)、[批次 6](2026-10-25-batch-6-deepseek.md)、
@@ -29,7 +28,7 @@
 
 ## 1. 现在有什么
 
-已合入 #1–#17 的 main `85bc5f5` 为本轮基线，包含：
+已合入 #1–#18 的 main `a603346` 为本轮基线，包含：
 
 - Node 26、TypeScript 7、Biome、Vitest；main 的类型检查、lint、Linux CI 已通过；#15 本机交付基线为 1,365 项测试通过（各平台证据以 CI 为准）
 - 持久化格式 `src/contracts/persisted`，版本 1，由 `fixtures/v1.ts` 锁定
@@ -48,7 +47,8 @@ DeepSeek Responses 文本/推理/函数调用适配器、固定地址 HTTP、录
 以及显式开发插件的空闲重载。`npm run moyyi -- --demo` 可运行有限的离线脚本，真实模型通过
 显式 `--host FILE` 配置；不自动发现工作区配置，不新增凭据后端。原有 DeepSeek 离线 demo/eval 保留。
 已用一次最小真实回答确认接口返回 `OK`；修复源码已离线完整解析该捕获，但没有新实时运行。
-真实工具续接及 Agent 任务能力仍未验证。真实工具冒烟及 phase 1 能力评测仍待 owner。
+最新工具冒烟暴露了 commentary 兼容问题，本轮先离线修复；真实工具续接及 Agent 任务能力仍未验证。
+再次真实验收与 phase 1 能力评测仍需明确调用预算。
 phase 2 已合并，提供受控创建/编辑/撤销与快照。phase 3 原生沙箱命令工具已按 D6 合并，验收和平台限制见 phase 3 记录。
 phase 4 显式压缩、恢复故障测试与长会话离线验收已通过 #14 合并。
 phase 5 Anthropic 与独立授权 web 已通过 #15 合并，真实服务验收和公网 DNS 限制保留。

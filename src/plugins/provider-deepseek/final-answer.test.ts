@@ -107,7 +107,6 @@ describe("DeepSeek final_answer phase compatibility", () => {
 
   describe.each(stages)("phase validation at %s", (stage) => {
     it.each([
-      ["commentary", "commentary"],
       ["unknown phase", "synthetic_unknown_phase"],
       ["empty string", ""],
       ["number", 1],

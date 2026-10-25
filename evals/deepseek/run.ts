@@ -2,7 +2,10 @@ import assert from "node:assert/strict";
 import { mkdirSync, writeFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
-import { deepSeekFixture } from "../../src/plugins/provider-deepseek/fixtures.ts";
+import {
+  deepSeekFixture,
+  type FixtureOptions,
+} from "../../src/plugins/provider-deepseek/fixtures.ts";
 import { assertEquivalent, finalAnswer, runRoundTrip, successfulFixtures } from "./scenario.ts";
 
 interface Evidence {
@@ -12,6 +15,33 @@ interface Evidence {
   readonly toolStatuses: readonly string[];
   readonly replayToolStatuses: readonly string[];
 }
+function commentaryRead(withReasoning = false, options: FixtureOptions = {}) {
+  const events = deepSeekFixture(
+    [
+      ...(withReasoning
+        ? [{ type: "reasoning" as const, text: "Read the synthetic greeting exactly." }]
+        : []),
+      { type: "message", text: "I will read the synthetic README.md file." },
+      {
+        type: "function_call",
+        callId: "synthetic_commentary_read",
+        name: "read",
+        arguments: '{ "path": "README.md" }',
+      },
+    ],
+    { responseId: "synthetic_commentary_response", ...options },
+  );
+  for (const event of events) {
+    const item = event.item as Record<string, unknown> | undefined;
+    if (item?.type === "message")
+      item.phase = event.type === "response.output_item.added" ? "final_answer" : "commentary";
+    const response = event.response as { output?: Record<string, unknown>[] } | undefined;
+    for (const item of response?.output ?? [])
+      if (item.type === "message") item.phase = "commentary";
+  }
+  return events;
+}
+
 const scenarios: readonly { id: string; run(): Promise<Evidence> }[] = [
   {
     id: "sse-file-tools-record-replay",
@@ -94,6 +124,146 @@ const scenarios: readonly { id: string; run(): Promise<Evidence> }[] = [
     },
   },
   {
+    id: "commentary-read-final-without-reasoning-record-replay",
+    async run() {
+      const result = await runRoundTrip({
+        responses: [
+          commentaryRead(),
+          deepSeekFixture([{ type: "message", text: finalAnswer }], {
+            responseId: "synthetic_plain_final",
+          }),
+        ],
+      });
+      assertEquivalent(result);
+      assert.equal(result.first.outcome.kind, "completed");
+      assert.equal(result.records.length, 2);
+      assert.deepEqual(
+        result.first.results.map((part) => part.status),
+        ["succeeded"],
+      );
+      assert.equal(result.first.effectStates.length, 1);
+      assert.ok(JSON.stringify(result.replay.assistantContent).includes(finalAnswer));
+      const continuation = result.wireRequests[1]?.input as Record<string, unknown>[];
+      assert.ok(
+        continuation.some(
+          (item) =>
+            item.type === "function_call_output" && JSON.stringify(item).includes("Hello moyyi"),
+        ),
+      );
+      assert.ok(
+        continuation.some(
+          (item) =>
+            item.type === "message" &&
+            JSON.stringify(item).includes("I will read the synthetic README.md file."),
+        ),
+      );
+      assert.ok(!continuation.some((item) => item.type === "reasoning"));
+      for (const normalized of [result.records, result.wireRequests]) {
+        assert.ok(!JSON.stringify(normalized).includes('"phase":'));
+        assert.ok(!JSON.stringify(normalized).includes('"replay":'));
+      }
+      assert.ok(
+        result.first.entries.some(
+          (entry) =>
+            entry.body.kind === "assistant_message" && entry.body.stopReason === "tool_use",
+        ),
+      );
+      assert.ok(
+        result.first.entries.some(
+          (entry) =>
+            entry.body.kind === "assistant_message" && entry.body.stopReason === "end_turn",
+        ),
+      );
+      return evidence(result);
+    },
+  },
+  {
+    id: "commentary-read-preserves-visible-reasoning-record-replay",
+    async run() {
+      const result = await runRoundTrip({
+        responses: [
+          commentaryRead(true),
+          deepSeekFixture([{ type: "message", text: finalAnswer }], {
+            responseId: "synthetic_reasoned_final",
+          }),
+        ],
+      });
+      assertEquivalent(result);
+      assert.equal(result.first.outcome.kind, "completed");
+      assert.deepEqual(
+        result.first.results.map((part) => part.status),
+        ["succeeded"],
+      );
+      const continuation = result.wireRequests[1]?.input as Record<string, unknown>[];
+      assert.deepEqual(
+        continuation.filter((item) => item.type === "reasoning"),
+        [
+          {
+            type: "reasoning",
+            content: [{ type: "reasoning_text", text: "Read the synthetic greeting exactly." }],
+          },
+        ],
+      );
+      assert.ok(JSON.stringify(result.replay.assistantContent).includes(finalAnswer));
+      return evidence(result);
+    },
+  },
+  ...(["prefix", "max_tokens", "refusal", "failed", "phase_conflict"] as const).map((variant) => ({
+    id: `commentary-${variant}-never-executes-proposed-tool`,
+    async run() {
+      let events = commentaryRead(
+        false,
+        variant === "max_tokens" || variant === "refusal"
+          ? {
+              status: "incomplete",
+              incompleteReason: variant === "max_tokens" ? "max_output_tokens" : "content_filter",
+            }
+          : variant === "failed"
+            ? { status: "failed" }
+            : {},
+      );
+      if (variant === "prefix") {
+        const end = events.findIndex(
+          (event) =>
+            event.type === "response.output_item.added" &&
+            (event.item as Record<string, unknown>).type === "function_call",
+        );
+        assert.ok(end > 0);
+        events = events.slice(0, end + 1);
+      }
+      if (variant === "phase_conflict") {
+        const last = events.at(-1);
+        assert.ok(last);
+        const output = (last.response as { output: Record<string, unknown>[] }).output;
+        const message = output.find((item) => item.type === "message");
+        assert.ok(message);
+        message.phase = "final_answer";
+      }
+      const result = await runRoundTrip({ responses: [events] });
+      assertEquivalent(result);
+      assert.equal(result.records.length, 1);
+      assert.equal(result.first.effectStates.length, 0);
+      assert.equal(result.replay.effectStates.length, 0);
+      assert.ok(result.first.results.every((part) => part.status !== "succeeded"));
+      assert.equal(result.transportCallsAfterReplay, 1);
+      const terminal = result.records[0]?.events.at(-1);
+      if (variant === "max_tokens" || variant === "refusal") {
+        assert.ok(terminal?.type === "completed" && terminal.stopReason === variant);
+      } else {
+        assert.ok(terminal?.type === "error");
+        assert.equal(
+          terminal.error.kind,
+          variant === "prefix"
+            ? "stream_interrupted"
+            : variant === "failed"
+              ? "overloaded"
+              : "protocol",
+        );
+      }
+      return evidence(result);
+    },
+  })),
+  {
     id: "unsupported-message-phase-never-executes-proposed-tool",
     async run() {
       const events = deepSeekFixture([
@@ -103,14 +273,14 @@ const scenarios: readonly { id: string; run(): Promise<Evidence> }[] = [
           name: "read",
           arguments: '{"path":"README.md"}',
         },
-        { type: "message", text: "Synthetic unsupported commentary." },
+        { type: "message", text: "Synthetic unsupported phase." },
       ]);
       const item = events.find(
         (event) =>
           event.type === "response.output_item.added" &&
           (event.item as Record<string, unknown>).type === "message",
       )?.item as Record<string, unknown>;
-      item.phase = "commentary";
+      item.phase = "synthetic_unknown_phase";
       const result = await runRoundTrip({ responses: [events] });
       assertEquivalent(result);
       assert.equal(result.first.outcome.kind, "failed");
