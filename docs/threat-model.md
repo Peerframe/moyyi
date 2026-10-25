@@ -3,7 +3,8 @@
 Status: D3 boundaries accepted on 2026-10-25 in
 [ADR 0006](decisions/0006-security-boundaries.md); read-only workspace enforcement is merged from batch 5.
 The phase 2 branch adds tested controlled writes and snapshots (see [ADR 0012](decisions/0012-controlled-workspace-writes.md)).
-Process, network and credential-store defenses still require their own verification.
+The phase 3 branch adds native process/file/network confinement under [ADR 0013](decisions/0013-native-process-sandbox.md).
+Credential-store integration still requires its own verification.
 The batch 7 CLI uses explicit trusted host callbacks, not a new credential-store adapter.
 It escapes terminal control/bidirectional text and accepts approvals only for displayed digests;
 explicit development modules remain trusted in-process code, not a sandbox.
@@ -53,10 +54,11 @@ explicit development modules remain trusted in-process code, not a sandbox.
 
 - Batch 5 implements read-only path checks and revocable per-invocation file capabilities;
   [files.md](files.md) defines protected paths, limits and tested behavior. Phase 2 adds separately
-  granted [writes](writes.md). No process authority is exposed; T4 remains unchanged.
-- Before shell: select and verify OS containment for each claimed platform; test connection
-  restrictions, cancellation, interruption and filesystem races. Resolve any proposed threat-model
-  expansion with the owner rather than claiming it implicitly.
+  granted [writes](writes.md). Phase 3 adds a separate explicit [command grant](shell.md); T4 remains unchanged.
+- Phase 3 uses actual native confinement and process-group cleanup, with no unrestricted fallback.
+  Mac detached descendants and host SIGKILL cleanup are not guaranteed. Linux masks existing
+  protected paths; concurrent host secret injection is unsupported. Native mode does not impose
+  CPU/memory/disk quotas or promise command rollback. See shell usage and current acceptance.
 - Before credential integration: choose the OS credential-store adapter and document availability,
   import/removal and any fallback behavior without exposing values to models or tools.
 - For local storage and exports: define access-control checks, retention, reference-aware blob

@@ -8,7 +8,8 @@ merged, including the interactive CLI and idle-only development reload. Start an
 offline terminal with `npm run moyyi -- --demo`, or explicitly connect a trusted host using
 `--host FILE`. The demo is a finite script, not an LLM; live DeepSeek acceptance remains pending.
 See [docs/cli.md](docs/cli.md), [docs/deepseek.md](docs/deepseek.md) and
-[docs/roadmap.md](docs/roadmap.md). Controlled writes are on the phase 2 branch for review; phase 3 is not started.
+[docs/roadmap.md](docs/roadmap.md). Controlled writes are merged. The phase 3 branch adds opt-in native sandboxed commands;
+see [docs/shell.md](docs/shell.md). Its PR is awaiting review.
 
 ## Setup
 
@@ -32,6 +33,7 @@ npm run check
 | `npm run demo:files` | Demonstrate real list/search/read with scripted responses and disposable files |
 | `npm run eval:deepseek` | Run six deterministic provider/file/record-replay scenarios |
 | `npm run demo:deepseek-replay` | Demonstrate synthetic DeepSeek SSE, real file tools and exact model replay |
+| `npm run eval:shell` | Run seven offline scenarios through real sandboxed processes |
 | `npm run demo:scripted` | Demonstrate a complete scripted agent loop using disposable storage |
 | `npm run build` | Compile to `dist/` |
 
@@ -44,7 +46,7 @@ npm run check
 | `src/core` | Run loop, tool executor, approvals, cancellation, budgets and recovery |
 | `src/store`, `src/context`, `src/policy` | Persistence, context assembly and base permissions |
 | `src/runtime` | Plugin registry, wiring, client protocol |
-| `src/plugins/<name>` | One plugin per folder; currently `provider-scripted`, `provider-deepseek` and `fs` |
+| `src/plugins/<name>` | One plugin per folder; currently `provider-scripted`, `provider-deepseek`, `fs` and `shell` |
 | `src/cli` | Terminal client |
 | `evals/` | Task suite and harness |
 | `docs/` | Architecture, roadmap, threat model, decisions, recipes |
@@ -56,8 +58,9 @@ recipes in [docs/recipes/](docs/recipes/).
 
 Licensed under the [Apache License, Version 2.0](LICENSE).
 
-Controlled file creation, editing, snapshots and undo are implemented on the phase 2 branch,
+Controlled file creation, editing, snapshots and undo are merged in phase 2,
 with explicit workspace grants. See [write usage](docs/writes.md) and
 [acceptance status](docs/tasks/2026-10-25-phase-2-writes.md). Run `npm run eval:writes` for
 eight offline scenarios with real filesystem and SQLite effects in disposable workspaces.
-Phase 3 is not started.
+Phase 3 [backend research](docs/research/phase-3-execution-backends.md) is available for review;
+implementation awaits the owner decision. Phase 4 is not started.

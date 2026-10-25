@@ -4,6 +4,7 @@ import type {
   PreconditionVerifier,
   RunLimits,
   WorkspaceFilesFactory,
+  WorkspaceProcessesFactory,
   WorkspaceWritesFactory,
 } from "../contracts/execution.ts";
 import type {
@@ -36,6 +37,7 @@ export interface ExecutionHost {
   readonly hasher: ActionHasher;
   readonly limits: RunLimits;
   readonly files?: WorkspaceFilesFactory;
+  readonly processes?: WorkspaceProcessesFactory;
   readonly writes?: WorkspaceWritesFactory;
   now(): Timestamp;
   nextEffectId(): EffectId;
@@ -217,15 +219,15 @@ async function executeCall(call: ToolCallPart, host: ExecutionHost): Promise<Too
     let live = true;
     const guard = () => {
       if (!live || host.signal.aborted || epoch() !== capabilityEpoch)
-        throw new Error("File capability expired, cancelled or revoked");
+        throw new Error("Capability expired, cancelled or revoked");
       const decision = phase === "execute" ? executePolicy() : undefined;
       if (
-        (profile.class !== "read" && profile.class !== "workspace_write") ||
+        !["read", "workspace_write", "process"].includes(profile.class) ||
         preparePolicy().kind !== "allow" ||
         decision?.kind === "deny" ||
         (decision?.kind === "ask" && grant !== "ask")
       )
-        throw new Error("File access is not authorized");
+        throw new Error("Capability access is not authorized");
     };
     const scoped: ToolContext = {
       ...context,
@@ -233,6 +235,15 @@ async function executeCall(call: ToolCallPart, host: ExecutionHost): Promise<Too
       ...(host.writes && profile.class === "workspace_write"
         ? {
             writes: host.writes.create(context, guard, {
+              phase,
+              ...(effect ? { effect } : {}),
+              ...(action ? { action } : {}),
+            }),
+          }
+        : {}),
+      ...(host.processes && profile.class === "process"
+        ? {
+            processes: host.processes.create(context, guard, {
               phase,
               ...(effect ? { effect } : {}),
               ...(action ? { action } : {}),

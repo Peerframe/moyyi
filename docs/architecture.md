@@ -45,7 +45,7 @@ core through five fixed points and can be added or removed without touching anyt
 | `provider-scripted` | model provider | exists (tests and evals) |
 | `provider-deepseek` (Responses subset; [ADR 0007](decisions/0007-first-model-provider.md)) | model provider | merged in batch 6; live acceptance pending |
 | `project-instructions` (AGENTS.md and similar) | context source | 1 |
-| `fs` (read, list, search; create, edit, undo) | tools | read-only merged in batch 5; writes on phase 2 branch |
+| `fs` (read, list, search; create, edit, undo) | tools | read-only merged in batch 5; writes merged in phase 2 |
 | `shell` | tools | 3 |
 | `provider-anthropic` | model provider | 5 |
 | `web` (fetch, search) | tools, policy rule | 5 |
@@ -175,7 +175,7 @@ Application-level session encryption is not a first-release prerequisite. The
 
 Browser automation, MCP, long-term memory, sub-agents, automation, GUI. Each has a place above.
 
-## Controlled writes (phase 2 branch)
+## Controlled writes (merged phase 2)
 
 The runtime supplies `ToolContext.writes` only to authorized workspace-write tools. Preparation
 can inspect; apply is single-use and bound to the executor-approved payload after durable start.
@@ -183,3 +183,16 @@ SQLite schema 2 adds immutable touched-file snapshots, with blobs included in ba
 transcript/effect v1 is unchanged. Undo is a new approved effect and refuses later file changes.
 Recovery only inspects recorded pre/post-state and never replays a mutation. See
 [ADR 0012](decisions/0012-controlled-workspace-writes.md) and [usage](writes.md).
+
+## Sandboxed commands (phase 3 branch)
+
+[ADR 0013](decisions/0013-native-process-sandbox.md) records accepted D6: native OS sandbox by
+default, Docker optional. `ToolContext.processes` adds a per-invocation process capability only
+for process-effect tools. `shell` prepares an exact command/cwd/timeout; runtime executes only
+that approved payload after the existing core's lease and durable-start barrier. A separate
+host grant selects exact roots, with clean environment and mandatory native confinement.
+
+Runtime owns Seatbelt/bubblewrap adaptation, bounded output, deadline and process-group cleanup.
+Non-exited/uncertain results become unknown and stop the run; recovery never reruns commands.
+macOS detached descendants and host-SIGKILL cleanup limits are explicit. Docker is a future
+optional adapter, not an implicit dependency or fallback. See [usage and limits](shell.md).
