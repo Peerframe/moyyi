@@ -78,17 +78,24 @@ those facts by asserting the data had been discarded with no consumer. Missing r
 therefore not a sufficient explanation. Neither trial proves general model incapability or
 establishes the accuracy of a hypothetical completed answer.
 
-Revise the existing source-analysis guidance rather than adding a retrieval framework or another
-model call. Cover each requested question before details; keep negative claims tied to exact
-objects, conditions and lifecycle phases; avoid restating findings with broader wording and
-unrequested audits/redesigns. Public behavior tasks use different synthetic pipelines, including
-both preserved and explicitly removed fields, to avoid teaching a universal "raw data is always
-preserved" answer. Their offline checks validate the fixtures and graders, not model competence.
-The original private knowledge rubric remains unchanged.
+A candidate revised source-analysis guidance to cover each question before details, retain
+conditions and lifecycle scope, and avoid broader repeated summaries. The autonomous retest used
+five requests, no source pack and the original question/criteria. It completed normally but still
+claimed that raw data had been discarded, despite having read its return and consumer. It also
+missed the final core/context path. The candidate guidance was therefore withdrawn; the prior
+PR #25 product baseline is retained. This trial does not establish a general performance
+regression, since the previous autonomous trial had eight requests rather than five.
 
-The remaining autonomous trial receives no source pack or answer hints, uses the updated local
-candidate, and has at most five requests. Earlier three diagnostic attempts count toward the same
-eight-request authorization. A failure at five cannot establish that eight would also fail.
-This is a measured candidate change to answer guidance, not a runtime truth guarantee. The
-optional recorder's fragmented-output limit is a separate unresolved limitation; repairing its
-format or changing model/output limits is outside this slice.
+Keep two original public behavior tasks using different synthetic pipelines, including both
+preserved and explicitly removed fields. They avoid teaching a universal "raw data is always
+preserved" answer and separate captured configuration, refresh and concurrent-read failures.
+Offline reference/near-miss checks validate the fixtures and graders, not model competence. Their
+real-model performance remains unmeasured. The original private knowledge rubric is unchanged.
+
+All eight authorized HTTP attempts were used: three diagnostic requests and five autonomous
+requests, with no automatic retries. The original knowledge task remains unsolved. The evidence
+supports errors in interpretation/expression in addition to retrieval gaps; it does not identify
+a universally correct prompt or prove model incapability. More generic prompt additions or a
+retrieval framework are not justified by these results. A future matched model/harness comparison
+requires its own bounded trial. The optional recorder's fragmented-output limit is also unresolved;
+recording formats, core limits and persisted data were not changed.
