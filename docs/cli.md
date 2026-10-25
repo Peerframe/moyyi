@@ -2,7 +2,7 @@
 
 The CLI connects the existing agent runtime to a terminal: continuous sessions, streamed text,
 explicit approvals, cancellation, steering and history resume. The default policy remains read-only.
-The DeepSeek adapter is available, but no paid/live acceptance run was made during this batch.
+DeepSeek and opt-in Anthropic adapters are available; their live acceptance remains pending.
 
 ## Try the offline client
 
@@ -52,7 +52,9 @@ trusted local code with the process's permissions; it is not sandboxed configura
 `--data DIR` overrides a host data directory, or defaults to `~/.moyyi/data` when neither is set.
 It cannot override an injected store. Stores, transcripts and blobs may contain private content;
 keep them outside a repository. The runtime protects its store from ordinary file tools. See
-[DeepSeek configuration and live smoke](deepseek.md) for the supported profile and acceptance gap.
+[DeepSeek configuration and live smoke](deepseek.md) or [Anthropic configuration](anthropic.md)
+for supported profiles and acceptance gaps. Tool networking is separate: [web grants](web.md)
+describe explicit origins, optional search and interactive approval.
 
 ## Session controls
 
@@ -148,7 +150,7 @@ while a run is awaiting approval. Exit with Ctrl-D and reopen the same store to 
 The merged batch 7 record is [here](tasks/2026-10-25-batch-7-cli.md). Phase 2 adds
 [controlled writes](writes.md) through explicit host configuration, using the same displayed-digest
 approvals. Dependency-graph reload and live model evaluation remain outside scope.
-The current handoff is [phase 4](tasks/2026-10-25-phase-4-long-sessions.md).
+Phase 4 is merged. The current handoff is [phase 5](tasks/2026-10-25-phase-5-anthropic-web.md).
 
 ## Native command opt-in
 

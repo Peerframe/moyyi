@@ -115,3 +115,23 @@ and atomic-head checks remain in integration tests. It writes only synthetic ign
 checkers. The scripted summary contains known facts by construction: these results establish
 context/lifecycle behavior, not a real model's recall quality, task score or cache savings.
 Real SIGKILL and recovery-of-recovery checks run in the normal test gate.
+
+
+## Anthropic and web conformance
+
+`npm run eval:anthropic` runs five offline scenarios through the actual Messages codec, file tools,
+SQLite and recording/replay: tools/record-replay, compaction/restart with thinking invalidation,
+interrupted tool calls that never execute, unknown usage, and rejected replay that stays invalid
+after restoring the original host context and reopening SQLite. All SSE and signatures are synthetic;
+the suite does not call the remote service or measure model task quality.
+
+`npm run eval:web` runs seven public-protocol scenarios: injected page, search then fetch, missing
+grant, denied approval, private DNS, redirect and cancellation. DNS/HTTP responses and model actions
+are synthetic, while runtime, canary files and SQLite are real. It asserts durable-start ordering,
+actual denied/executed requests, preserved local files and no restart replay. The script knowingly
+attempts the injected instructions: passing establishes authority enforcement for those attempts,
+not an LLM injection-resistance score. Real TLS/hostname/certificate probes run in the normal tests.
+
+Reports go to ignored `evals/results/anthropic.json` and `evals/results/web.json`. Neither suite loads
+private tasks or changes the existing 30 public-task checkers. Actual Anthropic/SearXNG acceptance,
+real-model prompt-injection evaluation and service availability remain separate verification.

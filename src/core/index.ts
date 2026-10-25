@@ -33,6 +33,7 @@ import {
   type ToolDefinition,
   type ToolResultPart,
   type TranscriptEntry,
+  type WebAccessFactory,
   type WorkspaceFilesFactory,
   type WorkspaceProcessesFactory,
   type WorkspaceWritesFactory,
@@ -70,6 +71,7 @@ export interface CoreDeps {
   readonly files?: WorkspaceFilesFactory;
   readonly processes?: WorkspaceProcessesFactory;
   readonly writes?: WorkspaceWritesFactory;
+  readonly web?: WebAccessFactory;
 }
 
 interface Running {
@@ -647,6 +649,7 @@ export class AgentCore {
         ...(this.#deps.files ? { files: this.#deps.files } : {}),
         ...(this.#deps.processes ? { processes: this.#deps.processes } : {}),
         ...(this.#deps.writes ? { writes: this.#deps.writes } : {}),
+        ...(this.#deps.web ? { web: this.#deps.web } : {}),
         now: () => this.#deps.clock.now(),
         nextEffectId: () => this.#deps.ids.next("effect") as EffectId,
         record: (effect, result) => this.#record(run, effect, result),

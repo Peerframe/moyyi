@@ -1,3 +1,4 @@
+import assert from "node:assert/strict";
 import { createHash } from "node:crypto";
 import { describe, expect, it, vi } from "vitest";
 import type {
@@ -10,6 +11,7 @@ import type {
 import { canTransition } from "../contracts/persisted/index.ts";
 import { canonicalizeJson } from "../contracts/replay.ts";
 import type { PreparedAction, ToolDefinition } from "../contracts/tools.ts";
+import type { WebAccess } from "../contracts/web.ts";
 import { boundOutput, type ExecutionHost, executeCalls } from "./executor.ts";
 
 function call(name = "test", id = "call_1", rawArguments = "{}"): ToolCallPart {
@@ -114,6 +116,85 @@ function setup(selected = tool()) {
 }
 
 describe("tool execution pipeline", () => {
+  it("isolates external web authority from local files and expires each invocation", async () => {
+    const test = setup(tool("external"));
+    const localFiles = vi.fn(() => {
+      throw Error("External tool obtained local authority");
+    });
+    const calls: string[] = [];
+    let prepared: WebAccess | undefined;
+    let executed: WebAccess | undefined;
+    const web: NonNullable<ExecutionHost["web"]> = {
+      create(_context, guard, scope) {
+        return {
+          async prepare(request) {
+            guard();
+            calls.push(scope.phase);
+            return request;
+          },
+          async execute() {
+            guard();
+            expect(scope.phase).toBe("execute");
+            expect(test.records.at(-1)?.state).toBe("started");
+            return {
+              url: "https://example.com/",
+              status: 200,
+              contentType: "text/plain",
+              text: "ok",
+              truncated: false,
+            };
+          },
+        };
+      },
+    };
+    test.selected.prepare = async (_args, context) => {
+      expect(context.files).toBeUndefined();
+      prepared = context.web;
+      assert(prepared);
+      const payload = await prepared.prepare({ kind: "fetch", url: "https://example.com/" });
+      return {
+        digest: "claimed" as ActionDigest,
+        summary: "Fetch public example",
+        preconditions: [],
+        payload,
+      };
+    };
+    test.selected.execute = async (_action, context) => {
+      expect(context.files).toBeUndefined();
+      assert(prepared);
+      await expect(
+        prepared.prepare({ kind: "fetch", url: "https://example.com/" }),
+      ).rejects.toThrow("expired");
+      executed = context.web;
+      assert(executed);
+      await executed.execute();
+      return { status: "succeeded", content: [] };
+    };
+    expect(
+      (await executeCalls([call()], { ...test.host, web, files: { create: localFiles } }))[0]
+        ?.status,
+    ).toBe("succeeded");
+    assert(executed);
+    await expect(executed.execute()).rejects.toThrow("expired");
+    expect(localFiles).not.toHaveBeenCalled();
+    expect(calls).toEqual(["prepare"]);
+  });
+
+  it("never supplies tool-network authority to a read tool", async () => {
+    const test = setup();
+    const create = vi.fn(() => {
+      throw Error("Read tool obtained web authority");
+    });
+    test.selected.execute = async (_action, context) => {
+      expect(context.web).toBeUndefined();
+      return { status: "succeeded", content: [] };
+    };
+    expect((await executeCalls([call()], { ...test.host, web: { create } }))[0]?.status).toBe(
+      "succeeded",
+    );
+    expect(create).not.toHaveBeenCalled();
+  });
+
   it("durably journals started before invocation and records bounded result with settlement", async () => {
     const test = setup();
     test.selected.execute = vi.fn<ToolDefinition["execute"]>(async (action) => {
