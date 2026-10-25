@@ -7,7 +7,7 @@ on a branch/PR; no automatic merge, paid model calls or phase 4. This supersedes
 research-only stop. [ADR 0013](../decisions/0013-native-process-sandbox.md) records the decision.
 
 Directory: `/Users/yxflc/Project/moyyi`. Branch: `codex/phase-3-sandboxed-shell`.
-[PR #13](https://github.com/Peerframe/moyyi/pull/13) is being advanced from research to implementation
+[PR #13](https://github.com/Peerframe/moyyi/pull/13) now delivers implementation following research
 on the same branch; it targets main directly, without a dependent PR. Main baseline remains
 `801175fff78a067436f3105bd7ebd500120ffd28`. D1-D5, persisted v1 and prior checker criteria remain unchanged.
 
@@ -44,9 +44,13 @@ copy/import workflow, persistent terminal or arbitrary-network capability.
 - `npx vitest run src/runtime/processes.test.ts tests/shell-process.test.ts`: **22/22** passed,
   including two actual runtime SIGKILL checkpoints and bounded detached-pipe handling.
 - Native macOS confinement: **26/26** cases passed against actual files, child processes and
-  host TCP/Unix socket listeners. Linux execution is pending the new PR CI, not inferred from Mac.
+  host TCP/Unix socket listeners. Linux independently passed its actual CI execution.
 - Focused runtime/core/policy/plugin regression: **115/115** in 7 files.
 - `npm run eval:shell`: **7/7** scenarios using real native execution, files and SQLite passed.
+- Linux [CI run 40177002293](https://github.com/Peerframe/moyyi/actions/runs/40177002293) passed
+  on implementation head `6e47886ce7c62be629161846c7c8931e3f6271ac`: **1,148 passed / 1 Mac-only
+  test skipped / 51 files**, plus **7/7 shell conformance scenarios**. The skipped detached-pipe
+  Mac test passed locally; it is not counted as Linux evidence.
 - `npm run build` passed. No private corpus or real model was used. Existing checks/fixtures remain
   unchanged; the Linux CI prerequisite is added without removing the original check command.
 
@@ -56,7 +60,8 @@ in CI, while all original assertions remain; denial probes additionally require 
 shell started. The next run (`40176679021`) launched correctly and passed 1,145 tests, but
 three assertions caught writes to bubblewrap's private synthetic root. The host canary was not
 modified; the root mount is now made read-only so outside-workspace writes fail consistently
-instead of creating misleading private aliases. Linux acceptance awaits the corrected-head run.
+instead of creating misleading private aliases. The corrected implementation head passed as
+recorded above. Subsequent documentation-only head CI is recorded on the PR page.
 
 The first full-gate attempt encountered a temporary SessionId typing error in an in-progress
 new crash fixture. It was corrected before the successful full run; no check was relaxed.
