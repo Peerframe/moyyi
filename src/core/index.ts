@@ -385,6 +385,7 @@ export class AgentCore {
       system: await blob({
         origin: request.origin,
         maxOutputTokens: request.maxOutputTokens,
+        ...(request.toolChoice === undefined ? {} : { toolChoice: request.toolChoice }),
         content: request.system,
       }),
       tools: await blob(request.tools),
@@ -539,6 +540,23 @@ export class AgentCore {
         return { kind: "budget_exhausted", budget: "model_requests" };
       }
       await run.queue;
+      const remaining = this.#limits.maxModelRequests - run.requests;
+      const finalRequest = remaining === 1;
+      await this.#append(run, {
+        kind: "notice",
+        code: "model_request_budget",
+        text:
+          `Model request budget: attempt ${run.requests + 1} of ${this.#limits.maxModelRequests}; ` +
+          `${remaining} request(s) remaining including this one. ` +
+          (finalRequest
+            ? "This is the final request. New tool calls are disabled. Give the user your final answer " +
+              "using only evidence already available. Distinguish verified findings, incomplete work " +
+              "and uncertainty; do not invent results or claim unperformed actions. If evidence is " +
+              "insufficient, explain the partial result and what remains unverified."
+            : "Reserve the final request for an answer. Gather only necessary evidence, group " +
+              "independent reads when useful, and answer early when you have enough. Retries consume " +
+              "this same budget. This notice does not grant permissions or override user constraints."),
+      });
       const snapshot = await this.#session(run.sessionId);
       const consumedSteering = snapshot.entries.filter(
         (entry) =>
@@ -546,7 +564,7 @@ export class AgentCore {
       ).length;
       const sections = await this.#collect(run);
       if (run.controller.signal.aborted) break;
-      const { request } = this.#deps.context.build({
+      const built = this.#deps.context.build({
         path: pathToHead(snapshot),
         profile: this.#deps.profile,
         tools: this.#deps.tools.map(({ name, description, inputSchema }) => ({
@@ -555,9 +573,14 @@ export class AgentCore {
           inputSchema,
         })),
         sections,
+        ...(finalRequest ? { toolChoice: "none" as const } : {}),
         unsettledEffects: snapshot.effects.filter((effect) => !isTerminal(effect.state)),
       });
-      const rendered = await this.#recordRequest(request, "moyyi-core-v1");
+      // The core's final-attempt constraint also applies to custom context builders/providers.
+      const request: ModelRequest = finalRequest
+        ? { ...built.request, toolChoice: "none" }
+        : built.request;
+      const rendered = await this.#recordRequest(request, "moyyi-core-v2");
       if (run.controller.signal.aborted) break;
       run.requests++;
       const response = await consumeResponse(
@@ -594,6 +617,7 @@ export class AgentCore {
         !response.partial &&
         !response.error.partialOutput &&
         !run.controller.signal.aborted &&
+        !finalRequest &&
         ["rate_limited", "overloaded", "network"].includes(response.error.kind) &&
         retries < this.#limits.maxRetries
       ) {
@@ -618,7 +642,27 @@ export class AgentCore {
       const calls = response.parts.filter(
         (part): part is ToolCallPart => part.type === "tool_call",
       );
-      if (interrupted || response.stopReason !== "tool_use") {
+      if (finalRequest && !interrupted && !run.controller.signal.aborted && calls.length) {
+        // Pair even a provider-violating call without prepare, approval, journal or execution.
+        await this.#append(run, {
+          kind: "tool_results",
+          results: calls.map((call) => ({
+            type: "tool_result",
+            callId: call.callId,
+            status: "denied",
+            content: [
+              {
+                type: "text",
+                text: "Tool was not executed: the final model request is reserved for an answer.",
+              },
+            ],
+          })),
+        });
+        if (run.controller.signal.aborted) break;
+        run.finishing = true;
+        return { kind: "budget_exhausted", budget: "model_requests" };
+      }
+      if (interrupted || run.controller.signal.aborted || response.stopReason !== "tool_use") {
         if (calls.length)
           await this.#append(run, {
             kind: "tool_results",
@@ -643,6 +687,16 @@ export class AgentCore {
           }
         }
         run.finishing = true;
+        if (
+          finalRequest &&
+          !response.error &&
+          (!["end_turn", "refusal"].includes(response.stopReason) ||
+            !response.parts.some(
+              (part) =>
+                (part.type === "text" || part.type === "refusal") && part.text.trim().length > 0,
+            ))
+        )
+          return { kind: "budget_exhausted", budget: "model_requests" };
         return response.error
           ? { kind: "failed", reason: response.error.message }
           : { kind: "completed" };

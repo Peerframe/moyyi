@@ -14,10 +14,19 @@ tool result, sends it back to the model, and prints the final answer. It uses an
 temporary SQLite directory. It performs no model API request, no real file-tool operation and
 no network operation. The answer is scripted; this demonstrates execution, not model intelligence.
 
-The fault eval reports eight deterministic protocol/lifecycle scenarios and writes synthetic
+The fault eval reports 21 deterministic protocol/lifecycle scenarios and writes synthetic
 evidence to ignored `evals/results/core.json`. It observes committed events and reloads entries
 through the client protocol; direct database and real-process crash checks are in the tests.
 It does not load `evals/private`, change public-task checkers, or claim a public-corpus score.
+
+The ordinary run loop tells the model its remaining request count before every attempt. The last
+request is reserved for a final answer: it retains prior tool evidence but disables new tool calls.
+Even a provider that ignores this control cannot execute a tool in that attempt. Retries count
+against the same quota, and the final attempt is not retried. With `maxModelRequests: 1`, the model
+can only answer from existing context. Empty/truncated/tool-only final responses stop as budget
+exhaustion; a complete answer may honestly describe partial results. Protocol completion is not
+a task-quality score. Cancellation and other resource limits can still prevent an answer.
+See [ADR 0021](decisions/0021-request-budget-closeout.md) for recording and provider compatibility.
 
 ## Runtime API
 

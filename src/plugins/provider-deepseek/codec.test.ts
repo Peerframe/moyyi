@@ -101,6 +101,19 @@ describe("DeepSeek request codec", () => {
       tool_choice: "auto",
     });
   });
+  it("explicitly disables tools without removing definitions and keeps absence unchanged", () => {
+    const input = request();
+    const ordinary = buildDeepSeekRequest(input);
+    expect(buildDeepSeekRequest({ ...input, toolChoice: "none" })).toEqual({
+      ...ordinary,
+      tool_choice: "none",
+    });
+    expect(buildDeepSeekRequest({ ...input, tools: [] })).not.toHaveProperty("tool_choice");
+    expect(buildDeepSeekRequest({ ...input, tools: [], toolChoice: "none" })).toMatchObject({
+      tool_choice: "none",
+    });
+    expect(input).not.toHaveProperty("toolChoice");
+  });
   it("reconstructs full reasoning in all completed turns and preserves tool arguments/results", () => {
     const callId = "local_1" as ToolCallId;
     const built = buildDeepSeekRequest(

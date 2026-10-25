@@ -38,17 +38,23 @@ interface Observation {
   readonly results: readonly ToolResultPart[];
   readonly events: readonly RuntimeEvent[];
   readonly requests: ReturnType<typeof scriptedProvider>["client"]["requests"];
+  readonly retryDelays: readonly number[];
 }
 interface Scenario {
   readonly id: string;
   readonly responses: readonly (readonly ModelStreamEvent[])[];
   readonly effect?: EffectClass;
   readonly cancelBeforeExecution?: boolean;
+  readonly cancelOnAssistantDelta?: boolean;
+  readonly cancelAfterAssistantCommit?: boolean;
+  readonly cancelAfterToolResultCommit?: boolean;
   readonly limits?: Partial<RunLimits>;
   check(observation: Observation): void;
 }
 
-const terminal = (stopReason: "tool_use" | "end_turn"): ModelStreamEvent => ({
+const terminal = (
+  stopReason: Extract<ModelStreamEvent, { type: "completed" }>["stopReason"],
+): ModelStreamEvent => ({
   type: "completed",
   stopReason,
   providerStopReason: null,
@@ -62,14 +68,17 @@ const finalAnswer: readonly ModelStreamEvent[] = [
   },
   terminal("end_turn"),
 ];
-const call = (rawArguments = '{"a":2,"b":3}'): readonly ModelStreamEvent[] => [
+const call = (
+  rawArguments = '{"a":2,"b":3}',
+  callId = "call_eval_1",
+): readonly ModelStreamEvent[] => [
   {
     type: "part_completed",
     index: 0,
     part: {
       type: "tool_call",
-      callId: "call_eval_1" as ToolCallId,
-      providerCallId: "call_eval_1",
+      callId: callId as ToolCallId,
+      providerCallId: callId,
       providerItemId: null,
       name: "eval_add",
       rawArguments,
@@ -103,6 +112,38 @@ const noRetry = (observation: Observation) => {
     ),
   );
 };
+
+const budgetExhausted = { kind: "budget_exhausted", budget: "model_requests" } as const;
+function checkBudgetPrompts(observation: Observation, maximum: number): void {
+  const notices = observation.entries.flatMap((entry) =>
+    entry.body.kind === "notice" && entry.body.code === "model_request_budget"
+      ? [entry.body.text]
+      : [],
+  );
+  assert.equal(notices.length, observation.requests.length);
+  for (const [index, request] of observation.requests.entries()) {
+    const remaining = maximum - index;
+    const prefix = `Model request budget: attempt ${index + 1} of ${maximum}; ${remaining} request(s) remaining including this one.`;
+    assert.ok(notices[index]?.startsWith(prefix), "Persist the actual attempt allowance");
+    const latest = request.messages.at(-1);
+    assert.equal(latest?.role, "user");
+    assert.ok(
+      latest?.content.some((part) => part.type === "text" && part.text.includes(prefix)),
+      "The current request must carry the current budget next to user content",
+    );
+    assert.deepEqual(request.system, observation.requests[0]?.system);
+    assert.ok(request.tools.some((tool) => tool.name === "eval_add"));
+    assert.equal(request.toolChoice, remaining === 1 ? "none" : undefined);
+  }
+}
+
+function checkNoFinalAnswer(observation: Observation): void {
+  noExecution(observation);
+  assert.equal(observation.evidence.modelRequests, 1);
+  assert.deepEqual(observation.evidence.outcome, budgetExhausted);
+  assert.deepEqual(observation.retryDelays, []);
+  checkBudgetPrompts(observation, 1);
+}
 
 const scenarios: readonly Scenario[] = [
   {
@@ -205,12 +246,184 @@ const scenarios: readonly Scenario[] = [
     id: "request-budget-stops-loop",
     responses: [call(), finalAnswer],
     limits: { maxModelRequests: 1 },
-    check({ evidence }) {
-      assert.equal(evidence.modelRequests, 1);
-      assert.equal(evidence.executions, 1);
-      assert.deepEqual(evidence.effectStates, ["succeeded"]);
-      assert.deepEqual(evidence.resultStatuses, ["succeeded"]);
-      assert.deepEqual(evidence.outcome, { kind: "budget_exhausted", budget: "model_requests" });
+    check(observation) {
+      checkNoFinalAnswer(observation);
+      assert.deepEqual(observation.evidence.resultStatuses, ["denied"]);
+      assert.ok(!observation.events.some((event) => event.type === "approval.requested"));
+    },
+  },
+  {
+    id: "budget-reserves-third-request-for-answer",
+    responses: [call(), call('{"a":4,"b":5}', "call_eval_2"), finalAnswer],
+    limits: { maxModelRequests: 3, maxRetries: 0 },
+    check(observation) {
+      const { evidence, requests } = observation;
+      assert.equal(evidence.modelRequests, 3);
+      assert.equal(evidence.preparations, 2);
+      assert.equal(evidence.executions, 2);
+      assert.deepEqual(evidence.outcome, { kind: "completed" });
+      assert.deepEqual(evidence.resultStatuses, ["succeeded", "succeeded"]);
+      assert.deepEqual(
+        requests[2]?.messages.flatMap((message) =>
+          message.content.filter((part) => part.type === "tool_result").map((part) => part.callId),
+        ),
+        ["call_eval_1", "call_eval_2"],
+      );
+      checkBudgetPrompts(observation, 3);
+    },
+  },
+  {
+    id: "one-request-budget-can-answer-directly",
+    responses: [finalAnswer],
+    limits: { maxModelRequests: 1 },
+    check(observation) {
+      noExecution(observation);
+      assert.equal(observation.evidence.modelRequests, 1);
+      assert.deepEqual(observation.evidence.outcome, { kind: "completed" });
+      checkBudgetPrompts(observation, 1);
+    },
+  },
+  {
+    id: "one-request-budget-refusal-is-an-answer",
+    responses: [
+      [
+        { type: "part_completed", index: 0, part: { type: "refusal", text: "Cannot verify it." } },
+        terminal("refusal"),
+      ],
+    ],
+    limits: { maxModelRequests: 1 },
+    check(observation) {
+      noExecution(observation);
+      assert.equal(observation.evidence.modelRequests, 1);
+      assert.deepEqual(observation.evidence.outcome, { kind: "completed" });
+      checkBudgetPrompts(observation, 1);
+    },
+  },
+  {
+    id: "last-request-write-call-cannot-start",
+    responses: [call(), finalAnswer],
+    effect: "workspace_write",
+    limits: { maxModelRequests: 1 },
+    check(observation) {
+      checkNoFinalAnswer(observation);
+      assert.deepEqual(observation.evidence.resultStatuses, ["denied"]);
+      assert.ok(!observation.events.some((event) => event.type === "approval.requested"));
+    },
+  },
+  {
+    id: "last-request-empty-answer-is-not-completion",
+    responses: [[terminal("end_turn")]],
+    limits: { maxModelRequests: 1 },
+    check: checkNoFinalAnswer,
+  },
+  {
+    id: "last-request-whitespace-is-not-completion",
+    responses: [
+      [
+        { type: "part_completed", index: 0, part: { type: "text", text: " \n\t" } },
+        terminal("end_turn"),
+      ],
+    ],
+    limits: { maxModelRequests: 1 },
+    check: checkNoFinalAnswer,
+  },
+  {
+    id: "last-request-truncation-is-not-completion",
+    responses: [
+      [
+        { type: "part_completed", index: 0, part: { type: "text", text: "Partial explanation" } },
+        terminal("max_tokens"),
+      ],
+    ],
+    limits: { maxModelRequests: 1 },
+    check: checkNoFinalAnswer,
+  },
+  {
+    id: "last-request-other-stop-is-not-completion",
+    responses: [
+      [
+        { type: "part_completed", index: 0, part: { type: "text", text: "Unproven ending" } },
+        terminal("other"),
+      ],
+    ],
+    limits: { maxModelRequests: 1 },
+    check: checkNoFinalAnswer,
+  },
+  {
+    id: "retry-consumes-allowance-before-final-answer",
+    responses: [[transient(false)], call(), finalAnswer],
+    limits: { maxModelRequests: 3, maxRetries: 1 },
+    check(observation) {
+      assert.equal(observation.evidence.modelRequests, 3);
+      assert.equal(observation.evidence.executions, 1);
+      assert.deepEqual(observation.evidence.outcome, { kind: "completed" });
+      assert.deepEqual(observation.retryDelays, [0]);
+      checkBudgetPrompts(observation, 3);
+    },
+  },
+  {
+    id: "last-request-error-has-no-retry-or-backoff",
+    responses: [[transient(false)], finalAnswer],
+    limits: { maxModelRequests: 1, maxRetries: 2 },
+    check(observation) {
+      noRetry(observation);
+      assert.deepEqual(observation.retryDelays, []);
+      assert.ok(
+        !observation.entries.some(
+          (entry) => entry.body.kind === "notice" && entry.body.code === "model_retry",
+        ),
+      );
+      checkBudgetPrompts(observation, 1);
+    },
+  },
+  {
+    id: "cancel-final-answer-does-not-reserve-extra-request",
+    responses: [
+      [{ type: "text_delta", index: 0, text: "Unfinished answer" }, ...finalAnswer],
+      finalAnswer,
+    ],
+    limits: { maxModelRequests: 1 },
+    cancelOnAssistantDelta: true,
+    check(observation) {
+      noExecution(observation);
+      assert.equal(observation.evidence.modelRequests, 1);
+      assert.deepEqual(observation.evidence.outcome, { kind: "cancelled" });
+      assert.deepEqual(observation.retryDelays, []);
+      assert.ok(
+        observation.entries.some(
+          (entry) =>
+            entry.body.kind === "assistant_message" && entry.body.stopReason === "interrupted",
+        ),
+      );
+      checkBudgetPrompts(observation, 1);
+    },
+  },
+  {
+    id: "cancel-final-tool-after-assistant-commit",
+    responses: [call(), finalAnswer],
+    limits: { maxModelRequests: 1 },
+    cancelAfterAssistantCommit: true,
+    check(observation) {
+      noExecution(observation);
+      assert.equal(observation.evidence.modelRequests, 1);
+      assert.deepEqual(observation.evidence.outcome, { kind: "cancelled" });
+      assert.deepEqual(observation.evidence.resultStatuses, ["cancelled"]);
+      assert.deepEqual(observation.retryDelays, []);
+      checkBudgetPrompts(observation, 1);
+    },
+  },
+  {
+    id: "cancel-final-tool-after-denial-commit",
+    responses: [call(), finalAnswer],
+    limits: { maxModelRequests: 1 },
+    cancelAfterToolResultCommit: true,
+    check(observation) {
+      noExecution(observation);
+      assert.equal(observation.evidence.modelRequests, 1);
+      assert.deepEqual(observation.evidence.outcome, { kind: "cancelled" });
+      assert.deepEqual(observation.evidence.resultStatuses, ["denied"]);
+      assert.deepEqual(observation.retryDelays, []);
+      checkBudgetPrompts(observation, 1);
     },
   },
 ];
@@ -224,6 +437,7 @@ async function runScenario(scenario: Scenario): Promise<Observation> {
     const provider = scriptedProvider(scenario.responses);
     let preparations = 0;
     let executions = 0;
+    const retryDelays: number[] = [];
     const synthetic: Plugin = {
       name: "eval-arithmetic",
       apiVersion: 1,
@@ -267,6 +481,16 @@ async function runScenario(scenario: Scenario): Promise<Observation> {
       model: scriptedProfile.origin,
       plugins: [{ plugin: provider.plugin }, { plugin: synthetic }],
       ...(scenario.limits ? { limits: scenario.limits } : {}),
+      scheduler: {
+        async sleep(milliseconds, signal) {
+          assert.ok(!signal.aborted, "Never schedule retry after cancellation");
+          retryDelays.push(milliseconds);
+        },
+        deadline(milliseconds, callback) {
+          const timer = setTimeout(callback, milliseconds);
+          return () => clearTimeout(timer);
+        },
+      },
     });
     assert.ok(
       runtime.plugins.every((plugin) => plugin.state === "loaded"),
@@ -288,9 +512,18 @@ async function runScenario(scenario: Scenario): Promise<Observation> {
       if (loadingSession && event.type === "entry.appended")
         loadedEntries.set(event.entry.id, event.entry);
       if (
-        scenario.cancelBeforeExecution &&
-        event.type === "effect.updated" &&
-        event.effect.state === "intended" &&
+        ((scenario.cancelBeforeExecution &&
+          event.type === "effect.updated" &&
+          event.effect.state === "intended") ||
+          (scenario.cancelOnAssistantDelta && event.type === "assistant.delta") ||
+          (scenario.cancelAfterAssistantCommit &&
+            !loadingSession &&
+            event.type === "entry.appended" &&
+            event.entry.body.kind === "assistant_message") ||
+          (scenario.cancelAfterToolResultCommit &&
+            !loadingSession &&
+            event.type === "entry.appended" &&
+            event.entry.body.kind === "tool_results")) &&
         runId
       ) {
         void runtime?.send({ type: "run.cancel", runId });
@@ -343,7 +576,7 @@ async function runScenario(scenario: Scenario): Promise<Observation> {
       effectStates: [...committedEffects.values()].map((effect) => effect.state),
       resultStatuses: results.map((result) => result.status),
     };
-    return { evidence, entries, results, events, requests: provider.client.requests };
+    return { evidence, entries, results, events, requests: provider.client.requests, retryDelays };
   } finally {
     try {
       await runtime?.close();

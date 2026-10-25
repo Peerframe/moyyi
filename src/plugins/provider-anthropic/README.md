@@ -10,6 +10,13 @@ thinking, function calls/results, refusal status/details and cumulative usage. I
 tools, server-side fallback, inline system/tool changes and provider compaction are not enabled.
 Unknown capability-bearing SSE events fail explicitly rather than being treated as success.
 
+The optional common `toolChoice: "none"` control sends `tool_choice: { type: "none" }`, retaining
+the tool definitions and history needed for signed replay. Absence retains the previous wire
+shape; unsupported values fail before HTTP. Budget text appended to the current user result does
+not change earlier prefixes; this adapter does not recognize notice text as authority. Core
+separately prevents final-attempt tool execution. The control is supported with adaptive thinking:
+[official tool-choice documentation](https://platform.claude.com/docs/en/agents-and-tools/tool-use/define-tools).
+
 Thinking signatures and encrypted blocks live only in bounded D2 replay envelopes. Content,
 model/API identity, exact rendered prefix and account scope must match. A changed prefix or
 account strips old thinking before the single HTTP attempt, using the documented keep-tail
