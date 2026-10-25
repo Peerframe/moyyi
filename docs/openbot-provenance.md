@@ -15,13 +15,24 @@ This file records everything that is taken from OpenBot so the origin stays trac
 
 Each becomes a deterministic test using the scripted model and fault injection:
 
-- [ ] Cancellation racing a tool start
-- [ ] Permission revoked during a run
-- [ ] Output and input size limits exceeded
-- [ ] Invalid tool arguments
-- [ ] Symlinks pointing outside the workspace
-- [ ] Overwrite conflicts (file changed after preview or approval)
-- [ ] Outcome unknown after interruption
+- [x] Cancellation racing a tool start — [executor tests](../src/core/executor.test.ts), including
+  cancellation immediately after the durable start barrier, before invocation
+- [x] Permission revoked during a run — executor and [protocol tests](../tests/runtime-core.test.ts),
+  including revoke/regrant invalidating an approval epoch
+- [x] Output and input size limits exceeded — executor truncation and
+  [argument validation tests](../src/runtime/validation.test.ts)
+- [x] Invalid tool arguments — strict JSON/schema rejection before prepare, paired result
+- [x] Symlinks pointing outside the workspace — actual disposable filesystem cases in
+  [precondition tests](../src/runtime/preconditions.test.ts); this validates the preflight port,
+  not a file capability. The batch 5 operation-time confinement tests remain required
+- [x] Overwrite conflicts (file changed after preview or approval) — file-hash preflight plus
+  executor/protocol re-approval with a new digest. No actual file-write tool is implemented
+- [x] Outcome unknown after interruption — [real-process recovery tests](../tests/core-recovery.test.ts)
+  kill after execution starts, reopen, retain unknown and never invoke the action again
+
+These are independently written moyyi tests based on the listed failure scenarios. They do not
+copy OpenBot code or establish general filesystem/process isolation. Batch 4's synthetic
+write tools exist only in tests; the default product policy remains read-only.
 
 ## Copied code
 

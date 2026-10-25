@@ -439,6 +439,14 @@ export class SqliteSessionStore implements SessionStore {
     };
   }
 
+  async listSessions(): Promise<readonly SessionId[]> {
+    this.#ready();
+    return this.#db
+      .prepare("SELECT id FROM sessions ORDER BY id")
+      .all()
+      .map((row) => row.id as SessionId);
+  }
+
   async unsettledEffects(): Promise<readonly EffectRecord[]> {
     this.#ready();
     return this.#db

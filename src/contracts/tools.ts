@@ -30,6 +30,7 @@ export interface ToolDefinition<Args = unknown> {
 }
 
 export interface PreparedAction {
+  /** Proposal from prepare; the executor binds the full action/arguments with its own hash. */
   readonly digest: ActionDigest;
   /** Human-readable summary shown in approvals. */
   readonly summary: string;

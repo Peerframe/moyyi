@@ -1,8 +1,9 @@
 # Local store
 
 `SqliteSessionStore` in [src/store/index.ts](../src/store/index.ts) implements `SessionStore`.
-It is available to application composition code and tests. The CLI/runtime is not wired to it
-yet: batch 3 does not make moyyi a runnable agent. The decision and supported filesystem
+It is available to application composition code and tests. Batch 3 did not wire the runtime to it.
+The batch 4 review branch adds programmatic runtime wiring and a scripted demo;
+see [core.md](core.md). The decision and supported filesystem
 boundary are in [ADR 0002](decisions/0002-storage.md).
 
 ## Lifetime and transactions

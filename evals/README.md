@@ -71,3 +71,10 @@ presence, not semantically graded; blocker facts are checked through structured 
 
 Planned additions: fault-injection suites (scripted model), longer conversation tasks, and
 same-model baselines for other harnesses.
+
+The batch 4 branch adds `npm run eval:core`, an independent scripted protocol/lifecycle suite.
+It covers eight deterministic core scenarios and writes synthetic evidence to
+`evals/results/core.json`. It does not load private tasks or alter the 30 public-task checkers.
+It checks committed events and entries loaded through the public runtime protocol; direct
+database, cancellation-race and SIGKILL recovery assertions remain in integration tests.
+Its pass count measures conformance to those scenarios, not a model's ability to solve tasks.

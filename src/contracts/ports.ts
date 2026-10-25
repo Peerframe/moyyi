@@ -19,6 +19,8 @@ import type { PreparedAction } from "./tools.ts";
  */
 
 export interface SessionStore {
+  /** Enumerates persisted sessions for startup recovery, including runs with no effects. */
+  listSessions(): Promise<readonly SessionId[]>;
   /** Applies all changes in one transaction, or none of them. */
   commit(batch: StoreBatch): Promise<void>;
   loadSession(sessionId: SessionId): Promise<SessionSnapshot | null>;
@@ -102,6 +104,8 @@ export type PolicyDecision =
   | { readonly kind: "deny"; readonly reason: string };
 
 export interface PermissionPolicy {
+  /** Mutable grant owners increment this epoch on every grant/revocation. */
+  revision?(): number;
   /** Called before `prepare`, which reads state and therefore needs read permission too. */
   beforePrepare(tool: string, profile: EffectProfile, args: unknown): PolicyDecision;
   /** Called with the prepared action; the decision binds to its digest. */
@@ -110,6 +114,7 @@ export interface PermissionPolicy {
     profile: EffectProfile,
     action: PreparedAction,
     effectId: EffectId,
+    args?: unknown,
   ): PolicyDecision;
 }
 

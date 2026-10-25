@@ -1,3 +1,4 @@
+export type * from "./execution.ts";
 export type * from "./model.ts";
 export * from "./model-conformance.ts";
 export * from "./persisted/index.ts";
