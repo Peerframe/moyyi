@@ -1,5 +1,9 @@
 # Batch 5 implementation and review handoff
 
+Historical delivery record. PR #9 was subsequently reviewed and merged as `15ac933` after
+its head CI passed; merged main CI also passed. Current scope is in the
+[batch 6 handoff](2026-10-25-batch-6-deepseek.md). The original authorization below is historical.
+
 Owner authorization (2026-10-25): review PR #8, fix blockers and merge after CI, then deliver
 batch 5 on a new branch/PR. Do not automatically merge the new PR, make paid model calls or
 start batch 6. D1–D5 remain accepted; persisted v1 and the public task criteria remain frozen.

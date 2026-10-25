@@ -8,6 +8,8 @@ import {
   canonicalizeJson,
   type IdSource,
   type ModelOrigin,
+  type ModelRecording,
+  type ModelRecordingSink,
   type PermissionPolicy,
   type PolicyDecision,
   type PreconditionVerifier,
@@ -19,9 +21,16 @@ import {
 } from "../contracts/index.ts";
 import { AgentCore } from "../core/index.ts";
 import { fsPlugin } from "../plugins/fs/index.ts";
+import {
+  createDeepSeekPlugin,
+  DEEPSEEK_API_PROFILE,
+  type DeepSeekTransport,
+} from "../plugins/provider-deepseek/index.ts";
 import { ReadOnlyPolicy } from "../policy/index.ts";
 import { SqliteSessionStore } from "../store/index.ts";
+import { type DeepSeekHttpOptions, deepSeekHttpTransport } from "./deepseek-http.ts";
 import { NodeWorkspaceFiles } from "./files.ts";
+import { FileRecordingSink, RecordingModelClient, ReplayModelClient } from "./model-recording.ts";
 import { type PluginEntry, PluginRegistry, type PluginStatus } from "./plugins.ts";
 import { WorkspacePreconditions } from "./preconditions.ts";
 import { AjvArgumentValidator } from "./validation.ts";
@@ -57,12 +66,55 @@ export interface RuntimeOptions {
   readonly scheduler?: Scheduler;
   /** Additional absolute host paths to exclude, e.g. a custom store's private data directory. */
   readonly protectedPaths?: readonly string[];
+  /** Explicit host connection only; no environment lookup or network before a model request. */
+  readonly deepseek?: DeepSeekHttpOptions | { readonly transport: DeepSeekTransport };
+  /** Opt-in diagnostic recording, limited to one sequential request stream per runtime. */
+  readonly modelRecording?: {
+    readonly sink: ModelRecordingSink;
+    readonly apiProfile: string;
+    readonly source: "live" | "synthetic";
+  };
+  /** Replaces the selected provider's client; never falls back to a live request. */
+  readonly modelReplay?: {
+    readonly records: readonly ModelRecording[];
+    readonly apiProfile: string;
+  };
 }
 
 export async function createRuntime(options: RuntimeOptions = {}): Promise<Runtime> {
+  if ((options.modelRecording && options.modelReplay) || (options.modelReplay && options.deepseek))
+    throw Error("Replay cannot be combined with live connection or recording options");
+  if ((options.modelRecording || options.modelReplay || options.deepseek) && !options.model)
+    throw Error("Model transport/recording requires an explicitly selected model");
+  for (const recording of [options.modelRecording, options.modelReplay]) {
+    if (
+      recording &&
+      options.model?.provider === "deepseek" &&
+      recording.apiProfile !== DEEPSEEK_API_PROFILE
+    )
+      throw Error("DeepSeek recording profile does not match the configured adapter");
+  }
+  const transport = options.deepseek
+    ? "transport" in options.deepseek
+      ? options.deepseek.transport
+      : deepSeekHttpTransport(options.deepseek)
+    : undefined;
+  const deepseek =
+    transport || (options.modelReplay && options.model?.provider === "deepseek")
+      ? createDeepSeekPlugin(
+          transport ??
+            (async () => {
+              throw Error("Replay cannot access the network");
+            }),
+        )
+      : undefined;
   const registry = new PluginRegistry();
   const plugins: PluginStatus[] = [];
-  for (const entry of [{ plugin: fsPlugin }, ...(options.plugins ?? [])])
+  for (const entry of [
+    { plugin: fsPlugin },
+    ...(deepseek ? [{ plugin: deepseek }] : []),
+    ...(options.plugins ?? []),
+  ])
     plugins.push(await registry.load(entry));
 
   const listeners = new Set<(event: RuntimeEvent) => void>();
@@ -83,6 +135,7 @@ export async function createRuntime(options: RuntimeOptions = {}): Promise<Runti
   };
   let ownedStore: SqliteSessionStore | undefined;
   let core: AgentCore | undefined;
+  let recorder: RecordingModelClient | undefined;
   const unload = async () => {
     for (const status of [...plugins].reverse()) await registry.unload(status.name);
   };
@@ -124,8 +177,21 @@ export async function createRuntime(options: RuntimeOptions = {}): Promise<Runti
             registry.evaluatePolicy({ tool, profile, args, phase: "execute" }),
           ),
       };
+      let client = options.modelReplay
+        ? new ReplayModelClient(options.modelReplay.records, {
+            apiProfile: options.modelReplay.apiProfile,
+          })
+        : provider.createClient(profile.origin.model);
+      if (options.modelRecording) {
+        recorder = new RecordingModelClient(
+          client,
+          options.modelRecording.sink,
+          options.modelRecording,
+        );
+        client = recorder;
+      }
       core = new AgentCore({
-        model: provider.createClient(profile.origin.model),
+        model: client,
         profile,
         tools: registry.tools,
         store,
@@ -135,6 +201,9 @@ export async function createRuntime(options: RuntimeOptions = {}): Promise<Runti
         preconditions: options.preconditions ?? new WorkspacePreconditions(),
         files: new NodeWorkspaceFiles([
           ...(store instanceof SqliteSessionStore ? [store.directory] : []),
+          ...(options.modelRecording?.sink instanceof FileRecordingSink
+            ? [options.modelRecording.sink.directory]
+            : []),
           ...(options.protectedPaths ?? []),
         ]),
         hasher: {
@@ -190,6 +259,7 @@ export async function createRuntime(options: RuntimeOptions = {}): Promise<Runti
     async idle() {
       await Promise.all([...commands]);
       await core?.idle();
+      await recorder?.flush();
     },
     close() {
       if (closing) return closing;
@@ -199,9 +269,13 @@ export async function createRuntime(options: RuntimeOptions = {}): Promise<Runti
         await Promise.all([...commands]);
         await stopping;
         await core?.close();
-        listeners.clear();
-        ownedStore?.close();
-        await unload();
+        try {
+          await recorder?.flush();
+        } finally {
+          listeners.clear();
+          ownedStore?.close();
+          await unload();
+        }
       })();
       return closing;
     },

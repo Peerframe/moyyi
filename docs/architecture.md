@@ -43,9 +43,9 @@ core through five fixed points and can be added or removed without touching anyt
 | Plugin | Extension points | Phase |
 |---|---|---|
 | `provider-scripted` | model provider | exists (tests and evals) |
-| `provider-deepseek` (Responses subset; [ADR 0007](decisions/0007-first-model-provider.md)) | model provider | 1 |
+| `provider-deepseek` (Responses subset; [ADR 0007](decisions/0007-first-model-provider.md)) | model provider | batch 6 review; live acceptance pending |
 | `project-instructions` (AGENTS.md and similar) | context source | 1 |
-| `fs` (read, list, search; edit/write later) | tools | read-only in batch 5 review |
+| `fs` (read, list, search; edit/write later) | tools | read-only merged in batch 5 |
 | `shell` | tools | 3 |
 | `provider-anthropic` | model provider | 5 |
 | `web` (fetch, search) | tools, policy rule | 5 |
@@ -117,6 +117,13 @@ One request per call. Every stream ends with exactly one terminal event (`comple
 `error`). Provider, network and cancellation failures are `error` events, never exceptions; an
 exception is a programming error. Every provider runs its recorded fixtures through
 `checkModelStream`.
+
+The DeepSeek adapter accepts a documented text/reasoning/function subset and delegates fixed-origin
+HTTP and credentials to runtime. Context includes the persisted assistant stop reason in the
+nonpersisted model port, so partial reasoning cannot masquerade as a complete continuation.
+Optional model recording/replay lives in runtime; it captures canonical requests and common events,
+not HTTP credentials. It requires a sequential stream and exact request/profile match, with no live
+fallback. See [deepseek.md](deepseek.md) and [ADR 0010](decisions/0010-deepseek-transport-and-recording.md).
 
 ## Effect pipeline
 

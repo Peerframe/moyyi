@@ -23,7 +23,9 @@
     "demo:scripted": "node scripts/demo-agent.ts",
     "check": "npm run typecheck && npm run lint && npm run test",
     "eval:files": "node evals/files/run.ts",
-    "demo:files": "node scripts/demo-files.ts"
+    "demo:files": "node scripts/demo-files.ts",
+    "eval:deepseek": "node evals/deepseek/run.ts",
+    "demo:deepseek-replay": "node scripts/demo-deepseek-replay.ts"
   },
   "devDependencies": {
     "@biomejs/biome": "2.5.15",

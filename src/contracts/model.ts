@@ -21,6 +21,8 @@ export interface ModelMessage {
   readonly role: "user" | "assistant";
   readonly content: readonly ContentPart[];
   readonly replay?: ReplayEnvelope;
+  /** Transcript provenance; absent means unknown, never proof of complete reasoning. */
+  readonly stopReason?: StopReason;
 }
 
 export interface ToolSpec {

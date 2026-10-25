@@ -102,6 +102,7 @@ function renderEntry(entry: TranscriptEntry): ModelMessage {
       return {
         role: "assistant",
         content: body.content,
+        stopReason: body.stopReason,
         ...(body.replay === undefined ? {} : { replay: body.replay }),
       };
     case "tool_results":

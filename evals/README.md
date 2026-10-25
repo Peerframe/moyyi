@@ -86,3 +86,12 @@ and SQLite. Eight scenarios cover the list/search/read loop, ignore rules, prote
 traversal/symlink denial, truncation and input limits. It writes ignored synthetic output to
 `evals/results/files.json`, does not load private tasks and does not alter public-task checkers.
 It measures execution/authority conformance, not real-model task competence.
+
+## DeepSeek offline conformance
+
+`npm run eval:deepseek` runs six public deterministic scenarios through the runtime protocol:
+synthetic SSE → real file tools/SQLite → normalized recording → offline replay, plus request/file
+changes, recording-path protection, unknown usage and partial interruption. It writes only a
+synthetic report to ignored `evals/results/deepseek.json` and cleans temporary data. It never
+loads private tasks, credentials or a real model. This is adapter/runtime evidence, not pass@1,
+pass^k or a model capability score. `npm run demo:deepseek-replay` demonstrates the same boundary.
