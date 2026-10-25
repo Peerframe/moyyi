@@ -5,6 +5,7 @@ import type {
   EffectProfile,
   EffectRecord,
   EntryId,
+  RunId,
   SessionId,
   Timestamp,
   TranscriptEntry,
@@ -31,12 +32,35 @@ export interface StoreBatch {
   readonly entries: readonly TranscriptEntry[];
   /** Upserts; the store rejects any change that is not a legal effect transition. */
   readonly effects: readonly EffectRecord[];
+  /** Session heads and run state share the entries/effects transaction. */
+  readonly sessions?: readonly SessionState[];
+  readonly runs?: readonly RunState[];
+  readonly leases?: readonly WorkspaceLeaseChange[];
   /**
-   * `before_side_effect` must survive power loss before the call resolves, because an effect
-   * is about to start and recovery depends on this record existing.
+   * Both labels use WAL + FULL. `before_side_effect` marks the barrier before an action;
+   * durability still depends on the operating system/filesystem honoring synchronization.
    */
   readonly durability: "normal" | "before_side_effect";
 }
+
+export interface SessionState {
+  readonly sessionId: SessionId;
+  readonly workspaceRoot: string;
+  readonly headEntryId: EntryId | null;
+}
+
+export interface RunState {
+  readonly runId: RunId;
+  readonly sessionId: SessionId;
+  readonly status: "active" | "completed" | "interrupted";
+}
+
+export interface WorkspaceLease {
+  readonly workspaceRoot: string;
+  readonly runId: RunId;
+}
+
+export type WorkspaceLeaseChange = WorkspaceLease & { readonly kind: "acquire" | "release" };
 
 export interface SessionSnapshot {
   readonly sessionId: SessionId;
@@ -44,6 +68,8 @@ export interface SessionSnapshot {
   readonly headEntryId: EntryId | null;
   readonly entries: readonly TranscriptEntry[];
   readonly effects: readonly EffectRecord[];
+  readonly runs: readonly RunState[];
+  readonly leases: readonly WorkspaceLease[];
 }
 
 export interface ContextBuilder {

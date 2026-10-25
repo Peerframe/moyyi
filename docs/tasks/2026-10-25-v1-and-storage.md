@@ -55,3 +55,55 @@ Tests use disposable synthetic directories only. A process-kill test is not proo
 power-loss survival on every filesystem. No exactly-once side-effect promise. The runtime and
 core loop stay unimplemented; batch 4 is not started. Run `npm run check` and CI; record what was
 executed, what remains platform-dependent, and the D2 PR dependency in the storage PR.
+
+## Current delivery record (2026-10-25)
+
+Workspace: the moyyi repository checkout. Base main: `1470a69`. D2 branch:
+`codex/d2-v1-amendment`, commit `095d8948b7fd8ab8980cc3433c31d30c4acaa55c`.
+[PR #6](https://github.com/Peerframe/moyyi/pull/6) targets main and is ready for review.
+`npm run check` passed (13 files, 354 tests; typecheck and lint passed), then
+[CI run 40163545371](https://github.com/Peerframe/moyyi/actions/runs/40163545371) passed on that
+commit. Only then was `codex/batch-3-store` created from it. The amended persisted folder has
+not changed during storage implementation. The one-time incompatible v1 amendment is consumed.
+
+Batch 3 delivers `SqliteSessionStore`, the initial transactional schema migration, verified
+content-addressed blobs, OS writer locks, session/run state, exclusive workspace leases and
+consistent backup/restore. [ADR 0002](../decisions/0002-storage.md) records the driver comparison,
+version evidence and filesystem boundary; [store.md](../store.md) documents the API and errors.
+No new npm dependency, OpenBot copy, boundary-rule change or eval/checker weakening was needed.
+
+Acceptance evidence on the storage branch:
+
+- `npx vitest run src/store/records.test.ts`: 100 strict-record cases, including original v1
+  JSON round-trip, refusal/reasoning, raw arguments, unknown usage, opaque replay and size limits.
+- `npx vitest run src/store/files.test.ts`: 19 real-filesystem cases for SHA-256 publication,
+  deduplication, corruption, limits, private permissions, symbolic links and same-process locks.
+- `npx vitest run tests/store.test.ts tests/store-process.test.ts`: real SQLite integration
+  and six child-process cases. SIGKILL before commit rolls back all records; SIGKILL after an
+  acknowledged commit retains them. A killed first migration can be reopened. Competing
+  processes fail to acquire the writer lock; the OS releases it after death.
+- Full `npm run check`: typecheck and lint (88 files) passed; 17 test files / 506 tests passed.
+  The exact final PR head CI remains the remote delivery gate; its result is recorded in the PR.
+  Earlier checkpoints are not substituted for final-head evidence.
+
+The frozen fixture's four external blob references originally have placeholder hashes and no
+payloads. The integration test materializes synthetic payloads and substitutes only those
+references, compares all written/read records unchanged, then repeats after reopen. Pure
+record tests preserve the original fixture exactly. No missing/hash validation is bypassed.
+The `unknown` effect fixture reaches its state through legal transitions, with its lease held.
+
+Independent review closed these issues before delivery: overlapping parent/child workspace
+leases, missing/altered schema constraints or extra triggers, releasing a moved workspace,
+and a final backup-publication sync failure. The latter raises `BackupDurabilityError` with
+the visible destination and explicitly unconfirmed durability; it is never reported as success.
+
+Not verified: physical power loss, faulty/network filesystems, Windows, large-history load or
+backup performance, and real provider APIs. Tests use local synthetic directories only; they
+do not prove exactly-once external effects. No private eval files or real credentials were read.
+Runtime wiring, core execution/recovery, context, permissions and providers remain future work;
+`createRuntime` still reports not implemented. Batch 4 has not started.
+
+Owner decisions: no new architecture choice is pending. Review the two PRs; after owner merges
+D2, retarget the storage PR to main and let its CI run again. Neither PR is automatically merged.
+There are no continuing test processes or delegated writers after the delivery checkpoint;
+final code revision and CI links are recorded in the PR to avoid a self-referential commit hash.
