@@ -118,6 +118,7 @@ export interface PermissionPolicy {
   /** Mutable grant owners increment this epoch on every grant/revocation. */
   revision?(): number;
   /** Automatic context reads have no approval flow. Missing, ask or deny means no read. */
+  /** AGENTS.md uses a workspace-relative path; selected skills use their absolute host path. */
   beforeContextRead?(path: string): PolicyDecision;
   /** Called before `prepare`, which reads state and therefore needs read permission too. */
   beforePrepare(tool: string, profile: EffectProfile, args: unknown): PolicyDecision;

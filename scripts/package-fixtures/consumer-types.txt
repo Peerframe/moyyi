@@ -102,3 +102,8 @@ const invalidCommand: ClientCommand = { type: "shell.execute", command: "anythin
 const wideningPlugin: Plugin = { name: "invalid-policy", apiVersion: 1, setup(host) { host.registerPolicyRule({ id: "invalid", evaluate() { return { kind: "allow" }; } }); } };
 
 void [typedClient, eventKind, validApproval, missingDigest, invalidCommand, wideningPlugin];
+
+const selectedSkills: RuntimeOptions = { skills: { root: "/synthetic-library", enabled: ["code-review"] } };
+// @ts-expect-error Skill configuration cannot omit the explicit enabled list.
+const implicitSkills: RuntimeOptions = { skills: { root: "/synthetic-library" } };
+void [selectedSkills, implicitSkills];

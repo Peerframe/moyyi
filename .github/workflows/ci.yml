@@ -58,5 +58,8 @@ jobs:
       - name: Runtime task harness conformance
         run: npm run eval:runtime
 
+      - name: Skill context conformance
+        run: npm run eval:skills
+
       - name: Installable candidate and client protocol
         run: npm run verify:package

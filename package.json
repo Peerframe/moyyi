@@ -38,7 +38,9 @@
     "docs/shell.md",
     "docs/long-sessions.md",
     "docs/instructions.md",
-    "docs/web.md"
+    "docs/web.md",
+    "docs/skills.md",
+    "THIRD_PARTY_NOTICES.md"
   ],
   "scripts": {
     "moyyi": "node src/cli/main.ts",
@@ -63,7 +65,8 @@
     "eval:anthropic": "node evals/anthropic/run.ts",
     "eval:web": "node evals/web/run.ts",
     "eval:instructions": "node evals/instructions/run.ts",
-    "eval:runtime": "node evals/runtime/run.ts"
+    "eval:runtime": "node evals/runtime/run.ts",
+    "eval:skills": "node evals/skills/run.ts"
   },
   "devDependencies": {
     "@biomejs/biome": "2.5.15",
@@ -73,6 +76,7 @@
   },
   "dependencies": {
     "ajv": "8.20.0",
-    "ignore": "7.0.12"
+    "ignore": "7.0.12",
+    "yaml": "2.9.1"
   }
 }

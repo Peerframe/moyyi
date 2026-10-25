@@ -28,6 +28,8 @@ export const installedGuides = [
   "docs/shell.md",
   "docs/long-sessions.md",
   "docs/instructions.md",
+  "docs/skills.md",
+  "THIRD_PARTY_NOTICES.md",
   "docs/web.md",
 ] as const;
 export function command(
