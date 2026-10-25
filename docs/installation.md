@@ -1,0 +1,99 @@
+# Install a local candidate
+
+Phase 6 prepares an installable CLI and programmatic package. This is a **local development
+candidate**, not an official release. No npm publication, GitHub Release, tag, signed installer,
+registry name reservation or automatic update is performed. The package retains `private: true`
+and version `0.0.0`; the tarball SHA-256 and source revision identify a candidate.
+
+## Requirements
+
+- Node.js 26 and npm 11 or newer. Candidate acceptance runs on macOS and Ubuntu Linux; Windows
+  installation is rejected by the package OS field. Other operating systems/architectures are
+  not certified by these checks.
+- Dependencies must be obtainable from npm or an existing cache. The tarball does not bundle
+  Node.js or third-party dependencies. Direct dependency versions remain pinned; future transitive
+  resolutions are governed by those dependencies' constraints, not frozen by the artifact hash.
+- Shell tools additionally need the existing native sandbox: macOS Seatbelt or Linux bubblewrap
+  with the required user-namespace policy. Installing moyyi does not install or enable those OS
+  facilities. File-only and offline demo use do not require a shell grant. See [shell limits](shell.md).
+
+## Build and verify from the repository
+
+```sh
+npm ci
+npm run check
+npm run verify:package
+```
+
+`verify:package` creates a clean compiled npm tarball, validates its complete file list, installs
+that exact file into disposable local and global-prefix consumers outside the repository, and
+runs CLI, terminal, public-client and TypeScript checks. Install scripts are disabled; npm may fetch
+the pinned production dependencies and their transitive dependencies from the public registry.
+The acceptance programs make no model or web requests. Existing user/global installations and data
+are untouched. Python 3 is needed for the existing POSIX terminal acceptance script; it is not a
+product runtime dependency. If package metadata and tarballs are already cached, use
+`npm run verify:package -- --offline` to require offline installation. A fresh `npm ci` cache alone
+is not sufficient: it may have tarballs without the metadata needed for a new consumer install.
+
+The command prints the artifact path in `artifacts/`, a SHA-256 sidecar, a file/revision manifest
+and, on success only, an `.acceptance.json` receipt. A dirty-worktree candidate is labeled dirty.
+The receipt applies to that artifact and host, not all future source versions or live providers.
+`npm run package:candidate` only builds/packages and does not establish installation acceptance.
+Direct `npm pack` also performs a clean build; use the verification command for the complete gate.
+
+## Install the tarball
+
+Use the exact artifact path printed above. A project-local install is:
+
+```sh
+mkdir -p /absolute/private/moyyi-client
+cd /absolute/private/moyyi-client
+npm init -y
+npm install --ignore-scripts /absolute/path/to/moyyi-0.0.0-HASH.tgz
+./node_modules/.bin/moyyi --help
+```
+
+For a command in an explicitly chosen user-owned prefix:
+
+```sh
+npm install --global --prefix /absolute/private/moyyi-prefix --ignore-scripts /absolute/path/to/moyyi-0.0.0-HASH.tgz
+/absolute/private/moyyi-prefix/bin/moyyi --version
+```
+
+These commands install a file, not an npm package selected by name. Use `--offline` if all
+dependencies are already cached. Compare the artifact with its `.sha256` sidecar before moving
+it between machines; a checksum detects changed bytes but does not establish publisher identity.
+No compiler, repository checkout or source `.ts` execution is needed by the installed CLI.
+
+Try the offline script with a disposable workspace containing a README:
+
+```sh
+/absolute/private/moyyi-prefix/bin/moyyi --demo -C /absolute/workspace --data /absolute/private/demo-data
+```
+
+The demo has 32 scripted read/answer pairs; it is not an intelligent model. Live operation uses
+the existing explicit `--host /absolute/private/host.mjs` configuration. See [CLI](cli.md),
+[DeepSeek](deepseek.md), [Anthropic](anthropic.md) and [web](web.md). Paid requests still require
+your deliberate model connection and tasks. Installation does not discover credentials, enable
+tools, relax approvals or prove remote API compatibility.
+
+Installed modules expose `moyyi/runtime` and `moyyi/contracts` for a trusted local client or host;
+see [client protocol](client-protocol.md). Place a host that imports these package entry points
+under the consumer project that contains `node_modules/moyyi`, so Node can resolve them. A global
+CLI install alone does not add a package to unrelated host modules' import search path.
+
+## Upgrade or remove a candidate
+
+Stop running sessions first. Back up your data using the documented storage workflow before an
+upgrade; candidate validation does not establish arbitrary downgrade compatibility. Installing a
+new local tarball into the same selected prefix replaces the application, not the data directory.
+Keep the previous tarball if you need to inspect it. Do not run two writers against the same data.
+
+```sh
+npm uninstall --global --prefix /absolute/private/moyyi-prefix moyyi
+```
+
+For a project-local installation run `npm uninstall moyyi` in that consumer. Neither operation
+deletes separate `--data` directories or `~/.moyyi/data`. Remove those only by a separate deliberate
+data-deletion action. Usage guides in the package are a subset; architecture, ADR, research and
+historical links refer to the full [repository documentation](https://github.com/Peerframe/moyyi/tree/main/docs).

@@ -47,8 +47,8 @@ core through five fixed points and can be added or removed without touching anyt
 | `project-instructions` (AGENTS.md and similar) | context source | 1 |
 | `fs` (read, list, search; create, edit, undo) | tools | read-only merged in batch 5; writes merged in phase 2 |
 | `shell` | tools | merged in phase 3 |
-| `provider-anthropic` | model provider | phase 5 branch; live acceptance pending |
-| `web` (fetch, search) | tools; runtime capability and base policy | phase 5 branch |
+| `provider-anthropic` | model provider | merged in phase 5; live acceptance pending |
+| `web` (fetch, search) | tools; runtime capability and base policy | merged in phase 5 |
 | `skills` (Agent Skills format) | context source | later |
 | `mcp` (bridge to MCP servers) | tools, policy rule | later |
 | `memory` (Hermes Agent–inspired learning) | context source, event observer | later |
@@ -212,7 +212,7 @@ run status, notice/result pairing and lease decision commit together, so a crash
 can be retried. See [ADR 0014](decisions/0014-recovery-and-compaction.md) and
 [usage](long-sessions.md); persisted v1 and layer import boundaries are unchanged.
 
-## Anthropic and tool network authority (phase 5 branch)
+## Anthropic and tool network authority (merged phase 5)
 
 [ADR 0015](decisions/0015-anthropic-and-web.md) adds a second provider through the existing model
 port. Anthropic-specific prefix/account replay bindings stay opaque to the core, in the existing
@@ -227,3 +227,16 @@ Production HTTPS validates all A records then pins the connection, verifies TLS,
 and bounds output/time. Search uses an explicitly configured SearXNG endpoint. Page content and
 search links are untrusted data without authority. Unknown external effects are never replayed.
 See [web usage and limits](web.md) and [Anthropic usage](anthropic.md).
+
+## Local candidate packaging (phase 6 branch)
+
+[ADR 0016](decisions/0016-local-installable-candidate.md) keeps the existing layers and compiles
+production ESM/declarations into a private npm tarball. `moyyi/runtime` exports the composition
+root and existing trusted-host configuration helpers; `moyyi/contracts` exports commands, events
+and plugin contracts. No internal wildcard entry or new network protocol is introduced. Installed
+clients use the same send/subscribe/idle/close lifecycle as the CLI.
+
+A complete package inventory, isolated tarball installation and actual CLI/PTY/client/type checks
+are required in CI. The installed process has no source checkout or compiler dependency. This is
+an unpublished development candidate with explicit platform and live-service gaps; see
+[installation](installation.md) and [client protocol](client-protocol.md).

@@ -1,5 +1,10 @@
 # Phase 5: Anthropic and web
 
+历史交付记录。#15 已在固定 head `a65d003` 经独立审查、66 项整合与 138 项定向测试、
+[PR CI](https://github.com/Peerframe/moyyi/actions/runs/40181990157) 通过后合并为 `cc25e7d`；
+[main CI](https://github.com/Peerframe/moyyi/actions/runs/40182497442) 通过。原始范围和证据保留，
+最新授权与交付见 [phase 6](2026-10-25-phase-6-candidate.md)。
+
 ## 授权与当前交付
 
 Owner 授权审查并合并 #14，再推进 phase 5。目录 `/Users/yxflc/Project/moyyi`，分支

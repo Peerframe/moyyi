@@ -1,6 +1,6 @@
 # ADR 0015: Anthropic Messages and separately authorized web access
 
-Status: implemented on the phase 5 branch; review pending. D1–D6 remain unchanged.
+Status: merged in PR #15 after fixed-head review and passing CI. D1–D6 remain unchanged.
 
 ## Context and decision
 
