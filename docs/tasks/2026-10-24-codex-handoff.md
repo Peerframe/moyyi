@@ -4,14 +4,16 @@
 #2–#5，并整合交接；本次文档整合的 main 基线为已合入 #1–#4 的 `26f2e41`。由 Claude 起草，
 审查者由 owner 指定；每个 PR 的实际提交、检查与合并记录以其页面为准。
 
-**2026-10-25 最新状态：#16 已审查合并为 `b0bdaa8`，本机候选已安装。**
-[合并后的 CI](https://github.com/Peerframe/moyyi/actions/runs/40185889433) 通过。
-Owner 后续分别授权一次最小 DeepSeek 请求与一次额外诊断请求；两次各发出一次 HTTP 请求，均为 200，
-没有自动重试。此前另有一次钥匙串读取超时，HTTP 请求为 0。第二次实际响应确定了
-`encrypted_content` 辅助字段导致的拒绝；本轮在 `codex/deepseek-visible-reasoning-compat`
-离线修复并按新 PR 交付。**新 PR 不自动合并，不再发起付费调用，暂不正式发布。**
+**2026-10-25 最新状态：#17 已审查合并为 `85bc5f5`，本机候选已更新。**
+[合并后的 CI](https://github.com/Peerframe/moyyi/actions/runs/40204280703) 通过。
+三个分别获准的最小 DeepSeek HTTP 请求均收到 200，没有自动重试。前两个定位了
+`encrypted_content` 辅助字段拒绝，已由 #17 修复；第三个完整捕获 23 个事件、答案 `OK` 与
+45 tokens 用量，但安装版在 `phase: "final_answer"` 处拒绝。本轮在
+`codex/deepseek-final-answer-phase` 离线修复并按新 PR 交付，新增网络请求为 0。
+此前多次钥匙串读取等待结束均未发 HTTP，不计入实际调用数。
+**新 PR 不自动合并，不再发起付费调用，暂不正式发布。**
 不直接推送 main，不改 persisted v1／分层规则／公共题判分，D1–D6 保持已定结论。
-当前范围、证据与完整响应尚未验证的限制见 [DeepSeek 兼容性记录](2026-10-25-deepseek-compatibility.md)。
+当前范围、完整捕获的离线验证与真实工具续接仍未验证的限制见 [DeepSeek 兼容性记录](2026-10-25-deepseek-compatibility.md)。
 [phase 6 记录](2026-10-25-phase-6-candidate.md)保留打包与安装历史证据。
 [phase 5](2026-10-25-phase-5-anthropic-web.md)、[phase 4](2026-10-25-phase-4-long-sessions.md)、[phase 3](2026-10-25-phase-3-shell.md)、[phase 2](2026-10-25-phase-2-writes.md)、
 [批次 7](2026-10-25-batch-7-cli.md)、[批次 6](2026-10-25-batch-6-deepseek.md)、
@@ -27,7 +29,7 @@ Owner 后续分别授权一次最小 DeepSeek 请求与一次额外诊断请求�
 
 ## 1. 现在有什么
 
-已合入 #1–#16 的 main `b0bdaa8` 为本轮基线，包含：
+已合入 #1–#17 的 main `85bc5f5` 为本轮基线，包含：
 
 - Node 26、TypeScript 7、Biome、Vitest；main 的类型检查、lint、Linux CI 已通过；#15 本机交付基线为 1,365 项测试通过（各平台证据以 CI 为准）
 - 持久化格式 `src/contracts/persisted`，版本 1，由 `fixtures/v1.ts` 锁定
@@ -45,7 +47,8 @@ DeepSeek Responses 文本/推理/函数调用适配器、固定地址 HTTP、录
 已合并的批次 7 提供交互会话、流式输出、审批、Ctrl-C/EOF 收尾、插话与恢复，
 以及显式开发插件的空闲重载。`npm run moyyi -- --demo` 可运行有限的离线脚本，真实模型通过
 显式 `--host FILE` 配置；不自动发现工作区配置，不新增凭据后端。原有 DeepSeek 离线 demo/eval 保留。
-已另以最小诊断确认远端 HTTP 接受请求；完整响应、工具续接及真实 Agent 任务能力仍未验证。真实冒烟及 phase 1 能力评测仍待 owner。
+已用一次最小真实回答确认接口返回 `OK`；修复源码已离线完整解析该捕获，但没有新实时运行。
+真实工具续接及 Agent 任务能力仍未验证。真实工具冒烟及 phase 1 能力评测仍待 owner。
 phase 2 已合并，提供受控创建/编辑/撤销与快照。phase 3 原生沙箱命令工具已按 D6 合并，验收和平台限制见 phase 3 记录。
 phase 4 显式压缩、恢复故障测试与长会话离线验收已通过 #14 合并。
 phase 5 Anthropic 与独立授权 web 已通过 #15 合并，真实服务验收和公网 DNS 限制保留。
@@ -69,6 +72,7 @@ phase 5 Anthropic 与独立授权 web 已通过 #15 合并，真实服务验收�
 | [#14：phase 4 恢复与长会话](https://github.com/Peerframe/moyyi/pull/14) | `25aff55` | 固定 diff 独立审查、64 项定向测试、原 head 与 main CI 通过 |
 | [#15：phase 5 Anthropic／web](https://github.com/Peerframe/moyyi/pull/15) | `cc25e7d` | 固定 diff 独立审查、66 项整合＋138 项定向测试、原 head 与 main CI 通过 |
 | [#16：phase 6 安装候选](https://github.com/Peerframe/moyyi/pull/16) | `b0bdaa8` | 独立审查、PR 与 main CI 通过；合并后安装验收通过，本机已安装 |
+| [#17：DeepSeek 辅助 reasoning 字段](https://github.com/Peerframe/moyyi/pull/17) | `85bc5f5` | 独立审查、PR 与 main CI 通过；本机已更新并通过离线验证 |
 
 [给 Claude 的交接](2026-10-25-claude-review-handoff.md)保留原始独立分支的历史验收，已标为历史快照。
 其中缺 fixture、未有 CI 和 D2 未定等状态不再是当前状态；不把旧的覆盖文件诊断冒充新检查结果。
@@ -77,7 +81,7 @@ phase 5 Anthropic 与独立授权 web 已通过 #15 合并，真实服务验收�
 
 - **分支与 PR**：每批一个分支 `codex/<批次名>`，从最新 `main` 切出，开一个 PR 到 `main`。不要基于另一个
   未合并的分支开 PR；D2／存储的依赖 PR 例外已结束。不直接推送 `main`，不改仓库设置。
-  #16 已按授权合并；DeepSeek 兼容性新 PR 不自动合并，暂不正式发布。
+  #17 已按授权合并；DeepSeek final_answer 兼容性新 PR 不自动合并，暂不正式发布。
 - **检查**：每个 PR 的 `npm run check` 必须全绿。新行为要有测试，包括拒绝、取消和中断的情况。
 - **边界**：`tests/boundaries.ts` 报错时改导入，不改规则。确实要改规则，就同时改 `architecture.md`，并在
   PR 里说明原因。
@@ -85,7 +89,7 @@ phase 5 Anthropic 与独立授权 web 已通过 #15 合并，真实服务验收�
   之后不兼容变更必须升版本和迁移。phase 2 快照使用独立 SQLite schema 2 增量迁移，不改已锁定格式。
 - **不替 owner 做决定**：第 3 节的事项由 owner 决定。依赖这些决定的批次，在决定之前不开始；遇到新的同类
   问题，在 PR 描述里列出选项和建议，然后停下。
-- **模型调用**：默认不做付费调用。Owner 两次单请求授权均已使用，后续调用需另行明确授权；不得自动重试。真实 key 仅由本机受控凭据回调读取，不进入工具输出、源码、提交或 PR。
+- **模型调用**：默认不做付费调用。Owner 三次单请求授权均已使用，后续调用需另行明确授权；不得自动重试。真实 key 仅由本机受控凭据回调读取，不进入工具输出、源码、提交或 PR。
 - **新依赖**：按 AGENTS.md 的研究要求比较候选，选发布满两周的确切版本，把候选、版本和理由写进 ADR 或
   PR 描述。
 - **复用代码**：不复制 OpenBot 或其他项目的源码；确实要复制，按 [openbot-provenance.md](../openbot-provenance.md)

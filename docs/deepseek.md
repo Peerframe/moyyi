@@ -2,9 +2,10 @@
 
 Batch 6 adds a programmatic DeepSeek provider and deterministic record/replay. The subsequent
 batch 7 [CLI](cli.md) connects it through explicit trusted host configuration. The default runtime still makes no network request without explicit configuration.
-Automated checks use synthetic protocol responses. An owner-authorized minimal diagnostic received
-HTTP 200 and exposed a reasoning-metadata incompatibility; full live response and tool-continuation
-acceptance remain pending. See the [compatibility follow-up](tasks/2026-10-25-deepseek-compatibility.md).
+Automated checks use synthetic protocol responses. Owner-authorized minimal probes exposed
+reasoning-metadata and final-answer-phase incompatibilities. The latest complete private response
+now decodes offline to `OK` with final usage; a fresh live run of this fix and real tool continuation
+remain unverified. See the [compatibility follow-up](tasks/2026-10-25-deepseek-compatibility.md).
 
 ## Offline entry points
 
@@ -37,7 +38,11 @@ function calls; the runtime's existing policy controls file tools. It does not g
 write or shell access. Only the core can retry a qualifying model error.
 
 The supported request profile is intentionally narrow. Images, opaque-only/summarized reasoning,
-refusal content items, assistant phases, hosted tools and stored server conversations are rejected.
+refusal content items, commentary/unknown assistant phases, hosted tools and stored server
+conversations are rejected. Assistant output accepts absent/null/`"final_answer"` phase only,
+then discards that annotation. It never overrides the response terminal, promotes an interrupted
+or failed response to success, or changes a tool turn into a final answer. Common recordings and
+the next plaintext request do not carry `phase`.
 An auxiliary `encrypted_content` string in reasoning output is accepted only alongside visible
 reasoning, bounded to 64 KiB UTF-8, and discarded. It is not a replacement for plaintext or a replay
 credential. An item that carries it must finish with nonblank visible reasoning, even when the
@@ -113,12 +118,18 @@ command is run by the batch 6 tests, demo or implementation process.
    known server revision, and actual usage/charge. A reported alias alone means the underlying model
    revision remains **unknown**. Keep raw private records local and report only sanitized evidence.
 
-The earlier three-request smoke above has not been executed. Two separately authorized one-request
-connectivity/diagnostic probes have received HTTP 200; neither established a complete normalized
-answer. The second exposed the auxiliary-field rejection and captured a partial stream. After the
-fix, that prefix emits a visible delta and correctly ends as interrupted, not completed. No further
-paid request is authorized by this documentation. Real-agent pass@1/pass^k, full-response usage/cost,
-normal task latency and model quality remain unverified.
+The three-request tool smoke above has not been executed. Three separately authorized single-request
+probes received HTTP 200, without retries. The second captured a partial stream exposing auxiliary
+reasoning metadata; its prefix still correctly reports interruption. The third captured all 23 events,
+including a final `OK`, but the installed decoder rejected `phase: "final_answer"`. Offline replay
+through the corrected source produces `completed` / `end_turn`, final input 34 and output 11 tokens
+(including 9 reasoning tokens). No response content or terminal was fabricated. The private wire
+is not committed; repository regressions use synthetic data.
+
+The fix has not made a fresh live request, and the user's installed main candidate is not automatically
+replaced by an unmerged branch. Actual billing, underlying model revision, real-agent pass@1/pass^k,
+tool continuation, normal task latency and model quality remain unverified. No further paid request
+is authorized by this documentation.
 The CLI, controlled writes, native commands, compaction and second provider are merged.
 The local installable candidate is described in [installation.md](installation.md); no official
 release or live acceptance is implied.

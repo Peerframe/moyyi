@@ -16,6 +16,11 @@ sent in a subsequent request. It may change or disappear across lifecycle events
 ever carries nonempty auxiliary metadata must complete with nonblank visible reasoning; opaque-only
 output still fails. Existing identity, status and streamed/final content checks remain in force.
 
+Assistant message output may have no `phase`, null, or `"final_answer"`. The supported final-answer
+annotation is validated and discarded; common content and subsequent input remain plain text.
+Commentary, unknown values and invalid types still fail. The annotation never completes a response
+or selects its stop reason: only the response terminal can authorize completion or a tool turn.
+
 Framing accepts chunked UTF-8 and SSE comments/line endings, rejects duplicate JSON keys and
 unfinished events, and caps the wire at 8 MiB and each event at 1 MiB. Semantic assembly checks
 sequence order, identities, lifecycle, completed content consistency and usage. EOF without a
@@ -23,9 +28,11 @@ terminal is `stream_interrupted`; partial output is retained and never retried h
 and HTTP errors expose fixed diagnostics, not raw server error bodies. Unknown usage remains null.
 
 `fixtures.ts` builds handwritten synthetic lifecycles, not recordings from DeepSeek. The provider's
-wire and common-event tests use these fixtures. An owner-authorized live diagnostic identified
-the auxiliary-field rejection; the captured prefix now passes that point in offline replay. A full
-live response and tool continuation remain unverified; see the [follow-up evidence](../../../docs/tasks/2026-10-25-deepseek-compatibility.md).
+wire and common-event tests use these fixtures. Owner-authorized minimal probes identified the
+auxiliary-field and final-answer-phase rejections. The latest private capture contains a complete
+response; offline replay through the fixed adapter yields `OK`, `end_turn` and final usage.
+This is not a new live call or real tool-continuation acceptance; see the
+[follow-up evidence](../../../docs/tasks/2026-10-25-deepseek-compatibility.md).
 For runtime configuration, record/replay and owner smoke instructions see
 [docs/deepseek.md](../../../docs/deepseek.md). Design evidence is in
 [ADR 0010](../../../docs/decisions/0010-deepseek-transport-and-recording.md).
