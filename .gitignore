@@ -4,5 +4,6 @@ coverage/
 .moyyi/
 evals/results/
 *.log
+!evals/tasks/remaining-work/fixture/progress.log
 .DS_Store
 evals/private/
