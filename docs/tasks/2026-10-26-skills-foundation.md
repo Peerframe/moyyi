@@ -60,3 +60,17 @@ multiple library roots, skill installation, reference/resource loading and scrip
 intentionally outside this first version. All are documented; none are silently simulated.
 Unicode skill names are outside the ASCII identifier profile. Hostile same-UID filesystem races
 are not an isolation guarantee. No new owner-level decision is pending for this scope.
+
+## 集成到 PR #21 后的 main
+
+基线更新为 `9881623f569d037350dc4a599941814ac50ab29b`。仅检查命令列表发生冲突；保留
+`eval:runtime` 与 `eval:skills` 两套 CI 检查，`git range-diff` 确认产品代码与独立审查版本一致。
+
+- 默认并发 `npm run check`：1703 通过、1 个未改动的 recording 目录枚举测试超过原 5 秒。
+  单独 `vitest run src/runtime/model-recording.test.ts`：43/43 通过（约 1 秒）。
+- 一次重跑错误地把 `--maxWorkers=4` 交给 npm，npm 忽略该选项，实际仍为默认并发；结果
+  1703 通过、既有 development watcher 用例未在原 3 秒内通知。没有修改任何超时或断言。
+- 正确执行 `npm run check -- -- --maxWorkers=4`：typecheck、Biome 233 文件、79 文件
+  **1704/1704** 全部通过。远端 CI 仍执行未改动的默认 `npm run check`。
+- `npm run eval:skills` 31/31、`npm run eval:runtime` 10/10 通过。
+- 主控及独立代理对固定 Skills diff 审查无阻断；再次核实 OpenBot 版本与 MIT 原版权正文。
