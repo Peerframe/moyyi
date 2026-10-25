@@ -18,8 +18,10 @@ import {
   type Timestamp,
 } from "../contracts/index.ts";
 import { AgentCore } from "../core/index.ts";
+import { fsPlugin } from "../plugins/fs/index.ts";
 import { ReadOnlyPolicy } from "../policy/index.ts";
 import { SqliteSessionStore } from "../store/index.ts";
+import { NodeWorkspaceFiles } from "./files.ts";
 import { type PluginEntry, PluginRegistry, type PluginStatus } from "./plugins.ts";
 import { WorkspacePreconditions } from "./preconditions.ts";
 import { AjvArgumentValidator } from "./validation.ts";
@@ -53,12 +55,15 @@ export interface RuntimeOptions {
   readonly clock?: Clock;
   readonly ids?: IdSource;
   readonly scheduler?: Scheduler;
+  /** Additional absolute host paths to exclude, e.g. a custom store's private data directory. */
+  readonly protectedPaths?: readonly string[];
 }
 
 export async function createRuntime(options: RuntimeOptions = {}): Promise<Runtime> {
   const registry = new PluginRegistry();
   const plugins: PluginStatus[] = [];
-  for (const entry of options.plugins ?? []) plugins.push(await registry.load(entry));
+  for (const entry of [{ plugin: fsPlugin }, ...(options.plugins ?? [])])
+    plugins.push(await registry.load(entry));
 
   const listeners = new Set<(event: RuntimeEvent) => void>();
   const diagnostics: string[] = [];
@@ -128,6 +133,10 @@ export async function createRuntime(options: RuntimeOptions = {}): Promise<Runti
         context: new MinimalContextBuilder(),
         validator: new AjvArgumentValidator(),
         preconditions: options.preconditions ?? new WorkspacePreconditions(),
+        files: new NodeWorkspaceFiles([
+          ...(store instanceof SqliteSessionStore ? [store.directory] : []),
+          ...(options.protectedPaths ?? []),
+        ]),
         hasher: {
           digest: (value) =>
             `sha256:${createHash("sha256").update(canonicalizeJson(value)).digest("hex")}` as ActionDigest,

@@ -1,3 +1,4 @@
+import type { WorkspaceFiles } from "./files.ts";
 import type { ActionDigest } from "./persisted/index.ts";
 import type { JsonSchema, Precondition, ToolContext } from "./tools.ts";
 
@@ -15,6 +16,11 @@ export interface PreconditionVerifier {
     conditions: readonly Precondition[],
     context: ToolContext,
   ): Promise<{ readonly valid: true } | { readonly valid: false; readonly reason: string }>;
+}
+
+/** The executor supplies a live guard; the host must check it around every asynchronous I/O. */
+export interface WorkspaceFilesFactory {
+  create(context: ToolContext, assertAuthorized: () => void): WorkspaceFiles;
 }
 
 /** Time and hashing remain injected so core code has no package or I/O dependency. */
