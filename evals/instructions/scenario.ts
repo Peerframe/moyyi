@@ -65,6 +65,7 @@ export const instructionScenarios = [
   "evidence-chain-within-eight-requests",
   "focused-evidence-truncation-and-reread",
   "failed-evidence-stays-failed",
+  "search-context-source-and-lifecycle-evidence",
 ] as const;
 export type InstructionScenario = (typeof instructionScenarios)[number];
 
@@ -491,6 +492,81 @@ export async function runInstructionScenario(scenario: InstructionScenario): Pro
       const limited = await open([final()], {}, [], baselineBudget + 1024);
       assert.equal((await limited.turn()).kind, "failed");
       assert.equal(limited.client.requests.length, 0);
+    } else if (scenario === "search-context-source-and-lifecycle-evidence") {
+      // Retrieval/continuation evidence only: scripted choices do not establish model judgment.
+      const sources = new Map<string, string>();
+      for (const [folder, task, names] of [
+        ["dataflow", "source-dataflow-report", ["decode.mjs", "requests.mjs", "policy.mjs"]],
+        ["lifecycle", "source-lifecycle-report", ["dashboard.mjs", "stable-read.mjs", "store.mjs"]],
+      ] as const) {
+        mkdirSync(join(workspace, folder));
+        for (const name of names) {
+          const source = readFileSync(
+            join(import.meta.dirname, "../tasks", task, "fixture/src", name),
+            "utf8",
+          );
+          const text = `// DISTANT_UNRELATED_CANARY\n${"// padding\n".repeat(300)}${source}`;
+          sources.set(`${folder}/${name}`, text);
+          writeFileSync(join(workspace, folder, name), text);
+        }
+      }
+      const h = await open(
+        [
+          tool("search", { path: "dataflow", query: "function", contextLines: 20 }, "trace-data"),
+          tool(
+            "search",
+            { path: "lifecycle", query: "function", contextLines: 20 },
+            "trace-lifetime",
+          ),
+          final(),
+        ],
+        { limits: { maxModelRequests: 3, maxRetries: 0 } },
+      );
+      assert.equal((await h.turn()).kind, "completed");
+      const last = h.client.requests[2];
+      assert.equal(last?.toolChoice, "none");
+      const evidence: string[] = [];
+      for (const call of ["trace-data", "trace-lifetime"]) {
+        const result = resultValue(last, call);
+        assert.equal(result.status, "succeeded");
+        assert.equal(result.value.truncated, false);
+        assert(result.value.context.length >= 3);
+        for (const window of result.value.context) {
+          const original = sources.get(window.path);
+          assert(original);
+          const lines = original.match(/[^\n]*\n|[^\n]+$/gu) ?? [];
+          assert.equal(window.text, lines.slice(window.startLine - 1, window.endLine).join(""));
+          assert.equal(window.complete, true);
+          assert(!window.text.includes("DISTANT_UNRELATED_CANARY"));
+          evidence.push(window.text);
+        }
+      }
+      const delivered = evidence.join("\n");
+      for (const exact of [
+        "source: text",
+        "document: card.source",
+        "document: card.body",
+        "createDashboard(options, storage)",
+        "createDynamicDashboard(options, storage)",
+        "const directory = options.directory",
+        "async render()",
+        "readStable(storage",
+      ])
+        assert(delivered.includes(exact), `Missing actual consumer/lifecycle source: ${exact}`);
+      assert.equal(h.client.requests.length, 3);
+      for (const [path, text] of sources)
+        assert.equal(readFileSync(join(workspace, path), "utf8"), text);
+      const assistant = h.events.findLast(
+        (event) => event.type === "entry.appended" && event.entry.body.kind === "assistant_message",
+      );
+      assert(
+        assistant?.type === "entry.appended" && assistant.entry.body.kind === "assistant_message",
+      );
+      const ref = assistant.entry.body.request.system;
+      const stored = JSON.parse(
+        readFileSync(join(h.dataDirectory, "blobs", ref.slice("sha256:".length)), "utf8"),
+      );
+      assert.equal(stored.toolChoice, "none");
     } else if (scenario === "evidence-guidance-static-through-focused-read") {
       writeFileSync(
         join(workspace, "consumer.ts"),
@@ -568,7 +644,8 @@ export async function runInstructionScenario(scenario: InstructionScenario): Pro
       writeFileSync(join(workspace, "protected.txt"), "UNCHANGED");
       const h = await open(
         [
-          tool("search", { query: "function sendPayload" }, "locate-sender"),
+          // Keep this existing focused-read scenario navigation-only; its no-prefix gate stays.
+          tool("search", { query: "function sendPayload", contextLines: 0 }, "locate-sender"),
           tool("read", { path: "consumer.ts", startLine: 1601, maxLines: 3 }, "read-sender"),
           tool("read", { path: "parser.ts" }, "read-parser"),
           tool("read", { path: "selection.ts" }, "read-selection"),

@@ -8,7 +8,12 @@ export interface WorkspaceFiles {
   search(
     path: string,
     query: string,
-    options?: { readonly maxMatches?: number; readonly caseSensitive?: boolean },
+    options?: {
+      readonly maxMatches?: number;
+      readonly caseSensitive?: boolean;
+      /** Nearby LF-delimited lines per side, 0–20. Capability default 0; fs tool default 8. */
+      readonly contextLines?: number;
+    },
   ): Promise<FileSearch>;
 }
 
@@ -49,9 +54,20 @@ export interface FileSearch {
     readonly line: number;
     readonly text: string;
   }[];
-  /** True when any scan, file-size, line-size or result bound prevented a complete search. */
+  /** Exact merged source windows, when requested; never a claim that a function is complete. */
+  readonly context?: readonly FileSearchContext[];
+  /** True when any scan, file-size, line-size, context or result bound omitted evidence. */
   readonly truncated: boolean;
   readonly skippedFiles: number;
+}
+
+export interface FileSearchContext {
+  readonly path: string;
+  readonly startLine: number;
+  readonly endLine: number;
+  readonly text: string;
+  /** All requested nearby lines available, or a verified file edge; not semantic completeness. */
+  readonly complete: boolean;
 }
 
 /** A complete, bounded UTF-8 file, or an absent target. Never a truncated read. */

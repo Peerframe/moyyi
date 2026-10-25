@@ -10,6 +10,8 @@ import {
   type ModelStreamEvent,
   type Plugin,
   type RuntimeEvent,
+  type WorkspaceFiles,
+  type FileSearchContext,
   UNKNOWN_USAGE,
 } from "moyyi/contracts";
 
@@ -118,3 +120,11 @@ const lowReplay: RuntimeOptions = {
 // @ts-expect-error Unspecified provider aliases are not accepted reasoning efforts.
 const invalidEffort: RuntimeOptions = { deepseekReasoningEffort: "medium" };
 void [lowReplay, invalidEffort];
+
+async function sourceWindows(files: WorkspaceFiles): Promise<readonly FileSearchContext[] | undefined> {
+  const result = await files.search("src", "function", { contextLines: 8 });
+  // @ts-expect-error Context radius is numeric, never a textual query or authority flag.
+  await files.search("src", "function", { contextLines: "all" });
+  return result.context;
+}
+void sourceWindows;

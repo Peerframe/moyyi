@@ -28,7 +28,18 @@ reports truncation, and lists/searches report skipped entries. A bounded or skip
 not proof that no other match exists. `search.path` must be an existing directory. Patterns such
 as `foo|bar` remain literal text, not alternation or regular expressions.
 
-To follow a search hit into its surrounding implementation, use a bounded line range:
+Search also returns `context`: merged nearby source windows from the same guarded scan, with
+`path`, `startLine`, `endLine`, `text` and `complete`. The tool defaults to eight lines per side;
+`contextLines` accepts 0–20 (0 keeps navigation-only results). The lower-level workspace capability
+retains a default of 0 for callers that only need hits. Overlapping/adjacent windows in one file
+are merged; tests and documentation are not silently excluded or ranked as less authoritative.
+Window text retains its original delimiters. `complete` concerns the requested nearby lines or
+a verified file edge, not a complete function or a verified conclusion. Context has a 64 KiB
+aggregate text cap within the existing tool output limit. Whole-line clipping marks the window
+incomplete; a partial scan's unfinished last line is omitted. Further JSON clipping drops whole
+windows, then falls back to bounded hits if necessary, always marking truncation.
+
+To read beyond a search window and check the full consumer or lifecycle, use a bounded line range:
 
 ```json
 {"path":"src/example.ts","startLine":400,"maxLines":60}

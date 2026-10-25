@@ -23,6 +23,7 @@ interface Arguments {
   readonly query?: string;
   readonly maxMatches?: number;
   readonly caseSensitive?: boolean;
+  readonly contextLines?: number;
 }
 type Result =
   | FileRead
@@ -55,6 +56,7 @@ const schemas: Record<Operation, JsonSchema> = {
       query: { type: "string", minLength: 1, maxLength: 256 },
       maxMatches: { type: "integer", minimum: 1, maximum: 100 },
       caseSensitive: { type: "boolean" },
+      contextLines: { type: "integer", minimum: 0, maximum: 20 },
     },
     required: ["query"],
     additionalProperties: false,
@@ -64,7 +66,7 @@ const descriptions: Record<Operation, string> = {
   read: "Read workspace UTF-8; default prefix 16384 bytes, capped by output budget. For search hits use startLine/maxLines (1-based; defaults 1/200). Range mode needs a complete file <=1 MiB. lineRange.complete concerns the window; truncated means file content omitted. Protected/binary files fail.",
   list: "List bounded entries of a workspace-relative directory (default .). The host enforces protected paths; truncated means the listing is incomplete.",
   search:
-    "Search an existing directory (default .) for one literal string, case-sensitive by default; obey .gitignore. No regex/alternation. Results give paths/lines for read startLine/maxLines. truncated/skippedFiles cannot prove absence.",
+    "Literal search in a directory (default .), respecting .gitignore; no regex. Returns hits and merged nearby code (contextLines 0–20 per side, default 8). Complete windows may omit function bodies; use read for gaps. Truncation/skippedFiles cannot prove absence.",
 };
 
 export const fsPlugin: Plugin = {
@@ -116,6 +118,7 @@ function tool(operation: Operation): ToolDefinition {
           result = await context.files.search(args.path, args.query as string, {
             maxMatches: Math.max(1, Math.min(args.maxMatches ?? 20, Math.floor(budget / 512))),
             caseSensitive: args.caseSensitive ?? true,
+            contextLines: args.contextLines ?? 8,
           });
         }
         assertActive(context);
@@ -189,11 +192,21 @@ function argumentsFor(operation: Operation, value: unknown): Arguments {
   if (args.caseSensitive !== undefined && typeof args.caseSensitive !== "boolean")
     throw new Error("Invalid caseSensitive");
   const maxMatches = optionalLimit("maxMatches", 100);
+  const contextLines = args.contextLines;
+  if (
+    contextLines !== undefined &&
+    (typeof contextLines !== "number" ||
+      !Number.isSafeInteger(contextLines) ||
+      contextLines < 0 ||
+      contextLines > 20)
+  )
+    throw new Error("Invalid contextLines");
   return {
     path,
     query: args.query,
     caseSensitive: args.caseSensitive ?? true,
     ...(maxMatches === undefined ? {} : { maxMatches }),
+    ...(contextLines === undefined ? {} : { contextLines }),
   };
 }
 
@@ -223,6 +236,27 @@ function outcome(status: ToolOutcome["status"], result: Result, budget: number):
       ),
     };
   } else if ("matches" in result) {
+    // Keep whole source windows only. Serialized clipping must not retain false endpoints.
+    if (result.context) {
+      const withEmptyContext = { ...base, context: [] };
+      if (fits(withEmptyContext)) {
+        const count = largest(result.context.length, (length) =>
+          fits({ ...base, context: result.context?.slice(0, length) }),
+        );
+        return { status, content: content({ ...base, context: result.context.slice(0, count) }) };
+      }
+      // Preserve hit navigation under a small budget; no windows survive clipped matches.
+      return outcome(
+        status,
+        {
+          path: result.path,
+          matches: result.matches,
+          truncated: true,
+          skippedFiles: result.skippedFiles,
+        },
+        budget,
+      );
+    }
     const count = largest(result.matches.length, (length) =>
       fits({ ...base, matches: result.matches.slice(0, length) }),
     );

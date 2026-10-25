@@ -58,6 +58,64 @@ function setup(content: Record<string, string | Uint8Array> = {}) {
 }
 
 describe("runtime workspace file capability", () => {
+  it("returns merged search context from the same source while preserving exact legacy hits", async () => {
+    const text = "before\nexport function picked() {\n  return pickedValue;\n}\nafter\n";
+    const t = setup({ "source.ts": text });
+    const old = await t.files.search(".", "picked");
+    const result = await t.files.search(".", "picked", { contextLines: 1 });
+    expect(result.matches).toEqual(old.matches);
+    expect(old).not.toHaveProperty("context");
+    expect(result.context).toEqual([
+      {
+        path: "source.ts",
+        startLine: 1,
+        endLine: 4,
+        text: text.slice(0, text.indexOf("after")),
+        complete: true,
+      },
+    ]);
+    expect(result.truncated).toBe(false);
+  });
+  it("does not add context from ignored, protected, or linked files", async () => {
+    const t = setup({
+      "allowed.ts": "hit\nvisible\n",
+      "ignored.ts": "hit\nIGNORED\n",
+      ".gitignore": "ignored.ts\n",
+      ".env": "hit\nSECRET\n",
+      "private-store/data": "hit\nPRIVATE\n",
+    });
+    symlinkSync("allowed.ts", join(t.workspace, "alias.ts"));
+    const result = await t.files.search(".", "hit", { contextLines: 20 });
+    expect(result.context?.map((window) => window.path)).toEqual(["allowed.ts"]);
+    expect(JSON.stringify(result)).not.toMatch(/IGNORED|SECRET|PRIVATE/);
+  });
+  it("caps total context bytes without widening the scan or falsely marking completeness", async () => {
+    const line = `hit ${"x".repeat(1800)}\n`;
+    const t = setup({ "source.txt": line.repeat(100) });
+    const result = await t.files.search(".", "hit", { maxMatches: 100, contextLines: 20 });
+    expect(
+      result.context?.reduce((sum, window) => sum + Buffer.byteLength(window.text), 0),
+    ).toBeLessThanOrEqual(65536);
+    expect(result.context?.[0]?.complete).toBe(false);
+    expect(result.truncated).toBe(true);
+    expect(result.matches).toHaveLength(100);
+  });
+  it.each([-1, 21, 1.5, null, "2", NaN])(
+    "rejects invalid context radius %j before file access",
+    async (contextLines) => {
+      const t = setup();
+      await expect(t.files.search("missing", "hit", { contextLines } as never)).rejects.toThrow(
+        /context/,
+      );
+    },
+  );
+  it.each(["abort", "revoke"])("discards in-flight search context on %s", async (kind) => {
+    const t = setup({ "source.ts": "hit\nDO_NOT_RETURN\n" });
+    const pending = t.files.search(".", "hit", { contextLines: 20 });
+    if (kind === "abort") t.controller.abort();
+    else t.revoke();
+    await expect(pending).rejects.toThrow(/cancel|revoked/i);
+  });
   it("reads UTF-8 and lists real files/directories without returning protected names", async () => {
     const t = setup({
       "hello.txt": "hello world",

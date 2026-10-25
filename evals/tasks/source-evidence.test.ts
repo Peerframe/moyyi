@@ -66,6 +66,16 @@ describe("source evidence report checker near misses", () => {
     ["editBetweenRendersReturnsNewText", false, "claims every document edit fails"],
     ["editDuringReadRejects", false, "confuses between-call refresh with an in-read race"],
     ["missingSelectedDocumentRejects", false, "claims missing documents are silently omitted"],
+    [
+      "recreatedDashboardUsesChangedSelection",
+      false,
+      "claims that even recreating a captured-config dashboard cannot change selection",
+    ],
+    [
+      "dynamicOptionsMutationChangesSelection",
+      false,
+      "assumes the per-render configuration factory is also frozen at creation",
+    ],
   ] as const) {
     it(name, async () => {
       const result = await spoiled(sourceLifecycleReport, (workspace) =>
@@ -76,6 +86,47 @@ describe("source evidence report checker near misses", () => {
       expect(result.passed).toBe(false);
       expect(result.falseSuccess).toBe(true);
       expect(result.details).toContain(`${field} contradicts the source lifecycle`);
+    });
+  }
+
+  it("rejects omitting the dynamic configuration comparison", async () => {
+    const result = await spoiled(sourceLifecycleReport, (workspace) =>
+      changeReport(workspace, (report) => {
+        delete report.dynamicOptionsMutationChangesSelection;
+      }),
+    );
+    expect(result.passed).toBe(false);
+    expect(result.falseSuccess).toBe(true);
+    expect(result.details).toContain(
+      "dynamicOptionsMutationChangesSelection contradicts the source lifecycle",
+    );
+  });
+
+  for (const [name, path] of [
+    [
+      "omits the dynamic path's storage implementation",
+      ["src/dashboard.mjs#createDynamicDashboard"],
+    ],
+    [
+      "substitutes the captured factory for the dynamic one",
+      [
+        "src/dashboard.mjs#createDashboard",
+        "src/stable-read.mjs#readStable",
+        "src/store.mjs#createMemoryStore",
+      ],
+    ],
+  ] as const) {
+    it(name, async () => {
+      const result = await spoiled(sourceLifecycleReport, (workspace) =>
+        changeReport(workspace, (report) => {
+          report.dynamicCallPath = path;
+        }),
+      );
+      expect(result.passed).toBe(false);
+      expect(result.falseSuccess).toBe(true);
+      expect(result.details).toContain(
+        "dynamicCallPath must include the dynamic dashboard, reader and storage implementation",
+      );
     });
   }
 
@@ -181,6 +232,47 @@ describe("source report fixture semantics", () => {
       raceRejected: true,
       missingRejected: true,
       empty: "",
+    });
+  });
+
+  it("the dynamic factory follows later options while the original changes selection only when recreated", async () => {
+    const result = await runProbe(
+      `
+      import { join } from 'node:path';
+      import { pathToFileURL } from 'node:url';
+      const root = process.argv[1];
+      const { createDashboard, createDynamicDashboard } = await import(pathToFileURL(join(root, 'src/dashboard.mjs')));
+      const { createMemoryStore } = await import(pathToFileURL(join(root, 'src/store.mjs')));
+      const store = createMemoryStore({
+        'one/a.txt': 'original', 'one/b.txt': 'replaced array',
+        'two/a.txt': 'changed directory', 'two/b.txt': 'changed panel',
+      });
+      const options = {directory: 'one', panels: ['a']};
+      const captured = createDashboard(options, store);
+      const dynamic = createDynamicDashboard(options, store);
+      const initial = [await captured.render(), await dynamic.render()];
+      options.directory = 'two';
+      const changedDirectory = await dynamic.render();
+      options.panels[0] = 'b';
+      const changedPanel = await dynamic.render();
+      const capturedStillOriginal = await captured.render();
+      const recreated = await createDashboard(options, store).render();
+      store.replace('two/b.txt', 'fresh content');
+      const refreshed = await dynamic.render();
+      options.directory = 'one'; options.panels = ['b'];
+      const replacedArray = await dynamic.render();
+      console.log(JSON.stringify({initial, changedDirectory, changedPanel, capturedStillOriginal, recreated, refreshed, replacedArray}));
+    `,
+      [sourceLifecycleReport.fixtureDir],
+    );
+    expect(result).toEqual({
+      initial: ["original", "original"],
+      changedDirectory: "changed directory",
+      changedPanel: "changed panel",
+      capturedStillOriginal: "original",
+      recreated: "changed panel",
+      refreshed: "fresh content",
+      replacedArray: "replaced array",
     });
   });
 });

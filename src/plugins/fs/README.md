@@ -9,7 +9,7 @@ There is no direct-I/O fallback and no plugin configuration.
 |---|---|---|
 | `read` | Required workspace-relative `path`; optional `maxBytes` (1–65,536), `startLine` (1–1,000,000), `maxLines` (1–1,000) | `path`, UTF-8 `text`, `bytesRead`, `truncated`; range reads also have `lineRange` |
 | `list` | `path` defaults to `.`; optional `maxEntries` (1–200) | `path`, typed `entries`, `skippedEntries`, `truncated` |
-| `search` | Required single-line literal `query` (1–256 characters); existing directory `path` defaults to `.`; optional `maxMatches` (1–100), `caseSensitive` (default `true`) | `path`, `matches` with file/line/text, `skippedFiles`, `truncated` |
+| `search` | Required single-line literal `query` (1–256 characters); existing directory `path` defaults to `.`; optional `maxMatches` (1–100), `caseSensitive` (default `true`), `contextLines` (0–20 per side, default 8) | `path`, `matches` with file/line/text, optional merged `context` windows, `skippedFiles`, `truncated` |
 
 Paths cannot be absolute, contain parent traversal, backslashes or NUL. Requests contain no
 permission override, alternate workspace, ignore bypass, regex or process flag. The host also
@@ -27,6 +27,16 @@ serialized output budget can reduce them further. Defaults request at most 16 Ki
 responses keep valid JSON, shorten their text/results and set `truncated: true`. A very small
 budget can return only `{"truncated":true}`. A truncated or partially skipped search is not
 proof that the rest of the workspace contains no matches. Failures remain failed outcomes.
+
+Search context uses the same scanned file version as its hits. Each window has `path`, 1-based
+`startLine`/`endLine`, exact `text`, and `complete`. Overlapping/adjacent windows merge, without
+semantic ranking or automatic exclusion of tests. Runtime caps combined context text at 64 KiB;
+the existing output budget may reduce it further. Context is clipped on whole lines; incomplete
+scan tails are never presented as complete lines. `complete` means nearby lines were returned,
+not that a whole function or dataflow was verified. Output serialization drops whole windows
+instead of retaining false endpoints. Omitted context sets `truncated`; use `read` to inspect gaps.
+`contextLines: 0` disables windows and preserves hit-only navigation. The capability's default
+remains 0; the model-facing tool explicitly selects 8. See [ADR 0024](../../../docs/decisions/0024-search-source-context.md).
 
 Without line arguments, `read` retains its prefix behavior. Supplying either `startLine` or
 `maxLines` selects a range, defaulting the missing option to line 1 or 200 lines. For example,

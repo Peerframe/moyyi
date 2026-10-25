@@ -23,6 +23,12 @@ separate private diagnostic: raw payload versus reconstructed data, authority ve
 and captured configuration versus refresh and read races. They use synthetic code and hidden
 structured-report checkers, including opposite data-retention cases. Offline reference and
 near-miss checks validate the tasks; real-model performance on these two tasks is unmeasured.
+The lifecycle fixture also includes a separate factory that reads configuration on each render,
+and asks whether calling the original factory again adopts changed options. Its checker retains all
+original requirements and adds these opposite cases, so a blanket claim that configuration is
+always frozen cannot pass. Executed fixture probes validate the expected semantics; these and
+the report-checker near misses remain offline test evidence, not successful model runs or proof
+that an agent actually retrieved the cited source.
 
 What the owner asked for most:
 

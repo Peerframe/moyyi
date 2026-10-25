@@ -7,11 +7,13 @@ import type {
   FileRead,
   FileReadOptions,
   FileSearch,
+  FileSearchContext,
   ToolContext,
   WorkspaceFiles,
   WorkspaceFilesFactory,
 } from "../contracts/index.ts";
 import { assertUnprotected } from "./preconditions.ts";
+import { searchContext } from "./search-context.ts";
 
 const MAX_FILE_BYTES = 1024 * 1024;
 const MAX_SCAN_BYTES = 16 * 1024 * 1024;
@@ -20,6 +22,7 @@ const MAX_DEPTH = 32;
 const MAX_IGNORE_BYTES = 16 * 1024;
 const MAX_ALL_IGNORE_BYTES = 64 * 1024;
 const MAX_LINE_CHARS = 2_000;
+const MAX_SEARCH_CONTEXT_BYTES = 64 * 1024;
 const classes = new Set(
   "alnum alpha blank cntrl digit graph lower print punct space upper xdigit".split(" "),
 );
@@ -86,8 +89,15 @@ export class NodeWorkspaceFiles implements WorkspaceFilesFactory {
       search: (
         path: string,
         query: string,
-        options?: { maxMatches?: number; caseSensitive?: boolean },
-      ) => scope.search(path, query, options?.maxMatches, options?.caseSensitive),
+        options?: { maxMatches?: number; caseSensitive?: boolean; contextLines?: number },
+      ) =>
+        scope.search(
+          path,
+          query,
+          options?.maxMatches,
+          options?.caseSensitive,
+          options?.contextLines,
+        ),
     });
   }
 }
@@ -410,9 +420,17 @@ class ReadScope {
     }
   }
 
-  search(path: string, query: string, maximum?: number, caseSensitive = true): Promise<FileSearch> {
+  search(
+    path: string,
+    query: string,
+    maximum?: number,
+    caseSensitive = true,
+    contextLines = 0,
+  ): Promise<FileSearch> {
     return this.operation(async (root) => {
       const cap = bounded(maximum, 50, 200);
+      if (!Number.isSafeInteger(contextLines) || contextLines < 0 || contextLines > 20)
+        throw new FileAccessError("denied", "Search context must be 0 to 20 lines per side");
       if (
         typeof query !== "string" ||
         !query.length ||
@@ -428,6 +446,8 @@ class ReadScope {
       if (!start.stat.isDirectory())
         throw new FileAccessError("denied", "Search requires a directory");
       const matches: { path: string; line: number; text: string }[] = [];
+      const context: FileSearchContext[] = [];
+      let contextBytes = 0;
       let visited = 0,
         scanned = 0,
         ignoreBytes = 0,
@@ -534,6 +554,7 @@ class ReadScope {
               const read = await this.readFile(root, path, bytes);
               truncated ||= read.truncated;
               const lines = read.text.split("\n");
+              const hits: number[] = [];
               for (let index = 0; index < lines.length; index++) {
                 const line = lines[index] as string;
                 if ((caseSensitive ? line : line.toLowerCase()).includes(needle)) {
@@ -543,11 +564,23 @@ class ReadScope {
                     line: index + 1,
                     text: line.slice(0, MAX_LINE_CHARS).toWellFormed(),
                   });
+                  hits.push(index + 1);
                   if (matches.length >= cap) {
                     truncated = true;
                     break;
                   }
                 }
+              }
+              if (contextLines > 0 && hits.length) {
+                const windows = searchContext(
+                  read,
+                  hits,
+                  contextLines,
+                  MAX_SEARCH_CONTEXT_BYTES - contextBytes,
+                );
+                context.push(...windows.context);
+                contextBytes += windows.bytes;
+                truncated ||= windows.truncated;
               }
             } catch (error) {
               this.guard();
@@ -564,7 +597,13 @@ class ReadScope {
         });
       };
       await walk(start, inherited, 0);
-      return { path: start.relative, matches, truncated, skippedFiles };
+      return {
+        path: start.relative,
+        matches,
+        truncated,
+        skippedFiles,
+        ...(contextLines ? { context } : {}),
+      };
     });
   }
 }

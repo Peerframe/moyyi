@@ -227,11 +227,64 @@ describe("fs plugin", () => {
     expect(files.search).toHaveBeenCalledExactlyOnceWith(".", "a.*b", {
       maxMatches: 4,
       caseSensitive: false,
+      contextLines: 8,
     });
     await expect(tool.prepare({ query: "text", regex: true }, ctx)).rejects.toThrow("Unsupported");
     await expect(tool.prepare({ query: "text", respectIgnore: false }, ctx)).rejects.toThrow(
       "Unsupported",
     );
+  });
+  it.each([0, 20])(
+    "forwards explicit search context %i without additional reads",
+    async (contextLines) => {
+      const files = capability(),
+        ctx = context(files),
+        tool = await selected("search");
+      await tool.execute(await tool.prepare({ query: "hit", contextLines }, ctx), ctx);
+      expect(files.search).toHaveBeenCalledExactlyOnceWith(".", "hit", {
+        maxMatches: 16,
+        caseSensitive: true,
+        contextLines,
+      });
+      expect(files.read).not.toHaveBeenCalled();
+    },
+  );
+  it.each([-1, 21, 1.5, null, "8"])("rejects invalid tool context %j", async (contextLines) => {
+    const files = capability();
+    await expect(
+      (await selected("search")).prepare({ query: "hit", contextLines }, context(files)),
+    ).rejects.toThrow(/contextLines/);
+    expect(files.search).not.toHaveBeenCalled();
+  });
+  it("drops whole search windows on output clipping without false range endpoints", async () => {
+    const files = capability(),
+      ctx = context(files, undefined, 512),
+      tool = await selected("search");
+    const first = { path: "file", startLine: 1, endLine: 2, text: "hit\nsecond\n", complete: true };
+    files.search.mockResolvedValue({
+      path: ".",
+      matches: [
+        { path: "file", line: 1, text: "hit" },
+        { path: "file", line: 20, text: "hit" },
+      ],
+      context: [
+        first,
+        {
+          path: "file",
+          startLine: 20,
+          endLine: 20,
+          text: `hit${"x".repeat(1000)}`,
+          complete: true,
+        },
+      ],
+      truncated: false,
+      skippedFiles: 0,
+    });
+    const result = await tool.execute(await tool.prepare({ query: "hit" }, ctx), ctx);
+    expect(body(result).context).toEqual([first]);
+    expect(body(result).matches).toHaveLength(2);
+    expect(body(result).truncated).toBe(true);
+    expect(Buffer.byteLength(JSON.stringify(result.content))).toBeLessThanOrEqual(512);
   });
   it.each(["read", "list", "search"])(
     "%s fails explicitly without a file capability",
