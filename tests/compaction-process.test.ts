@@ -78,7 +78,15 @@ it.each(["before", "after"])(
     await closed;
     expect(child.signalCode).toBe("SIGKILL");
     const baseline = JSON.parse(readFileSync(baselineFile, "utf8")) as SessionSnapshot;
-    expect(baseline.entries).toHaveLength(8);
+    expect(baseline.entries).toHaveLength(12);
+    expect(baseline.entries.map((entry) => entry.body.kind)).toEqual(
+      Array.from({ length: 4 }, () => ["user_message", "notice", "assistant_message"]).flat(),
+    );
+    expect(
+      baseline.entries.filter(
+        (entry) => entry.body.kind === "notice" && entry.body.code === "model_request_budget",
+      ),
+    ).toHaveLength(4);
     expect(baseline.runs).toHaveLength(4);
     const store = new SqliteSessionStore(directory);
     stores.push(store);
@@ -114,7 +122,7 @@ it.each(["before", "after"])(
       for (const ref of refs) expect(await store.getBlob(ref)).not.toBeNull();
       expect(compacted.body.replaces).toEqual({
         fromEntryId: baseline.entries[0]?.id,
-        toEntryId: baseline.entries[3]?.id,
+        toEntryId: baseline.entries[5]?.id,
       });
     }
     const provider = scriptedProvider([]);

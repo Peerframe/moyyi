@@ -138,6 +138,14 @@ One request per call. Every stream ends with exactly one terminal event (`comple
 exception is a programming error. Every provider runs its recorded fixtures through
 `checkModelStream`.
 
+[ADR 0021](decisions/0021-request-budget-closeout.md) reserves the final permitted conversation
+request for an answer without increasing the request quota. Core records a countdown notice for
+each attempt and sets optional `ModelRequest.toolChoice: "none"` on the last one, retaining tool
+definitions and history. Providers disable new calls and core independently refuses any violating
+call before preparation/execution. An absent, truncated or tool-only final answer is not completed.
+Budget notices extend the current user turn in context; they do not rewrite the system or old
+prefixes. The exact request, including tool choice, is recorded without a persisted schema change.
+
 The DeepSeek adapter accepts a documented text/reasoning/function subset and delegates fixed-origin
 HTTP and credentials to runtime. Context includes the persisted assistant stop reason in the
 nonpersisted model port, so partial responses cannot masquerade as complete history. All actual

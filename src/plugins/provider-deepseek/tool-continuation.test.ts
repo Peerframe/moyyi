@@ -141,6 +141,53 @@ function expectError(events: ModelStreamEvent[], kind = "protocol"): void {
 }
 
 describe("DeepSeek commentary and complete tool history", () => {
+  it("disables new tool calls while preserving full tool history for a closing answer", async () => {
+    const completed = parts(await decode(toolTurn(true)));
+    const previous = history(completed);
+    const result = previous.at(-1);
+    if (!result) throw Error("No tool result");
+    const closing: ModelRequest = {
+      ...request([
+        ...previous.slice(0, -1),
+        {
+          ...result,
+          content: [
+            ...result.content,
+            { type: "text", text: "Runtime budget: final request; report verified findings now." },
+          ],
+        },
+      ]),
+      toolChoice: "none",
+    };
+    const built = buildDeepSeekRequest(closing);
+    expect(built.tool_choice).toBe("none");
+    expect(built.tools).toEqual(buildDeepSeekRequest(request()).tools);
+    const input = built.input as WireEvent[];
+    expect(input.filter((item) => item.type === "function_call")).toHaveLength(2);
+    expect(input.filter((item) => item.type === "function_call_output")).toHaveLength(2);
+    expect(input.filter((item) => item.type === "reasoning")).toEqual([
+      { type: "reasoning", content: [{ type: "reasoning_text", text: reasoning }] },
+    ]);
+    expect(input.at(-1)).toMatchObject({
+      type: "message",
+      role: "user",
+      content: [
+        {
+          type: "input_text",
+          text: "Runtime budget: final request; report verified findings now.",
+        },
+      ],
+    });
+    const { transport } = source(
+      deepSeekFixture([{ type: "message", text: "Verified findings." }]),
+    );
+    const response = await collect(
+      createDeepSeekClient(transport).stream(closing, new AbortController().signal),
+    );
+    expect(response.at(-1)).toMatchObject({ type: "completed", stopReason: "end_turn" });
+    expect(transport).toHaveBeenCalledTimes(1);
+    expect(JSON.parse(transport.mock.calls[0]?.[0] ?? "null")).toEqual(built);
+  });
   it.each([false, true])(
     "round-trips commentary and tool results with reasoning=%s",
     async (hasReasoning) => {

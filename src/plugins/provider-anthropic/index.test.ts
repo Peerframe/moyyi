@@ -71,6 +71,15 @@ function toolResult(message: ModelMessage): ModelMessage {
 }
 
 describe("Anthropic Messages provider", () => {
+  it("encodes an explicit no-tools control and leaves absent controls unchanged", () => {
+    const input = request();
+    const ordinary = buildAnthropicRequest(input, options);
+    expect(ordinary.body).not.toHaveProperty("tool_choice");
+    const closing = buildAnthropicRequest({ ...input, toolChoice: "none" }, options);
+    expect(closing.body).toEqual({ ...ordinary.body, tool_choice: { type: "none" } });
+    expect(closing.prefixHash).toBe(ordinary.prefixHash);
+    expect(input).not.toHaveProperty("toolChoice");
+  });
   it("streams text, summarized/redacted reasoning and honest cumulative usage", async () => {
     const events = await collect(
       anthropicFixture([
@@ -156,6 +165,80 @@ describe("Anthropic Messages provider", () => {
     );
     expect(JSON.stringify(third.body).match(/synthetic-signature/g)).toHaveLength(2);
     expect(third.invalidated).toEqual([]);
+  });
+  it("preserves signed tool history when the last attempt adds budget text and disables tools", async () => {
+    const initial = request([
+      {
+        role: "user",
+        content: [
+          { type: "text", text: "Read the fixture" },
+          { type: "text", text: "Runtime budget: 3 requests remain, including this request." },
+        ],
+      },
+    ]);
+    const first = assistant(
+      await collect(
+        anthropicFixture(
+          [
+            thought,
+            { type: "tool_use", id: "budget_1", name: "read", rawArguments: '{"path":"a.txt"}' },
+          ],
+          { responseId: "budget_first" },
+        ),
+        initial,
+      ),
+    );
+    const firstResult = toolResult(first);
+    const secondRequest = request([
+      ...initial.messages,
+      first,
+      {
+        ...firstResult,
+        content: [
+          ...firstResult.content,
+          { type: "text", text: "Runtime budget: 2 requests remain, including this request." },
+        ],
+      },
+    ]);
+    const second = assistant(
+      await collect(
+        anthropicFixture(
+          [
+            { ...thought, signature: "synthetic-second-signature" },
+            { type: "tool_use", id: "budget_2", name: "read", rawArguments: '{"path":"b.txt"}' },
+          ],
+          { responseId: "budget_second" },
+        ),
+        secondRequest,
+      ),
+    );
+    const secondResult = toolResult(second);
+    const finalRequest: ModelRequest = {
+      ...request([
+        ...secondRequest.messages,
+        second,
+        {
+          ...secondResult,
+          content: [
+            ...secondResult.content,
+            { type: "text", text: "Runtime budget: final request; answer with verified findings." },
+          ],
+        },
+      ]),
+      toolChoice: "none",
+    };
+    const closing = buildAnthropicRequest(finalRequest, options);
+    expect(closing.invalidated).toEqual([]);
+    expect(closing.body.tools).toEqual(buildAnthropicRequest(initial, options).body.tools);
+    expect(closing.body.tool_choice).toEqual({ type: "none" });
+    const wire = JSON.stringify(closing.body);
+    expect(wire).toContain(thought.signature);
+    expect(wire).toContain("synthetic-second-signature");
+    expect(wire).toContain('"tool_use_id":"budget_1"');
+    expect(wire).toContain('"tool_use_id":"budget_2"');
+    expect(wire).toContain("final request; answer with verified findings");
+    const response = await collect(anthropicFixture([textBlock]), finalRequest);
+    expect(response.at(-1)).toMatchObject({ type: "completed", stopReason: "end_turn" });
   });
   it("strips stale reasoning after compaction, but preserves fresh subsequent reasoning", async () => {
     const first = assistant(
@@ -518,6 +601,20 @@ describe("Anthropic Messages provider", () => {
     ).toMatchObject({ type: "error", error: { kind: "invalid_request" } });
     expect(transport).not.toHaveBeenCalled();
   });
+  it.each([null, "auto", "required", false, { type: "none" }])(
+    "rejects unsupported common tool choice %j before transport",
+    async (toolChoice) => {
+      const transport = vi.fn<AnthropicTransport>();
+      const events = await all(
+        createAnthropicClient(transport, options).stream(
+          { ...request(), toolChoice } as unknown as ModelRequest,
+          new AbortController().signal,
+        ),
+      );
+      expect(events).toMatchObject([{ type: "error", error: { kind: "invalid_request" } }]);
+      expect(transport).not.toHaveBeenCalled();
+    },
+  );
   it("registers only the pinned model and rejects plugin wire configuration", () => {
     const register = vi.fn();
     const plugin = createAnthropicPlugin(vi.fn(), options);

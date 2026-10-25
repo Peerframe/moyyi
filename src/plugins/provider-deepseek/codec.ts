@@ -31,7 +31,7 @@ type ObjectValue = Record<string, unknown>;
 /** Render only the documented text/function subset. Replay payloads have no authority here. */
 export function buildDeepSeekRequest(request: ModelRequest): Record<string, unknown> {
   const value = JSON.parse(canonicalizeJson(request)) as ModelRequest;
-  keys(object(value), ["origin", "system", "messages", "tools", "maxOutputTokens"]);
+  keys(object(value), ["origin", "system", "messages", "tools", "maxOutputTokens", "toolChoice"]);
   keys(object(value.origin), ["provider", "model"]);
   requireCondition(
     value.origin.provider === "deepseek" && value.origin.model === "deepseek-flash",
@@ -42,6 +42,10 @@ export function buildDeepSeekRequest(request: ModelRequest): Record<string, unkn
       value.maxOutputTokens > 0 &&
       value.maxOutputTokens <= deepSeekProfile.maxOutputTokens,
     "Invalid output token limit",
+  );
+  requireCondition(
+    value.toolChoice === undefined || value.toolChoice === "none",
+    "Unsupported tool choice",
   );
   const instructions = value.system.map((part) => textPart(part)).join("\n\n");
   const names = new Set<string>();
@@ -168,6 +172,7 @@ export function buildDeepSeekRequest(request: ModelRequest): Record<string, unkn
     ...(instructions ? { instructions } : {}),
     input,
     ...(tools.length ? { tools, tool_choice: "auto" } : {}),
+    ...(value.toolChoice === "none" ? { tool_choice: "none" } : {}),
   };
   requireCondition(
     encoder.encode(canonicalizeJson(body)).byteLength <= MAX_BYTES,

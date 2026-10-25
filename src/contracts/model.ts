@@ -14,6 +14,8 @@ export interface ModelRequest {
   readonly system: readonly ContentPart[];
   readonly messages: readonly ModelMessage[];
   readonly tools: readonly ToolSpec[];
+  /** Disable new tool calls while retaining definitions needed by prior tool history. */
+  readonly toolChoice?: "none";
   readonly maxOutputTokens: number;
 }
 

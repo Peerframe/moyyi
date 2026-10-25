@@ -109,6 +109,16 @@ describe("DeepSeek provider", () => {
     ).toMatchObject([{ type: "error", error: { kind: "invalid_request" } }]);
     expect(transport).not.toHaveBeenCalled();
   });
+  it.each([null, "auto", "required", false, { type: "none" }])(
+    "rejects unsupported common tool choice %j before transport",
+    async (toolChoice) => {
+      const { transport } = wire("");
+      expect(
+        await collect(transport, { ...request, toolChoice } as unknown as ModelRequest),
+      ).toMatchObject([{ type: "error", error: { kind: "invalid_request" } }]);
+      expect(transport).not.toHaveBeenCalled();
+    },
+  );
   it("cancels before transport", async () => {
     const controller = new AbortController();
     controller.abort();

@@ -168,7 +168,23 @@ function render(input: ContextInput, projection: readonly ProjectedEntry[]): Mod
       .filter((section) => section.stability === stability)
       .flatMap((section) => section.content),
   );
-  const messages = projection.map(({ entry }) => renderEntry(entry));
+  const messages: ModelMessage[] = [];
+  for (const { entry } of projection) {
+    const message = renderEntry(entry);
+    const previous = messages.at(-1);
+    // Budget notices extend the same user turn without changing any earlier request prefix.
+    // Other adjacent user messages still carry interruption/replay barriers for adapters.
+    if (
+      entry.body.kind === "notice" &&
+      entry.body.code === "model_request_budget" &&
+      previous?.role === "user"
+    ) {
+      messages[messages.length - 1] = {
+        ...previous,
+        content: [...previous.content, ...message.content],
+      };
+    } else messages.push(message);
+  }
   if (input.unsettledEffects.length)
     messages.push({
       role: "user",
@@ -188,6 +204,7 @@ function render(input: ContextInput, projection: readonly ProjectedEntry[]): Mod
     system,
     messages,
     tools: [...input.tools].sort((a, b) => (a.name < b.name ? -1 : a.name > b.name ? 1 : 0)),
+    ...(input.toolChoice === undefined ? {} : { toolChoice: input.toolChoice }),
     maxOutputTokens: input.profile.maxOutputTokens,
   };
 }

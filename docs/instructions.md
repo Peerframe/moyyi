@@ -4,6 +4,13 @@ moyyi supplies a small default working prompt: inspect relevant evidence, carry 
 work, preserve unrelated changes, verify the result, and report what actually happened. It uses
 the user's language and does not treat a tool description or a document as permission.
 
+The runtime also adds a recorded request-budget notice on each attempt. It states the remaining
+requests including the current one and reserves the last for an answer based on existing evidence.
+That final request disables new tool calls; it must distinguish verified findings from unfinished
+work. The quota is unchanged and retries consume it too. A one-request budget permits no new tool
+work. This execution boundary does not guarantee a correct answer; time/cancellation/context limits
+can still stop the run. See [closeout details](core.md) and [ADR 0021](decisions/0021-request-budget-closeout.md).
+
 Place project guidance in **`AGENTS.md` at the selected workspace root**. For example:
 
 ```markdown

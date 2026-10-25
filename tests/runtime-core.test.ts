@@ -636,16 +636,159 @@ describe("runtime core with real SQLite persistence", () => {
     expect((await test.snapshot()).runs[0]?.status).toBe("interrupted");
   });
 
-  it("stops at the model request budget after pairing the completed tool action", async () => {
-    const test = await harness([toolTurn(call()), finalTurn()], undefined, {
+  it("pairs but never executes a tool requested during the reserved final attempt", async () => {
+    const selected = syntheticTool();
+    const test = await harness([toolTurn(call()), finalTurn()], [selected], {
       limits: { maxModelRequests: 1 },
     });
     await test.start();
     expect(await test.finish()).toEqual({ kind: "budget_exhausted", budget: "model_requests" });
     expect(test.client.requests).toHaveLength(1);
     const snapshot = await test.snapshot();
-    expect(results(snapshot)[0]?.status).toBe("succeeded");
+    expect(results(snapshot)[0]?.status).toBe("denied");
+    expect(selected.prepare).not.toHaveBeenCalled();
+    expect(selected.execute).not.toHaveBeenCalled();
+    expect(snapshot.effects).toHaveLength(0);
+    expect(test.client.requests[0]?.toolChoice).toBe("none");
+    expect(test.events.some((event) => event.type === "approval.requested")).toBe(false);
     expect(snapshot.runs[0]?.status).toBe("interrupted");
+  });
+
+  it("counts down, preserves evidence and records the reserved final request exactly", async () => {
+    const selected = syntheticTool();
+    const test = await harness(
+      [
+        toolTurn(call("first")),
+        toolTurn(call("second")),
+        finalTurn("Verified two reads; no tests run."),
+      ],
+      [selected],
+      { limits: { maxModelRequests: 3 } },
+    );
+    await test.start();
+    expect(await test.finish()).toEqual({ kind: "completed" });
+    expect(test.client.requests).toHaveLength(3);
+    expect(selected.execute).toHaveBeenCalledTimes(2);
+    const snapshot = await test.snapshot();
+    const notices = snapshot.entries.filter(
+      (entry) => entry.body.kind === "notice" && entry.body.code === "model_request_budget",
+    );
+    expect(notices).toHaveLength(3);
+    for (const [index, request] of test.client.requests.entries()) {
+      expect(JSON.stringify(request.messages.at(-1))).toContain(
+        `attempt ${index + 1} of 3; ${3 - index} request(s) remaining including this one`,
+      );
+      expect(request.toolChoice).toBe(index === 2 ? "none" : undefined);
+      expect(request.tools.some((tool) => tool.name === "inspect")).toBe(true);
+      expect(request.system).toEqual(test.client.requests[0]?.system);
+    }
+    expect(JSON.stringify(test.client.requests[2]?.messages)).toContain("Synthetic file contents");
+    const final = snapshot.entries.findLast((entry) => entry.body.kind === "assistant_message");
+    if (final?.body.kind !== "assistant_message") throw Error("Missing final answer");
+    const recorded = await test.store.getBlob(final.body.request.system);
+    if (!recorded) throw Error("Missing final request blob");
+    expect(final.body.request.rendererVersion).toBe("moyyi-core-v2");
+    expect(JSON.parse(new TextDecoder().decode(recorded))).toEqual({
+      origin: test.client.requests[2]?.origin,
+      maxOutputTokens: test.client.requests[2]?.maxOutputTokens,
+      content: test.client.requests[2]?.system,
+      toolChoice: "none",
+    });
+  });
+
+  it("can answer with a one-request budget without granting a tool opportunity", async () => {
+    const test = await harness(
+      [finalTurn("Not enough evidence to verify this claim.")],
+      undefined,
+      {
+        limits: { maxModelRequests: 1 },
+      },
+    );
+    await test.start();
+    expect(await test.finish()).toEqual({ kind: "completed" });
+    expect(test.client.requests).toHaveLength(1);
+    expect(test.client.requests[0]?.toolChoice).toBe("none");
+    expect(JSON.stringify(test.client.requests[0]?.messages)).toContain("what remains");
+    expect((await test.snapshot()).effects).toHaveLength(0);
+  });
+
+  it.each([
+    { label: "empty", text: "", stopReason: "end_turn" as const },
+    { label: "whitespace", text: "  ", stopReason: "end_turn" as const },
+    { label: "truncated", text: "Unfinished answer", stopReason: "max_tokens" as const },
+    { label: "unknown stop", text: "Unproven answer", stopReason: "other" as const },
+  ])("does not report a $label final response as completed", async ({ text, stopReason }) => {
+    const test = await harness(
+      [
+        [
+          { type: "part_completed", index: 0, part: { type: "text", text } },
+          { ...done, stopReason },
+        ],
+      ],
+      undefined,
+      { limits: { maxModelRequests: 1 } },
+    );
+    await test.start();
+    expect(await test.finish()).toEqual({ kind: "budget_exhausted", budget: "model_requests" });
+    expect(test.client.requests).toHaveLength(1);
+  });
+
+  it("accepts an explicit final refusal without manufacturing task success evidence", async () => {
+    const test = await harness(
+      [
+        [
+          {
+            type: "part_completed",
+            index: 0,
+            part: { type: "refusal", text: "I cannot verify that." },
+          },
+          { ...done, stopReason: "refusal" },
+        ],
+      ],
+      undefined,
+      { limits: { maxModelRequests: 1 } },
+    );
+    await test.start();
+    expect(await test.finish()).toEqual({ kind: "completed" });
+    expect((await test.snapshot()).effects).toHaveLength(0);
+  });
+
+  it("counts a transient failure before closeout and never retries a final failure", async () => {
+    const failure: ModelStreamEvent = {
+      type: "error",
+      error: {
+        kind: "network",
+        message: "Unavailable",
+        partialOutput: false,
+        usage: UNKNOWN_USAGE,
+      },
+    };
+    const test = await harness([[failure], [failure], finalTurn("Never requested")], undefined, {
+      limits: { maxModelRequests: 2, maxRetries: 5 },
+    });
+    await test.start();
+    expect(await test.finish()).toEqual({ kind: "failed", reason: "Unavailable" });
+    expect(test.client.requests).toHaveLength(2);
+    expect(test.client.requests[1]?.toolChoice).toBe("none");
+    expect(JSON.stringify(test.client.requests[1]?.messages.at(-1))).toContain(
+      "attempt 2 of 2; 1 request(s)",
+    );
+    expect(test.scheduler.sleep).toHaveBeenCalledTimes(1);
+    expect(test.client.remaining).toBe(1);
+  });
+
+  it("honors cancellation during the final request without a replacement answer request", async () => {
+    const test = await harness([finalTurn(), finalTurn("Never requested")], undefined, {
+      limits: { maxModelRequests: 1 },
+    });
+    test.runtime.subscribe((event) => {
+      if (event.type === "assistant.delta")
+        void test.runtime.send({ type: "run.cancel", runId: event.runId });
+    });
+    await test.start();
+    expect(await test.finish()).toEqual({ kind: "cancelled" });
+    expect(test.client.requests).toHaveLength(1);
+    expect((await test.snapshot()).effects).toHaveLength(0);
   });
 
   it("expires its time budget during execution using an injected deterministic deadline", async () => {

@@ -525,7 +525,13 @@ export function parseModelRecording(value: unknown): ModelRecording {
 
 function assertRequest(value: unknown): asserts value is ModelRequest {
   canonicalizeJson(value);
-  const request = shape(value, ["origin", "system", "messages", "tools", "maxOutputTokens"]);
+  const request = shape(
+    value,
+    ["origin", "system", "messages", "tools", "maxOutputTokens"],
+    ["toolChoice"],
+  );
+  if (request.toolChoice !== undefined && request.toolChoice !== "none")
+    throw Error("Invalid recorded tool choice");
   const origin = shape(request.origin, ["provider", "model"]);
   nonempty(origin.provider);
   nonempty(origin.model);

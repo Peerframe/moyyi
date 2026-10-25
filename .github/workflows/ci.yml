@@ -37,6 +37,9 @@ jobs:
       - name: Check
         run: npm run check
 
+      - name: Core budget and execution conformance
+        run: npm run eval:core
+
       - name: DeepSeek offline conformance
         run: npm run eval:deepseek
 

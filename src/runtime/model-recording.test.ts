@@ -194,7 +194,7 @@ describe("ModelClient recording and deterministic replay", () => {
     ).toEqual([terminal]);
   });
 
-  it.each(["system", "messages", "tools", "maxOutputTokens", "model", "provider"])(
+  it.each(["system", "messages", "tools", "maxOutputTokens", "model", "provider", "toolChoice"])(
     "rejects a changed %s without consuming an exchange",
     async (field) => {
       const record = await recorded();
@@ -204,11 +204,13 @@ describe("ModelClient recording and deterministic replay", () => {
         messages: unknown[];
         tools: unknown[];
         maxOutputTokens: number;
+        toolChoice?: "none";
       };
       if (field === "model" || field === "provider") changed.origin[field] += "-changed";
       else if (field === "maxOutputTokens") changed.maxOutputTokens++;
       else if (field === "system") changed.system = [];
       else if (field === "messages") changed.messages = [];
+      else if (field === "toolChoice") changed.toolChoice = "none";
       else changed.tools = [];
       const replay = new ReplayModelClient([record], { apiProfile: options.apiProfile });
       expectError(await collect(replay, changed as ModelRequest), "invalid_request", false);
@@ -216,6 +218,25 @@ describe("ModelClient recording and deterministic replay", () => {
       expect(await collect(replay)).toEqual(events);
     },
   );
+
+  it("records the optional final tool choice exactly and rejects invalid choices", async () => {
+    const input: ModelRequest = { ...request, toolChoice: "none" };
+    const sink = new MemoryRecordingSink();
+    await collect(new RecordingModelClient(fake(), sink, options), input);
+    expect(sink.records[0]?.request.toolChoice).toBe("none");
+    const replay = new ReplayModelClient(sink.records, { apiProfile: options.apiProfile });
+    expectError(await collect(replay, request), "invalid_request", false);
+    expect(replay.remaining).toBe(1);
+    expect(await collect(replay, input)).toEqual(events);
+    const invalid = { ...input, toolChoice: "auto" } as unknown as ModelRequest;
+    const source = fake();
+    expectError(
+      await collect(new RecordingModelClient(source, new MemoryRecordingSink(), options), invalid),
+      "invalid_request",
+      false,
+    );
+    expect(source.stream).not.toHaveBeenCalled();
+  });
 
   it("matches canonical object order while preserving message order", async () => {
     const record = await recorded();

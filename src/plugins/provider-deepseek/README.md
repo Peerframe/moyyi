@@ -11,6 +11,11 @@ a complete response need not generate reasoning. Unsupported
 content/options fail before HTTP. Opaque replay data is unused; valid common content is sufficient.
 The local output cap is 8,192 tokens. Model alias resolution remains controlled by the service.
 
+The optional common `toolChoice: "none"` control sends `tool_choice: "none"` while preserving
+tool definitions and complete tool-call/result history. Absence retains the previous wire shape;
+other values fail before HTTP. Core enforces the final-attempt execution boundary independently
+of the provider response. See the official [Responses controls](https://api-docs.deepseek.com/api/create-response/).
+
 Reasoning output can carry an auxiliary `encrypted_content` string alongside visible text. It is
 validated (at most 64 KiB UTF-8), then discarded: it is neither decrypted nor recorded/replayed or
 sent in a subsequent request. It may change or disappear across lifecycle events. An item that

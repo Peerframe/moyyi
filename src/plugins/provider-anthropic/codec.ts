@@ -157,6 +157,10 @@ export function buildAnthropicRequest(
       value.maxOutputTokens <= anthropicProfile.maxOutputTokens,
     "Invalid output budget",
   );
+  requireValue(
+    value.toolChoice === undefined || value.toolChoice === "none",
+    "Unsupported tool choice",
+  );
   requireValue(value.messages.length <= 4096 && value.tools.length <= 128, "Request item limit");
   const system = value.system.map((part) => {
     requireValue(part.type === "text", "Only text system content is supported");
@@ -275,6 +279,7 @@ export function buildAnthropicRequest(
     model: anthropicProfile.origin.model,
     system,
     tools,
+    ...(value.toolChoice === "none" ? { tool_choice: { type: "none" } } : {}),
     messages,
     max_tokens: value.maxOutputTokens,
     thinking: { type: "adaptive" },

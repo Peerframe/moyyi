@@ -92,6 +92,8 @@ export interface ContextInput {
   readonly path: readonly TranscriptEntry[];
   readonly profile: ModelProfile;
   readonly tools: readonly ToolSpec[];
+  /** A final-answer request retains tool history but forbids new tool calls. */
+  readonly toolChoice?: "none";
   /** Collected from plugin context sources before building. */
   readonly sections: readonly ContextSection[];
   /** Effects the model must be told about regardless of compaction. */

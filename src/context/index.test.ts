@@ -33,6 +33,64 @@ const input = (change: Partial<ContextInput> = {}): ContextInput => ({
 });
 
 describe("MinimalContextBuilder", () => {
+  it("extends user turns with durable budget notices without rewriting earlier prefixes", () => {
+    const user = textPath[0];
+    if (!user) throw Error("fixture");
+    const notice: TranscriptEntry = {
+      ...user,
+      id: "budget_1" as TranscriptEntry["id"],
+      body: { kind: "notice", code: "model_request_budget", text: "attempt 1 of 2" },
+    };
+    const later: TranscriptEntry = {
+      ...notice,
+      id: "budget_2" as TranscriptEntry["id"],
+      body: { kind: "notice", code: "model_request_budget", text: "attempt 2 of 2" },
+    };
+    const builder = new MinimalContextBuilder();
+    const first = builder.build(input({ path: [user, notice], unsettledEffects: [] })).request;
+    const last = builder.build(
+      input({
+        path: [user, notice, ...textPath.slice(1, 3), later],
+        unsettledEffects: [],
+        toolChoice: "none",
+      }),
+    ).request;
+    expect(first.messages).toHaveLength(1);
+    expect(last.messages[0]).toEqual(first.messages[0]);
+    expect(last.messages).toHaveLength(3);
+    expect(last.messages[2]?.content.at(-1)).toEqual({
+      type: "text",
+      text: "Runtime notice (model_request_budget): attempt 2 of 2",
+    });
+    expect(last.toolChoice).toBe("none");
+    expect(last.system).toEqual(first.system);
+    expect(user.body).toEqual(textPath[0]?.body);
+  });
+
+  it("preserves interruption barriers while attaching a later budget notice", () => {
+    const user = textPath[0];
+    if (!user) throw Error("fixture");
+    const barrier: TranscriptEntry = {
+      ...user,
+      id: "barrier" as TranscriptEntry["id"],
+      body: { kind: "notice", code: "model_retry", text: "Previous attempt failed" },
+    };
+    const budget: TranscriptEntry = {
+      ...user,
+      id: "budget" as TranscriptEntry["id"],
+      body: { kind: "notice", code: "model_request_budget", text: "attempt 2 of 2" },
+    };
+    const request = new MinimalContextBuilder().build(
+      input({
+        path: [user, barrier, budget],
+        unsettledEffects: [],
+      }),
+    ).request;
+    expect(request.messages.map((message) => message.role)).toEqual(["user", "user"]);
+    expect(request.messages[1]?.content).toHaveLength(2);
+    expect(JSON.stringify(request.messages[1])).toContain("Previous attempt failed");
+  });
+
   it("projects recorded compaction without sending replaced replay or hiding unsettled effects", () => {
     const result = new MinimalContextBuilder().build(input());
     expect(result.report.includedEntryIds).toEqual(entries.slice(3).map((entry) => entry.id));
