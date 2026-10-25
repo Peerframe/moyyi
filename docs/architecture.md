@@ -43,7 +43,7 @@ core through five fixed points and can be added or removed without touching anyt
 | Plugin | Extension points | Phase |
 |---|---|---|
 | `provider-scripted` | model provider | exists (tests and evals) |
-| `provider-openai-compatible` | model provider | 1 |
+| `provider-deepseek` (Responses subset; [ADR 0007](decisions/0007-first-model-provider.md)) | model provider | 1 |
 | `project-instructions` (AGENTS.md and similar) | context source | 1 |
 | `fs` (read, list, search, edit, write) | tools | 1–2 |
 | `shell` | tools | 3 |
@@ -108,6 +108,8 @@ Three kinds of authoritative records, committed together in one SQLite transacti
 
 Large payloads live in the blob store. Streaming deltas are not persisted; completed parts are,
 and an interrupted assistant message is persisted with `stopReason: "interrupted"`.
+Committed transcript, effect and state records use WAL + `synchronous=FULL` by default, under
+[ADR 0002](decisions/0002-storage.md). Both store durability intent labels map to FULL in v1.
 
 ## Model client contract
 
@@ -142,9 +144,16 @@ parse args → schema validation → policy (prepare) → prepare (read-only)
 
 ## Concurrency
 
-One writer process per data directory, enforced with an OS file lock. Proposed in
+One writer process per data directory, enforced with an OS file lock. Accepted in
 [ADR 0002](decisions/0002-storage.md): one active run per session and a write lease per
-workspace.
+workspace. These are implementation requirements, not claims about the current scaffold.
+
+## Security decision
+
+[ADR 0006](decisions/0006-security-boundaries.md) defines workspace permissions, separate
+process containment and network authority, credential handling and local session privacy.
+Application-level session encryption is not a first-release prerequisite. The
+[threat model](threat-model.md) records assumptions and remaining validation.
 
 ## Out of scope for the first release
 

@@ -23,16 +23,20 @@ Done:
 Remaining:
 
 - Grow the corpus from 14 to 30–50 tasks, including a held-out set in `evals/private/`
-- Threat model filled in ([threat-model.md](threat-model.md))
+- Validate the accepted security design ([threat-model.md](threat-model.md),
+  [ADR 0006](decisions/0006-security-boundaries.md)) in the relevant implementation phases
 - Two-protocol mapping for the content model, with recorded fixtures
   ([ADR 0003](decisions/0003-provider-neutral-content.md))
-- Decide the proposed parts of ADR 0002 and ADR 0003
+- Land the accepted D1/D2/D3/D5 decisions and finish the separately authorized D2 v1 amendment
+  before storage writes data; see the [batch 3 prerequisites](tasks/2026-10-24-codex-handoff.md#31-开始批次-3-之前)
 
 ## Phase 1: read-only loop
 
-Core loop, `provider-openai-compatible`, `project-instructions`, read and search tools in `fs`,
-SQLite store (`node:sqlite` first), record/replay, plugin hot reload in development mode. Run
-the read-only subset of the corpus.
+Core loop, `provider-deepseek` ([ADR 0007](decisions/0007-first-model-provider.md)),
+`project-instructions`, read and search tools in `fs`, SQLite store (driver comparison in
+batch 3; `node:sqlite` first candidate), record/replay, plugin hot reload in development mode.
+Run the read-only subset of the corpus. Qwen and shasha training are deferred directions,
+not requirements for this phase or the first release.
 
 ## Phase 2: controlled writes
 
