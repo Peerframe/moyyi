@@ -27,7 +27,8 @@ export interface CliSession {
 }
 
 const help = [
-  "Commands: /help, /new, /resume ID, /cancel, /exit",
+  "Commands: /help, /new, /resume ID, /compact, /cancel, /exit",
+  "Compaction: /compact uses one request to the selected model; originals remain in history.",
   "Approval: /approve EFFECT_ID or /deny EFFECT_ID (only the displayed digest)",
   "Development: /reload NAME (configured plugins only, between runs)",
   "While running, ordinary input steers the current run. Ctrl-C cancels; when idle it exits.",
@@ -206,6 +207,10 @@ export function createCliSession(runtime: Runtime, options: CliSessionOptions): 
     seenEntries.add(entry.id);
     const body = entry.body;
     if (body.kind === "assistant_message") {
+      if (body.request.rendererVersion === "moyyi-compaction-v1") {
+        output("compaction audit", `Summary request recorded (${body.stopReason}).`);
+        return;
+      }
       const text = body.content
         .filter((part) => part.type === "text" || part.type === "refusal")
         .map((part) => part.text)
@@ -354,7 +359,14 @@ export function createCliSession(runtime: Runtime, options: CliSessionOptions): 
         else if (command === "/new" && !args.length) await openSession();
         else if (command === "/resume" && args.length === 1)
           await openSession(args[0] as SessionId);
-        else if (command === "/cancel" && !args.length) {
+        else if (command === "/compact" && !args.length) {
+          if (runId) output("moyyi", "Compaction is only available between runs.");
+          else if (!sessionId) output("moyyi", "No session is available. Use /new or /resume ID.");
+          else {
+            output("moyyi", "Compacting older turns using the selected model; /cancel stops it.");
+            await send({ type: "session.compact", sessionId });
+          }
+        } else if (command === "/cancel" && !args.length) {
           if (runId) await send({ type: "run.cancel", runId });
           else output("moyyi", "No run is active.");
         } else if ((command === "/approve" || command === "/deny") && args.length === 1)

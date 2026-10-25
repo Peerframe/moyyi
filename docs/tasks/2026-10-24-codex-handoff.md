@@ -4,15 +4,17 @@
 #2–#5，并整合交接；本次文档整合的 main 基线为已合入 #1–#4 的 `26f2e41`。由 Claude 起草，
 审查者由 owner 指定；每个 PR 的实际提交、检查与合并记录以其页面为准。
 
-**2026-10-25 最新授权：审查并合并 #12，再推进 phase 3。** #12 固定 head 审查、122 项定向测试
-（含 13 项真实 SIGKILL）及 CI 通过后，已合并为 `801175f`，main CI 通过。
-本轮从该最新 main 开 `codex/phase-3-sandboxed-shell`，**新 PR 不自动合并，phase 4 先不开始**。
-Owner 已在研究后确定 D6：原生系统沙箱默认、Docker 可选，并授权继续完成 phase 3。
-本轮沿用该分支及 PR #13，交付受控命令工具；Docker 实现保留为后续可选后端，不作为本轮前置。
-不做付费调用，不访问真实凭据，不直接推送 main。
-当前范围和证据见 [phase 3 记录](2026-10-25-phase-3-shell.md)；[phase 2 记录](2026-10-25-phase-2-writes.md)、[批次 7 记录](2026-10-25-batch-7-cli.md)、
-[批次 6](2026-10-25-batch-6-deepseek.md)、[批次 5](2026-10-25-batch-5-files.md)、
-[批次 4](2026-10-25-batch-4-core.md)和[D2／批次 3](2026-10-25-v1-and-storage.md)记录保留历史证据。
+**2026-10-25 最新授权：审查并合并 #13，再推进 phase 4。** #13 固定 head
+`fff0308` 经独立审查、本轮 115 项定向测试和 CI 通过后，合并为 `3e0202a`；
+[合并后的 main CI](https://github.com/Peerframe/moyyi/actions/runs/40178362029) 通过。
+本轮从该 main 开 `codex/phase-4-recovery-long-sessions`，交付恢复、显式长对话压缩、缓存友好上下文及离线验收。
+**新 PR 不自动合并，phase 5 先不开始。** D1–D6 保持已定结论；不做付费调用，不访问真实凭据，
+不直接推送 main，不改锁定的 persisted v1。
+当前范围和证据见 [phase 4 记录](2026-10-25-phase-4-long-sessions.md)。
+[phase 3](2026-10-25-phase-3-shell.md)、[phase 2](2026-10-25-phase-2-writes.md)、
+[批次 7](2026-10-25-batch-7-cli.md)、[批次 6](2026-10-25-batch-6-deepseek.md)、
+[批次 5](2026-10-25-batch-5-files.md)、[批次 4](2026-10-25-batch-4-core.md)和
+[D2／批次 3](2026-10-25-v1-and-storage.md)保留历史证据。
 
 ## 0. 先读
 
@@ -23,9 +25,9 @@ Owner 已在研究后确定 D6：原生系统沙箱默认、Docker 可选，并�
 
 ## 1. 现在有什么
 
-已合入 #1–#12 的 main `801175f` 为本轮基线，包含：
+已合入 #1–#13 的 main `3e0202a` 为本轮基线，包含：
 
-- Node 26、TypeScript 7、Biome、Vitest；最新 main 基线检查包含类型检查、lint 和 1,081 项测试
+- Node 26、TypeScript 7、Biome、Vitest；最新 main 基线检查包含类型检查、lint 和 Linux 1,148 项通过、1 项 Mac 专用跳过（本机 1,149 项通过）
 - 持久化格式 `src/contracts/persisted`，版本 1，由 `fixtures/v1.ts` 锁定
 - 模型、工具、插件、客户端协议契约和端口；`checkModelStream`
 - 插件注册表（原子加载、归属清理、只能更严格的权限规则、隔离的事件监听）；`provider-scripted`
@@ -42,7 +44,7 @@ DeepSeek Responses 文本/推理/函数调用适配器、固定地址 HTTP、录
 以及显式开发插件的空闲重载。`npm run moyyi -- --demo` 可运行有限的离线脚本，真实模型通过
 显式 `--host FILE` 配置；不自动发现工作区配置，不新增凭据后端。原有 DeepSeek 离线 demo/eval 保留。
 这些不证明远端 API 已接受请求或真实 Agent 任务能力。真实冒烟及 phase 1 能力评测仍待 owner。
-phase 2 已合并，提供受控创建/编辑/撤销与快照。phase 3 已按 D6 推进原生沙箱命令工具，当前交付和验收见 phase 3 记录。
+phase 2 已合并，提供受控创建/编辑/撤销与快照。phase 3 原生沙箱命令工具已按 D6 合并，验收和平台限制见 phase 3 记录。
 计划中的 project-instructions 插件仍未交付；本轮离线结果不替代 phase 1 真实模型验收。
 
 | PR | 已核对的合并记录 | 结果与后续 |
@@ -59,6 +61,7 @@ phase 2 已合并，提供受控创建/编辑/撤销与快照。phase 3 已按 D
 | [#10：批次 6 模型](https://github.com/Peerframe/moyyi/pull/10) | `8fce38e` | 固定 head 审查与 153 项定向检查通过，原 head CI 和 main CI 均通过 |
 | [#11：批次 7 CLI](https://github.com/Peerframe/moyyi/pull/11) | `cda24d4` | 固定 diff 审查、70 项定向测试、5 项 PTY、原 head 与 main CI 通过 |
 | [#12：phase 2 写入](https://github.com/Peerframe/moyyi/pull/12) | `801175f` | 固定 diff 审查、122 项定向测试、原 head 与 main CI 通过 |
+| [#13：phase 3 命令](https://github.com/Peerframe/moyyi/pull/13) | `3e0202a` | 固定 diff 独立审查、115 项定向测试、原 head 与 main CI 通过；D6 平台限制保留 |
 
 [给 Claude 的交接](2026-10-25-claude-review-handoff.md)保留原始独立分支的历史验收，已标为历史快照。
 其中缺 fixture、未有 CI 和 D2 未定等状态不再是当前状态；不把旧的覆盖文件诊断冒充新检查结果。
@@ -67,7 +70,7 @@ phase 2 已合并，提供受控创建/编辑/撤销与快照。phase 3 已按 D
 
 - **分支与 PR**：每批一个分支 `codex/<批次名>`，从最新 `main` 切出，开一个 PR 到 `main`。不要基于另一个
   未合并的分支开 PR；D2／存储的依赖 PR 例外已结束。不直接推送 `main`，不改仓库设置。
-  #12 已按最新授权合并；phase 3 的新 PR 不自动合并，phase 4 不开始。D6 已定，继续 phase 3 实现与验收。
+  #13 已按最新授权合并；phase 4 的新 PR 不自动合并，phase 5 不开始。
 - **检查**：每个 PR 的 `npm run check` 必须全绿。新行为要有测试，包括拒绝、取消和中断的情况。
 - **边界**：`tests/boundaries.ts` 报错时改导入，不改规则。确实要改规则，就同时改 `architecture.md`，并在
   PR 里说明原因。
@@ -108,7 +111,7 @@ PR #5 完成交接冲突和 D1/D3/D5 文档整合；最终 head CI 与合并后�
 
 **当前状态：两项均已完成并合入。** PR #6 完成格式修订，PR #7 完成存储及故障验收；
 #7 转向 main 后的新 CI 及合并后的 main CI 均通过。以下条目保留当时的执行顺序及格式边界；
-本轮最新授权已推进至 D6 已定后的 phase 3 实现，见文档开头与 phase 3 记录。
+本轮最新授权已推进至 phase 4，见文档开头与 phase 4 记录。
 
 1. **独立完成 D2 的 v1 修订。** 依已授权的本轮任务书确认尚无真实存储数据；按 B 方案修订
    契约与 `fixtures/v1.ts`，补齐需要持久化的用量、终止原因、拒绝、参数来源及推理/重放信息，并验收。
@@ -133,11 +136,11 @@ Owner 已根据 [Codex / Claude / OpenCode / OpenHands / Goose 对比](../resear
 命令直接操作授权工作区，保留 D3 的文件／网络强制边界、干净环境和失败时拒绝执行。
 进程组取消不等于任意后代的绝对清除；Mac 主动脱离组和宿主 SIGKILL 后清除不在保证内。
 Docker 不是默认依赖、自动回退或本轮复制回写子系统；作为后续可选后端独立验收。
-该决定已授权 phase 3 实现，无需再次批准同一事项。新 PR 不自动合并，不做付费调用，phase 4 不开始。
+该决定已授权 phase 3 实现并经 #13 合入，无需再次批准同一事项。当前 phase 4 新 PR 不自动合并，不做付费调用，phase 5 不开始。
 
 ## 4. 批次
 
-以下保留各批的历史目标和验收。批次 0–7 和 phase 2 已合入；本轮放行 phase 3，phase 4–6 尚未放行。
+以下保留各批的历史目标和验收。批次 0–7 和 phase 2–3 已合入；本轮放行 phase 4，phase 5–6 尚未放行。
 
 ### 批次 0：CI
 
@@ -253,7 +256,7 @@ Docker 不是默认依赖、自动回退或本轮复制回写子系统；作为�
 
 ## 5. 不在本次交接里
 
-当前不包含 phase 4–6（长会话、第二个供应商和网页、发布）。phase 3 已获推进授权，
-D6 已确定并推进实现；不因此宣布 phase 1 真实模型验收完成。
+当前不包含 phase 5–6（第二个供应商和网页、发布）。phase 4 长会话与恢复已获推进授权；
+D6 保持已定，不因此宣布 phase 1 真实模型验收完成。
 
 Qwen 和 shasha 仅保留为未来方向。当前不训练模型、不选训练底座或购买/租用算力；先把 Agent 做好。

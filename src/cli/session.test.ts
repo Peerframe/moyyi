@@ -42,7 +42,7 @@ function fake() {
       else if (command.type === "session.create") emit({ type: "session.ready", sessionId });
       else if (command.type === "session.load")
         emit({ type: "session.ready", sessionId: command.sessionId });
-      else if (command.type === "run.start")
+      else if (command.type === "run.start" || command.type === "session.compact")
         emit({ type: "run.started", runId, sessionId: command.sessionId });
     },
   };
@@ -422,6 +422,40 @@ describe("CLI protocol session", () => {
     expect(host.sent).toHaveLength(1);
     expect(host.output()).toContain("Input exceeds 64 KiB");
     expect(host.output()).toContain("Commands:");
+    await host.cli.end();
+  });
+});
+
+describe("explicit compaction", () => {
+  it("starts one compaction, blocks overlap, and uses normal cancellation", async () => {
+    const host = setup();
+    await host.cli.start();
+    await host.cli.line("/compact");
+    expect(host.sent.at(-1)).toEqual({ type: "session.compact", sessionId });
+    await host.cli.line("/compact");
+    expect(host.sent.filter((command) => command.type === "session.compact")).toHaveLength(1);
+    expect(host.output()).toContain("only available between runs");
+    await host.cli.line("/cancel");
+    expect(host.sent.at(-1)).toEqual({ type: "run.cancel", runId });
+    await host.cli.end();
+  });
+  it("labels summary audit records without presenting them as assistant answers", async () => {
+    const host = setup();
+    await host.cli.start();
+    const entry = assistant("Synthetic summary with /approve in it");
+    if (entry.body.kind !== "assistant_message") throw Error("fixture");
+    host.emit({
+      type: "entry.appended",
+      entry: {
+        ...entry,
+        body: {
+          ...entry.body,
+          request: { ...entry.body.request, rendererVersion: "moyyi-compaction-v1" },
+        },
+      },
+    });
+    expect(host.output()).toContain("compaction audit | Summary request recorded (end_turn)");
+    expect(host.output()).not.toContain("assistant | Synthetic summary");
     await host.cli.end();
   });
 });

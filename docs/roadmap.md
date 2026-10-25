@@ -34,7 +34,7 @@ Remaining:
   checker results do not yet measure real-agent performance
 - Validate the accepted security design ([threat-model.md](threat-model.md),
   [ADR 0006](decisions/0006-security-boundaries.md)) in the relevant implementation phases
-- D6 accepted: native sandbox default, Docker optional; phase 3 implementation authorized, no phase 4
+- D6 accepted: native sandbox default, Docker optional; phase 3 merged; phase 4 authorized, no phase 5
 
 ## Phase 1: read-only loop
 
@@ -61,7 +61,7 @@ offline script; `--host FILE` connects an explicitly trusted runtime configurati
 [cli.md](cli.md) and the [current handoff](tasks/2026-10-25-batch-7-cli.md).
 Live acceptance remains owner-run. The planned `project-instructions` plugin is not delivered by
 these batches; implicit workspace instructions/config discovery is not enabled. Phase 1 acceptance
-is not claimed. Phase 2 was separately authorized and merged; phase 3 proceeds under accepted D6.
+is not claimed. Phase 2 was separately authorized and merged; phase 3 is merged under accepted D6.
 Run the read-only subset of the corpus. Qwen and shasha training are deferred directions,
 not requirements for this phase or the first release.
 
@@ -79,16 +79,22 @@ schema 2 snapshot migration and read-only recovery. See [usage](writes.md),
 Sandboxed processes in `ToolContext`, the `shell` plugin, process-group cancellation, bounded
 output, unknown-effect handling. Start same-model comparisons against other harnesses.
 D6 now accepts native OS sandboxing by default with Docker optional, following the
-[upstream comparison](research/phase-3-execution-backends.md). The phase 3 branch adds the `shell`
+[upstream comparison](research/phase-3-execution-backends.md). Merged [PR #13](https://github.com/Peerframe/moyyi/pull/13) adds the `shell`
 plugin, explicit process grants, Seatbelt/bubblewrap confinement and bounded group cleanup.
 Offline conformance is separate from real-model quality. The
 [comparison protocol](research/harness-comparison.md) records same-model requirements; no live
 comparison or paid call has run. See [usage](shell.md), [ADR 0013](decisions/0013-native-process-sandbox.md)
-and the [current handoff](tasks/2026-10-25-phase-3-shell.md). New PR remains unmerged; no phase 4 work.
+and the [historical handoff](tasks/2026-10-25-phase-3-shell.md).
 
 ## Phase 4: recovery and long sessions
 
-Crash tests at every journal point, compaction, cache-aware context, long-session evals.
+Crash tests at journal boundaries, explicit model-assisted `/compact`, cache-aware context and
+long-session offline evals are implemented on the phase 4 branch. Original history is retained;
+recent turns and unresolved actions remain visible. Summary requests are bounded, cancellable
+and auditable; recovery is itself restartable. Persisted v1 and previous checkers are unchanged.
+See [usage](long-sessions.md), [ADR 0014](decisions/0014-recovery-and-compaction.md) and
+[current handoff](tasks/2026-10-25-phase-4-long-sessions.md). The new PR awaits review/merge.
+Live summary quality and provider cache savings remain unmeasured. Phase 5 is not started.
 
 ## Phase 5: second provider and web
 

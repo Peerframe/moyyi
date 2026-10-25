@@ -1,6 +1,14 @@
 # Phase 3 shell: implementation handoff
 
-## Authorization and checkout
+## Historical handoff
+
+PR #13 was independently reviewed at `fff0308`, passed 115 focused tests and head CI, then
+merged under the owner's next authorization as `3e0202a` on 2026-10-25. Main CI
+[40178362029](https://github.com/Peerframe/moyyi/actions/runs/40178362029) passed. The following is
+the original delivery record; phase 4 is now authorized and tracked in the
+[current handoff](2026-10-25-phase-4-long-sessions.md). Phase 5 remains unauthorized.
+
+## Original authorization and checkout
 
 Owner accepted D6 on 2026-10-25: native OS sandbox by default, Docker optional. Continue phase 3
 on a branch/PR; no automatic merge, paid model calls or phase 4. This supersedes the earlier

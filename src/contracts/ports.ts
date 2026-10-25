@@ -76,6 +76,15 @@ export interface SessionSnapshot {
 
 export interface ContextBuilder {
   build(input: ContextInput): ContextResult;
+  /** Plans an explicit, tool-free summary request without changing history. */
+  planCompaction?(input: ContextInput): CompactionPlan | null;
+}
+
+export interface CompactionPlan {
+  readonly replaces: { readonly fromEntryId: EntryId; readonly toEntryId: EntryId };
+  readonly request: ModelRequest;
+  readonly promptVersion: string;
+  readonly originalTokens: number;
 }
 
 export interface ContextInput {
@@ -95,6 +104,8 @@ export interface ContextResult {
   readonly report: {
     readonly includedEntryIds: readonly EntryId[];
     readonly notes: readonly string[];
+    readonly estimatedTokens?: number;
+    readonly summarizedEntryIds?: readonly EntryId[];
   };
 }
 

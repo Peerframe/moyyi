@@ -41,9 +41,6 @@ export async function recoverSession(
     entries: [],
     effects: updates,
     durability: "normal",
-    runs: snapshot.runs
-      .filter((run) => run.status === "active")
-      .map((run) => ({ ...run, status: "interrupted" })),
   });
   for (const effect of updates) deps.emit({ type: "effect.updated", effect });
   let current = await deps.store.loadSession(snapshot.sessionId);
@@ -203,6 +200,10 @@ export async function recoverSession(
       effects: [],
       leases: release,
       durability: "normal",
+      // Keep an active run recoverable until its notice, missing results and lease
+      // decision commit together. A crash after effect normalization must not erase
+      // the only signal that a run without missing results still needs its notice.
+      runs: wasActive ? [{ runId, sessionId: current.sessionId, status: "interrupted" }] : [],
       sessions: entries.length
         ? [
             {
