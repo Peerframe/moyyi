@@ -25,6 +25,8 @@ export const webScenarios = [
   "private-dns",
   "redirect",
   "cancel-in-flight",
+  "html-text",
+  "html-limit",
 ] as const;
 export type WebScenario = (typeof webScenarios)[number];
 const tool = (id: number, name: string, args: unknown): ModelStreamEvent[] => [
@@ -92,7 +94,11 @@ export async function runWebScenario(scenario: WebScenario): Promise<void> {
                     },
                   ],
                 })
-              : page;
+              : scenario === "html-text"
+                ? "<title>Readable page</title><nav>NOISE</nav><main><h1>Evidence</h1><p>A &amp; B</p><script>EXECUTE_ME</script><p hidden>HIDDEN</p></main>"
+                : scenario === "html-limit"
+                  ? "<div>".repeat(41)
+                  : page;
             const message = (
               scenario === "cancel-in-flight"
                 ? new Readable({ read() {} })
@@ -205,6 +211,20 @@ export async function runWebScenario(scenario: WebScenario): Promise<void> {
     } else if (scenario === "redirect" || scenario === "cancel-in-flight") {
       assert.equal(requests.length, 1);
       assert.equal(results[0]?.status, "unknown");
+    } else if (scenario === "html-text" || scenario === "html-limit") {
+      assert.equal(requests.length, 1);
+      assert.equal(results[0]?.status, scenario === "html-text" ? "succeeded" : "failed");
+      const observed = JSON.stringify(provider.client.requests);
+      if (scenario === "html-text") {
+        assert(observed.includes("Readable page"));
+        assert(observed.includes("A & B"));
+        assert(observed.includes("bounded-html-text-v1"));
+        assert(
+          !observed.includes("NOISE") &&
+            !observed.includes("EXECUTE_ME") &&
+            !observed.includes("HIDDEN"),
+        );
+      } else assert(observed.includes("depth limit exceeded"));
     } else if (scenario === "injected-page") {
       assert.equal(requests.length, 1);
       assert.deepEqual(
