@@ -2,8 +2,9 @@
 
 Research date: **2026-10-25**. Reviewed contract baseline: `main` at `e7e270a`.
 **D2 option B is now accepted in [ADR 0003](../decisions/0003-provider-neutral-content.md).**
-The proposals and alternatives below preserve the research-stage rationale. The format amendment
-and provider implementation remain pending; this research changes no persisted contract.
+The proposals and alternatives below preserve the batch 2 research-stage rationale. The format
+amendment subsequently merged in PR #6; the batch 6 DeepSeek addendum at the end describes the
+implemented subset. The original three-provider analysis is historical, not a current gap checklist.
 
 The current five `ContentPart` variants and six `ModelStreamEvent` variants do not provide a
 lossless representation of all three wire formats. The common text/function-call path is
@@ -292,3 +293,48 @@ The owner subsequently accepted recommendation 2 in ADR 0003, including its one-
 v1 amendment exception. D1, D3 and D5 are also settled; the [current handoff](../tasks/2026-10-24-codex-handoff.md)
 records them and their implementation gates. No storage, loop or format amendment is authorized
 by this research document. Batch 3 remains unstarted.
+
+## Batch 6 addendum: DeepSeek Responses (2026-10-25)
+
+The preceding sections preserve batch 2's historical contract analysis. D2's v1 amendment has
+since merged in PR #6. This addendum describes the implemented profile
+`deepseek-responses-text-v1-2026-10-25`; it does not alter persisted v1 or add an OpenAI adapter.
+Primary DeepSeek sources and the pinned SDK alternative are listed in
+[ADR 0010](../decisions/0010-deepseek-transport-and-recording.md).
+
+| Common field/path | DeepSeek wire → common | Common → DeepSeek request |
+|---|---|---|
+| System text | No response role equivalent | Top-level `instructions`; never `developer` (treated as user) |
+| User/assistant text | `message.content.output_text` → text | `message` with `input_text` / `output_text` |
+| Visible reasoning | `reasoning.content.reasoning_text` → visible reasoning, preserving text | Full `reasoning` items for all completed prior assistant turns with tools |
+| Summary/opaque reasoning, image, refusal content | Rejected by the implemented subset | Rejected before HTTP; no silent downgrade |
+| Tool call | `function_call`, verbatim arguments, provider item/call IDs; local ID combines response and call IDs | Exact call ID/name/argument text, paired uniquely across supplied history |
+| Tool result | Model never produces trusted execution results | `function_call_output.output` is JSON text containing status and common text; unpaired/duplicate results rejected |
+| Replay envelope | None required for this plain reasoning subset | Opaque payload ignored; common history must independently be complete and supported |
+| Assistant completion provenance | Existing persisted stop reason | Nonpersisted context port carries it; interrupted/unknown history with tools fails locally |
+| Text/reasoning delta | Typed deltas preserve part index; monotonically increasing sequence may have gaps | Response-only; not a request event |
+| Tool argument fragments | Accumulated until consistent item completion; verbatim source | Final string sent unchanged in history, never used as authority before local validation |
+| Part/item done | Exact consistency against prior deltas/completions; no content replacement | Diagnostic inverse only |
+| completed | `tool_use` when calls exist, otherwise `end_turn` | Completion status is a local history guard, not a wire request control |
+| incomplete | `max_output_tokens` → `max_tokens`; `content_filter` → `refusal`; other reasons unsupported | Not sent as if successful history; no tools executed from an incomplete response |
+| failed/error/EOF | Typed error with observed partial-output flag; EOF without terminal → `stream_interrupted` | Never silently resubmitted by provider; core owns retries |
+| Termination provenance | Raw status/incomplete reason, reported model and response ID | Not sent as request options |
+| Usage | Input/output totals with cached/reasoning subsets; cache writes unknown; missing counts null | Accounting only; no synthetic zeros or request fields |
+
+The endpoint is stateless; each request contains the complete retained history. The adapter uses
+`stream: true`, `reasoning.effort: high` and a local maximum of 8,192 output tokens. It neither sets
+nor relies on ignored server tool-count/parallelism controls. Byte, event, item and local executor
+limits remain enforced by moyyi. No hosted tools or stored response IDs are enabled.
+
+SSE framing supports split UTF-8, BOM, CR/LF/CRLF, comments and multiline data. An unfinished final
+event and duplicate JSON keys fail closed. There is no `[DONE]` terminator or reconnect loop.
+The decoder validates item identities and completed/terminal snapshots so a later malformed frame
+cannot replace accepted content. HTTP 401/402/403 map to auth, 429 to rate limit, 500/503 to overload,
+400/422 to invalid request; an undifferentiated 400 is not guessed to be context overflow. Known
+usage on a failed response is partial; missing usage is unknown.
+
+Fixtures are hand-authored in
+[src/plugins/provider-deepseek/fixtures.ts](../../src/plugins/provider-deepseek/fixtures.ts), with
+source noted there and in recording metadata. Unit and runtime integration tests decode these
+through `checkModelStream`; the real-file eval compares normalized recordings and replay. Neither
+these fixtures nor the release title prove live service acceptance or a pinned model revision.

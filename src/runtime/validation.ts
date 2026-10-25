@@ -3,6 +3,7 @@ import {
   type ArgumentValidator,
   canonicalizeJson,
   type JsonSchema,
+  parseStrictJson,
   type ValidationResult,
 } from "../contracts/index.ts";
 
@@ -21,9 +22,7 @@ export class AjvArgumentValidator implements ArgumentValidator {
       if (typeof raw !== "string" || Buffer.byteLength(raw, "utf8") > maxBytes) {
         throw new Error("Tool arguments exceed the byte limit");
       }
-      const value: unknown = JSON.parse(raw);
-      assertUnambiguousJson(raw);
-      canonicalizeJson(value);
+      const value = parseStrictJson(raw, maxBytes);
       const key = canonicalizeJson(schema);
       if (Buffer.byteLength(key, "utf8") > MAX_SCHEMA_BYTES)
         throw new Error("Tool schema exceeds 64 KiB");
@@ -110,55 +109,4 @@ function inspectSchema(value: unknown, depth = 0): void {
       if (!Array.isArray(dependency)) inspectSchema(dependency, depth + 1);
     }
   }
-}
-
-/** JSON.parse validates syntax first; this bounded scan rejects duplicate decoded keys. */
-function assertUnambiguousJson(raw: string): void {
-  let offset = 0;
-  const whitespace = () => {
-    while (/\s/.test(raw[offset] ?? "") && offset < raw.length) offset++;
-  };
-  const string = (): string => {
-    const start = offset++;
-    while (offset < raw.length) {
-      const char = raw[offset++];
-      if (char === "\\") offset++;
-      else if (char === '"') break;
-    }
-    return JSON.parse(raw.slice(start, offset)) as string;
-  };
-  const visit = (depth: number): void => {
-    if (depth > MAX_DEPTH) throw new Error("Tool arguments are too deeply nested");
-    whitespace();
-    const char = raw[offset];
-    if (char === '"') {
-      string();
-      return;
-    }
-    if (char === "{" || char === "[") {
-      const object = char === "{";
-      const close = object ? "}" : "]";
-      const keys = new Set<string>();
-      offset++;
-      whitespace();
-      while (raw[offset] !== close) {
-        if (object) {
-          const key = string();
-          if (keys.has(key)) throw new Error("Duplicate JSON object key");
-          keys.add(key);
-          whitespace();
-          offset++;
-        }
-        visit(depth + 1);
-        whitespace();
-        if (raw[offset] !== ",") break;
-        offset++;
-        whitespace();
-      }
-      offset++;
-    } else {
-      while (offset < raw.length && !/[\s,\]}]/.test(raw[offset] ?? "")) offset++;
-    }
-  };
-  visit(0);
 }

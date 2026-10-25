@@ -6,5 +6,7 @@ export * from "./persisted/index.ts";
 export type * from "./plugin.ts";
 export type * from "./ports.ts";
 export type * from "./protocol.ts";
+export type * from "./recording.ts";
 export * from "./replay.ts";
+export { parseStrictJson } from "./strict-json.ts";
 export type * from "./tools.ts";

@@ -43,6 +43,7 @@ describe("MinimalContextBuilder", () => {
     expect(result.request.messages[1]).toEqual({
       role: "assistant",
       content: assistant.content,
+      stopReason: assistant.stopReason,
       replay: assistant.replay,
     });
     expect(result.request.messages[1]?.replay).toBe(assistant.replay);

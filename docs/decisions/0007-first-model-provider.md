@@ -1,6 +1,6 @@
 # 0007: DeepSeek as the first model provider
 
-Status: accepted (D5, owner decision 2026-10-25); implementation and live acceptance pending
+Status: accepted (D5, owner decision 2026-10-25); batch 6 implementation in review, live acceptance pending
 
 ## Decision
 
@@ -12,7 +12,8 @@ sharing a wire format does not imply complete OpenAI compatibility.
 
 moyyi retains its own loop, context, recording, permissions, tool execution, retry and recovery.
 No external agent harness is adopted. An SDK, if selected later, is transport only and must have
-automatic retries disabled. Direct HTTP versus an SDK remains a batch 6 implementation choice.
+automatic retries disabled. The batch 6 transport decision is recorded in [ADR 0010](0010-deepseek-transport-and-recording.md):
+existing native HTTP, no SDK or automatic provider retry.
 
 The immediate objective is a reliable agent using an existing model. Qwen, self-hosting and
 shasha training are deferred directions, not first-release prerequisites. This decision neither
@@ -71,7 +72,11 @@ Peak hours are weekdays 01:00–04:00 and 06:00–10:00 UTC, excluding Chinese p
 This is arithmetic, not a per-task estimate; repeated history, reasoning and retries affect
 usage. Other services and taxes are excluded. Recheck the price before paid acceptance.
 
-## Acceptance still required
+## Acceptance
+
+The batch 6 branch implements the synthetic mapping, provider and record/replay checks below;
+executed evidence is in [the current handoff](../tasks/2026-10-25-batch-6-deepseek.md).
+Live service acceptance remains outstanding.
 
 Extend batch 2's mapping with DeepSeek-specific role, reasoning, usage, error and stream cases.
 Test synthetic decode/replay, cancellation, incomplete/failed/EOF handling and unknown usage
