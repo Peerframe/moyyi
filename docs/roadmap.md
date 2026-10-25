@@ -34,7 +34,7 @@ Remaining:
   checker results do not yet measure real-agent performance
 - Validate the accepted security design ([threat-model.md](threat-model.md),
   [ADR 0006](decisions/0006-security-boundaries.md)) in the relevant implementation phases
-- Phase 3 backend decision D6 after the requested upstream comparison; no phase 4 authorization
+- D6 accepted: native sandbox default, Docker optional; phase 3 implementation authorized, no phase 4
 
 ## Phase 1: read-only loop
 
@@ -61,7 +61,7 @@ offline script; `--host FILE` connects an explicitly trusted runtime configurati
 [cli.md](cli.md) and the [current handoff](tasks/2026-10-25-batch-7-cli.md).
 Live acceptance remains owner-run. The planned `project-instructions` plugin is not delivered by
 these batches; implicit workspace instructions/config discovery is not enabled. Phase 1 acceptance
-is not claimed. Phase 2 was separately authorized and merged; phase 3 backend selection remains pending.
+is not claimed. Phase 2 was separately authorized and merged; phase 3 proceeds under accepted D6.
 Run the read-only subset of the corpus. Qwen and shasha training are deferred directions,
 not requirements for this phase or the first release.
 
@@ -78,10 +78,13 @@ schema 2 snapshot migration and read-only recovery. See [usage](writes.md),
 
 Sandboxed processes in `ToolContext`, the `shell` plugin, process-group cancellation, bounded
 output, unknown-effect handling. Start same-model comparisons against other harnesses.
-The owner authorized progression, then requested an [upstream comparison](research/phase-3-execution-backends.md)
-before choosing D6. No command tool is implemented or enabled yet. The research-only branch
-`codex/phase-3-sandboxed-shell` awaits the backend/lifecycle choice; see the
-[current handoff](tasks/2026-10-25-phase-3-shell.md). No paid model comparisons or phase 4 work.
+D6 now accepts native OS sandboxing by default with Docker optional, following the
+[upstream comparison](research/phase-3-execution-backends.md). The phase 3 branch adds the `shell`
+plugin, explicit process grants, Seatbelt/bubblewrap confinement and bounded group cleanup.
+Offline conformance is separate from real-model quality. The
+[comparison protocol](research/harness-comparison.md) records same-model requirements; no live
+comparison or paid call has run. See [usage](shell.md), [ADR 0013](decisions/0013-native-process-sandbox.md)
+and the [current handoff](tasks/2026-10-25-phase-3-shell.md). New PR remains unmerged; no phase 4 work.
 
 ## Phase 4: recovery and long sessions
 

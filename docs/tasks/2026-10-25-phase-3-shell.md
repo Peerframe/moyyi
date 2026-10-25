@@ -1,73 +1,77 @@
-# Phase 3 shell: backend decision handoff
+# Phase 3 shell: implementation handoff
 
-## Current authorization and outcome
+## Authorization and checkout
 
-The owner authorized reviewing/merging PR #12, then phase 3 as a new branch and PR, without
-merging the new PR, paid calls or phase 4. After being asked about Docker plus a copied workspace,
-the owner replied: **first examine how established projects solve this**. This is a request for
-research, not approval of Docker or a weaker security boundary.
+Owner accepted D6 on 2026-10-25: native OS sandbox by default, Docker optional. Continue phase 3
+on a branch/PR; no automatic merge, paid model calls or phase 4. This supersedes the earlier
+research-only stop. [ADR 0013](../decisions/0013-native-process-sandbox.md) records the decision.
 
-PR #12 fixed head `adfa3a28e959470e337796673873e0a4d27a224d` was independently reviewed with no
-reproducible blocker. Six focused files passed 122/122 tests, including 13 real SIGKILL cases;
-its [head CI](https://github.com/Peerframe/moyyi/actions/runs/40170696136) passed. It was merged as
-`801175fff78a067436f3105bd7ebd500120ffd28`; [main CI](https://github.com/Peerframe/moyyi/actions/runs/40171281063)
-passed. There was no direct push to main.
+Directory: `/Users/yxflc/Project/moyyi`. Branch: `codex/phase-3-sandboxed-shell`.
+[PR #13](https://github.com/Peerframe/moyyi/pull/13) is being advanced from research to implementation
+on the same branch; it targets main directly, without a dependent PR. Main baseline remains
+`801175fff78a067436f3105bd7ebd500120ffd28`. D1-D5, persisted v1 and prior checker criteria remain unchanged.
 
-Current directory: `/Users/yxflc/Project/moyyi`. Branch: `codex/phase-3-sandboxed-shell`, based on
-that latest main. This branch contains only research and status documentation. It does not add
-or enable a shell tool. D1-D5, frozen persisted v1 and existing check standards are unchanged.
+PR #12 fixed head `adfa3a2` was independently reviewed, passed 122 focused tests (including 13
+real SIGKILL cases) and [head CI](https://github.com/Peerframe/moyyi/actions/runs/40170696136), then
+merged as `801175f`; [main CI](https://github.com/Peerframe/moyyi/actions/runs/40171281063) passed.
+No direct push to main was made. The prior research commit `51bfd5f` passed
+[its CI](https://github.com/Peerframe/moyyi/actions/runs/40172302385); that is historical evidence,
+not acceptance of the subsequent implementation.
 
-## Deliverable
+## Delivered behavior
 
-The [fixed-source comparison](../research/phase-3-execution-backends.md) covers Codex, Claude's
-public sandbox runtime, OpenCode, OpenHands and Goose, plus local synthetic probes. It separates
-filesystem/network confinement, process cancellation, and direct-versus-copied workspaces.
+- `shell` plugin through `ToolContext.processes`: exact command, relative cwd, bounded timeout,
+  truthful process effect profile; no Node filesystem/process imports in the plugin.
+- Separate explicit `workspaceProcesses` host grant, default ask; file-write grants do not
+  authorize processes. Runtime supplies clean environment and rejects missing containment.
+- Native Seatbelt on macOS and bubblewrap on Linux. Real workspace, mandatory protection of
+  credentials/metadata/runtime paths, no network or provider credentials inherited by commands.
+- Existing core validation, digest-bound approval, workspace lease and durable started barrier
+  precede execution. The process capability is scoped, revocable, no-argument and single-use.
+- Shared stdout/stderr byte bound, bounded deadline, TERM→KILL group cleanup on interruption and
+  normal shell exit; inherited pipes cannot block return forever.
+- Cancellation, timeout, output exhaustion, revocation or uncertain cleanup become unknown;
+  no automatic retry. Startup does not replay commands or infer their outcomes. No command rollback.
+- [Usage](../shell.md), updated threat model, seven deterministic offline scenarios, and
+  [same-model comparison protocol](../research/harness-comparison.md).
 
-The recommendation is revised to **native OS sandbox by default, container as an optional
-stronger backend**. The earlier Docker-copy recommendation assumed an arbitrary-descendant and
-host-crash guarantee stronger than the roadmap's process-group cancellation. The native route
-still must enforce D3 and must state cancellation limits precisely; it is not ordinary host shell.
+Docker remains an optional future backend. This phase does not add a Docker dependency,
+copy/import workflow, persistent terminal or arbitrary-network capability.
 
-D6 remains pending. The owner has not yet accepted the default backend, direct-workspace mode
-or the precise lifecycle guarantee. Under section 3 of the original handoff, record the options
-and recommendation in the PR and stop before the dependent implementation. Do not implement
-phase 3 product code or begin phase 4 from this research-only PR.
+## Acceptance evidence
 
-## Evidence
+- `npm run check`: TypeScript and Biome (166 files) passed; **1,149/1,149 tests in 51 files** passed.
+- `npx vitest run src/runtime/processes.test.ts tests/shell-process.test.ts`: **22/22** passed,
+  including two actual runtime SIGKILL checkpoints and bounded detached-pipe handling.
+- Native macOS confinement: **26/26** cases passed against actual files, child processes and
+  host TCP/Unix socket listeners. Linux execution is pending the new PR CI, not inferred from Mac.
+- Focused runtime/core/policy/plugin regression: **115/115** in 7 files.
+- `npm run eval:shell`: **7/7** scenarios using real native execution, files and SQLite passed.
+- `npm run build` passed. No private corpus or real model was used. Existing checks/fixtures remain
+  unchanged; the Linux CI prerequisite is added without removing the original check command.
 
-- PR #12: `npx vitest run src/runtime/writes.test.ts src/store/schema.test.ts src/store/snapshots.test.ts src/plugins/fs/writes.test.ts tests/runtime-writes.test.ts tests/write-process.test.ts`
-  passed 122/122; fixed-diff whitespace and frozen-scope checks passed.
-- Source evidence is pinned in the comparison. Public-source review is distinguished from running
-  an upstream product. Claude's full closed-source cancellation path was not verified.
-- Docker temporary probes passed filesystem/network/environment denial and detached-descendant
-  termination by container kill. They do not validate client/host crash cleanup.
-- A native process/session probe demonstrated the boundary of group-kill. Two small custom
-  Seatbelt profiles aborted before their file checks; they are not passing native conformance.
-- `npm run check`: typecheck passed, Biome checked 155 files, final full run passed 1,081/1,081
-  tests across 46 files. The first full run had 1 watcher timeout in the unchanged
-  `src/runtime/development.test.ts` asynchronous-callback case (1,080 passed). A focused rerun
-  passed 10/10, then the complete gate passed. No timeout, assertion, source or check was changed;
-  the intermittent failure is recorded, not represented as a fix.
-- `git diff --check` passed. Seven changed/new Markdown files had 73 valid local links.
-  There is no diff under src, tests, evals, dependencies or CI. No rebuild or live-model test
-  was performed for this documentation-only change. The new PR CI is reported on its page.
-- Existing code tests are regression evidence, not phase 3 implementation acceptance.
+The first full-gate attempt encountered a temporary SessionId typing error in an in-progress
+new crash fixture. It was corrected before the successful full run; no check was relaxed.
 
-## Next implementation if native default is accepted
+The earlier research-only full run had one unchanged development watcher timeout (1,080/1,081);
+focused 10/10 and a full rerun 1,081/1,081 passed without changing timeouts or assertions. That
+historical intermittent failure was documented, not claimed as fixed by this feature.
 
-1. Define a small process capability port behind the existing tool lifecycle; implement a `shell`
-   plugin without filesystem/process imports and without replacing the self-owned core.
-2. Implement the macOS adapter first against actual tools: explicit roots, protected paths that
-   cannot be renamed around, required system read paths, clean environment, network denied, and
-   failure closed. Linux bubblewrap remains a separate backend with real environment acceptance.
-3. Bind exact command/cwd to approval and journal; no unrestricted retry or model-selected backend.
-4. Bound memory, output and time; TERM then KILL the owned group; observe closure, preserve
-   cancellation/unknown honestly, and never automatically replay uncertain process effects.
-5. Test actual file/network denial, ordinary children, ignored TERM, inherited pipes, output flood,
-   cancellation races and startup failure. Declare detached-process/host-crash limits separately.
-6. Run offline conformance and record the same-model comparison protocol. Actual model performance
-   measurements remain unavailable under the no-paid-call constraint.
+## Limits and remaining work
 
-No container-copy/import subsystem is authorized by the pending decision. If stronger container
-isolation is selected instead, approve its separate workspace/import and crash-lifecycle scope
-before implementing it. No source copying or new dependency was done in this turn.
+- No live DeepSeek compatibility or real-model task-quality/harness comparison was run. Offline
+  conformance does not establish pass@1, cost, latency or superiority. Phase 1 live acceptance
+  remains pending independently of this phase's implementation.
+- macOS deliberately detached descendants and host-SIGKILL cleanup are outside the accepted
+  process-group guarantee. Native mode is not resource quota enforcement or a hostile same-user
+  boundary. Commands may leave partial changes without file snapshots.
+- Linux protects existing sensitive entries with mounts; host secret injection during execution
+  is unsupported. Explicit toolchain grants must not contain private data. Workspace admission
+  rejects unsupported aliases/special files and scans within documented bounds, failing closed.
+- Docker execution, network grants, credential-store integration and phase 4 long-session work
+  are not delivered. They are not silently enabled or represented as tested features.
+
+## Owner decisions
+
+D6 is accepted; no further decision is needed for this native phase 3 scope. The PR remains
+unmerged for owner review. Phase 4 and paid-model comparisons need later authorization.

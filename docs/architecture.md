@@ -184,7 +184,15 @@ transcript/effect v1 is unchanged. Undo is a new approved effect and refuses lat
 Recovery only inspects recorded pre/post-state and never replays a mutation. See
 [ADR 0012](decisions/0012-controlled-workspace-writes.md) and [usage](writes.md).
 
-Phase 3 execution backends remain undecided. The current
-[upstream comparison](research/phase-3-execution-backends.md) recommends native OS enforcement
-by default and an optional container backend, with precise lifecycle limits. This is not yet
-an accepted architecture change or permission to run commands.
+## Sandboxed commands (phase 3 branch)
+
+[ADR 0013](decisions/0013-native-process-sandbox.md) records accepted D6: native OS sandbox by
+default, Docker optional. `ToolContext.processes` adds a per-invocation process capability only
+for process-effect tools. `shell` prepares an exact command/cwd/timeout; runtime executes only
+that approved payload after the existing core's lease and durable-start barrier. A separate
+host grant selects exact roots, with clean environment and mandatory native confinement.
+
+Runtime owns Seatbelt/bubblewrap adaptation, bounded output, deadline and process-group cleanup.
+Non-exited/uncertain results become unknown and stop the run; recovery never reruns commands.
+macOS detached descendants and host-SIGKILL cleanup limits are explicit. Docker is a future
+optional adapter, not an implicit dependency or fallback. See [usage and limits](shell.md).

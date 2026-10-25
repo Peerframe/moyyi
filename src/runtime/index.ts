@@ -30,13 +30,15 @@ import {
   DEEPSEEK_API_PROFILE,
   type DeepSeekTransport,
 } from "../plugins/provider-deepseek/index.ts";
-import { ReadOnlyPolicy, WorkspaceWritePolicy } from "../policy/index.ts";
+import { shellPlugin } from "../plugins/shell/index.ts";
+import { ReadOnlyPolicy, WorkspaceProcessPolicy, WorkspaceWritePolicy } from "../policy/index.ts";
 import { SqliteSessionStore } from "../store/index.ts";
 import { type DeepSeekHttpOptions, deepSeekHttpTransport } from "./deepseek-http.ts";
 import { NodeWorkspaceFiles } from "./files.ts";
 import { FileRecordingSink, RecordingModelClient, ReplayModelClient } from "./model-recording.ts";
 import { type PluginEntry, PluginRegistry, type PluginStatus } from "./plugins.ts";
 import { WorkspacePreconditions } from "./preconditions.ts";
+import { NodeWorkspaceProcesses } from "./processes.ts";
 import { AjvArgumentValidator } from "./validation.ts";
 import { NodeWorkspaceWrites } from "./writes.ts";
 
@@ -82,6 +84,15 @@ export interface RuntimeOptions {
   readonly workspaceWrites?: {
     readonly roots: readonly string[];
     readonly approval?: "ask" | "allow";
+  };
+  /** Separate host opt-in for sandboxed commands; no credential or network inheritance. */
+  readonly workspaceProcesses?: {
+    readonly roots: readonly string[];
+    readonly approval?: "ask" | "allow";
+    /** Additional trusted, read-only toolchain directories; never model-supplied. */
+    readonly executablePaths?: readonly string[];
+    /** Explicit read-only libraries required by selected toolchains. */
+    readonly readOnlyPaths?: readonly string[];
   };
   /** Explicit host connection only; no environment lookup or network before a model request. */
   readonly deepseek?: DeepSeekHttpOptions | { readonly transport: DeepSeekTransport };
@@ -133,11 +144,17 @@ export async function createRuntime(options: RuntimeOptions = {}): Promise<Runti
     return realpathSync(root);
   });
   if (writeRoots && !writeRoots.length) throw Error("Write grants require at least one workspace");
+  const filePolicy = options.workspaceWrites
+    ? new WorkspaceWritePolicy({ approval: options.workspaceWrites.approval ?? "ask" })
+    : new ReadOnlyPolicy();
   const base =
     options.policy ??
-    (options.workspaceWrites
-      ? new WorkspaceWritePolicy({ approval: options.workspaceWrites.approval ?? "ask" })
-      : new ReadOnlyPolicy());
+    (options.workspaceProcesses
+      ? new WorkspaceProcessPolicy({
+          files: filePolicy,
+          approval: options.workspaceProcesses.approval ?? "ask",
+        })
+      : filePolicy);
   const stricter = (
     first: PolicyDecision,
     second: Exclude<PolicyDecision, { kind: "allow" }> | null,
@@ -150,6 +167,7 @@ export async function createRuntime(options: RuntimeOptions = {}): Promise<Runti
   const plugins: PluginStatus[] = [];
   const startup = [
     { plugin: fsPlugin },
+    { plugin: shellPlugin },
     ...(deepseek ? [{ plugin: deepseek }] : []),
     ...(options.plugins ?? []),
   ];
@@ -311,6 +329,9 @@ export async function createRuntime(options: RuntimeOptions = {}): Promise<Runti
     const writes = writeRoots
       ? new NodeWorkspaceWrites(store as SqliteSessionStore, excluded)
       : undefined;
+    const processes = options.workspaceProcesses
+      ? new NodeWorkspaceProcesses({ ...options.workspaceProcesses, protectedPaths: excluded })
+      : undefined;
     core = new AgentCore({
       model: selectedClient,
       profile,
@@ -321,6 +342,7 @@ export async function createRuntime(options: RuntimeOptions = {}): Promise<Runti
       validator: new AjvArgumentValidator(),
       preconditions: options.preconditions ?? new WorkspacePreconditions(),
       files: new NodeWorkspaceFiles(excluded),
+      ...(processes ? { processes } : {}),
       ...(writes
         ? {
             writes: {

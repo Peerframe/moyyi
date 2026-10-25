@@ -148,3 +148,11 @@ The merged batch 7 record is [here](tasks/2026-10-25-batch-7-cli.md). Phase 2 ad
 [controlled writes](writes.md) through explicit host configuration, using the same displayed-digest
 approvals. Shell execution, dependency-graph reload and live model evaluation remain outside scope.
 The current handoff is [phase 2](tasks/2026-10-25-phase-2-writes.md).
+
+## Native command opt-in
+
+An explicit host can set `workspaceProcesses: { roots: [absoluteProject], approval: "ask" }`.
+The CLI displays exact command approvals through the existing protocol and Ctrl-C cancels the
+owned process group. File-write grants alone do not grant shell access. The default demo remains
+read-only. See [shell configuration and platform limits](shell.md); unknown interrupted command
+effects are not retried automatically and may require manual workspace inspection.

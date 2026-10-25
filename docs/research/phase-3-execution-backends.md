@@ -1,14 +1,15 @@
 # Phase 3 execution backends: upstream comparison
 
-Research date: 2026-10-25. Decision pending; this is not an implementation or authorization to
-run model-selected commands. The owner asked to examine established projects before choosing D6.
+Research date: 2026-10-25. D6 was subsequently accepted: native OS sandbox default, Docker optional.
+See [ADR 0013](../decisions/0013-native-process-sandbox.md) for the accepted decision and
+[phase 3 handoff](../tasks/2026-10-25-phase-3-shell.md) for implementation evidence.
+The comparison below preserves the reasoning and limits that informed that decision.
 No source was copied into moyyi, no dependency installed, and no model was called.
 
 ## Conclusion
 
 Prefer a platform-native default for a personal local agent, with a separate container backend
-when stronger environment/lifecycle isolation is requested. This is a recommendation, not an
-accepted change to D3. The earlier recommendation to require Docker plus a filtered workspace
+when stronger environment/lifecycle isolation is requested. This recommendation was accepted as D6 while preserving D3. The earlier recommendation to require Docker plus a filtered workspace
 copy was premature: it combined three independent decisions and assumed a stronger stopping
 contract than the roadmap's explicit process-group cancellation.
 
@@ -193,5 +194,6 @@ execution. Import must compare current real-workspace hashes and ask for the new
 Current phase 2 does not provide arbitrary delete, directory creation, binary mutation or
 multi-file atomic rollback; those must be explicitly designed rather than hidden in shell output.
 
-D6 is **not decided**. The owner requested this comparison instead of approving Docker. Do not
-implement or wire a shell backend until the choice is resolved. No phase 4 work is authorized.
+D6 is **accepted** through ADR 0013. Native implementation is now authorized; Docker remains
+optional. No phase 4 work is authorized. Earlier probes above are historical research evidence,
+not substitutes for the implementation acceptance recorded in the current handoff.

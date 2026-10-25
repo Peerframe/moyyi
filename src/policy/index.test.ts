@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { ActionDigest, EffectId, EffectProfile, PreparedAction } from "../contracts/index.ts";
-import { ReadOnlyPolicy } from "./index.ts";
+import { ReadOnlyPolicy, WorkspaceProcessPolicy } from "./index.ts";
 
 const profile: EffectProfile = { class: "read", reversibility: "none", verification: "none" };
 const action: PreparedAction = {
@@ -46,5 +46,29 @@ describe("ReadOnlyPolicy", () => {
       kind: "ask",
     });
     expect(policy.beforePrepare("read", profile, { grant: "external" })).toEqual({ kind: "allow" });
+  });
+});
+
+describe("WorkspaceProcessPolicy", () => {
+  it("requires separate process authority and keeps file/external decisions independent", () => {
+    const policy = new WorkspaceProcessPolicy();
+    const process = { class: "process", reversibility: "none", verification: "none" } as const;
+    expect(policy.beforePrepare("shell", process, {})).toEqual({ kind: "allow" });
+    expect(policy.beforeExecute("shell", process, action, effect)).toEqual({ kind: "ask" });
+    expect(
+      policy.beforePrepare("write", { ...process, class: "workspace_write" }, {}),
+    ).toMatchObject({ kind: "deny" });
+    expect(policy.beforePrepare("web", { ...process, class: "external" }, {})).toMatchObject({
+      kind: "deny",
+    });
+    expect(
+      policy.beforePrepare("dishonest", { ...process, reversibility: "snapshot" }, {}),
+    ).toMatchObject({ kind: "deny" });
+    policy.revoke();
+    expect(policy.revision()).toBe(1);
+    expect(policy.beforePrepare("shell", process, {})).toMatchObject({ kind: "deny" });
+    policy.grant();
+    expect(policy.revision()).toBe(2);
+    expect(policy.beforeExecute("shell", process, action, effect)).toEqual({ kind: "ask" });
   });
 });

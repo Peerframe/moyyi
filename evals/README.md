@@ -95,3 +95,11 @@ changes, recording-path protection, unknown usage and partial interruption. It w
 synthetic report to ignored `evals/results/deepseek.json` and cleans temporary data. It never
 loads private tasks, credentials or a real model. This is adapter/runtime evidence, not pass@1,
 pass^k or a model capability score. `npm run demo:deepseek-replay` demonstrates the same boundary.
+
+## Shell offline conformance
+
+`npm run eval:shell` runs seven deterministic scenarios through real native sandboxes, SQLite
+and the runtime protocol. It verifies actual file results, denial, protected/outside files,
+timeout unknown handling and bounded output. It does not load private tasks or change existing
+corpus checkers. [Same-model comparison protocol](../docs/research/harness-comparison.md) defines
+future measurements; the scripted scenarios are not live model or harness-quality scores.

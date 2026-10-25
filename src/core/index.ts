@@ -31,6 +31,7 @@ import {
   type ToolResultPart,
   type TranscriptEntry,
   type WorkspaceFilesFactory,
+  type WorkspaceProcessesFactory,
   type WorkspaceWritesFactory,
 } from "../contracts/index.ts";
 import { type ExecutionHost, executeCalls } from "./executor.ts";
@@ -64,6 +65,7 @@ export interface CoreDeps {
   readonly collect?: (workspaceRoot: string) => Promise<readonly ContextSection[]>;
   readonly limits?: Partial<RunLimits>;
   readonly files?: WorkspaceFilesFactory;
+  readonly processes?: WorkspaceProcessesFactory;
   readonly writes?: WorkspaceWritesFactory;
 }
 
@@ -483,6 +485,7 @@ export class AgentCore {
         hasher: this.#deps.hasher,
         limits: this.#limits,
         ...(this.#deps.files ? { files: this.#deps.files } : {}),
+        ...(this.#deps.processes ? { processes: this.#deps.processes } : {}),
         ...(this.#deps.writes ? { writes: this.#deps.writes } : {}),
         now: () => this.#deps.clock.now(),
         nextEffectId: () => this.#deps.ids.next("effect") as EffectId,

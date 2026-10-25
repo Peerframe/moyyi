@@ -1,5 +1,6 @@
 import type { WorkspaceFiles, WorkspaceWrites } from "./files.ts";
 import type { ActionDigest, EffectRecord } from "./persisted/index.ts";
+import type { WorkspaceProcesses } from "./processes.ts";
 import type { JsonSchema, Precondition, PreparedAction, ToolContext } from "./tools.ts";
 
 export type ValidationResult =
@@ -35,6 +36,14 @@ export interface WorkspaceWritesFactory {
     assertAuthorized: () => void,
     scope: WorkspaceWriteScope,
   ): WorkspaceWrites;
+}
+
+export interface WorkspaceProcessesFactory {
+  create(
+    context: ToolContext,
+    assertAuthorized: () => void,
+    scope: WorkspaceWriteScope,
+  ): WorkspaceProcesses;
 }
 
 /** Time and hashing remain injected so core code has no package or I/O dependency. */

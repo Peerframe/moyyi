@@ -7,7 +7,8 @@
 **2026-10-25 最新授权：审查并合并 #12，再推进 phase 3。** #12 固定 head 审查、122 项定向测试
 （含 13 项真实 SIGKILL）及 CI 通过后，已合并为 `801175f`，main CI 通过。
 本轮从该最新 main 开 `codex/phase-3-sandboxed-shell`，**新 PR 不自动合并，phase 4 先不开始**。
-Owner 随后要求先研究优秀项目，尚未选择 D6；当前仅完成执行后端对比，未实现或开放命令工具。
+Owner 已在研究后确定 D6：原生系统沙箱默认、Docker 可选，并授权继续完成 phase 3。
+本轮沿用该分支及 PR #13，交付受控命令工具；Docker 实现保留为后续可选后端，不作为本轮前置。
 不做付费调用，不访问真实凭据，不直接推送 main。
 当前范围和证据见 [phase 3 记录](2026-10-25-phase-3-shell.md)；[phase 2 记录](2026-10-25-phase-2-writes.md)、[批次 7 记录](2026-10-25-batch-7-cli.md)、
 [批次 6](2026-10-25-batch-6-deepseek.md)、[批次 5](2026-10-25-batch-5-files.md)、
@@ -41,7 +42,7 @@ DeepSeek Responses 文本/推理/函数调用适配器、固定地址 HTTP、录
 以及显式开发插件的空闲重载。`npm run moyyi -- --demo` 可运行有限的离线脚本，真实模型通过
 显式 `--host FILE` 配置；不自动发现工作区配置，不新增凭据后端。原有 DeepSeek 离线 demo/eval 保留。
 这些不证明远端 API 已接受请求或真实 Agent 任务能力。真实冒烟及 phase 1 能力评测仍待 owner。
-phase 2 已合并，提供受控创建/编辑/撤销与快照。phase 3 处于后端选择研究，D6 未定前不实现命令工具。
+phase 2 已合并，提供受控创建/编辑/撤销与快照。phase 3 已按 D6 推进原生沙箱命令工具，当前交付和验收见 phase 3 记录。
 计划中的 project-instructions 插件仍未交付；本轮离线结果不替代 phase 1 真实模型验收。
 
 | PR | 已核对的合并记录 | 结果与后续 |
@@ -66,7 +67,7 @@ phase 2 已合并，提供受控创建/编辑/撤销与快照。phase 3 处于�
 
 - **分支与 PR**：每批一个分支 `codex/<批次名>`，从最新 `main` 切出，开一个 PR 到 `main`。不要基于另一个
   未合并的分支开 PR；D2／存储的依赖 PR 例外已结束。不直接推送 `main`，不改仓库设置。
-  #12 已按最新授权合并；phase 3 的新 PR 不自动合并，phase 4 不开始。D6 未定前先交付研究。
+  #12 已按最新授权合并；phase 3 的新 PR 不自动合并，phase 4 不开始。D6 已定，继续 phase 3 实现与验收。
 - **检查**：每个 PR 的 `npm run check` 必须全绿。新行为要有测试，包括拒绝、取消和中断的情况。
 - **边界**：`tests/boundaries.ts` 报错时改导入，不改规则。确实要改规则，就同时改 `architecture.md`，并在
   PR 里说明原因。
@@ -91,6 +92,7 @@ phase 2 已合并，提供受控创建/编辑/撤销与快照。phase 3 处于�
 | D3 | [ADR 0006](../decisions/0006-security-boundaries.md)、[威胁模型](../threat-model.md)：安全边界 | 4、5，后续命令阶段 | 工作区内按能力自主、敏感路径例外；范围授权可撤销；命令真实隔离；工具网络与模型 API 分开控制；凭据受控保存；会话加密非首版前置 |
 | D4 | 开源许可证 | 不影响开发 | Apache-2.0（`e7e270a`） |
 | D5 | [ADR 0007](../decisions/0007-first-model-provider.md)：首个真实模型 | v1 修订参考、6 | DeepSeek 官方 API，首接 `deepseek-flash` 的 Responses 子集；当前目标是 Agent，Qwen/shasha 及训练留待以后 |
+| D6 | [ADR 0013](../decisions/0013-native-process-sandbox.md)：命令执行后端 | phase 3 | 原生系统沙箱默认（Mac Seatbelt、Linux bubblewrap），直接使用授权工作区；Docker 为可选后端；明确进程组停止保证与 Mac 脱离组后代／宿主硬杀限制 |
 
 本次同步保留了 #4 的 D2、D4 和本 PR 的 D1、D3、D5。ADR 0003 已澄清：重放信息作废后，只有
 统一内容仍能形成受支持的合法请求时才能继续，否则明确拒绝或使用另行定义并验证的上下文重建；
@@ -106,7 +108,7 @@ PR #5 完成交接冲突和 D1/D3/D5 文档整合；最终 head CI 与合并后�
 
 **当前状态：两项均已完成并合入。** PR #6 完成格式修订，PR #7 完成存储及故障验收；
 #7 转向 main 后的新 CI 及合并后的 main CI 均通过。以下条目保留当时的执行顺序及格式边界；
-本轮最新授权已推进至 phase 3 的后端研究，见文档开头与 phase 3 记录。
+本轮最新授权已推进至 D6 已定后的 phase 3 实现，见文档开头与 phase 3 记录。
 
 1. **独立完成 D2 的 v1 修订。** 依已授权的本轮任务书确认尚无真实存储数据；按 B 方案修订
    契约与 `fixtures/v1.ts`，补齐需要持久化的用量、终止原因、拒绝、参数来源及推理/重放信息，并验收。
@@ -124,17 +126,18 @@ SQLite 驱动比较、建表/迁移、blob、事务和锁实现，以及存储�
 命令沙箱、后续写入能力、第二模型、自部署、Qwen/shasha、模型训练和会话加密，不是批次 3 的前置实现。
 具体平台的隔离方案与验收需在相应能力开放前完成，不能以暂缓实现为由提前开放未隔离的命令。
 
-### 3.2 Phase 3 的 D6 待定
+### 3.2 Phase 3 的 D6 已定
 
-Owner 要求先研究成熟项目，而非同意 Docker。已完成
-[Codex / Claude / OpenCode / OpenHands / Goose 对比](../research/phase-3-execution-backends.md)。
-当前建议改为原生 OS 沙箱默认、容器后端可选；不能把普通 shell 或进程组取消当作更强隔离承诺。
-需明确执行后端、真实工作区与副本模式、停止保证，保留 D3 的文件/网络强制边界。
-按本节规则在研究 PR 描述列出选项和建议，决定前不开始依赖它的产品实现。
+Owner 已根据 [Codex / Claude / OpenCode / OpenHands / Goose 对比](../research/phase-3-execution-backends.md)
+选择原生 OS 沙箱默认、Docker 可选；见 [ADR 0013](../decisions/0013-native-process-sandbox.md)。
+命令直接操作授权工作区，保留 D3 的文件／网络强制边界、干净环境和失败时拒绝执行。
+进程组取消不等于任意后代的绝对清除；Mac 主动脱离组和宿主 SIGKILL 后清除不在保证内。
+Docker 不是默认依赖、自动回退或本轮复制回写子系统；作为后续可选后端独立验收。
+该决定已授权 phase 3 实现，无需再次批准同一事项。新 PR 不自动合并，不做付费调用，phase 4 不开始。
 
 ## 4. 批次
 
-以下保留各批的目标和验收。批次 0–6 已合入；本轮只放行批次 7，phase 2–6 尚未放行。
+以下保留各批的历史目标和验收。批次 0–7 和 phase 2 已合入；本轮放行 phase 3，phase 4–6 尚未放行。
 
 ### 批次 0：CI
 
@@ -251,6 +254,6 @@ Owner 要求先研究成熟项目，而非同意 Docker。已完成
 ## 5. 不在本次交接里
 
 当前不包含 phase 4–6（长会话、第二个供应商和网页、发布）。phase 3 已获推进授权，
-但 owner 要求先看研究，D6 尚未确定；不因此宣布 phase 1 真实模型验收完成。
+D6 已确定并推进实现；不因此宣布 phase 1 真实模型验收完成。
 
 Qwen 和 shasha 仅保留为未来方向。当前不训练模型、不选训练底座或购买/租用算力；先把 Agent 做好。

@@ -8,6 +8,7 @@ import type {
   TextPart,
   ToolResultStatus,
 } from "./persisted/index.ts";
+import type { WorkspaceProcesses } from "./processes.ts";
 
 /** JSON Schema as sent to models; it is the single source of truth for tool arguments. */
 export type JsonSchema = { readonly [key: string]: unknown };
@@ -73,4 +74,6 @@ export interface ToolContext {
   readonly files?: WorkspaceFiles;
   /** Runtime binds apply to the current approved action; unavailable to read tools. */
   readonly writes?: WorkspaceWrites;
+  /** A scoped, sandboxed process; absent without a separate explicit host grant. */
+  readonly processes?: WorkspaceProcesses;
 }

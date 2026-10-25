@@ -109,3 +109,52 @@ export class WorkspaceWritePolicy implements PermissionPolicy {
     return prepared.kind === "allow" ? { kind: this.approval } : prepared;
   }
 }
+
+/** Independent process grant; granting file writes never silently authorizes commands. */
+export class WorkspaceProcessPolicy implements PermissionPolicy {
+  private allowed = true;
+  private epoch = 0;
+  private readonly files: PermissionPolicy;
+  private readonly approval: "ask" | "allow";
+
+  constructor(
+    options: { readonly files?: PermissionPolicy; readonly approval?: "ask" | "allow" } = {},
+  ) {
+    this.files = options.files ?? new ReadOnlyPolicy();
+    this.approval = options.approval ?? "ask";
+    if (!["ask", "allow"].includes(this.approval)) throw Error("Invalid process approval mode");
+  }
+  grant(): void {
+    this.allowed = true;
+    this.epoch++;
+  }
+  revoke(): void {
+    this.allowed = false;
+    this.epoch++;
+  }
+  revision(): number {
+    return this.epoch + (this.files.revision?.() ?? 0);
+  }
+  beforePrepare(tool: string, profile: EffectProfile, args: unknown): PolicyDecision {
+    if (profile.class !== "process") return this.files.beforePrepare(tool, profile, args);
+    if (!this.allowed) return { kind: "deny", reason: "Process permission has been revoked" };
+    if (profile.reversibility !== "none" || profile.verification !== "none")
+      return {
+        kind: "deny",
+        reason: "Commands cannot claim snapshot rollback or inferred recovery",
+      };
+    return { kind: "allow" };
+  }
+  beforeExecute(
+    tool: string,
+    profile: EffectProfile,
+    action: PreparedAction,
+    effectId: EffectId,
+    args?: unknown,
+  ): PolicyDecision {
+    if (profile.class !== "process")
+      return this.files.beforeExecute(tool, profile, action, effectId, args);
+    const decision = this.beforePrepare(tool, profile, args);
+    return decision.kind === "allow" ? { kind: this.approval } : decision;
+  }
+}
