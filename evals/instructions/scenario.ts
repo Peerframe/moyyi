@@ -512,6 +512,10 @@ export async function runInstructionScenario(scenario: InstructionScenario): Pro
         "entry point through transformations to its consumer and error handling",
         "payload transmission, permission decisions, and refresh lifetimes",
         "check each requested conclusion against the evidence actually returned",
+        "Lead with an answer to every question and its source",
+        "Scope negative claims precisely",
+        "startup, between requests, and during a read differ",
+        "State findings once",
       ])
         assert(rendered.includes(anchor), `Missing evidence workflow: ${anchor}`);
       for (const request of h.client.requests) assert.equal(system(request), rendered);

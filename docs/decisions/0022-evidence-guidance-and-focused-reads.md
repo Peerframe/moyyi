@@ -55,3 +55,40 @@ actual HTTP requests and zero automatic retries. Its final answer is independent
 source. A completed run is not by itself a passed knowledge task. The eight-request ceiling, the
 last-request tool prohibition and the public-release boundary remain unchanged. No upstream or
 OpenBot source or prompt was copied or substantially adapted.
+
+## Source-supplied diagnostic and scoped answers (2026-10-26)
+
+The owner subsequently authorized at most eight HTTP attempts in total for diagnosis and a
+candidate retest. Source material came from the same committed snapshot and the original
+question/criteria were retained. No reference answer or private grading checklist was supplied.
+Pre-supplying evidence is a diagnostic condition, not a pass of autonomous source discovery.
+
+The first full-source response hit the optional recorder's 8,192-event limit before completion.
+That interrupted record is retained unchanged. Coalescing recorded deltas was investigated and
+rejected: it changes the replay prefix when the existing consumer's event-byte budget cuts off a
+stream. Recording formats and limits remain unchanged. Subsequent diagnostics use the existing
+core request/transcript audit without the optional stream recorder; they do not claim stream
+replay acceptance.
+
+A full-source diagnostic then reached the unchanged 8,192-output-token ceiling, with 7,023
+reasoning tokens. A pre-reviewed focused-source diagnostic also reached that ceiling, with
+3,358 reasoning tokens. Both incomplete outcomes remain incomplete. In the latter's returned
+answer, the model correctly described a raw-text return and its downstream use, then contradicted
+those facts by asserting the data had been discarded with no consumer. Missing retrieval is
+therefore not a sufficient explanation. Neither trial proves general model incapability or
+establishes the accuracy of a hypothetical completed answer.
+
+Revise the existing source-analysis guidance rather than adding a retrieval framework or another
+model call. Cover each requested question before details; keep negative claims tied to exact
+objects, conditions and lifecycle phases; avoid restating findings with broader wording and
+unrequested audits/redesigns. Public behavior tasks use different synthetic pipelines, including
+both preserved and explicitly removed fields, to avoid teaching a universal "raw data is always
+preserved" answer. Their offline checks validate the fixtures and graders, not model competence.
+The original private knowledge rubric remains unchanged.
+
+The remaining autonomous trial receives no source pack or answer hints, uses the updated local
+candidate, and has at most five requests. Earlier three diagnostic attempts count toward the same
+eight-request authorization. A failure at five cannot establish that eight would also fail.
+This is a measured candidate change to answer guidance, not a runtime truth guarantee. The
+optional recorder's fragmented-output limit is a separate unresolved limitation; repairing its
+format or changing model/output limits is outside this slice.

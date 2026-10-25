@@ -11,6 +11,12 @@ claims against returned evidence. Independent reads may share a response; no ext
 automatic verifier, new permission or increased request budget is introduced. Truncated output
 cannot prove absence, and reading test code is not execution evidence.
 
+Source explanations cover each requested question before expanding detail. Claims retain their
+conditions and timing: a missing parsed field is not necessarily missing from raw output, and
+startup selection, between-request refresh and during-read races are separate observations.
+Findings should not be restated with broader wording in recaps or unsolicited redesign advice.
+This is guidance for the model, not a semantic validator or a guarantee of factual correctness.
+
 The instructions distinguish tool availability from permission and ordinary external content
 from instructions. They explain the root-only automatic project instruction support and tell
 the model to inspect applicable nested `AGENTS.md` files through ordinary file tools before

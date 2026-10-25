@@ -1,7 +1,7 @@
 # Task corpus
 
 Where the eval tasks come from and which candidates are still waiting. Target: 30–50 tasks
-before tuning the agent against them. The public corpus now has 30 tasks.
+before tuning the agent against them. The public corpus now has 32 tasks.
 
 ## Sources
 
@@ -18,6 +18,12 @@ comparison); their code, commit identities, project names and README facts are i
 other 13 additions are marked `invented`. No personal sessions, credentials, real project
 snapshots or private task material were added.
 
+Two original source-analysis tasks (2026-10-26) isolate factual distinctions observed during a
+separate private diagnostic: raw payload versus reconstructed data, authority versus content,
+and captured configuration versus refresh and read races. They use synthetic code and hidden
+structured-report checkers, including opposite data-retention cases. Offline reference and
+near-miss checks validate the tasks; real-model performance on these two tasks is unmeasured.
+
 What the owner asked for most:
 
 - "What is left to do?", "continue with X", "CI failed, fix it"
@@ -30,8 +36,8 @@ Failure modes the owner named, and the probes that target them:
 
 | Probe | Failure | Tasks |
 |---|---|---|
-| `false_done` | Says it is done, but part is missing | conflicting-ledger, contradictory-tests, deduplicate-roster, deployment-credentials-stop, document-format-retention, document-packet-injection, git-history-ci-repair, greet-with-translations, js-to-ts-split, listener-leak, listing-sheet, metadata-batch-rename, node-upgrade, obsolete-engine-cleanup, offline-project-comparison, quoted-csv-export, release-evidence-audit, release-notes-transform, remaining-work, research-constraint-followup, research-source-injection, short-summary, vault-move, website-source-injection |
-| `collateral_damage` | Changes or deletes what it was told to keep | accessible-names, ambiguous-cleanup, deduplicate-roster, deployment-credentials-stop, document-format-retention, document-packet-injection, english-page, git-history-ci-repair, homework-keep-format, js-to-ts-split, listener-leak, listing-sheet, metadata-batch-rename, node-upgrade, obsolete-engine-cleanup, offline-project-comparison, release-evidence-audit, release-notes-transform, research-constraint-followup, research-source-injection, stale-cache-cleanup, vault-move, website-source-injection |
+| `false_done` | Says it is done, but part is missing | conflicting-ledger, contradictory-tests, deduplicate-roster, deployment-credentials-stop, document-format-retention, document-packet-injection, git-history-ci-repair, greet-with-translations, js-to-ts-split, listener-leak, listing-sheet, metadata-batch-rename, node-upgrade, obsolete-engine-cleanup, offline-project-comparison, quoted-csv-export, release-evidence-audit, release-notes-transform, remaining-work, research-constraint-followup, research-source-injection, short-summary, source-dataflow-report, source-lifecycle-report, vault-move, website-source-injection |
+| `collateral_damage` | Changes or deletes what it was told to keep | accessible-names, ambiguous-cleanup, deduplicate-roster, deployment-credentials-stop, document-format-retention, document-packet-injection, english-page, git-history-ci-repair, homework-keep-format, js-to-ts-split, listener-leak, listing-sheet, metadata-batch-rename, node-upgrade, obsolete-engine-cleanup, offline-project-comparison, release-evidence-audit, release-notes-transform, research-constraint-followup, research-source-injection, source-dataflow-report, source-lifecycle-report, stale-cache-cleanup, vault-move, website-source-injection |
 | `forgotten_constraint` | Drops a constraint stated earlier | deduplicate-roster, document-format-retention, english-page, homework-keep-format, js-to-ts-split, metadata-batch-rename, offline-project-comparison, quoted-csv-export, research-constraint-followup, short-summary, stale-cache-cleanup |
 | `no_stop` | Keeps going instead of stopping and reporting | ambiguous-cleanup, conflicting-ledger, contradictory-tests, deployment-credentials-stop |
 | `prompt_injection` | Follows operational instructions embedded in source material | document-packet-injection, research-source-injection, website-source-injection |
@@ -66,6 +72,8 @@ Failure modes the owner named, and the probes that target them:
 | conflicting-ledger | data | invented | stop and report |
 | metadata-batch-rename | files | invented | complete |
 | ambiguous-cleanup | files | invented | stop and report |
+| source-dataflow-report | research | invented | complete |
+| source-lifecycle-report | research | invented | complete |
 | offline-project-comparison | research | real | complete |
 | research-source-injection | research | invented | complete |
 | research-constraint-followup | research | invented | complete |

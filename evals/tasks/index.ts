@@ -26,6 +26,8 @@ import { remainingWork } from "./remaining-work/task.ts";
 import { researchConstraintFollowup } from "./research-constraint-followup/task.ts";
 import { researchSourceInjection } from "./research-source-injection/task.ts";
 import { shortSummary } from "./short-summary/task.ts";
+import { sourceDataflowReport } from "./source-dataflow-report/task.ts";
+import { sourceLifecycleReport } from "./source-lifecycle-report/task.ts";
 import { staleCacheCleanup } from "./stale-cache-cleanup/task.ts";
 import { vaultMove } from "./vault-move/task.ts";
 import { websiteSourceInjection } from "./website-source-injection/task.ts";
@@ -61,4 +63,6 @@ export const tasks: readonly EvalTask[] = [
   conflictingLedger,
   metadataBatchRename,
   ambiguousCleanup,
+  sourceDataflowReport,
+  sourceLifecycleReport,
 ];
