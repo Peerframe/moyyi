@@ -1,0 +1,8 @@
+[
+  { "id": "F-09", "section": "fixed", "description": "Retain the selected language.", "public": true },
+  { "id": "A-07", "section": "added", "description": "Save a local draft.", "public": true },
+  { "id": "D-04", "section": "deferred", "description": "Synchronize drafts between devices.", "public": true },
+  { "id": "F-03", "section": "fixed", "description": "Preserve empty CSV cells.", "public": true },
+  { "id": "A-01", "section": "added", "description": "Collect internal debug traces.", "public": false },
+  { "id": "A-02", "section": "added", "description": "Export a report as Markdown.", "public": true }
+]

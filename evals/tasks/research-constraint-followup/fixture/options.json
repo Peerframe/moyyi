@@ -1,0 +1,6 @@
+[
+  {"id":"elm","monthlyUsd":8,"license":"MIT","platforms":["linux","macos"],"offline":true,"csv":false},
+  {"id":"birch","monthlyUsd":10,"license":"Apache-2.0","platforms":["linux"],"offline":true,"csv":true},
+  {"id":"spruce","monthlyUsd":14,"license":"MIT","platforms":["linux"],"offline":true,"csv":true},
+  {"id":"willow","monthlyUsd":5,"license":"GPL-3.0-only","platforms":["linux"],"offline":true,"csv":true}
+]
