@@ -51,3 +51,18 @@ publication schemas, author/publisher identity and control plane are not importe
 worktree file was modified. The reviewed source files matched that commit despite unrelated local
 OpenBot changes. The runtime reader, request recording, permission and cancellation mechanisms
 remain moyyi's existing implementations; see [ADR 0019](decisions/0019-explicit-skills-context.md).
+
+## Web text extraction experience
+
+Independently rewritten in `src/plugins/web/html-text.ts`, its tests and `evals/web/scenario.ts`,
+from OpenBot revision `010439bb9002fabb7e1facd8450ee85edbafa309`:
+
+- `apps/server-python/src/openbot_server/public_source.py`: bound input/depth/children/events,
+  remove non-content subtrees, preserve UTF-8 on clipping; no raw fallback on parser limits.
+- `apps/server-python/tests/test_public_source.py`: `test_python_html_semantics_and_utf8_bound`
+  and `test_parser_tree_limits_fail_closed`; new moyyi cases also cover title, hidden attributes,
+  malformed HTML and preserved HTTP/source truncation.
+
+No OpenBot source is copied or substantially adapted. The Python process/BeautifulSoup pipeline,
+network implementation and Server authority are not ported. [ADR 0020](decisions/0020-bounded-html-text.md)
+records the independently chosen TypeScript parser, exact version and limits.

@@ -49,7 +49,7 @@ list. Private/localhost SearXNG deployments are outside this first network bound
   IPv6-only sites, private/reserved addresses and literal IP URLs are rejected.
 - No redirects, credentials, cookies, custom headers, proxy environment, POST bodies, downloads
   or browser JavaScript. Compressed responses are refused. Supported UTF-8 media types are
-  `text/plain`, `text/html` and `application/json`. HTML remains raw, untrusted source text.
+  `text/plain`, `text/html` and `application/json`. HTML becomes a bounded, untrusted plain text view with its title.
 - Default response cap is 256 KiB, configurable up to 1 MiB, further bounded by the tool-output
   limit. Fetch may return a marked prefix. Search requires complete bounded JSON. Default timeout
   is 30 seconds, configurable up to 120 seconds, covering DNS and HTTP.
@@ -66,9 +66,9 @@ list. Private/localhost SearXNG deployments are outside this first network bound
 
 ## Verification
 
-`npm run eval:web` runs seven offline scenarios through real runtime/SQLite with synthetic HTTP:
+`npm run eval:web` runs nine offline scenarios through real runtime/SQLite with synthetic HTTP:
 injected page, search then fetch, missing grant, declined approval, private DNS, redirect and
-cancellation. They check actual canaries, durable ordering and the absence of extra requests,
+cancellation, HTML extraction and HTML depth rejection. They check actual canaries, durable ordering and the absence of extra requests,
 including after restart. The adversarial tool attempts are scripted: this proves enforcement
 for the tested actions, not that a real model will ignore every malicious page.
 
@@ -83,3 +83,18 @@ connection; public browsing in that environment is not accepted. A fake-IP/proxy
 a network route compatible with these public-address checks, not an address-check bypass.
 See [ADR 0015](decisions/0015-anthropic-and-web.md) and
 [transport research](research/phase-5-web-egress.md).
+
+## HTML text extraction
+
+`web_fetch` preserves status, URL and content type. HTML adds `title` and
+`extraction: "bounded-html-text-v1"`, removes script/style/navigation/footer and explicitly hidden
+subtrees, and retains readable paragraphs, link labels, tables and code. It never executes
+JavaScript or follows embedded resources. Text/JSON responses and search results are unchanged.
+
+Extraction accepts at most 512 KiB, depth 40, 50,000 parser events and 1,000 children/events per
+parent. The title is capped at 512 UTF-8 bytes and body at 6,000 bytes. Any input/output prefix
+is marked `truncated`; the ordinary whole-tool output cap still applies. Structural overflow
+fails without returning raw HTML or sending another request. This is a bounded text view, not
+article selection, computed CSS visibility, browser-equivalent parsing or a prompt-injection
+filter. Scripts-only pages may be empty. Normal page prose still cannot grant authority.
+See [ADR 0020](decisions/0020-bounded-html-text.md) for dependency and OpenBot reuse evidence.
