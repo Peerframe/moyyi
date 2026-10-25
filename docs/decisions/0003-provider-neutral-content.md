@@ -10,8 +10,10 @@ after one wire protocol inherits its gaps. Known differences:
 - Anthropic Messages: signed thinking blocks must be passed back unchanged in tool loops; every
   `tool_use` must be answered by a `tool_result` in the next user message.
 - OpenAI Responses: reasoning items, optionally `encrypted_content` for stateless use.
-- OpenAI-compatible Chat Completions (also typical for self-hosted Qwen via vLLM/SGLang): no
-  reasoning round-trip; tool-call parsing quality depends on the server's parser.
+- OpenAI-compatible Chat Completions (also typical for self-hosted Qwen via vLLM/SGLang):
+  reasoning fields and replay requirements depend on the provider and server profile; the
+  shared wire format does not guarantee portable reasoning replay. Tool-call parsing quality
+  depends on the server's parser.
 - Prompt caching on both major APIs matches on request prefixes.
 
 The batch 2 mapping research
@@ -46,8 +48,11 @@ that:
 2. **Bound to origin.** It also records the origin profile: provider, model, and the API version
    or server profile it was produced under. It is replayed only to an exactly matching profile.
 3. **Invalidated, never repaired.** Editing, compacting, truncating or rewriting the covered
-   content invalidates the envelope. The adapter then renders from the common parts alone. An
-   envelope is never patched to fit new content.
+   content invalidates the envelope. The adapter may render from the common parts alone only
+   if they still form a valid request under its supported provider profile. Otherwise it must
+   reject explicitly or use a separately specified and verified context rebuild. Required
+   provider state must not be silently dropped, and tool actions must not be automatically
+   repeated. An envelope is never patched to fit new content.
 4. **Opaque outside its adapter.** Only the adapter that produced an envelope reads it. The core,
    context builder, policy and evals treat it as opaque bytes and never base a decision on it.
    It grants no authority and cannot change execution flow.
