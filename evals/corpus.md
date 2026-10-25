@@ -121,4 +121,6 @@ measure help with evading trademark review, which moyyi should not optimize for.
 
 Tasks containing personal material, and the held-out set used to detect overfitting, go in
 `evals/private/` (ignored by git). Export `tasks` from `evals/private/index.ts` in the same
-format; `npm run eval` includes them when the folder exists.
+format. The CLI is public-only by default; `npm run eval -- --include-private` explicitly
+loads the private module. Do not enable it without authorization for that material. See
+[runtime task evaluation](../docs/runtime-evaluation.md) for model and capability opt-ins.

@@ -366,3 +366,43 @@ describe("eval runner", () => {
     expect(result).toMatchObject({ passed: true, falseSuccess: false });
   });
 });
+
+describe("runtime adapter lifecycle reports", () => {
+  it("cannot pass a correct final state when the runtime reports an incomplete outcome", async () => {
+    const agent: AgentUnderTest = {
+      name: "incomplete",
+      async run(input) {
+        await fixingAgent.run(input);
+        return { claimedSuccess: true, outcome: "failed", modelRequests: 1 };
+      },
+    };
+    const result = await runTrial(fixRangeOffByOne, agent, 1);
+    expect(result).toMatchObject({
+      passed: false,
+      claimedSuccess: null,
+      falseSuccess: false,
+      modelRequests: 1,
+    });
+    expect(result.details).toContain("agent reported failed");
+  });
+
+  it("disposes trial state before removing the workspace even if a checker throws", async () => {
+    let disposed = "";
+    const agent: AgentUnderTest = {
+      ...nullAgent,
+      async disposeTrial(root) {
+        disposed = root;
+        await access(join(root, "workspace"));
+      },
+    };
+    const task = {
+      ...fixRangeOffByOne,
+      async check() {
+        throw Error("checker failed");
+      },
+    };
+    await expect(runTrial(task, agent, 1)).rejects.toThrow("checker failed");
+    expect(disposed).not.toBe("");
+    await expect(access(disposed)).rejects.toMatchObject({ code: "ENOENT" });
+  });
+});

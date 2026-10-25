@@ -62,7 +62,8 @@
     "eval:long-sessions": "node evals/long-sessions/run.ts",
     "eval:anthropic": "node evals/anthropic/run.ts",
     "eval:web": "node evals/web/run.ts",
-    "eval:instructions": "node evals/instructions/run.ts"
+    "eval:instructions": "node evals/instructions/run.ts",
+    "eval:runtime": "node evals/runtime/run.ts"
   },
   "devDependencies": {
     "@biomejs/biome": "2.5.15",

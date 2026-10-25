@@ -55,5 +55,8 @@ jobs:
       - name: Project instruction conformance
         run: npm run eval:instructions
 
+      - name: Runtime task harness conformance
+        run: npm run eval:runtime
+
       - name: Installable candidate and client protocol
         run: npm run verify:package

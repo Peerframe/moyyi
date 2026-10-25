@@ -62,6 +62,8 @@ export interface CheckResult {
 export interface AgentUnderTest {
   readonly name: string;
   run(input: AgentInput): Promise<AgentReport>;
+  /** Called after each trial, including errors. Must settle/close before fixture removal. */
+  disposeTrial?(sessionId: string): Promise<void>;
 }
 
 export interface AgentInput {
@@ -81,6 +83,10 @@ export interface AgentReport {
   readonly claimedSuccess: boolean | null;
   readonly modelRequests?: number;
   readonly costUsd?: number;
+  /** An incomplete runtime outcome cannot pass a checker merely because files look right. */
+  readonly outcome?: "completed" | "failed" | "cancelled" | "budget_exhausted";
+  /** Raw normalized per-request usage; unknown fields stay unknown, not zero. */
+  readonly usage?: readonly import("../../src/contracts/index.ts").Usage[];
 }
 
 export interface TrialResult {
@@ -97,6 +103,8 @@ export interface TrialResult {
   readonly timedOut: boolean;
   readonly durationMs: number;
   readonly details: string;
+  readonly modelRequests?: number | null;
+  readonly usage?: readonly import("../../src/contracts/index.ts").Usage[];
 }
 
 export interface SuiteSummary {
