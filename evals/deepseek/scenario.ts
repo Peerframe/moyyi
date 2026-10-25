@@ -16,8 +16,9 @@ import {
   deepSeekTextFixture,
 } from "../../src/plugins/provider-deepseek/fixtures.ts";
 import {
-  DEEPSEEK_API_PROFILE,
+  type DeepSeekReasoningEffort,
   type DeepSeekTransport,
+  deepSeekApiProfile,
   deepSeekProfile,
 } from "../../src/plugins/provider-deepseek/index.ts";
 import { createRuntime, type Runtime } from "../../src/runtime/index.ts";
@@ -161,6 +162,7 @@ export async function runSession(
 }
 
 export interface RoundTripOptions {
+  readonly reasoningEffort?: DeepSeekReasoningEffort;
   readonly responses?: readonly (readonly Record<string, unknown>[])[];
   readonly replayInput?: string;
   readonly recordingInsideWorkspace?: boolean;
@@ -176,6 +178,8 @@ export interface RoundTrip {
   readonly closedResponses: number;
 }
 export async function runRoundTrip(options: RoundTripOptions = {}): Promise<RoundTrip> {
+  const reasoningEffort = options.reasoningEffort ?? "high";
+  const apiProfile = deepSeekApiProfile(reasoningEffort);
   const directory = mkdtempSync(join(tmpdir(), "moyyi-deepseek-offline-"));
   let runtime: Runtime | undefined;
   try {
@@ -194,7 +198,8 @@ export async function runRoundTrip(options: RoundTripOptions = {}): Promise<Roun
       model: deepSeekProfile.origin,
       dataDirectory: join(directory, "data-original"),
       deepseek: { transport: source.transport },
-      modelRecording: { sink, apiProfile: DEEPSEEK_API_PROFILE, source: "synthetic" },
+      deepseekReasoningEffort: reasoningEffort,
+      modelRecording: { sink, apiProfile, source: "synthetic" },
       limits: { timeoutMs: 15000, maxRetries: 0 },
     });
     assert.ok(runtime.plugins.every((plugin) => plugin.state === "loaded"));
@@ -214,7 +219,8 @@ export async function runRoundTrip(options: RoundTripOptions = {}): Promise<Roun
     runtime = await createRuntime({
       model: deepSeekProfile.origin,
       dataDirectory: join(directory, "data-replay"),
-      modelReplay: { records, apiProfile: DEEPSEEK_API_PROFILE },
+      deepseekReasoningEffort: reasoningEffort,
+      modelReplay: { records, apiProfile },
       protectedPaths: [sink.directory],
       limits: { timeoutMs: 15000, maxRetries: 0 },
     });

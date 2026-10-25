@@ -28,6 +28,7 @@ The trusted application configures `createRuntime` with:
 ```ts
 {
   model: { provider: "deepseek", model: "deepseek-flash" },
+  deepseekReasoningEffort: "low",
   dataDirectory: "/absolute/private/new-data-directory",
   deepseek: { getApiKey: async () => /* obtain from the owner's credential store */ key },
 }
@@ -38,6 +39,28 @@ The host sends one POST to `https://api.deepseek.com/responses`, prohibits redir
 secret-bearing network diagnostics. The provider handles text, full visible reasoning and local
 function calls; the runtime's existing policy controls file tools. It does not grant tool network,
 write or shell access. Only the core can retry a qualifying model error.
+
+### Reasoning effort
+
+The trusted host may set `deepseekReasoningEffort` to `none`, `low`, `high` or `max`.
+Omission preserves the existing `high` behavior. `none` disables thinking; the other values select
+the provider's thinking effort. These are the canonical values from the
+[official mapping](https://api-docs.deepseek.com/guides/thinking_mode/); aliases such as `medium`
+are deliberately rejected. The setting requires a built-in DeepSeek connection or replay and is
+captured when the runtime is created. Changing the host object afterward has no effect; recreate
+the runtime to use another effort. It never grants tool permissions or changes the model or endpoint.
+
+The 8,192-token output cap includes reasoning and answer tokens. Lower effort can leave more room
+for an answer, but does not guarantee shorter thinking or correct conclusions. The owner-authorized
+comparison motivating this option found completed answers with remaining factual errors; see
+[ADR 0023](decisions/0023-configurable-deepseek-reasoning.md). None/max have offline protocol coverage,
+not live task-quality acceptance.
+
+Session request records contain the common `ModelRequest`, not provider-specific effort. Session
+storage alone therefore cannot reconstruct the exact wire configuration. For strict diagnostic
+replay, use the effort-specific recording profile below; keep the chosen host configuration and
+actual wire audit with live evaluation evidence when optional recording is disabled. No transcript
+format change or extra system instruction is introduced by this setting.
 
 The supported request profile is intentionally narrow. Images, opaque-only/summarized reasoning,
 refusal content items, unknown assistant phases, hosted tools and stored server
@@ -60,13 +83,13 @@ implemented. No partial reasoning is silently presented as a complete continuati
 
 ## Opt-in recording and offline replay
 
-Installed hosts import `FileRecordingSink`, `loadModelRecordings` and `DEEPSEEK_API_PROFILE`
+Installed hosts import `FileRecordingSink`, `loadModelRecordings` and `deepSeekApiProfile`
 from `moyyi/runtime`. Add to a connected runtime:
 
 ```ts
 modelRecording: {
   sink: new FileRecordingSink("/absolute/private/new-recordings"),
-  apiProfile: DEEPSEEK_API_PROFILE,
+  apiProfile: deepSeekApiProfile("low"), // matches deepseekReasoningEffort: "low"
   source: "live", // use "synthetic" for injected fixtures
 }
 ```
@@ -82,15 +105,19 @@ labeling is the trusted caller's responsibility, not evidence inferred from resp
 For replay use a new runtime/data directory, the same workspace state and model, and:
 
 ```ts
+deepseekReasoningEffort: "low",
 modelReplay: {
   records: loadModelRecordings("/absolute/private/new-recordings"),
-  apiProfile: DEEPSEEK_API_PROFILE,
+  apiProfile: deepSeekApiProfile("low"),
 }
 ```
 
 Do not supply `deepseek` or `modelRecording` during replay; configuration rejects the combination.
-A changed request, model, profile or invalid record fails without network fallback. Sequential
-recordings are bounded at 8 MiB/8,192 events per exchange and 64 MiB/1,024 files per directory.
+A changed request, model, effort/profile or invalid record fails without network fallback.
+`DEEPSEEK_API_PROFILE` remains an alias for the historical high profile; old high recordings retain
+their identity. Low records cannot replay as high or vice versa. Runtime snapshots recording options
+and validates replay records before asynchronous plugin setup, so caller mutations cannot relabel
+their configuration. Sequential recordings are bounded at 8 MiB/8,192 events per exchange and 64 MiB/1,024 files per directory.
 Concurrent model requests in one recording/replay wrapper fail explicitly; use separate runtimes
 and directories for independent captures. `runtime.idle()` and `runtime.close()` wait for
 recording finalization, including consumer cancellation; custom sinks must settle their operations. The lower-level `ReplayModelClient.assertConsumed()`

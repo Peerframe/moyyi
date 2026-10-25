@@ -10,8 +10,9 @@ import {
   UNKNOWN_USAGE,
   type Usage,
 } from "../../contracts/index.ts";
+import { type DeepSeekOptions, resolveDeepSeekReasoningEffort } from "./options.ts";
 
-export const DEEPSEEK_API_PROFILE = "deepseek-responses-text-v1-2026-10-25";
+export { DEEPSEEK_API_PROFILE } from "./options.ts";
 export const deepSeekProfile: ModelProfile = {
   origin: { provider: "deepseek", model: "deepseek-flash" },
   contextWindowTokens: 1_000_000,
@@ -29,7 +30,11 @@ const MAX_AUXILIARY_REASONING_BYTES = 64 * 1024;
 type ObjectValue = Record<string, unknown>;
 
 /** Render only the documented text/function subset. Replay payloads have no authority here. */
-export function buildDeepSeekRequest(request: ModelRequest): Record<string, unknown> {
+export function buildDeepSeekRequest(
+  request: ModelRequest,
+  options: DeepSeekOptions = {},
+): Record<string, unknown> {
+  const reasoningEffort = resolveDeepSeekReasoningEffort(options.reasoningEffort);
   const value = JSON.parse(canonicalizeJson(request)) as ModelRequest;
   keys(object(value), ["origin", "system", "messages", "tools", "maxOutputTokens", "toolChoice"]);
   keys(object(value.origin), ["provider", "model"]);
@@ -167,7 +172,7 @@ export function buildDeepSeekRequest(request: ModelRequest): Record<string, unkn
   const body = {
     model: "deepseek-flash",
     stream: true,
-    reasoning: { effort: "high" },
+    reasoning: { effort: reasoningEffort },
     max_output_tokens: value.maxOutputTokens,
     ...(instructions ? { instructions } : {}),
     input,

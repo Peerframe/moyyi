@@ -7,14 +7,25 @@ import {
   UNKNOWN_USAGE,
 } from "../../contracts/index.ts";
 import { buildDeepSeekRequest, decodeDeepSeekEvents, deepSeekProfile } from "./codec.ts";
+import { type DeepSeekOptions, resolveDeepSeekReasoningEffort } from "./options.ts";
 import { parseDeepSeekSse } from "./sse.ts";
 import type { DeepSeekTransport, DeepSeekWireResponse } from "./types.ts";
 
 export { DEEPSEEK_API_PROFILE, deepSeekProfile } from "./codec.ts";
+export {
+  type DeepSeekOptions,
+  type DeepSeekReasoningEffort,
+  deepSeekApiProfile,
+  resolveDeepSeekReasoningEffort,
+} from "./options.ts";
 export type { DeepSeekTransport, DeepSeekWireResponse } from "./types.ts";
 
 /** Exactly one HTTP attempt. Only the core decides whether a new model attempt is allowed. */
-export function createDeepSeekClient(transport: DeepSeekTransport): ModelClient {
+export function createDeepSeekClient(
+  transport: DeepSeekTransport,
+  options: DeepSeekOptions = {},
+): ModelClient {
+  const reasoningEffort = resolveDeepSeekReasoningEffort(options.reasoningEffort);
   return {
     async *stream(request, signal) {
       const error = (
@@ -37,7 +48,7 @@ export function createDeepSeekClient(transport: DeepSeekTransport): ModelClient 
       }
       let body: string;
       try {
-        body = canonicalizeJson(buildDeepSeekRequest(request));
+        body = canonicalizeJson(buildDeepSeekRequest(request, { reasoningEffort }));
         if (new TextEncoder().encode(body).byteLength > 4 * 1024 * 1024)
           throw Error("Request too large");
       } catch {
@@ -104,7 +115,11 @@ export function createDeepSeekClient(transport: DeepSeekTransport): ModelClient 
   };
 }
 
-export function createDeepSeekPlugin(transport: DeepSeekTransport): Plugin {
+export function createDeepSeekPlugin(
+  transport: DeepSeekTransport,
+  options: DeepSeekOptions = {},
+): Plugin {
+  const reasoningEffort = resolveDeepSeekReasoningEffort(options.reasoningEffort);
   return {
     name: "provider-deepseek",
     apiVersion: 1,
@@ -116,7 +131,7 @@ export function createDeepSeekPlugin(transport: DeepSeekTransport): Plugin {
         models: [deepSeekProfile],
         createClient(model) {
           if (model !== "deepseek-flash") throw Error("Unsupported DeepSeek model");
-          return createDeepSeekClient(transport);
+          return createDeepSeekClient(transport, { reasoningEffort });
         },
       });
     },

@@ -44,6 +44,32 @@ function commentaryRead(withReasoning = false, options: FixtureOptions = {}) {
 
 const scenarios: readonly { id: string; run(): Promise<Evidence> }[] = [
   {
+    id: "low-effort-file-tools-record-replay",
+    async run() {
+      const result = await runRoundTrip({ reasoningEffort: "low" });
+      assertEquivalent(result);
+      assert.equal(result.first.outcome.kind, "completed");
+      assert.equal(result.records.length, 3);
+      assert.deepEqual(
+        result.first.results.map((part) => part.status),
+        ["succeeded", "succeeded"],
+      );
+      assert.ok(
+        result.wireRequests.every(
+          (wire) =>
+            (wire.reasoning as { effort: string }).effort === "low" &&
+            wire.model === "deepseek-flash" &&
+            wire.max_output_tokens === 8192,
+        ),
+      );
+      assert.ok(
+        result.records.every((record) => record.meta.apiProfile.endsWith("-reasoning-low")),
+      );
+      assert.ok(JSON.stringify(result.wireRequests[2]).includes("Hello moyyi"));
+      return evidence(result);
+    },
+  },
+  {
     id: "sse-file-tools-record-replay",
     async run() {
       const result = await runRoundTrip();
