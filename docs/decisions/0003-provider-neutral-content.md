@@ -100,3 +100,44 @@ change. From then on the recipe applies without exception.
 These are design details within the decision, not owner decisions: exact type and field names,
 the envelope size cap, where envelopes are stored (inline or as blobs), and the error-kind
 mapping (`ModelErrorKind`) that the research did not cover.
+
+## Pre-storage v1 amendment (2026-10-25)
+
+The owner authorized the amendment and then batch 3 in the
+[implementation brief](../tasks/2026-10-25-v1-and-storage.md). The existing store is still absent;
+the checkout has no local `.moyyi` data. The amended typed fixture is the v1 baseline used by
+batch 3, and the one-time amendment is consumed by this change. Later incompatible changes
+require a version bump and migration; neither this record nor batch 3 authorizes batch 4.
+
+- `RefusalPart` is distinct from text. Reasoning distinguishes full visible text, summary text
+  and an opaque marker; the marker carries no provider object. DeepSeek needs full visible
+  reasoning, not a summary, for its supported stateless history.
+- `argumentsSource` distinguishes verbatim arguments from object serialization; `providerItemId`
+  is separate from `providerCallId`. Invalid verbatim JSON is still preserved exactly.
+- `providerStopReason` retains provider termination detail next to normalized `stopReason`.
+  `other` does not imply successful completion. Usage has unknown/partial/final status and
+  explicit nullable counters, including the reasoning subcount; missing is not zero.
+- Replay is a message-level envelope. Its hash covers `{role, content}` including array order.
+  Its origin adds a non-secret `apiProfile` and `modelRevision`; null revision may be recorded
+  but never proves replay compatibility. Provider-only payload is a string, never decoded by
+  generic contract helpers. The entire canonical UTF-8 envelope is limited to 1 MiB.
+- Pure replay helpers canonicalize JSON, validate envelope structure, compare bindings and
+  remove envelopes explicitly on edits. SHA-256 is an injected trusted function so contracts
+  remain free of packages and I/O. Passing validation is not an authority grant or a claim that
+  a provider accepts the request. Fallback validity remains the adapter's responsibility.
+- Stream errors retain usage and whether any delta or completed part escaped. This is
+  conservative retry evidence, not an implemented retry policy or loop.
+
+Targeted evidence reviewed on 2026-10-25: [RFC 8785](https://www.rfc-editor.org/rfc/rfc8785),
+[DeepSeek Responses](https://api-docs.deepseek.com/guides/responses_api/) and
+[thinking mode](https://api-docs.deepseek.com/guides/thinking_mode/). Responses accepts complete
+plain-text reasoning items but not reasoning summaries/encrypted content; unsupported input
+must be rejected by the future adapter, not silently normalized away.
+
+Canonicalization options reviewed: `canonicalize@5.1.0` (2026-09-18, Apache-2.0,
+[source 31fb117](https://github.com/erdtman/canonicalize/tree/31fb117afde3ef305b2e1d99bde539bf6300bc62))
+and a strict, small RFC 8785 serializer using ECMAScript primitives. The package permits
+`toJSON` and omission of some non-JSON values, so it would still need input validation; placing
+it in runtime would also prevent plugins from using it through the existing contract boundary.
+Choose the pure serializer plus injected hash, with standards vectors and rejection tests.
+No upstream implementation was copied and no dependency or boundary exception was added.

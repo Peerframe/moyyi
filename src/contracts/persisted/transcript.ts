@@ -1,5 +1,6 @@
 import type { ContentPart, ModelOrigin, TextPart, ToolResultPart } from "./content.ts";
 import type { BlobRef, EntryId, RunId, SessionId, Timestamp } from "./ids.ts";
+import type { JsonValue, ReplayEnvelope } from "./replay.ts";
 
 /**
  * One immutable transcript entry. Entries form a tree through `parentId` so that editing an
@@ -28,14 +29,23 @@ export interface UserMessageBody {
   readonly steering: boolean;
 }
 
-export type StopReason = "end_turn" | "tool_use" | "max_tokens" | "refusal" | "interrupted";
+export type StopReason =
+  | "end_turn"
+  | "tool_use"
+  | "max_tokens"
+  | "refusal"
+  | "interrupted"
+  | "other";
 
 export interface AssistantMessageBody {
   readonly kind: "assistant_message";
   readonly origin: ModelOrigin;
   readonly content: readonly ContentPart[];
   readonly stopReason: StopReason;
+  /** Provider termination code/details; null means not reported, never an invented value. */
+  readonly providerStopReason: JsonValue;
   readonly usage: Usage;
+  readonly replay?: ReplayEnvelope;
   /** The exact request the model saw, for debugging, replay and training export. */
   readonly request: RenderedRequestRef;
 }
@@ -64,10 +74,14 @@ export interface NoticeBody {
 }
 
 export interface Usage {
-  readonly inputTokens: number;
-  readonly outputTokens: number;
-  readonly cacheReadTokens?: number;
-  readonly cacheWriteTokens?: number;
+  readonly status: "unknown" | "partial" | "final";
+  /** Total input includes cache read/write subcounts. Missing counters are null, not zero. */
+  readonly inputTokens: number | null;
+  /** Includes any reasoning tokens counted by the provider; never add them again. */
+  readonly outputTokens: number | null;
+  readonly cacheReadTokens: number | null;
+  readonly cacheWriteTokens: number | null;
+  readonly reasoningTokens: number | null;
 }
 
 /**

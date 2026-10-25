@@ -5,7 +5,18 @@ import type { BlobRef, ToolCallId } from "./ids.ts";
  * the supported wire protocols need to round-trip, not the lowest common denominator.
  * See docs/decisions/0003-provider-neutral-content.md.
  */
-export type ContentPart = TextPart | ImagePart | ReasoningPart | ToolCallPart | ToolResultPart;
+export type ContentPart =
+  | TextPart
+  | RefusalPart
+  | ImagePart
+  | ReasoningPart
+  | ToolCallPart
+  | ToolResultPart;
+
+export interface RefusalPart {
+  readonly type: "refusal";
+  readonly text: string;
+}
 
 export interface TextPart {
   readonly type: "text";
@@ -18,17 +29,10 @@ export interface ImagePart {
   readonly blob: BlobRef;
 }
 
-/**
- * Model reasoning. `opaque` is provider-owned (e.g. a signed thinking block or an encrypted
- * reasoning item) and must be replayed verbatim, and only, to the same provider family and model
- * that produced it. Other targets get `summary` or nothing.
- */
-export interface ReasoningPart {
-  readonly type: "reasoning";
-  readonly origin: ModelOrigin;
-  readonly summary?: string;
-  readonly opaque?: unknown;
-}
+/** Full visible reasoning is never substituted with a summary. Opaque state lives in replay. */
+export type ReasoningPart =
+  | { readonly type: "reasoning"; readonly kind: "visible" | "summary"; readonly text: string }
+  | { readonly type: "reasoning"; readonly kind: "opaque" };
 
 export interface ToolCallPart {
   readonly type: "tool_call";
@@ -38,6 +42,10 @@ export interface ToolCallPart {
   readonly name: string;
   /** Exactly what the model produced; kept even when it does not parse. */
   readonly rawArguments: string;
+  /** Object-only protocols serialize input once; they must not claim verbatim wire JSON. */
+  readonly argumentsSource: "verbatim" | "json_serialized";
+  /** Item IDs are distinct from call IDs on protocols such as Responses. */
+  readonly providerItemId: string | null;
 }
 
 export type ToolResultStatus =

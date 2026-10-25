@@ -2,6 +2,11 @@
 
 Anything under `src/contracts/persisted/` is on users' disks. Old data must stay readable.
 
+The owner-authorized ADR 0003 amendment on 2026-10-25 used the single pre-storage exception
+and replaced `fixtures/v1.ts` before a store existed. That amended fixture is now the baseline;
+the exception is consumed, not a standing permission to edit it again. The rules below apply
+to subsequent changes, including changes discovered while implementing storage.
+
 Adding an optional field that old records simply lack is usually compatible: old fixtures still
 type-check. Anything else is a format change: renaming or removing a field, making a field
 required, changing a type, adding an entry kind or effect state.
