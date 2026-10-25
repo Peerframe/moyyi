@@ -45,7 +45,7 @@ core through five fixed points and can be added or removed without touching anyt
 | `provider-scripted` | model provider | exists (tests and evals) |
 | `provider-deepseek` (Responses subset; [ADR 0007](decisions/0007-first-model-provider.md)) | model provider | merged in batch 6; live acceptance pending |
 | `project-instructions` (AGENTS.md and similar) | context source | 1 |
-| `fs` (read, list, search; edit/write later) | tools | read-only merged in batch 5 |
+| `fs` (read, list, search; create, edit, undo) | tools | read-only merged in batch 5; writes on phase 2 branch |
 | `shell` | tools | 3 |
 | `provider-anthropic` | model provider | 5 |
 | `web` (fetch, search) | tools, policy rule | 5 |
@@ -174,3 +174,12 @@ Application-level session encryption is not a first-release prerequisite. The
 ## Out of scope for the first release
 
 Browser automation, MCP, long-term memory, sub-agents, automation, GUI. Each has a place above.
+
+## Controlled writes (phase 2 branch)
+
+The runtime supplies `ToolContext.writes` only to authorized workspace-write tools. Preparation
+can inspect; apply is single-use and bound to the executor-approved payload after durable start.
+SQLite schema 2 adds immutable touched-file snapshots, with blobs included in backups; persisted
+transcript/effect v1 is unchanged. Undo is a new approved effect and refuses later file changes.
+Recovery only inspects recorded pre/post-state and never replays a mutation. See
+[ADR 0012](decisions/0012-controlled-workspace-writes.md) and [usage](writes.md).

@@ -2,7 +2,8 @@
 
 Status: D3 boundaries accepted on 2026-10-25 in
 [ADR 0006](decisions/0006-security-boundaries.md); read-only workspace enforcement is merged from batch 5.
-Later write, process, network and credential-store defenses still require their own verification.
+The phase 2 branch adds tested controlled writes and snapshots (see [ADR 0012](decisions/0012-controlled-workspace-writes.md)).
+Process, network and credential-store defenses still require their own verification.
 The batch 7 CLI uses explicit trusted host callbacks, not a new credential-store adapter.
 It escapes terminal control/bidirectional text and accepts approvals only for displayed digests;
 explicit development modules remain trusted in-process code, not a sandbox.
@@ -30,7 +31,7 @@ explicit development modules remain trusted in-process code, not a sandbox.
 - Policy decides what the agent may *request*. Containment (OS sandbox) decides what a process can
   *do*. Policy alone is not a security boundary for `process` effects.
 - A selected workspace grants only the supported, authorized operations. Phase 1 allows reads,
-  lists and searches; writes and commands retain their later-phase gates.
+  lists and searches. Phase 2 writes require an explicit root grant; commands retain their phase 3 gate.
 - Outside-workspace access requires an explicit scoped grant. Credential stores and protected
   files are exceptions even inside a workspace. Model output, tool output and project instructions
   cannot create or widen a grant.
@@ -51,9 +52,9 @@ explicit development modules remain trusted in-process code, not a sandbox.
 ## Remaining implementation and validation
 
 - Batch 5 implements read-only path checks and revocable per-invocation file capabilities;
-  [files.md](files.md) defines protected paths, limits and tested behavior. No write or process
-  authority is exposed. The hostile same-user race limit in T4 remains unchanged.
-- Before writes/shell: select and verify containment for each claimed platform; test connection
+  [files.md](files.md) defines protected paths, limits and tested behavior. Phase 2 adds separately
+  granted [writes](writes.md). No process authority is exposed; T4 remains unchanged.
+- Before shell: select and verify OS containment for each claimed platform; test connection
   restrictions, cancellation, interruption and filesystem races. Resolve any proposed threat-model
   expansion with the owner rather than claiming it implicitly.
 - Before credential integration: choose the OS credential-store adapter and document availability,

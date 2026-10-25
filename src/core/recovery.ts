@@ -5,6 +5,7 @@ import {
   isTerminal,
   type RunLimits,
   type SessionSnapshot,
+  type ToolContext,
   type ToolResultPart,
   type TranscriptEntry,
 } from "../contracts/index.ts";
@@ -58,13 +59,31 @@ export async function recoverSession(
       continue;
     const controller = new AbortController();
     const stop = deps.scheduler.deadline(limits.timeoutMs, () => controller.abort());
+    const revision = deps.policy.revision?.() ?? 0;
+    let live = true;
+    const guard = () => {
+      if (
+        !live ||
+        controller.signal.aborted ||
+        revision !== (deps.policy.revision?.() ?? 0) ||
+        deps.policy.beforePrepare(tool.name, tool.effect, { recovery: effect.id }).kind !== "allow"
+      )
+        throw Error("Recovery inspection permission expired");
+    };
     try {
-      const result = await tool.reconcile(effect, {
+      const context: ToolContext = {
         runId: effect.runId,
         workspaceRoot: current.workspaceRoot,
         signal: controller.signal,
         limits: { maxOutputBytes: limits.maxToolOutputBytes },
+      };
+      const result = await tool.reconcile(effect, {
+        ...context,
+        ...(deps.writes && effect.profile.class === "workspace_write"
+          ? { writes: deps.writes.create(context, guard, { phase: "prepare", effect }) }
+          : {}),
       });
+      guard();
       if (
         controller.signal.aborted ||
         !result.resolved ||
@@ -107,6 +126,7 @@ export async function recoverSession(
     } catch {
       /* Failed inspection leaves the outcome unknown; never invoke the action. */
     } finally {
+      live = false;
       stop();
     }
   }

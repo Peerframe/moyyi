@@ -74,10 +74,10 @@ async function selected(name: string): Promise<ToolDefinition> {
 }
 
 describe("fs plugin", () => {
-  it("registers exactly three read tools with closed schemas and no permission options", async () => {
+  it("registers three read tools and three snapshot writes with closed schemas", async () => {
     const tools = await registered();
-    expect([...tools.keys()]).toEqual(["read", "list", "search"]);
-    for (const tool of tools.values()) {
+    expect([...tools.keys()]).toEqual(["read", "list", "search", "create", "edit", "undo"]);
+    for (const tool of [...tools.values()].slice(0, 3)) {
       expect(tool.effect).toEqual({
         class: "read",
         reversibility: "not_applicable",

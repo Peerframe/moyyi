@@ -11,6 +11,8 @@ import {
   type ToolOutcome,
 } from "../../contracts/index.ts";
 
+import { workspaceWriteTools } from "./writes.ts";
+
 type Operation = "read" | "list" | "search";
 interface Arguments {
   readonly path: string;
@@ -64,6 +66,7 @@ export const fsPlugin: Plugin = {
   setup(host) {
     if (host.config !== undefined) throw new Error("The fs plugin does not accept configuration");
     for (const operation of ["read", "list", "search"] as const) host.registerTool(tool(operation));
+    for (const write of workspaceWriteTools()) host.registerTool(write);
   },
 };
 

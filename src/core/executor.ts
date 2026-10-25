@@ -4,6 +4,7 @@ import type {
   PreconditionVerifier,
   RunLimits,
   WorkspaceFilesFactory,
+  WorkspaceWritesFactory,
 } from "../contracts/execution.ts";
 import type {
   EffectId,
@@ -35,6 +36,7 @@ export interface ExecutionHost {
   readonly hasher: ActionHasher;
   readonly limits: RunLimits;
   readonly files?: WorkspaceFilesFactory;
+  readonly writes?: WorkspaceWritesFactory;
   now(): Timestamp;
   nextEffectId(): EffectId;
   record(effect: EffectRecord, result?: ToolResultPart): Promise<void>;
@@ -218,14 +220,26 @@ async function executeCall(call: ToolCallPart, host: ExecutionHost): Promise<Too
         throw new Error("File capability expired, cancelled or revoked");
       const decision = phase === "execute" ? executePolicy() : undefined;
       if (
-        profile.class !== "read" ||
+        (profile.class !== "read" && profile.class !== "workspace_write") ||
         preparePolicy().kind !== "allow" ||
         decision?.kind === "deny" ||
         (decision?.kind === "ask" && grant !== "ask")
       )
         throw new Error("File access is not authorized");
     };
-    const scoped = host.files ? { ...context, files: host.files.create(context, guard) } : context;
+    const scoped: ToolContext = {
+      ...context,
+      ...(host.files ? { files: host.files.create(context, guard) } : {}),
+      ...(host.writes && profile.class === "workspace_write"
+        ? {
+            writes: host.writes.create(context, guard, {
+              phase,
+              ...(effect ? { effect } : {}),
+              ...(action ? { action } : {}),
+            }),
+          }
+        : {}),
+    };
     try {
       return await operation(scoped);
     } finally {

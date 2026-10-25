@@ -25,7 +25,8 @@
     "eval:files": "node evals/files/run.ts",
     "demo:files": "node scripts/demo-files.ts",
     "eval:deepseek": "node evals/deepseek/run.ts",
-    "demo:deepseek-replay": "node scripts/demo-deepseek-replay.ts"
+    "demo:deepseek-replay": "node scripts/demo-deepseek-replay.ts",
+    "eval:writes": "node evals/writes/run.ts"
   },
   "devDependencies": {
     "@biomejs/biome": "2.5.15",

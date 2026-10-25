@@ -4,11 +4,11 @@ A personal, general-purpose agent with a small, self-owned core. Capabilities su
 providers and tools are plugins.
 
 Status: the self-owned core, SQLite, read-only file tools and DeepSeek provider/record-replay are
-merged. Batch 7 adds the interactive CLI and idle-only development reload for review. Start an
+merged, including the interactive CLI and idle-only development reload. Start an
 offline terminal with `npm run moyyi -- --demo`, or explicitly connect a trusted host using
 `--host FILE`. The demo is a finite script, not an LLM; live DeepSeek acceptance remains pending.
 See [docs/cli.md](docs/cli.md), [docs/deepseek.md](docs/deepseek.md) and
-[docs/roadmap.md](docs/roadmap.md). Phase 2 has not started.
+[docs/roadmap.md](docs/roadmap.md). Controlled writes are on the phase 2 branch for review; phase 3 is not started.
 
 ## Setup
 
@@ -55,3 +55,9 @@ recipes in [docs/recipes/](docs/recipes/).
 ## License
 
 Licensed under the [Apache License, Version 2.0](LICENSE).
+
+Controlled file creation, editing, snapshots and undo are implemented on the phase 2 branch,
+with explicit workspace grants. See [write usage](docs/writes.md) and
+[acceptance status](docs/tasks/2026-10-25-phase-2-writes.md). Run `npm run eval:writes` for
+eight offline scenarios with real filesystem and SQLite effects in disposable workspaces.
+Phase 3 is not started.

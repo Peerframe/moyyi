@@ -1,4 +1,4 @@
-import type { WorkspaceFiles } from "./files.ts";
+import type { WorkspaceFiles, WorkspaceWrites } from "./files.ts";
 import type {
   ActionDigest,
   EffectProfile,
@@ -71,4 +71,6 @@ export interface ToolContext {
   readonly limits: { readonly maxOutputBytes: number };
   /** Absent in hosts without file support; never fall back to direct host access. */
   readonly files?: WorkspaceFiles;
+  /** Runtime binds apply to the current approved action; unavailable to read tools. */
+  readonly writes?: WorkspaceWrites;
 }
