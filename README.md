@@ -11,12 +11,15 @@ See [docs/cli.md](docs/cli.md), [docs/deepseek.md](docs/deepseek.md) and
 [docs/roadmap.md](docs/roadmap.md). Controlled writes and opt-in native sandboxed commands are merged;
 see [docs/shell.md](docs/shell.md). Phase 4 compaction and crash recovery are merged in
 [PR #14](https://github.com/Peerframe/moyyi/pull/14); see [docs/long-sessions.md](docs/long-sessions.md).
-The phase 5 branch adds opt-in [Anthropic](docs/anthropic.md) and separately authorized
-[web fetch/search](docs/web.md). Its PR awaits review; live Anthropic/search acceptance is pending.
+Phase 5 [Anthropic](docs/anthropic.md) and separately authorized [web fetch/search](docs/web.md)
+are merged in [PR #15](https://github.com/Peerframe/moyyi/pull/15). Live provider/search acceptance
+remains pending. Phase 6 adds a [local installable candidate](docs/installation.md) with installed
+CLI/client acceptance; its PR awaits review. This is not an official release.
 
-## Setup
+## Development setup
 
-Requires Node 26 and npm ≥ 11 (bundled with Node 26).
+For a source checkout, use Node 26 and npm ≥ 11 (bundled with Node 26). For a tarball installation,
+follow [installation.md](docs/installation.md); contributor commands below require the repository.
 
 ```bash
 npm install
@@ -41,7 +44,9 @@ npm run check
 | `npm run eval:anthropic` | Run five offline Anthropic tools/replay/compaction/failure scenarios |
 | `npm run eval:web` | Run seven offline web authority and injection-attempt scenarios |
 | `npm run demo:scripted` | Demonstrate a complete scripted agent loop using disposable storage |
-| `npm run build` | Compile to `dist/` |
+| `npm run build` | Clean and compile production code to `dist/` |
+| `npm run package:candidate` | Create a local private tarball, checksum and inventory |
+| `npm run verify:package` | Package, install outside the repo and verify CLI, PTY, client and declarations |
 
 ## Layout
 
@@ -68,4 +73,4 @@ Controlled file creation, editing, snapshots and undo are merged in phase 2,
 with explicit workspace grants. See [write usage](docs/writes.md) and
 [acceptance status](docs/tasks/2026-10-25-phase-2-writes.md). Run `npm run eval:writes` for
 eight offline scenarios with real filesystem and SQLite effects in disposable workspaces.
-Phase 3 follows accepted D6: native sandbox default, Docker optional. Phase 6 is not started.
+Phase 3 follows accepted D6: native sandbox default, Docker optional. Phase 6 is limited to a local candidate; registry publication, release tags and official installers are not started.

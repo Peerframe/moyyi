@@ -34,7 +34,7 @@ Remaining:
   checker results do not yet measure real-agent performance
 - Validate the accepted security design ([threat-model.md](threat-model.md),
   [ADR 0006](decisions/0006-security-boundaries.md)) in the relevant implementation phases
-- D6 accepted: native sandbox default, Docker optional; phases 3–4 merged; phase 5 authorized, no phase 6
+- D6 accepted: native sandbox default, Docker optional; phases 3–5 merged; phase 6 local candidate authorized, no official publication
 
 ## Phase 1: read-only loop
 
@@ -100,13 +100,21 @@ PR CI and merged-main CI passed. Live summary quality and provider cache savings
 
 `provider-anthropic` targets the direct Messages API with signed-reasoning replay, compaction
 fallback and fixed-origin host HTTP. The `web` plugin provides separately granted fetch/search
-with exact-origin approvals, public-address DNS pinning and bounded HTTPS. Implemented on the
-phase 5 branch; the new PR awaits review/merge. Offline provider and prompt-injection authority
+with exact-origin approvals, public-address DNS pinning and bounded HTTPS. Reviewed and merged
+in [PR #15](https://github.com/Peerframe/moyyi/pull/15) after fixed-head review, 66 integration tests,
+138 risk-focused tests and passing PR/main CI. Offline provider and prompt-injection authority
 scenarios pass; live Anthropic and deployed SearXNG acceptance remain unverified. No paid call
 was made. See [Anthropic usage](anthropic.md), [web usage](web.md),
 [ADR 0015](decisions/0015-anthropic-and-web.md) and
-[current handoff](tasks/2026-10-25-phase-5-anthropic-web.md). Phase 6 is not started.
+[historical handoff](tasks/2026-10-25-phase-5-anthropic-web.md).
 
 ## Phase 6: release
 
-Packaging, installation, client protocol acceptance. UI slots arrive with the first GUI client.
+Packaging, installation and client protocol acceptance are implemented on the phase 6 branch,
+with a new PR awaiting review. This is a local private `0.0.0` candidate, not an official release.
+The same tarball is tested outside the checkout using its compiled CLI, real POSIX terminal,
+programmatic exports and strict TypeScript declarations. No paid model call, registry publication,
+tag, signed installer, GUI or automatic update is performed. See [installation](installation.md),
+[client protocol](client-protocol.md), [ADR 0016](decisions/0016-local-installable-candidate.md) and
+[current handoff](tasks/2026-10-25-phase-6-candidate.md). Live model/service and phase 1 acceptance
+gaps remain. UI slots arrive with the first GUI client, which is outside this delivery.

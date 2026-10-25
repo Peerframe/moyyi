@@ -1,0 +1,104 @@
+import {
+  createRuntime, type Runtime, type RuntimeOptions, FileRecordingSink, loadModelRecordings,
+  DEEPSEEK_API_PROFILE, ANTHROPIC_API_PROFILE, WebPolicy,
+} from "moyyi/runtime";
+import {
+  type ActionDigest,
+  type ClientCommand,
+  type EffectId,
+  type ModelStreamEvent,
+  type Plugin,
+  type RuntimeEvent,
+  UNKNOWN_USAGE,
+} from "moyyi/contracts";
+
+const synthetic: Plugin = {
+  name: "typed-consumer",
+  apiVersion: 1,
+  setup(host) {
+    host.registerModelProvider({
+      id: "typed-consumer",
+      models: [{
+        origin: { provider: "typed-consumer", model: "synthetic" },
+        contextWindowTokens: 10_000,
+        maxOutputTokens: 100,
+        parallelToolCalls: false,
+        reasoning: "none",
+        promptCache: "none",
+        editFormat: "search_replace",
+      }],
+      createClient() {
+        return {
+          async *stream(_request, _signal): AsyncIterable<ModelStreamEvent> {
+            yield { type: "part_completed", index: 0, part: { type: "text", text: "Synthetic" } };
+            yield { type: "completed", stopReason: "end_turn", providerStopReason: null, usage: UNKNOWN_USAGE };
+          },
+        };
+      },
+    });
+  },
+};
+
+const options: RuntimeOptions = {
+  model: { provider: "typed-consumer", model: "synthetic" },
+  dataDirectory: "/synthetic/private-data",
+  plugins: [{ plugin: synthetic }],
+  web: { allowedOrigins: [], approval: "ask" },
+};
+
+async function typedClient(): Promise<void> {
+  const runtime: Runtime = await createRuntime(options);
+  const unsubscribe = runtime.subscribe((event) => {
+    if (event.type === "session.ready") {
+      const command: ClientCommand = { type: "run.start", sessionId: event.sessionId, input: [{ type: "text", text: "Hello" }] };
+      void runtime.send(command);
+    }
+    if (event.type === "approval.requested") {
+      void runtime.send({ type: "approval.respond", effectId: event.effectId, digest: event.digest, decision: "deny" });
+    }
+  });
+  await runtime.send({ type: "session.create", workspaceRoot: "/synthetic/workspace" });
+  await runtime.idle();
+  unsubscribe();
+  await runtime.close();
+}
+
+function recordingHost(): RuntimeOptions {
+  const policy = new WebPolicy({ fetch: true });
+  policy.revoke();
+  return { ...options, policy,
+    modelRecording: { sink: new FileRecordingSink("/synthetic/private-recordings"), apiProfile: DEEPSEEK_API_PROFILE, source: "synthetic" },
+  };
+}
+void [recordingHost, loadModelRecordings, ANTHROPIC_API_PROFILE];
+
+function eventKind(event: RuntimeEvent): string {
+  switch (event.type) {
+    case "plugin.status":
+    case "session.ready":
+    case "run.started":
+    case "assistant.delta":
+    case "entry.appended":
+    case "approval.requested":
+    case "effect.updated":
+    case "run.finished":
+    case "command.rejected":
+      return event.type;
+    default: {
+      const unreachable: never = event;
+      return unreachable;
+    }
+  }
+}
+
+const effectId = "effect_synthetic" as EffectId;
+const digest = "sha256:synthetic" as ActionDigest;
+const validApproval: ClientCommand = { type: "approval.respond", effectId, digest, decision: "approve" };
+// @ts-expect-error Approvals cannot omit the displayed action digest.
+const missingDigest: ClientCommand = { type: "approval.respond", effectId, decision: "approve" };
+// @ts-expect-error The protocol deliberately has no unrestricted shell command.
+const invalidCommand: ClientCommand = { type: "shell.execute", command: "anything" };
+// @ts-expect-error Plugins cannot grant permission through restrictive policy rules.
+const wideningPlugin: Plugin = { name: "invalid-policy", apiVersion: 1, setup(host) { host.registerPolicyRule({ id: "invalid", evaluate() { return { kind: "allow" }; } }); } };
+
+void [typedClient, eventKind, validApproval, missingDigest, invalidCommand, wideningPlugin];

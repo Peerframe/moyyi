@@ -137,7 +137,8 @@ python3 scripts/verify-cli-pty.py
 python3 scripts/verify-cli-pty.py --entry dist/cli/main.js
 ```
 
-The optional Python 3 script is a POSIX terminal smoke, separate from Node-only CI. It creates
+The Python 3 script is a POSIX terminal smoke. Phase 6 also runs it against the installed
+candidate in CI; Python is a verification prerequisite, not a product runtime dependency. It creates
 synthetic files and private temporary stores, drives real approvals/Ctrl-C/steering/resume/reload/EOF,
 then cleans up. It makes no model call and needs no credential. Unit/integration tests also run the
 source executable as a child process. These are execution and UI evidence, not model-quality scores.
@@ -150,7 +151,8 @@ while a run is awaiting approval. Exit with Ctrl-D and reopen the same store to 
 The merged batch 7 record is [here](tasks/2026-10-25-batch-7-cli.md). Phase 2 adds
 [controlled writes](writes.md) through explicit host configuration, using the same displayed-digest
 approvals. Dependency-graph reload and live model evaluation remain outside scope.
-Phase 4 is merged. The current handoff is [phase 5](tasks/2026-10-25-phase-5-anthropic-web.md).
+Phases 4–5 are merged. The current handoff is [phase 6](tasks/2026-10-25-phase-6-candidate.md);
+[installation](installation.md) covers local candidate packages and their acceptance boundary.
 
 ## Native command opt-in
 

@@ -1,5 +1,7 @@
 node_modules/
 dist/
+artifacts/
+*.tgz
 coverage/
 .moyyi/
 evals/results/

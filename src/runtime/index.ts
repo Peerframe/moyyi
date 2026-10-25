@@ -56,7 +56,18 @@ import { NodeWebAccess, type WebAccessOptions } from "./web.ts";
 import type { WebHttpDependencies } from "./web-http.ts";
 import { NodeWorkspaceWrites } from "./writes.ts";
 
+export { FileRecordingSink, loadModelRecordings } from "./model-recording.ts";
 export type { PluginEntry, PluginStatus } from "./plugins.ts";
+// Trusted installed hosts use the same bounded helpers as source checkouts, without reaching
+// into package-private module paths. These exports do not grant a runtime any capabilities.
+export {
+  ANTHROPIC_API_PROFILE,
+  DEEPSEEK_API_PROFILE,
+  ReadOnlyPolicy,
+  WebPolicy,
+  WorkspaceProcessPolicy,
+  WorkspaceWritePolicy,
+};
 
 /**
  * Composition root: loads plugins, wires concrete store, context and policy into the core,

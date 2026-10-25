@@ -60,7 +60,7 @@ list. Private/localhost SearXNG deployments are outside this first network bound
   capability, grant writes or start a process. Network and local capabilities remain separate.
   With broader explicit grants, a model can still put known data in an allowed URL/query;
   origin restrictions are not semantic data-loss prevention. Review approvals accordingly.
-- A host-supplied `WebPolicy` can revoke its grant; cancellation/expiry/revocation stop an active
+- A host-supplied `WebPolicy` (import from `moyyi/runtime`) can revoke its grant; cancellation/expiry/revocation stop an active
   invocation. Regranting does not revive retained capabilities. Changing static origins requires
   recreating the runtime. Trusted in-process host/plugin code is not sandboxed by these ports.
 

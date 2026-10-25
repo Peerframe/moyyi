@@ -62,7 +62,7 @@ local failed result exists; start a new session. The adapter does not fabricate 
 provider turn or run its partial tool call to make such history acceptable.
 
 Generic `RuntimeOptions.modelRecording` / `modelReplay` work with `ANTHROPIC_API_PROFILE`
-exported from the plugin. Replay cannot be configured with a live connection or fall back to one.
+exported from `moyyi/runtime` for installed hosts. Replay cannot be configured with a live connection or fall back to one.
 Synthetic recording/replay is exercised by:
 
 ```sh

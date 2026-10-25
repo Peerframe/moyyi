@@ -48,3 +48,6 @@ jobs:
 
       - name: Web authority conformance
         run: npm run eval:web
+
+      - name: Installable candidate and client protocol
+        run: npm run verify:package

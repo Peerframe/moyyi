@@ -42,8 +42,8 @@ implemented. No partial reasoning is silently presented as a complete continuati
 
 ## Opt-in recording and offline replay
 
-Import `FileRecordingSink` and `loadModelRecordings` from `src/runtime/model-recording.ts`, and
-`DEEPSEEK_API_PROFILE` from `src/plugins/provider-deepseek/index.ts`. Add to a connected runtime:
+Installed hosts import `FileRecordingSink`, `loadModelRecordings` and `DEEPSEEK_API_PROFILE`
+from `moyyi/runtime`. Add to a connected runtime:
 
 ```ts
 modelRecording: {
@@ -107,4 +107,6 @@ command is run by the batch 6 tests, demo or implementation process.
    revision remains **unknown**. Keep raw private records local and report only sanitized evidence.
 
 Service acceptance, real-agent pass@1/pass^k, cost, latency and model quality remain unverified.
-The batch 7 CLI and development reload are in review. Phase 2 has not started.
+The CLI, controlled writes, native commands, compaction and second provider are merged.
+The local installable candidate is described in [installation.md](installation.md); no official
+release or live acceptance is implied.

@@ -12,9 +12,39 @@
   "bin": {
     "moyyi": "dist/cli/main.js"
   },
+  "os": [
+    "darwin",
+    "linux"
+  ],
+  "exports": {
+    "./runtime": {
+      "types": "./dist/runtime/index.d.ts",
+      "import": "./dist/runtime/index.js"
+    },
+    "./contracts": {
+      "types": "./dist/contracts/index.d.ts",
+      "import": "./dist/contracts/index.js"
+    }
+  },
+  "files": [
+    "dist/",
+    "docs/installation.md",
+    "docs/client-protocol.md",
+    "docs/cli.md",
+    "docs/deepseek.md",
+    "docs/anthropic.md",
+    "docs/files.md",
+    "docs/writes.md",
+    "docs/shell.md",
+    "docs/long-sessions.md",
+    "docs/web.md"
+  ],
   "scripts": {
     "moyyi": "node src/cli/main.ts",
-    "build": "tsc -p tsconfig.build.json",
+    "build": "node scripts/build.ts",
+    "prepack": "npm run build",
+    "package:candidate": "node scripts/package-candidate.ts",
+    "verify:package": "node scripts/verify-package.ts",
     "typecheck": "tsc -p tsconfig.json --noEmit",
     "lint": "biome check .",
     "test": "vitest run",
