@@ -42,6 +42,9 @@ D1–D6、现有 30 道公开题、fixture、checker、reference、评分阈值�
   CLI 接线和未放松 checker，不是模型能力成绩。生成结果仅在 ignored `evals/results/`。
 - `git diff --quiet -- src/contracts/persisted src/core evals/tasks evals/harness/checks.ts tests/boundaries.ts`：通过。
 - `git diff --check`：通过。
+- PR 审查补正：取消场景改为模型已进入 `stream` 后触发 adapter 的同一 outer AbortController，
+  保留 10 秒安全 deadline、取消传播/清理/零重试断言，取消应早于 deadline。取消时机不再依赖
+  CI 在 150ms 内启动 runtime。此测试改动后再次 typecheck、focused **46/46**、eval:runtime **10/10** 通过。
 
 ## 尚未验证与下一步
 

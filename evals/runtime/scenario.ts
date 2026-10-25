@@ -11,7 +11,7 @@ import {
 import { ScriptedModelClient, scriptedProfile } from "../../src/plugins/provider-scripted/index.ts";
 import { createMoyyiEvalAgent, type MoyyiEvalAgent } from "../agents/moyyi.ts";
 import { runSuite, runTrial } from "../harness/runner.ts";
-import type { EvalTask } from "../harness/types.ts";
+import type { AgentUnderTest, EvalTask } from "../harness/types.ts";
 
 export const runtimeEvalScenarios = [
   "read-write",
@@ -63,6 +63,7 @@ export async function runRuntimeEvalScenario(scenario: RuntimeEvalScenario): Pro
   let agent: MoyyiEvalAgent | undefined;
   let seenWorkspace: string | undefined;
   let cancelled = false;
+  const cancelController = new AbortController();
   const task: EvalTask = {
     id: "hidden-checker-id",
     title: "hidden-checker-title",
@@ -116,9 +117,12 @@ export async function runRuntimeEvalScenario(scenario: RuntimeEvalScenario): Pro
   const failing: ModelClient = {
     async *stream(_request, signal) {
       if (scenario === "cancel") {
+        assert(!signal.aborted, "the model must be active before controlled cancellation");
         await new Promise<void>((resolve) => {
-          if (signal.aborted) resolve();
-          else signal.addEventListener("abort", () => resolve(), { once: true });
+          signal.addEventListener("abort", () => resolve(), { once: true });
+          // Abort the adapter's outer signal only after the model stream is actually running.
+          // The trial's ordinary 10-second deadline remains a separate safety backstop.
+          cancelController.abort();
         });
         cancelled = true;
       }
@@ -146,6 +150,26 @@ export async function runRuntimeEvalScenario(scenario: RuntimeEvalScenario): Pro
         return scenario === "failure" || scenario === "cancel" ? failing : client;
       },
     });
+    const activeAgent = agent;
+    const trialAgent: AgentUnderTest =
+      scenario === "cancel"
+        ? {
+            name: agent.name,
+            async run(input) {
+              const abort = () => cancelController.abort();
+              input.signal.addEventListener("abort", abort, { once: true });
+              if (input.signal.aborted) abort();
+              try {
+                return await activeAgent.run({ ...input, signal: cancelController.signal });
+              } finally {
+                input.signal.removeEventListener("abort", abort);
+              }
+            },
+            async disposeTrial(id) {
+              await activeAgent.disposeTrial?.(id);
+            },
+          }
+        : agent;
     if (scenario === "suite-budget" || scenario === "multi-turn-budget") {
       const budgetTask =
         scenario === "multi-turn-budget" ? { ...task, followUps: ["Now finish."] } : task;
@@ -171,9 +195,8 @@ export async function runRuntimeEvalScenario(scenario: RuntimeEvalScenario): Pro
         ...(scenario === "trial-budget"
           ? { budget: { timeoutMs: 10000, maxModelRequests: 1 } }
           : {}),
-        ...(scenario === "cancel" ? { budget: { timeoutMs: 150, maxModelRequests: 8 } } : {}),
       };
-      const result = await runTrial(configured, agent, 1);
+      const result = await runTrial(configured, trialAgent, 1);
       assert.deepEqual(result.forbiddenEffects, []);
       if (scenario === "read-write" || scenario === "resume" || scenario === "shell") {
         assert.equal(result.passed, true, result.details);
@@ -210,7 +233,12 @@ export async function runRuntimeEvalScenario(scenario: RuntimeEvalScenario): Pro
         }
         if (scenario === "cancel") {
           assert(cancelled);
-          assert(result.timedOut);
+          assert.match(result.details, /agent reported cancelled/);
+          assert.equal(
+            result.timedOut,
+            false,
+            "controlled cancellation must precede the safety deadline",
+          );
         }
       }
     }
