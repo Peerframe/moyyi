@@ -50,6 +50,11 @@ copy/import workflow, persistent terminal or arbitrary-network capability.
 - `npm run build` passed. No private corpus or real model was used. Existing checks/fixtures remain
   unchanged; the Linux CI prerequisite is added without removing the original check command.
 
+The first Linux CI failed before command launch because Ubuntu AppArmor blocked bubblewrap
+loopback setup (run `40176393792`: 21 failures). The scoped distribution profile is now loaded
+in CI, while all original assertions remain; denial probes additionally require proof that the
+shell started. Linux acceptance still awaits the corrected-head run.
+
 The first full-gate attempt encountered a temporary SessionId typing error in an in-progress
 new crash fixture. It was corrected before the successful full run; no check was relaxed.
 

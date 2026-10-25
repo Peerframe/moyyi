@@ -41,7 +41,10 @@ No interactive stdin, persistent terminal or background-service API is provided.
   dependency trees can require a narrower selected project. It never silently scans only a prefix.
 
 macOS requires `/usr/bin/sandbox-exec`. Linux requires a security-maintained bubblewrap and
-permitted user/PID/network namespaces. Ubuntu CI pins `0.9.0-1ubuntu0.3`. Unsupported OSes,
+permitted user/PID/network namespaces. Ubuntu CI pins `0.9.0-1ubuntu0.3` plus
+`apparmor-profiles=4.0.1really4.0.1-0ubuntu0.24.04.9` and loads the distribution
+`bwrap-userns-restrict` profile. On Ubuntu 24.04, an administrator may need to enable that
+profile; moyyi never disables AppArmor or changes host sysctls automatically. Unsupported OSes,
 unavailable isolation and invalid configuration fail closed. No ordinary-host-shell fallback.
 Docker is reserved as an optional backend; this delivery does not expose Docker execution or
 introduce workspace copying/import. It is not required to use the native command tool.

@@ -73,3 +73,14 @@ The Linux launcher explicitly combines `--unshare-user` with `--disable-userns`,
 [upstream v0.9.0](https://github.com/containers/bubblewrap/blob/v0.9.0/bwrap.xml). It disables
 further user namespaces inside the sandbox; this writes a namespaced limit, not the host's
 sysctl. A setuid backend or unavailable namespace capability is rejected, not downgraded.
+
+The first Linux CI (`40176393792`) failed before launching commands: Ubuntu AppArmor denied
+bubblewrap's isolated loopback setup (`RTM_NEWADDR`). Installing bubblewrap alone is insufficient.
+CI additionally pins `apparmor-profiles=4.0.1really4.0.1-0ubuntu0.24.04.9` (Ubuntu archive publication
+2026-09-24) and loads its supplied `bwrap-userns-restrict` profile, as described by the
+[official sandbox setup](https://github.com/openai/codex-security/blob/af973f94224aea3035b96987e878301a3769da8c/github-action/README.md#ubuntu-sandbox-setup).
+The [Ubuntu package](https://archive.ubuntu.com/ubuntu/pool/main/a/apparmor/) was inspected: it
+allows namespace setup by bwrap and denies capabilities to executed children. This is scoped
+runner setup, not disabling AppArmor or global user-namespace restrictions. No runtime silently
+changes host security settings. Denial probes now require a real shell launch marker first, so
+an unavailable backend cannot masquerade as successful confinement.

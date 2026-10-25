@@ -61,7 +61,12 @@ const systemReadPaths =
         "/private/var/select/sh",
       ]
     : [
-        "/usr",
+        "/usr/bin",
+        "/usr/sbin",
+        "/usr/lib",
+        "/usr/lib64",
+        "/usr/libexec",
+        "/usr/share",
         "/bin",
         "/sbin",
         "/lib",

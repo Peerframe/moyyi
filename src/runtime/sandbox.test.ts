@@ -254,7 +254,11 @@ describe("native sandbox confinement", () => {
 async function run(
   commandText: string,
 ): Promise<{ code: number | null; signal: string | null; stdout: string; stderr: string }> {
-  const plan = await prepareNativeSandbox({ ...options, commandText });
+  const marker = "MOYYI_SANDBOX_STARTED\n";
+  const plan = await prepareNativeSandbox({
+    ...options,
+    commandText: `printf ${quote(marker)}; ${commandText}`,
+  });
   return new Promise((resolve, reject) => {
     const child = spawn(plan.command, [...plan.args], {
       cwd: workspace,
@@ -276,7 +280,12 @@ async function run(
     });
     child.once("close", (code, signal) => {
       clearTimeout(timer);
-      resolve({ code, signal, stdout, stderr });
+      // An unavailable launcher is not evidence that a running command was denied access.
+      if (!stdout.startsWith(marker)) {
+        reject(Error(`Sandbox did not start the probe command: ${stderr}`));
+        return;
+      }
+      resolve({ code, signal, stdout: stdout.slice(marker.length), stderr });
     });
   });
 }
