@@ -25,8 +25,7 @@ Use `createRuntime` with `plugins`, an explicitly selected `{provider, model}`, 
 `dataDirectory` or an injected `SessionStore`. The runtime owns a store it creates; callers
 close injected stores themselves. Plugins still load atomically and report their status. The batch 5 runtime registers the built-in
 `fs` plugin before additional plugins; duplicate tool/plugin names fail instead of replacing it.
-Without model/storage configuration, commands fail closed. The ordinary CLI is not yet an
-interactive client; that remains batch 7.
+Without model/storage configuration, commands fail closed. The batch 7 CLI now drives this protocol interactively; see [cli.md](cli.md).
 
 Subscribe before sending commands. `session.create` emits `session.ready`; `run.start` accepts
 input and emits `run.started`. `send(run.start)` resolves when accepted, while `idle()` waits for
@@ -45,7 +44,7 @@ still apply: a new instruction does not add free model calls or reset the deadli
   saves the assistant and the exact common request. A provider gets a separate request copy.
   For renderer `moyyi-core-v1`, the system blob contains `{origin, maxOutputTokens, content}`;
   the tools blob and individual message blobs preserve the remaining request fields. Real
-  provider wire recording/mapping remains batch 6.
+  provider wire recording/mapping was added in batch 6; see [deepseek.md](deepseek.md).
 - Argument validation precedes `prepare`. Preparation requires read permission. An `ask`
   decision before a prepared action exists fails closed and requires a host scope grant;
   selected read tools can ask for approval after preparation under `ReadOnlyPolicy`.

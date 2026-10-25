@@ -138,6 +138,10 @@ export class PluginRegistry {
     return [...this.#providers.values()].map((owned) => owned.item);
   }
 
+  providerOwner(id: string): string | undefined {
+    return this.#providers.get(id)?.owner;
+  }
+
   get contextSources(): ContextSource[] {
     return [...this.#sources.values()].map((owned) => owned.item);
   }

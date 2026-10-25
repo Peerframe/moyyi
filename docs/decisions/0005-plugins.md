@@ -40,14 +40,16 @@ Not taken, with reasons:
 - **Cordis as a dependency.** Its context, service and fiber concepts would appear in every
   module, including the core, which must stay free of packages.
 
-Planned (the project owner wants both, 2026-10-24):
+Hot reload is implemented in the batch 7 review branch; UI slots remain planned (owner direction, 2026-10-24):
 
 - **Hot reload.** The registry already loads atomically and removes everything a plugin owns on
   unload, so reload is unload followed by load. Constraints to implement: reload only between
   runs, never while a run may call the plugin; a failed reload leaves the plugin unloaded and
   reported, not half-replaced; Node caches ES modules, so development reload imports a new
   module URL each time and leaks the old module, which is acceptable for development only.
-  Target: phase 1, as a development mode of the interactive CLI.
+  Batch 7 implements this as an explicit development mode of the interactive CLI; see
+  [ADR 0011](0011-interactive-cli-and-development-reload.md) for admission, core rebinding,
+  failure handling and the single-entry/dependency-restart limit.
 - **UI slots.** Plugins will contribute declarative UI (data describing panels, settings and
   tool previews) that clients render. Not arbitrary code injected into the client or the core.
   Target: with the first GUI client.

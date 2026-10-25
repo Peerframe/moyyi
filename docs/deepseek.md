@@ -1,7 +1,7 @@
 # DeepSeek and model recordings
 
-Batch 6 adds a programmatic DeepSeek provider and deterministic record/replay. It does not add an
-interactive CLI. The default runtime still makes no network request without explicit configuration.
+Batch 6 adds a programmatic DeepSeek provider and deterministic record/replay. The subsequent
+batch 7 [CLI](cli.md) connects it through explicit trusted host configuration. The default runtime still makes no network request without explicit configuration.
 All development evidence uses synthetic protocol responses; live API acceptance remains pending.
 
 ## Offline entry points
@@ -107,4 +107,4 @@ command is run by the batch 6 tests, demo or implementation process.
    revision remains **unknown**. Keep raw private records local and report only sanitized evidence.
 
 Service acceptance, real-agent pass@1/pass^k, cost, latency and model quality remain unverified.
-The interactive CLI and hot reload belong to batch 7, which has not started.
+The batch 7 CLI and development reload are in review. Phase 2 has not started.

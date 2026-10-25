@@ -34,7 +34,7 @@ Remaining:
   checker results do not yet measure real-agent performance
 - Validate the accepted security design ([threat-model.md](threat-model.md),
   [ADR 0006](decisions/0006-security-boundaries.md)) in the relevant implementation phases
-- Review the batch 6 provider/record-replay PR; it is not automatically merged
+- Review the batch 7 CLI/development-reload PR; it is not automatically merged
 
 ## Phase 1: read-only loop
 
@@ -49,12 +49,19 @@ policy, approvals, cancellation, budgets and startup reconciliation.
 The batch 5 file tools were reviewed and merged in [PR #9](https://github.com/Peerframe/moyyi/pull/9)
 after its CI passed; merged main CI passed too. They provide real `read`, `list` and `search`,
 a scoped runtime capability, revocation/lifetime guards and bounded ignore-aware search.
-The batch 6 branch adds the DeepSeek Responses text/function provider, fixed-origin host HTTP,
+The batch 6 provider was reviewed and merged in [PR #10](https://github.com/Peerframe/moyyi/pull/10).
+It adds the DeepSeek Responses text/function provider, fixed-origin host HTTP,
 and canonical model recording/replay. `npm run demo:deepseek-replay` drives real files and SQLite
 with synthetic SSE and verifies replay; `npm run eval:deepseek` checks six offline scenarios.
 These do not measure real-model task competence or live service compatibility. See
-[deepseek.md](deepseek.md) and the [current handoff](tasks/2026-10-25-batch-6-deepseek.md).
-Live acceptance remains owner-run. Batch 7 (interactive CLI/hot reload) has not started.
+[deepseek.md](deepseek.md) and the [batch 6 record](tasks/2026-10-25-batch-6-deepseek.md).
+The batch 7 branch adds interactive sessions, streaming, digest approvals, Ctrl-C/EOF cleanup,
+steering/resume and explicit development-plugin reload through the protocol. `--demo` is a finite
+offline script; `--host FILE` connects an explicitly trusted runtime configuration. See
+[cli.md](cli.md) and the [current handoff](tasks/2026-10-25-batch-7-cli.md).
+Live acceptance remains owner-run. The planned `project-instructions` plugin is not delivered by
+these batches; implicit workspace instructions/config discovery is not enabled. Phase 1 acceptance
+is not claimed, and phase 2 has not started.
 Run the read-only subset of the corpus. Qwen and shasha training are deferred directions,
 not requirements for this phase or the first release.
 

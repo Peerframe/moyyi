@@ -43,7 +43,7 @@ core through five fixed points and can be added or removed without touching anyt
 | Plugin | Extension points | Phase |
 |---|---|---|
 | `provider-scripted` | model provider | exists (tests and evals) |
-| `provider-deepseek` (Responses subset; [ADR 0007](decisions/0007-first-model-provider.md)) | model provider | batch 6 review; live acceptance pending |
+| `provider-deepseek` (Responses subset; [ADR 0007](decisions/0007-first-model-provider.md)) | model provider | merged in batch 6; live acceptance pending |
 | `project-instructions` (AGENTS.md and similar) | context source | 1 |
 | `fs` (read, list, search; edit/write later) | tools | read-only merged in batch 5 |
 | `shell` | tools | 3 |
@@ -72,7 +72,12 @@ Defined in [plugin.ts](../src/contracts/plugin.ts):
 Loading is atomic. A plugin's registrations become visible only after its whole `setup`
 succeeds; a failure removes everything it registered and runs its cleanups. Name conflicts fail
 the later plugin. Each registration has one owner and disappears when the owner is unloaded.
-Load failures are reported in `Runtime.plugins`, so clients never assume readiness.
+Load failures are reported in `Runtime.plugins`, so clients never assume readiness. Batch 7 adds
+explicit development loaders and the nonpersisted `plugin.reload`/`plugin.status` protocol. Runtime
+admits reload only while idle, unloads first, then rebinds the core to current registrations while
+retaining store/session/policy and unaffected provider clients. A failed replacement stays unloaded.
+See [CLI usage](cli.md) and [ADR 0011](decisions/0011-interactive-cli-and-development-reload.md).
+Development reload is incompatible with recording/replay and refreshes only explicit ESM entries.
 
 ### Trust
 
