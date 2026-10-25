@@ -33,7 +33,8 @@ npm run check
 | `npm run moyyi -- --help` | Show CLI modes, session controls and development options |
 | `npm run moyyi -- --demo` | Open the offline scripted terminal using real read-only file tools |
 | `npm run check` | Typecheck, lint, tests (including layer boundaries and the format lock) |
-| `npm run eval` | Run the eval suite |
+| `npm run eval` | Run the public task suite with the null baseline; [explicit runtime/model opt-in](docs/runtime-evaluation.md) |
+| `npm run eval:runtime` | Run ten offline real-runtime/task-harness conformance scenarios |
 | `npm run eval:core` | Run eight deterministic core conformance/fault scenarios (no paid model) |
 | `npm run eval:files` | Run eight deterministic real-file capability scenarios |
 | `npm run demo:files` | Demonstrate real list/search/read with scripted responses and disposable files |

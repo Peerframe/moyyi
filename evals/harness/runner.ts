@@ -2,6 +2,7 @@ import { createHash } from "node:crypto";
 import { cp, mkdir, mkdtemp, readdir, readFile, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join, relative } from "node:path";
+import type { Usage } from "../../src/contracts/index.ts";
 import type { AgentUnderTest, EvalTask, SuiteSummary, TrialResult } from "./types.ts";
 
 /**
@@ -37,6 +38,8 @@ export async function runTrial(
     let agentError: string | null = null;
     let requestsLeft = task.budget.maxModelRequests;
     let budgetExhausted = false;
+    let modelRequests: number | null = 0;
+    const usage: Usage[] = [];
     try {
       const instructions = [task.instruction, ...(task.followUps ?? [])];
       for (const [turnIndex, instruction] of instructions.entries()) {
@@ -65,16 +68,23 @@ export async function runTrial(
             throw new Error("agent reported an invalid model request count");
           }
           requestsLeft -= report.modelRequests;
+          if (modelRequests !== null) modelRequests += report.modelRequests;
           if (requestsLeft < 0) {
             budgetExhausted = true;
             break;
           }
+        } else modelRequests = null;
+        usage.push(...(report.usage ?? []));
+        if (report.outcome && report.outcome !== "completed") {
+          agentError = `agent reported ${report.outcome}`;
+          break;
         }
         // Earlier turns describe only partial work, not the outcome of the whole trial.
         if (turnIndex === instructions.length - 1) claimedSuccess = report.claimedSuccess;
       }
     } catch (error) {
       agentError = error instanceof Error ? error.message : String(error);
+      modelRequests = null;
     } finally {
       clearTimeout(timer);
     }
@@ -110,6 +120,8 @@ export async function runTrial(
       forbiddenEffects,
       timedOut,
       durationMs,
+      modelRequests,
+      usage,
       details: [
         ...(agentError === null ? [] : [`agent error: ${agentError}`]),
         ...(timedOut ? ["trial timed out"] : []),
@@ -118,7 +130,11 @@ export async function runTrial(
       ].join("; "),
     };
   } finally {
-    await rm(root, { recursive: true, force: true });
+    try {
+      await agent.disposeTrial?.(root);
+    } finally {
+      await rm(root, { recursive: true, force: true });
+    }
   }
 }
 
