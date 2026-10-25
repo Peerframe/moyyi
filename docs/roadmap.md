@@ -10,6 +10,7 @@ The remaining phase 0 work and phase 1 are split into batches in the
 Done:
 
 - Repository and toolchain on Node 26; layer boundary check
+- CI on pull requests and main pushes, including the tracked eval fixture baseline
 - Persisted format (content, transcript tree, effect journal and transitions) with version and
   fixture lock
 - Model client contract with `checkModelStream`; tool contract; ports; client protocol
@@ -17,22 +18,29 @@ Done:
   observers; `provider-scripted` as the first plugin
 - Eval harness: fresh workspace per trial, hidden checker, outside-workspace canary, false-success
   and pass^k metrics, stop-and-report tasks, private task folder
-- Task corpus: 14 tasks, 13 rewritten from the owner's real requests; every checker proven
-  against a reference solution and near misses ([evals/corpus.md](../evals/corpus.md))
+- Task corpus: 30 public tasks with multi-turn and injection cases; every checker proven
+  against a reference solution and near misses ([evals/corpus.md](../evals/corpus.md)).
+  The B1 final-claim and B2 answer-hint corrections are integrated
+- Three-protocol content mapping with synthetic fixtures and integrity tests
+  ([content-model-mapping.md](research/content-model-mapping.md)); no live API acceptance
+- Accepted D1–D5 decisions; implementation gates remain in the handoff brief
 
 Remaining:
 
-- Grow the corpus from 14 to 30–50 tasks, including a held-out set in `evals/private/`
-- Threat model filled in ([threat-model.md](threat-model.md))
-- Two-protocol mapping for the content model, with recorded fixtures
-  ([ADR 0003](decisions/0003-provider-neutral-content.md))
-- Decide the proposed parts of ADR 0002 and ADR 0003
+- Add more tasks as needed and an owner-supplied held-out set in `evals/private/`; public
+  checker results do not yet measure real-agent performance
+- Validate the accepted security design ([threat-model.md](threat-model.md),
+  [ADR 0006](decisions/0006-security-boundaries.md)) in the relevant implementation phases
+- Finish the separately authorized D2 v1 amendment
+  before storage writes data; see the [batch 3 prerequisites](tasks/2026-10-24-codex-handoff.md#31-开始批次-3-之前)
 
 ## Phase 1: read-only loop
 
-Core loop, `provider-openai-compatible`, `project-instructions`, read and search tools in `fs`,
-SQLite store (`node:sqlite` first), record/replay, plugin hot reload in development mode. Run
-the read-only subset of the corpus.
+Core loop, `provider-deepseek` ([ADR 0007](decisions/0007-first-model-provider.md)),
+`project-instructions`, read and search tools in `fs`, SQLite store (driver comparison in
+batch 3; `node:sqlite` first candidate), record/replay, plugin hot reload in development mode.
+Run the read-only subset of the corpus. Qwen and shasha training are deferred directions,
+not requirements for this phase or the first release.
 
 ## Phase 2: controlled writes
 

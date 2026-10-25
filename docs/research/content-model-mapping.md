@@ -1,13 +1,15 @@
 # Content model mapping: Messages, Responses and Chat Completions
 
-Research date: **2026-10-25**. Baseline: `main` at `e7e270a`. Status: **evidence for owner
-decision D2; not an accepted format change or provider implementation**. No file under
-`src/contracts/persisted` is changed. ADR 0003 remains proposed.
+Research date: **2026-10-25**. Reviewed contract baseline: `main` at `e7e270a`.
+**D2 option B is now accepted in [ADR 0003](../decisions/0003-provider-neutral-content.md).**
+The proposals and alternatives below preserve the research-stage rationale. The format amendment
+and provider implementation remain pending; this research changes no persisted contract.
 
 The current five `ContentPart` variants and six `ModelStreamEvent` variants do not provide a
 lossless representation of all three wire formats. The common text/function-call path is
-expressible, but replay metadata, refusal content, termination details and missing usage need
-explicit decisions. A provider-neutral interface is feasible without flattening these differences.
+expressible, but replay metadata, refusal content, termination details and missing usage still
+need the separately authorized contract amendment. A provider-neutral interface is feasible
+without flattening these differences.
 
 ## Scope and notation
 
@@ -220,7 +222,8 @@ not 100. Twelve output tokens including four reasoning tokens stays 12, not 16.
 Totals alone cannot reconstruct detailed reasoning/audio/image/prediction counters, cache TTL
 breakdowns or provider billing adjustments. Usage is observation, not a field to echo in a model
 request. A stream can be interrupted before final usage; the required integer totals and an
-`error` event without usage cannot preserve unknown/partial accounting. D2 must settle this.
+`error` event without usage cannot preserve unknown/partial accounting. ADR 0003 accepts the
+normalization and presence requirements; the persisted-format amendment remains pending.
 
 ## Request placement and capability boundary
 
@@ -268,11 +271,11 @@ wire values. Synthetic signatures, encrypted payloads and IDs cannot authenticat
 real conversation. JSON/structural checks do not certify acceptance by a service, SDK or model.
 No provider adapter, automatic converter, model invocation or recording system is implemented
 by this batch. Batch 6 will need actual decoder/renderer tests and `checkModelStream` on their
-decoded results after the owner selects D2 and D5.
+decoded results under the accepted D2 and D5 decisions and their implementation briefs.
 
-## Owner decision D2
+## D2 alternatives considered
 
-Options for the next implementation brief:
+Research-stage options, retained to explain the decision:
 
 1. **Keep v1 and enforce a narrow supported subset.** Lowest migration work, but reject or
    explicitly disable unsupported refusal, multimodal, reasoning replay and termination paths.
@@ -285,6 +288,7 @@ Options for the next implementation brief:
    but makes core/context/compaction depend on vendor shapes and complicates model switching.
    Not recommended for the self-owned core goal.
 
-Recommendation 2 is an architectural inference from the mapping, **not an accepted decision**.
-Do not start storage, loop implementation or a format migration as a consequence of this file.
-D1, D2, D3 and D5 remain owner decisions; batches 3+ have not started.
+The owner subsequently accepted recommendation 2 in ADR 0003, including its one-time pre-storage
+v1 amendment exception. D1, D3 and D5 are also settled; the [current handoff](../tasks/2026-10-24-codex-handoff.md)
+records them and their implementation gates. No storage, loop or format amendment is authorized
+by this research document. Batch 3 remains unstarted.
