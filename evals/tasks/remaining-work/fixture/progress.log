@@ -1,0 +1,10 @@
+2026-10-14 merged #9   02a 加 Prettier 和 ESLint
+2026-10-15 merged #10  02b TypeScript 类型检查
+2026-10-15 merged #11  02c 统一脚本命名
+2026-10-16 merged #12  03a 测试模式开关
+2026-10-16 merged #13  03b Playwright 端到端测试
+2026-10-17 reverted #13 03b：CI 上浏览器装不上，整个回滚
+2026-10-18 merged #14  04a 浏览器脚本改写成 TypeScript
+2026-10-19 merged #15  04c 第 1 部分：拆出相机和灯光（共 2 部分，第 2 部分建筑和道路还没做）
+2026-10-20 merged #17  05a CI 跑单元测试和快速校验
+2026-10-21 opened #18  04h 修复 bug（还在审查，没合并）
