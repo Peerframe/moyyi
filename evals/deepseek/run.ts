@@ -58,6 +58,72 @@ const scenarios: readonly { id: string; run(): Promise<Evidence> }[] = [
     },
   },
   {
+    id: "final-answer-phase-record-replay-and-tool-continuation",
+    async run() {
+      const responses = [...successfulFixtures()];
+      responses[0] = deepSeekFixture([
+        { type: "reasoning", text: "Inspect the selected workspace." },
+        { type: "message", text: "Synthetic phase annotation cannot finish a tool turn." },
+        { type: "function_call", callId: "fixture_list_1", name: "list", arguments: "{}" },
+      ]);
+      for (const events of responses)
+        for (const event of events) {
+          const item = event.item as Record<string, unknown> | undefined;
+          if (item?.type === "message") item.phase = "final_answer";
+          const response = event.response as { output?: Record<string, unknown>[] } | undefined;
+          for (const final of response?.output ?? [])
+            if (final.type === "message") final.phase = "final_answer";
+        }
+      const result = await runRoundTrip({ responses });
+      assertEquivalent(result);
+      assert.equal(result.first.outcome.kind, "completed");
+      assert.equal(result.records.length, 3);
+      assert.deepEqual(
+        result.first.results.map((part) => part.status),
+        ["succeeded", "succeeded"],
+      );
+      const terminal = result.records[0]?.events.at(-1);
+      assert.ok(terminal?.type === "completed" && terminal.stopReason === "tool_use");
+      assert.ok(JSON.stringify(result.wireRequests[1]).includes("annotation cannot finish"));
+      assert.ok(JSON.stringify(result.replay.assistantContent).includes(finalAnswer));
+      for (const normalized of [result.records, result.wireRequests]) {
+        assert.ok(!JSON.stringify(normalized).includes('"phase":'));
+        assert.ok(!JSON.stringify(normalized).includes('"final_answer"'));
+      }
+      return evidence(result);
+    },
+  },
+  {
+    id: "unsupported-message-phase-never-executes-proposed-tool",
+    async run() {
+      const events = deepSeekFixture([
+        {
+          type: "function_call",
+          callId: "fixture_pending_read",
+          name: "read",
+          arguments: '{"path":"README.md"}',
+        },
+        { type: "message", text: "Synthetic unsupported commentary." },
+      ]);
+      const item = events.find(
+        (event) =>
+          event.type === "response.output_item.added" &&
+          (event.item as Record<string, unknown>).type === "message",
+      )?.item as Record<string, unknown>;
+      item.phase = "commentary";
+      const result = await runRoundTrip({ responses: [events] });
+      assertEquivalent(result);
+      assert.equal(result.first.outcome.kind, "failed");
+      assert.equal(result.first.effectStates.length, 0);
+      assert.ok(result.first.results.every((part) => part.status !== "succeeded"));
+      assert.equal(result.transportCallsAfterReplay, 1);
+      assert.equal(result.records.length, 1);
+      const terminal = result.records[0]?.events.at(-1);
+      assert.ok(terminal?.type === "error" && terminal.error.kind === "protocol");
+      return evidence(result);
+    },
+  },
+  {
     id: "opaque-only-reasoning-never-executes-proposed-tool",
     async run() {
       const events = deepSeekFixture([

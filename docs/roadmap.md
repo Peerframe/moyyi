@@ -52,7 +52,8 @@ a scoped runtime capability, revocation/lifetime guards and bounded ignore-aware
 The batch 6 provider was reviewed and merged in [PR #10](https://github.com/Peerframe/moyyi/pull/10).
 It adds the DeepSeek Responses text/function provider, fixed-origin host HTTP,
 and canonical model recording/replay. `npm run demo:deepseek-replay` drives real files and SQLite
-with synthetic SSE and verifies replay; `npm run eval:deepseek` checks six offline scenarios.
+with synthetic SSE and verifies replay; `npm run eval:deepseek` now checks ten offline scenarios,
+including auxiliary reasoning and final-answer annotations with unchanged terminal authority.
 These do not measure real-model task competence or live service compatibility. See
 [deepseek.md](deepseek.md) and the [batch 6 record](tasks/2026-10-25-batch-6-deepseek.md).
 Batch 7 was reviewed and merged in [PR #11](https://github.com/Peerframe/moyyi/pull/11). It adds interactive sessions, streaming, digest approvals, Ctrl-C/EOF cleanup,

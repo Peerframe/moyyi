@@ -653,9 +653,11 @@ function normalizeItem(raw: unknown): ObjectValue {
     };
   if (type === "message") {
     requireCondition(value.role === "assistant", "Invalid output role");
+    // This output annotation does not complete the response or authorize tools. Normalize
+    // final-answer text to the existing stateless history; commentary remains unsupported.
     requireCondition(
-      value.phase === undefined || value.phase === null,
-      "Assistant phases are unsupported",
+      value.phase === undefined || value.phase === null || value.phase === "final_answer",
+      "Unsupported assistant phase",
     );
   } else {
     emptyOptionalArray(value.summary, "Reasoning summaries are unsupported");

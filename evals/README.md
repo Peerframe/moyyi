@@ -89,7 +89,7 @@ It measures execution/authority conformance, not real-model task competence.
 
 ## DeepSeek offline conformance
 
-`npm run eval:deepseek` runs six public deterministic scenarios through the runtime protocol:
+`npm run eval:deepseek` runs ten public deterministic scenarios through the runtime protocol:
 synthetic SSE → real file tools/SQLite → normalized recording → offline replay, plus request/file
 changes, recording-path protection, unknown usage and partial interruption. It writes only a
 synthetic report to ignored `evals/results/deepseek.json` and cleans temporary data. It never

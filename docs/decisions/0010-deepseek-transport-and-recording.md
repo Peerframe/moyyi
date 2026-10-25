@@ -52,7 +52,7 @@ assembly. Missing, interrupted, truncated or unsupported history fails locally b
 The supported profile is `deepseek-responses-text-v1-2026-10-25`, with `deepseek-flash`, high
 reasoning effort, a 1,000,000-token context declaration and a deliberately conservative **8,192**
 output-token limit. This is lower than the reviewed service limit, not a claim about its maximum.
-Images, summaries, opaque-only reasoning, assistant phases, refusal content items, hosted tools,
+Images, summaries, opaque-only reasoning, commentary/unknown assistant phases, refusal content items, hosted tools,
 server-stored conversations and vendor-specific request options are outside this profile.
 No `parallel_tool_calls` or `max_tool_calls` promise is delegated to the server; moyyi's existing
 execution limits apply. Unsupported cases fail closed and may need a later adapter profile.
@@ -81,6 +81,34 @@ This is an output compatibility correction to the existing profile. Common reque
 the profile identifier, D2 envelopes, persisted v1 and authority boundaries do not change. No upstream
 source or private response text was copied. Offline replay closes this first rejection only; the
 captured prefix ends before a terminal event and is correctly reported as interrupted.
+
+### Final-answer output annotation compatibility (2026-10-25)
+
+A subsequent separately authorized minimal request returned HTTP 200 and a complete private wire
+capture: visible reasoning, an assistant message with `phase: "final_answer"` in added/done/terminal
+snapshots, and `response.completed`. The installed decoder rejected the message's added event.
+The capture contains the final answer and usage, so this defect can be reproduced and verified
+offline without another paid request. No private IDs, reasoning or wire transcript enter the repo.
+
+Accept only absent, null or `"final_answer"` on message output, validating every item snapshot;
+normalize that annotation away. Commentary, unknown phases and invalid types remain unsupported.
+This maps the observed final-answer text to the profile's existing assistant text. It does not
+declare a successful turn: response status and its terminal event still govern completion, refusal,
+truncation, failure and tool execution. EOF remains interrupted, and a response containing a function
+call still completes as `tool_use`. Identity, lifecycle and streamed/final content equality remain.
+
+The [DeepSeek guide](https://api-docs.deepseek.com/guides/responses_api/) defines response terminal
+events and stateless plaintext continuation; its [input schema](https://api-docs.deepseek.com/api/create-response/)
+does not specify a `phase` field. It does not explicitly document this output annotation either;
+the actual capture establishes its presence. Within this supported subset, no extra replay state
+is needed: common event and request semantics, D2 envelopes, persisted v1 and the profile identifier
+stay unchanged. This is not a general rule for other providers' phase or reasoning requirements.
+Real DeepSeek multi-turn quality and tool continuation remain unverified.
+
+Synthetic regressions cover lifecycle variants, terminal authority and rejected commentary before
+tool execution. The existing runtime/SQLite record-replay eval confirms that normalized recordings
+and reconstructed input omit the annotation. Offline decoding of the entire private wire returns
+the final answer and reported usage. No upstream implementation was copied or dependency added.
 
 ## Recording and replay
 
