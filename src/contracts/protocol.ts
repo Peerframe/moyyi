@@ -14,6 +14,7 @@ import type {
  * by changing the transport only.
  */
 export type ClientCommand =
+  | { readonly type: "plugin.reload"; readonly name: string }
   | { readonly type: "session.create"; readonly workspaceRoot: string }
   | { readonly type: "session.load"; readonly sessionId: SessionId }
   | {
@@ -32,6 +33,13 @@ export type ClientCommand =
     };
 
 export type RuntimeEvent =
+  | { readonly type: "plugin.status"; readonly name: string; readonly state: "loaded" }
+  | {
+      readonly type: "plugin.status";
+      readonly name: string;
+      readonly state: "failed";
+      readonly error: string;
+    }
   | { readonly type: "session.ready"; readonly sessionId: SessionId }
   | { readonly type: "run.started"; readonly runId: RunId; readonly sessionId: SessionId }
   | { readonly type: "assistant.delta"; readonly runId: RunId; readonly text: string }

@@ -3,12 +3,12 @@
 A personal, general-purpose agent with a small, self-owned core. Capabilities such as model
 providers and tools are plugins.
 
-Status: the self-owned core, SQLite runtime and real read-only file tools are merged. Batch 6
-adds the DeepSeek Responses provider and model recording/replay for review. Run
-`npm run demo:deepseek-replay` for synthetic DeepSeek SSE driving real files and SQLite, followed
-by equivalent offline replay. Live service acceptance and the interactive CLI remain pending.
-See [docs/deepseek.md](docs/deepseek.md), [docs/files.md](docs/files.md) and
-[docs/roadmap.md](docs/roadmap.md).
+Status: the self-owned core, SQLite, read-only file tools and DeepSeek provider/record-replay are
+merged. Batch 7 adds the interactive CLI and idle-only development reload for review. Start an
+offline terminal with `npm run moyyi -- --demo`, or explicitly connect a trusted host using
+`--host FILE`. The demo is a finite script, not an LLM; live DeepSeek acceptance remains pending.
+See [docs/cli.md](docs/cli.md), [docs/deepseek.md](docs/deepseek.md) and
+[docs/roadmap.md](docs/roadmap.md). Phase 2 has not started.
 
 ## Setup
 
@@ -23,7 +23,8 @@ npm run check
 
 | Command | What it does |
 |---|---|
-| `npm run moyyi -- --help` | Run the CLI from source |
+| `npm run moyyi -- --help` | Show CLI modes, session controls and development options |
+| `npm run moyyi -- --demo` | Open the offline scripted terminal using real read-only file tools |
 | `npm run check` | Typecheck, lint, tests (including layer boundaries and the format lock) |
 | `npm run eval` | Run the eval suite |
 | `npm run eval:core` | Run eight deterministic core conformance/fault scenarios (no paid model) |

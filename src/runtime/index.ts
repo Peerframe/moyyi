@@ -7,7 +7,9 @@ import {
   type Clock,
   canonicalizeJson,
   type IdSource,
+  type ModelClient,
   type ModelOrigin,
+  type ModelProvider,
   type ModelRecording,
   type ModelRecordingSink,
   type PermissionPolicy,
@@ -52,7 +54,14 @@ export interface Runtime {
   close(): Promise<void>;
 }
 
+export interface DevelopmentPlugin {
+  readonly name: string;
+  /** Explicit trusted code; invoked only at startup or an idle reload. */
+  readonly load: () => Promise<PluginEntry>;
+}
+
 export interface RuntimeOptions {
+  readonly developmentPlugins?: readonly DevelopmentPlugin[];
   readonly plugins?: readonly PluginEntry[];
   readonly model?: ModelOrigin;
   readonly dataDirectory?: string;
@@ -82,6 +91,8 @@ export interface RuntimeOptions {
 }
 
 export async function createRuntime(options: RuntimeOptions = {}): Promise<Runtime> {
+  if (options.developmentPlugins?.length && (options.modelRecording || options.modelReplay))
+    throw Error("Development reload cannot be combined with recording or replay");
   if ((options.modelRecording && options.modelReplay) || (options.modelReplay && options.deepseek))
     throw Error("Replay cannot be combined with live connection or recording options");
   if ((options.modelRecording || options.modelReplay || options.deepseek) && !options.model)
@@ -110,16 +121,32 @@ export async function createRuntime(options: RuntimeOptions = {}): Promise<Runti
       : undefined;
   const registry = new PluginRegistry();
   const plugins: PluginStatus[] = [];
-  for (const entry of [
+  const startup = [
     { plugin: fsPlugin },
     ...(deepseek ? [{ plugin: deepseek }] : []),
     ...(options.plugins ?? []),
-  ])
-    plugins.push(await registry.load(entry));
+  ];
+  const development = new Map<string, DevelopmentPlugin>();
+  const reserved = new Set(startup.map(({ plugin }) => plugin.name));
+  for (const entry of options.developmentPlugins ?? []) {
+    if (!/^[a-z][a-z0-9-]{0,63}$/.test(entry.name) || typeof entry.load !== "function")
+      throw Error("Invalid development plugin entry");
+    if (reserved.has(entry.name) || development.has(entry.name))
+      throw Error("Development plugin names must be unique and cannot replace startup plugins");
+    development.set(entry.name, entry);
+  }
+  for (const entry of startup) plugins.push(await registry.load(entry));
 
   const listeners = new Set<(event: RuntimeEvent) => void>();
   const diagnostics: string[] = [];
+  const activeRuns = new Set<string>();
+  const commands = new Set<Promise<void>>();
+  let closed = false;
+  let reloading = false;
+  let closing: Promise<void> | undefined;
   const emit = (event: RuntimeEvent) => {
+    if (event.type === "run.started") activeRuns.add(event.runId);
+    if (event.type === "run.finished") activeRuns.delete(event.runId);
     // Observers receive an immutable copy, so mutating a displayed approval cannot alter work.
     const copy = freeze(JSON.parse(canonicalizeJson(event))) as RuntimeEvent;
     for (const listener of listeners) {
@@ -133,124 +160,264 @@ export async function createRuntime(options: RuntimeOptions = {}): Promise<Runti
     }
     registry.emit(copy);
   };
+  const reject = (command: string, reason: string) =>
+    emit({ type: "command.rejected", command, reason });
+  const status = (next: PluginStatus, notify = true) => {
+    const index = plugins.findIndex((entry) => entry.name === next.name);
+    if (index < 0) plugins.push(next);
+    else plugins[index] = next;
+    if (notify) emit({ type: "plugin.status", ...next });
+  };
+  const loadDevelopment = async (entry: DevelopmentPlugin): Promise<PluginStatus> => {
+    try {
+      const loaded = await entry.load();
+      if (closed) return { name: entry.name, state: "failed", error: "Runtime is closing" };
+      if (loaded.plugin.name !== entry.name)
+        return {
+          name: entry.name,
+          state: "failed",
+          error: "Development plugin export is invalid; check its configured name",
+        };
+      const result = await registry.load(loaded);
+      return result.state === "loaded"
+        ? { name: entry.name, state: "loaded" }
+        : {
+            name: entry.name,
+            state: "failed",
+            error: "Development plugin setup failed; fix it and reload",
+          };
+    } catch {
+      // Trusted module errors can still contain credentials; never put their text in client events.
+      return {
+        name: entry.name,
+        state: "failed",
+        error: "Development plugin import failed; fix the entry and reload",
+      };
+    }
+  };
+  for (const entry of development.values()) status(await loadDevelopment(entry), false);
+
   let ownedStore: SqliteSessionStore | undefined;
   let core: AgentCore | undefined;
   let recorder: RecordingModelClient | undefined;
-  const unload = async () => {
-    for (const status of [...plugins].reverse()) await registry.unload(status.name);
+  let selectedProvider: ModelProvider | undefined;
+  let selectedClient: ModelClient | undefined;
+  let store: SessionStore | undefined;
+  let recovered = false;
+  let unavailable = "Model and storage are not configured";
+  const base = options.policy ?? new ReadOnlyPolicy();
+  const stricter = (
+    first: PolicyDecision,
+    second: Exclude<PolicyDecision, { kind: "allow" }> | null,
+  ): PolicyDecision => {
+    if (first.kind === "deny") return first;
+    if (second?.kind === "deny") return second;
+    return first.kind === "ask" || second?.kind === "ask" ? { kind: "ask" } : { kind: "allow" };
   };
-  try {
-    if (options.store && options.dataDirectory)
-      throw new Error("Choose a store or dataDirectory, not both");
-    if (options.model) {
-      const provider = registry.providers.find(
-        (provider) => provider.id === options.model?.provider,
-      );
-      const profile = provider?.models.find(
-        (profile) =>
-          profile.origin.provider === options.model?.provider &&
-          profile.origin.model === options.model.model,
-      );
-      if (!provider || !profile) throw new Error("Configured model is not registered");
-      if (options.dataDirectory) ownedStore = new SqliteSessionStore(options.dataDirectory);
-      const store = options.store ?? ownedStore;
-      if (!store) throw new Error("A configured model requires persistent storage");
-      const base = options.policy ?? new ReadOnlyPolicy();
-      const stricter = (
-        first: PolicyDecision,
-        second: Exclude<PolicyDecision, { kind: "allow" }> | null,
-      ): PolicyDecision => {
-        if (first.kind === "deny") return first;
-        if (second?.kind === "deny") return second;
-        return first.kind === "ask" || second?.kind === "ask" ? { kind: "ask" } : { kind: "allow" };
-      };
-      const policy: PermissionPolicy = {
-        revision: () => base.revision?.() ?? 0,
-        beforePrepare: (tool, profile, args) =>
-          stricter(
-            base.beforePrepare(tool, profile, args),
-            registry.evaluatePolicy({ tool, profile, args, phase: "prepare" }),
-          ),
-        beforeExecute: (tool, profile, action, effectId, args) =>
-          stricter(
-            base.beforeExecute(tool, profile, action, effectId, args),
-            registry.evaluatePolicy({ tool, profile, args, phase: "execute" }),
-          ),
-      };
-      let client = options.modelReplay
-        ? new ReplayModelClient(options.modelReplay.records, {
-            apiProfile: options.modelReplay.apiProfile,
-          })
-        : provider.createClient(profile.origin.model);
+  const policy: PermissionPolicy = {
+    revision: () => base.revision?.() ?? 0,
+    beforePrepare: (tool, profile, args) =>
+      stricter(
+        base.beforePrepare(tool, profile, args),
+        registry.evaluatePolicy({ tool, profile, args, phase: "prepare" }),
+      ),
+    beforeExecute: (tool, profile, action, effectId, args) =>
+      stricter(
+        base.beforeExecute(tool, profile, action, effectId, args),
+        registry.evaluatePolicy({ tool, profile, args, phase: "execute" }),
+      ),
+  };
+  const unload = async () => {
+    for (const entry of [...plugins].reverse()) await registry.unload(entry.name);
+  };
+  const wireCore = async (allowMissing: boolean) => {
+    core = undefined;
+    if (!options.model || !store) return;
+    const provider = registry.providers.find((item) => item.id === options.model?.provider);
+    const profile = provider?.models.find(
+      (item) =>
+        item.origin.provider === options.model?.provider &&
+        item.origin.model === options.model.model,
+    );
+    if (!provider || !profile) {
+      selectedProvider = undefined;
+      selectedClient = undefined;
+      unavailable = "Configured model is not registered";
+      if (!allowMissing) throw Error(unavailable);
+      return;
+    }
+    // A tool-only reload must not restart an unrelated provider's private session/cursor state.
+    if (provider !== selectedProvider || !selectedClient) {
+      selectedProvider = provider;
+      try {
+        selectedClient = options.modelReplay
+          ? new ReplayModelClient(options.modelReplay.records, {
+              apiProfile: options.modelReplay.apiProfile,
+            })
+          : provider.createClient(profile.origin.model);
+      } catch (error) {
+        const owner = registry.providerOwner(provider.id);
+        if (!owner || !development.has(owner)) throw error;
+        await registry.unload(owner);
+        selectedProvider = undefined;
+        selectedClient = undefined;
+        unavailable = "Configured development model failed initialization; fix it and reload";
+        const failed: PluginStatus = {
+          name: owner,
+          state: "failed",
+          error: "Development plugin model initialization failed; fix it and reload",
+        };
+        status(failed, false);
+        return failed;
+      }
       if (options.modelRecording) {
         recorder = new RecordingModelClient(
-          client,
+          selectedClient,
           options.modelRecording.sink,
           options.modelRecording,
         );
-        client = recorder;
+        selectedClient = recorder;
       }
-      core = new AgentCore({
-        model: client,
-        profile,
-        tools: registry.tools,
-        store,
-        policy,
-        context: new MinimalContextBuilder(),
-        validator: new AjvArgumentValidator(),
-        preconditions: options.preconditions ?? new WorkspacePreconditions(),
-        files: new NodeWorkspaceFiles([
-          ...(store instanceof SqliteSessionStore ? [store.directory] : []),
-          ...(options.modelRecording?.sink instanceof FileRecordingSink
-            ? [options.modelRecording.sink.directory]
-            : []),
-          ...(options.protectedPaths ?? []),
-        ]),
-        hasher: {
-          digest: (value) =>
-            `sha256:${createHash("sha256").update(canonicalizeJson(value)).digest("hex")}` as ActionDigest,
-        },
-        scheduler: options.scheduler ?? nodeScheduler,
-        clock: options.clock ?? { now: () => new Date().toISOString() as Timestamp },
-        ids: options.ids ?? { next: (prefix) => `${prefix}_${randomUUID()}` },
-        emit,
-        collect: async (workspaceRoot) =>
-          (
-            await Promise.all(
-              registry.contextSources.map((source) => source.collect({ workspaceRoot, profile })),
-            )
-          ).flat(),
-        ...(options.limits === undefined ? {} : { limits: options.limits }),
-      });
+    }
+    core = new AgentCore({
+      model: selectedClient,
+      profile,
+      tools: registry.tools,
+      store,
+      policy,
+      context: new MinimalContextBuilder(),
+      validator: new AjvArgumentValidator(),
+      preconditions: options.preconditions ?? new WorkspacePreconditions(),
+      files: new NodeWorkspaceFiles([
+        ...(store instanceof SqliteSessionStore ? [store.directory] : []),
+        ...(options.modelRecording?.sink instanceof FileRecordingSink
+          ? [options.modelRecording.sink.directory]
+          : []),
+        ...(options.protectedPaths ?? []),
+      ]),
+      hasher: {
+        digest: (value) =>
+          `sha256:${createHash("sha256").update(canonicalizeJson(value)).digest("hex")}` as ActionDigest,
+      },
+      scheduler: options.scheduler ?? nodeScheduler,
+      clock: options.clock ?? { now: () => new Date().toISOString() as Timestamp },
+      ids: options.ids ?? { next: (prefix) => `${prefix}_${randomUUID()}` },
+      emit,
+      collect: async (workspaceRoot) =>
+        (
+          await Promise.all(
+            registry.contextSources.map((source) => source.collect({ workspaceRoot, profile })),
+          )
+        ).flat(),
+      ...(options.limits === undefined ? {} : { limits: options.limits }),
+    });
+    if (!recovered) {
       await core.recover();
+      recovered = true;
+    }
+  };
+  try {
+    if (options.store && options.dataDirectory)
+      throw Error("Choose a store or dataDirectory, not both");
+    if (options.model) {
+      if (options.dataDirectory) ownedStore = new SqliteSessionStore(options.dataDirectory);
+      store = options.store ?? ownedStore;
+      if (!store) throw Error("A configured model requires persistent storage");
+      await wireCore(development.size > 0);
     } else if (options.store || options.dataDirectory)
-      throw new Error("Storage requires an explicitly selected model");
+      throw Error("Storage requires an explicitly selected model");
   } catch (error) {
     ownedStore?.close();
     await unload();
     throw error;
   }
-  let closed = false;
-  let closing: Promise<void> | undefined;
-  const commands = new Set<Promise<void>>();
+  const track = (pending: Promise<void>): Promise<void> => {
+    commands.add(pending);
+    void pending.then(
+      () => commands.delete(pending),
+      () => commands.delete(pending),
+    );
+    return pending;
+  };
+  const reload = async (entry: DevelopmentPlugin) => {
+    try {
+      await core?.close();
+      core = undefined;
+      // A cached module may re-register the same provider object after its disposal closed
+      // the client. Ownership, not object identity alone, decides whether reuse is safe.
+      if (selectedProvider && registry.providerOwner(selectedProvider.id) === entry.name) {
+        selectedProvider = undefined;
+        selectedClient = undefined;
+      }
+      await registry.unload(entry.name);
+      if (closed) return;
+      let next = await loadDevelopment(entry);
+      if (closed) {
+        await registry.unload(entry.name);
+        return;
+      }
+      try {
+        const failed = await wireCore(true);
+        if (failed?.name === entry.name) next = failed;
+        else if (failed) status(failed);
+      } catch {
+        // A provider that cannot create its client is not a usable replacement.
+        await registry.unload(entry.name);
+        selectedProvider = undefined;
+        selectedClient = undefined;
+        core = undefined;
+        next = {
+          name: entry.name,
+          state: "failed",
+          error: "Development plugin model initialization failed; fix it and reload",
+        };
+        try {
+          await wireCore(true);
+        } catch {
+          unavailable = "Model initialization failed";
+        }
+      }
+      status(next);
+    } finally {
+      reloading = false;
+    }
+  };
   return {
-    plugins,
+    get plugins() {
+      return plugins.map((entry) => ({ ...entry }));
+    },
     get diagnostics() {
       return [...diagnostics, ...registry.diagnostics];
     },
     send(command) {
-      if (closed || !core) {
-        emit({
-          type: "command.rejected",
-          command: command.type,
-          reason: closed ? "Runtime is closed" : "Model and storage are not configured",
-        });
+      if (closed) {
+        reject(command.type, "Runtime is closed");
         return Promise.resolve();
       }
-      const pending = core.send(command);
-      commands.add(pending);
-      void pending.finally(() => commands.delete(pending));
-      return pending;
+      if (command.type === "plugin.reload") {
+        const entry = development.get(command.name);
+        if (!entry) reject(command.type, "Plugin is not configured for development reload");
+        else if (reloading || commands.size || activeRuns.size)
+          reject(
+            command.type,
+            "Plugin reload requires an idle runtime; retry after the run finishes",
+          );
+        else {
+          // Set admission synchronously before the first await; no run can enter this window.
+          reloading = true;
+          return track(reload(entry));
+        }
+        return Promise.resolve();
+      }
+      if (reloading) {
+        reject(command.type, "Plugin reload is in progress");
+        return Promise.resolve();
+      }
+      if (!core) {
+        reject(command.type, unavailable);
+        return Promise.resolve();
+      }
+      return track(core.send(command));
     },
     subscribe(listener) {
       listeners.add(listener);

@@ -77,4 +77,5 @@ Node's final-component `O_NOFOLLOW` and repeated identity checks do not eliminat
 directory races. Read cancellation discards unreturned content and closes handles after pending
 I/O settles; it cannot retract a syscall. Windows, network filesystems and adversarial same-user
 race resistance are not claimed. Native containment, writes, shell, real models and interactive
-CLI remain outside this delivery. Batch 6 has not started.
+CLI were outside the original batch 5 delivery; the provider is now merged and the
+[CLI](cli.md) is in batch 7 review. Write/process capabilities remain outside the current scope.

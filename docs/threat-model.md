@@ -1,8 +1,11 @@
 # Threat model
 
 Status: D3 boundaries accepted on 2026-10-25 in
-[ADR 0006](decisions/0006-security-boundaries.md); read-only workspace enforcement is implemented in the batch 5 review branch.
-Later write, process, network and credential defenses still require their own verification.
+[ADR 0006](decisions/0006-security-boundaries.md); read-only workspace enforcement is merged from batch 5.
+Later write, process, network and credential-store defenses still require their own verification.
+The batch 7 CLI uses explicit trusted host callbacks, not a new credential-store adapter.
+It escapes terminal control/bidirectional text and accepts approvals only for displayed digests;
+explicit development modules remain trusted in-process code, not a sandbox.
 
 ## Assets
 

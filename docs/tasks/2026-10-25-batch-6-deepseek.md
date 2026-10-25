@@ -1,5 +1,9 @@
 # Batch 6 implementation and review handoff
 
+Historical delivery record. PR #10 was subsequently reviewed and merged as `8fce38e` after
+its head CI passed; merged main CI also passed. Current scope is in the
+[batch 7 handoff](2026-10-25-batch-7-cli.md). The original authorization below is historical.
+
 Owner authorization (2026-10-25): review PR #9, merge after review and CI, then deliver batch 6
 on a new branch/PR. Do not automatically merge the new PR, make paid calls, access credentials
 or start batch 7. D1–D5 remain accepted. Persisted v1, SQLite schema, original task criteria,
