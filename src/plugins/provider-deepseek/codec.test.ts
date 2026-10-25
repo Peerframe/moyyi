@@ -581,13 +581,13 @@ describe("DeepSeek semantic stream codec", () => {
     expect(events.at(-1)).toMatchObject({ error: { retryAfterMs: 250 } });
     expect(JSON.stringify(events)).not.toContain("synthetic-key");
   });
-  it.each(["summary", "encrypted", "annotation", "phase", "unknown"])(
+  it.each(["summary", "invalid_encrypted", "annotation", "phase", "unknown"])(
     "rejects unsupported semantic output %s",
     async (variant) => {
       const wire = deepSeekTextFixture();
       const item = at(wire, "response.output_item.added").item as Record<string, unknown>;
       if (variant === "summary") item.summary = [{ type: "summary_text", text: "Not full" }];
-      if (variant === "encrypted") item.encrypted_content = "opaque";
+      if (variant === "invalid_encrypted") item.encrypted_content = { ciphertext: "opaque" };
       if (variant === "unknown") item.type = "web_search_call";
       if (variant === "phase") {
         item.type = "message";

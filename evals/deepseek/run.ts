@@ -30,6 +30,65 @@ const scenarios: readonly { id: string; run(): Promise<Evidence> }[] = [
     },
   },
   {
+    id: "visible-reasoning-auxiliary-metadata-record-replay",
+    async run() {
+      const responses = structuredClone(successfulFixtures());
+      for (const events of responses)
+        for (const event of events) {
+          const item = event.item as Record<string, unknown> | undefined;
+          if (item?.type === "reasoning")
+            item.encrypted_content = `SYNTHETIC_AUXILIARY_${event.type}`;
+          const response = event.response as { output?: Record<string, unknown>[] } | undefined;
+          for (const final of response?.output ?? [])
+            if (final.type === "reasoning") final.encrypted_content = "SYNTHETIC_AUXILIARY_FINAL";
+        }
+      const result = await runRoundTrip({ responses });
+      assertEquivalent(result);
+      assert.equal(result.first.outcome.kind, "completed");
+      assert.deepEqual(
+        result.first.results.map((part) => part.status),
+        ["succeeded", "succeeded"],
+      );
+      assert.ok(JSON.stringify(result.replay.assistantContent).includes(finalAnswer));
+      for (const normalized of [result.records, result.wireRequests]) {
+        assert.ok(!JSON.stringify(normalized).includes("SYNTHETIC_AUXILIARY"));
+        assert.ok(!JSON.stringify(normalized).includes("encrypted_content"));
+      }
+      return evidence(result);
+    },
+  },
+  {
+    id: "opaque-only-reasoning-never-executes-proposed-tool",
+    async run() {
+      const events = deepSeekFixture([
+        {
+          type: "function_call",
+          callId: "synthetic_pending_read",
+          name: "read",
+          arguments: '{"path":"README.md"}',
+        },
+        { type: "reasoning", text: "" },
+      ]);
+      const item = events.find(
+        (event) =>
+          event.type === "response.output_item.added" &&
+          (event.item as Record<string, unknown>).type === "reasoning",
+      )?.item as Record<string, unknown>;
+      item.encrypted_content = "SYNTHETIC_OPAQUE_ONLY";
+      const result = await runRoundTrip({ responses: [events] });
+      assertEquivalent(result);
+      assert.equal(result.first.outcome.kind, "failed");
+      assert.equal(result.first.effectStates.length, 0);
+      assert.ok(result.first.results.every((part) => part.status !== "succeeded"));
+      assert.equal(result.transportCallsAfterReplay, 1);
+      assert.equal(result.records.length, 1);
+      const terminal = result.records[0]?.events.at(-1);
+      assert.ok(terminal?.type === "error" && terminal.error.kind === "protocol");
+      assert.ok(!JSON.stringify(result.records).includes("SYNTHETIC_OPAQUE_ONLY"));
+      return evidence(result);
+    },
+  },
+  {
     id: "changed-request-rejected-no-fallback",
     async run() {
       const result = await runRoundTrip({ replayInput: "Changed user request" });

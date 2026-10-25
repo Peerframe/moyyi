@@ -37,6 +37,9 @@ jobs:
       - name: Check
         run: npm run check
 
+      - name: DeepSeek offline conformance
+        run: npm run eval:deepseek
+
       - name: Native shell conformance
         run: npm run eval:shell
 

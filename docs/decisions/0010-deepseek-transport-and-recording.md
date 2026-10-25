@@ -52,10 +52,35 @@ assembly. Missing, interrupted, truncated or unsupported history fails locally b
 The supported profile is `deepseek-responses-text-v1-2026-10-25`, with `deepseek-flash`, high
 reasoning effort, a 1,000,000-token context declaration and a deliberately conservative **8,192**
 output-token limit. This is lower than the reviewed service limit, not a claim about its maximum.
-Images, summaries, encrypted reasoning, assistant phases, refusal content items, hosted tools,
+Images, summaries, opaque-only reasoning, assistant phases, refusal content items, hosted tools,
 server-stored conversations and vendor-specific request options are outside this profile.
 No `parallel_tool_calls` or `max_tool_calls` promise is delegated to the server; moyyi's existing
 execution limits apply. Unsupported cases fail closed and may need a later adapter profile.
+
+### Auxiliary reasoning output compatibility (2026-10-25)
+
+An owner-authorized one-request diagnostic received a reasoning `output_item.added` containing
+`content: []`, `summary: []`, status `in_progress` and a nonempty `encrypted_content` string, followed
+by a visible reasoning content event/delta. The previous decoder rejected that added item. The
+private five-event prefix is not committed; synthetic fixtures reproduce its relevant shape.
+
+The DeepSeek guide's unsupported `encrypted_content` statement concerns **input items**. The
+guide refers to the [Responses schema](https://developers.openai.com/api/reference/resources/responses/methods/create),
+whose reasoning output field is optional string/null and whose added value may be incomplete.
+DeepSeek's own output schema does not explicitly enumerate that field; the observed trace is the
+evidence for accepting it here. This does not add support for opaque reasoning or encrypted replay.
+
+Accept a well-formed auxiliary string up to 64 KiB UTF-8 (within existing stream/semantic budgets),
+then discard it. Keep only a per-item presence flag so disappearance at done/terminal cannot turn
+opaque-only output into a successful visible response. Such an item must finish with nonblank
+visible reasoning. Auxiliary values may change; identity, lifecycle, argument and visible-content
+consistency checks still apply. The field never enters common content, recordings, replay or
+subsequent input. Full visible text remains the evidence required by this stateless profile.
+
+This is an output compatibility correction to the existing profile. Common request/event semantics,
+the profile identifier, D2 envelopes, persisted v1 and authority boundaries do not change. No upstream
+source or private response text was copied. Offline replay closes this first rejection only; the
+captured prefix ends before a terminal event and is correctly reported as interrupted.
 
 ## Recording and replay
 
