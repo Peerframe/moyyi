@@ -26,13 +26,13 @@ Each becomes a deterministic test using the scripted model and fault injection:
   [precondition tests](../src/runtime/preconditions.test.ts); this validates the preflight port,
   not a file capability. The batch 5 operation-time confinement tests remain required
 - [x] Overwrite conflicts (file changed after preview or approval) — file-hash preflight plus
-  executor/protocol re-approval with a new digest. No actual file-write tool is implemented
+  executor/protocol re-approval with a new digest. Phase 2 adds real write/undo conflict tests in `tests/runtime-writes.test.ts`
 - [x] Outcome unknown after interruption — [real-process recovery tests](../tests/core-recovery.test.ts)
   kill after execution starts, reopen, retain unknown and never invoke the action again
 
 These are independently written moyyi tests based on the listed failure scenarios. They do not
 copy OpenBot code or establish general filesystem/process isolation. Batch 4's synthetic
-write tools exist only in tests; the default product policy remains read-only.
+write tools were synthetic; phase 2 introduces an explicit runtime write grant. The default remains read-only.
 
 ## Copied code
 

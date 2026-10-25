@@ -34,7 +34,7 @@ Remaining:
   checker results do not yet measure real-agent performance
 - Validate the accepted security design ([threat-model.md](threat-model.md),
   [ADR 0006](decisions/0006-security-boundaries.md)) in the relevant implementation phases
-- Review the batch 7 CLI/development-reload PR; it is not automatically merged
+- Phase 2 PR review; no automatic merge or phase 3 authorization
 
 ## Phase 1: read-only loop
 
@@ -55,13 +55,13 @@ and canonical model recording/replay. `npm run demo:deepseek-replay` drives real
 with synthetic SSE and verifies replay; `npm run eval:deepseek` checks six offline scenarios.
 These do not measure real-model task competence or live service compatibility. See
 [deepseek.md](deepseek.md) and the [batch 6 record](tasks/2026-10-25-batch-6-deepseek.md).
-The batch 7 branch adds interactive sessions, streaming, digest approvals, Ctrl-C/EOF cleanup,
+Batch 7 was reviewed and merged in [PR #11](https://github.com/Peerframe/moyyi/pull/11). It adds interactive sessions, streaming, digest approvals, Ctrl-C/EOF cleanup,
 steering/resume and explicit development-plugin reload through the protocol. `--demo` is a finite
 offline script; `--host FILE` connects an explicitly trusted runtime configuration. See
 [cli.md](cli.md) and the [current handoff](tasks/2026-10-25-batch-7-cli.md).
 Live acceptance remains owner-run. The planned `project-instructions` plugin is not delivered by
 these batches; implicit workspace instructions/config discovery is not enabled. Phase 1 acceptance
-is not claimed, and phase 2 has not started.
+is not claimed. The owner separately authorized phase 2; its branch is under review.
 Run the read-only subset of the corpus. Qwen and shasha training are deferred directions,
 not requirements for this phase or the first release.
 
@@ -69,6 +69,10 @@ not requirements for this phase or the first release.
 
 Confined workspace file access in `ToolContext`; edit and create with hash preconditions,
 approval bound to digests, workspace snapshots and undo, effect journal; fault-injection tests.
+Implemented on `codex/phase-2-controlled-writes` with explicit grants, schema 2 snapshot migration
+and read-only recovery. See [usage](writes.md), [ADR 0012](decisions/0012-controlled-workspace-writes.md)
+and the [current handoff](tasks/2026-10-25-phase-2-writes.md). The new PR is not automatically merged.
+Phase 3 is not started.
 
 ## Phase 3: shell and reliable stop
 

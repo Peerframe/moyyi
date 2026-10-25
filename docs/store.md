@@ -75,3 +75,11 @@ including opaque replay bytes, are unchanged. It compares every written record w
 read record, reopens the store, and repeats that comparison. Pure record tests separately
 round-trip the exact original fixture. Missing or invalid blob checks are never bypassed, and
 the frozen fixture is not edited to accommodate storage.
+
+## Phase 2 snapshot storage
+
+Schema 2 adds immutable version-1 workspace snapshots tied to a started write effect/run/lease.
+The verified schema-1 migration is atomic and preserves existing transcript/effect v1 records.
+Snapshot-only before-image blobs participate in backup reachability and integrity checks; old
+schema-1 backups open through the same migration. See
+[ADR 0012](decisions/0012-controlled-workspace-writes.md).

@@ -1,3 +1,6 @@
+import type { BlobRef, EffectId, RunId } from "./persisted/index.ts";
+import type { ReconcileOutcome } from "./tools.ts";
+
 /** Read-only, runtime-confined capabilities. Paths are relative to the selected workspace. */
 export interface WorkspaceFiles {
   read(path: string, options?: { readonly maxBytes?: number }): Promise<FileRead>;
@@ -36,4 +39,62 @@ export interface FileSearch {
   /** True when any scan, file-size, line-size or result bound prevented a complete search. */
   readonly truncated: boolean;
   readonly skippedFiles: number;
+}
+
+/** A complete, bounded UTF-8 file, or an absent target. Never a truncated read. */
+export interface FileVersion {
+  readonly path: string;
+  readonly text: string | null;
+  readonly sha256: string | null;
+  readonly mode: number | null;
+}
+
+/** The exact mutation bound into the executor's action digest. null text removes a created file. */
+export interface WorkspaceChange {
+  readonly path: string;
+  readonly expectedHash: string | null;
+  readonly text: string | null;
+  readonly mode: number | null;
+  readonly restoreOf?: string;
+}
+
+export interface WorkspaceWriteReceipt {
+  readonly snapshotId: string;
+  readonly path: string;
+  readonly beforeHash: string | null;
+  readonly afterHash: string | null;
+}
+
+/** apply has no arguments: only the already approved payload may change the workspace. */
+export interface WorkspaceWrites {
+  inspect(path: string): Promise<FileVersion>;
+  inspectUndo(snapshotId: string): Promise<WorkspaceChange>;
+  apply(): Promise<WorkspaceWriteReceipt>;
+  /** Read-only postcondition inspection, bound to the recovering effect by runtime. */
+  reconcile(): Promise<ReconcileOutcome>;
+}
+
+/** Additive SQLite schema-v2 data; transcript/effect JSON remains frozen at v1. */
+export interface WorkspaceSnapshot {
+  readonly version: 1;
+  readonly id: string;
+  readonly effectId: EffectId;
+  readonly runId: RunId;
+  readonly workspaceRoot: string;
+  readonly path: string;
+  readonly beforeBlob: BlobRef | null;
+  readonly beforeHash: string | null;
+  readonly afterHash: string | null;
+  readonly beforeMode: number | null;
+  readonly afterMode: number | null;
+  readonly restoreOf?: string;
+}
+
+/** Snapshots are immutable and durable before publication; no workspace mutation is done here. */
+export interface WorkspaceSnapshotStore {
+  saveSnapshot(snapshot: WorkspaceSnapshot): Promise<void>;
+  getSnapshot(id: string): Promise<WorkspaceSnapshot | null>;
+  getSnapshotForEffect(effectId: EffectId): Promise<WorkspaceSnapshot | null>;
+  putBlob(bytes: Uint8Array): Promise<BlobRef>;
+  getBlob(ref: BlobRef): Promise<Uint8Array | null>;
 }

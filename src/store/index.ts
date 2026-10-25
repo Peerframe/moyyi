@@ -10,9 +10,11 @@ import {
 } from "node:fs";
 import { basename, dirname, isAbsolute, join, relative, resolve, sep } from "node:path";
 import { DatabaseSync } from "node:sqlite";
+import type { WorkspaceSnapshot, WorkspaceSnapshotStore } from "../contracts/files.ts";
 import {
   type BlobRef,
   canTransition,
+  type EffectId,
   type EffectRecord,
   type EntryId,
   isTerminal,
@@ -39,10 +41,12 @@ import {
 } from "./files.ts";
 import { encodeEffect, encodeEntry, entryBlobRefs } from "./records.ts";
 import { migrate, SCHEMA_VERSION } from "./schema.ts";
+import { encodeSnapshot } from "./snapshots.ts";
 
 export type StoreCheckpoint =
   | "migration:before_commit"
   | "commit:before_commit"
+  | "snapshot:before_commit"
   | "backup:before_publish"
   | "backup:before_parent_sync";
 export interface StoreOptions {
@@ -81,7 +85,7 @@ function inside(parent: string, child: string): boolean {
 }
 
 /** Local single-writer store. Opening it never resumes a run or executes an effect. */
-export class SqliteSessionStore implements SessionStore {
+export class SqliteSessionStore implements SessionStore, WorkspaceSnapshotStore {
   readonly directory: string;
   readonly #db: DatabaseSync;
   readonly #blobs: BlobStore;
@@ -160,6 +164,119 @@ export class SqliteSessionStore implements SessionStore {
   async getBlob(ref: BlobRef): Promise<Uint8Array | null> {
     this.#ready();
     return this.#blobs.get(ref);
+  }
+
+  /** Persist recovery evidence with FULL durability before the host publishes a file change. */
+  async saveSnapshot(snapshot: WorkspaceSnapshot): Promise<void> {
+    this.#ready();
+    const payload = encodeSnapshot(snapshot);
+    this.#writing = true;
+    let transaction = false;
+    try {
+      this.#db.exec("BEGIN IMMEDIATE");
+      transaction = true;
+      const authority = this.#db
+        .prepare(`SELECT e.state, r.status, s.workspace_root,
+        l.run_id AS lease_run FROM effects e JOIN runs r ON r.id = e.run_id
+        JOIN sessions s ON s.id = r.session_id
+        LEFT JOIN workspace_leases l ON l.workspace_root = s.workspace_root WHERE e.id = ?`)
+        .get(snapshot.effectId);
+      if (
+        authority?.state !== "started" ||
+        authority.status !== "active" ||
+        authority.workspace_root !== snapshot.workspaceRoot ||
+        authority.lease_run !== snapshot.runId
+      )
+        throw new Error(
+          "Snapshot requires its started effect, active run and exclusive workspace lease",
+        );
+      this.#db
+        .prepare(`INSERT INTO workspace_snapshots(id, effect_id, run_id, restore_of, payload)
+        VALUES (?, ?, ?, ?, ?)`)
+        .run(snapshot.id, snapshot.effectId, snapshot.runId, snapshot.restoreOf ?? null, payload);
+      this.#snapshot(snapshot.id);
+      this.#options.checkpoint?.("snapshot:before_commit");
+      this.#db.exec("COMMIT");
+      transaction = false;
+    } catch (error) {
+      if (transaction && this.#db.isTransaction) this.#db.exec("ROLLBACK");
+      throw error;
+    } finally {
+      this.#writing = false;
+    }
+  }
+
+  async getSnapshot(snapshotId: string): Promise<WorkspaceSnapshot | null> {
+    this.#ready();
+    id(snapshotId);
+    return this.#snapshot(snapshotId);
+  }
+
+  async getSnapshotForEffect(effectId: EffectId): Promise<WorkspaceSnapshot | null> {
+    return this.getSnapshot(effectId);
+  }
+
+  #decodeSnapshot(row: Record<string, unknown>): WorkspaceSnapshot {
+    if (typeof row.payload !== "string") throw new Error("Invalid snapshot payload");
+    const snapshot = JSON.parse(row.payload) as WorkspaceSnapshot;
+    encodeSnapshot(snapshot);
+    if (
+      snapshot.id !== row.id ||
+      snapshot.effectId !== row.effect_id ||
+      snapshot.runId !== row.run_id ||
+      (snapshot.restoreOf ?? null) !== row.restore_of
+    )
+      throw new Error("Snapshot columns disagree with its payload");
+    const linked = this.#db
+      .prepare(`SELECT e.payload, e.state AS effect_state, r.id AS run_id,
+      s.workspace_root FROM effects e JOIN runs r ON r.id = e.run_id
+      JOIN sessions s ON s.id = r.session_id WHERE e.id = ?`)
+      .get(snapshot.effectId);
+    if (
+      !linked ||
+      linked.run_id !== snapshot.runId ||
+      linked.workspace_root !== snapshot.workspaceRoot
+    )
+      throw new Error("Snapshot effect/run/workspace identity does not match");
+    const effect = JSON.parse(linked.payload as string) as EffectRecord;
+    encodeEffect(effect);
+    if (
+      effect.id !== snapshot.effectId ||
+      effect.runId !== snapshot.runId ||
+      effect.state !== linked.effect_state ||
+      effect.profile.class !== "workspace_write" ||
+      effect.profile.reversibility !== "snapshot" ||
+      !["started", "unknown", "succeeded", "failed"].includes(effect.state)
+    )
+      throw new Error(
+        "Snapshot requires a started workspace-write effect with snapshot reversibility",
+      );
+    if (snapshot.beforeBlob !== null) this.#blobs.assert(snapshot.beforeBlob);
+    return snapshot;
+  }
+
+  #snapshot(snapshotId: string): WorkspaceSnapshot | null {
+    const row = this.#db.prepare("SELECT * FROM workspace_snapshots WHERE id = ?").get(snapshotId);
+    if (!row) return null;
+    const snapshot = this.#decodeSnapshot(row);
+    if (snapshot.restoreOf !== undefined) {
+      const source = this.#db
+        .prepare("SELECT * FROM workspace_snapshots WHERE id = ?")
+        .get(snapshot.restoreOf);
+      if (!source || Number(source.ordinal) >= Number(row.ordinal))
+        throw new Error("Snapshot restore source must be an earlier snapshot");
+      const original = this.#decodeSnapshot(source);
+      if (
+        snapshot.workspaceRoot !== original.workspaceRoot ||
+        snapshot.path !== original.path ||
+        snapshot.beforeHash !== original.afterHash ||
+        snapshot.beforeMode !== original.afterMode ||
+        snapshot.afterHash !== original.beforeHash ||
+        snapshot.afterMode !== original.beforeMode
+      )
+        throw new Error("Snapshot restore must reverse its source in the same workspace and path");
+    }
+    return snapshot;
   }
 
   /** Synchronous SQLite/filesystem operations cannot interleave at an await inside a commit. */
@@ -413,6 +530,11 @@ export class SqliteSessionStore implements SessionStore {
       for (const ref of entryBlobRefs(entry)) this.#blobs.assert(ref);
     }
     for (const effect of effects) encodeEffect(effect);
+    for (const snapshot of this.#db
+      .prepare(`SELECT w.id FROM workspace_snapshots w
+      JOIN runs r ON r.id = w.run_id WHERE r.session_id = ?`)
+      .all(sessionId))
+      this.#snapshot(snapshot.id as string);
     return {
       sessionId,
       workspaceRoot: row.workspace_root as string,
@@ -482,6 +604,11 @@ export class SqliteSessionStore implements SessionStore {
         const entry = JSON.parse(row.payload as string) as TranscriptEntry;
         encodeEntry(entry);
         for (const ref of entryBlobRefs(entry)) refs.add(ref);
+      }
+      for (const row of this.#db.prepare("SELECT id FROM workspace_snapshots").all()) {
+        const snapshot = this.#snapshot(row.id as string);
+        if (snapshot?.beforeBlob !== null && snapshot?.beforeBlob !== undefined)
+          refs.add(snapshot.beforeBlob);
       }
       for (const ref of refs) {
         const bytes = this.#blobs.get(ref);

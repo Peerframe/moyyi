@@ -144,5 +144,7 @@ start another request, type steering and press Ctrl-C. Resume the printed sessio
 mode break and repair the explicit plugin file, observe failed then loaded status, and try `/reload`
 while a run is awaiting approval. Exit with Ctrl-D and reopen the same store to confirm lock release.
 
-Phase 2, write tools, shell execution, hot reloading dependency graphs and live model evaluation
-are outside this batch. The current handoff is [batch 7](tasks/2026-10-25-batch-7-cli.md).
+The merged batch 7 record is [here](tasks/2026-10-25-batch-7-cli.md). Phase 2 adds
+[controlled writes](writes.md) through explicit host configuration, using the same displayed-digest
+approvals. Shell execution, dependency-graph reload and live model evaluation remain outside scope.
+The current handoff is [phase 2](tasks/2026-10-25-phase-2-writes.md).

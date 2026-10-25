@@ -1,4 +1,6 @@
 import { createHash, randomUUID } from "node:crypto";
+import { lstatSync, realpathSync } from "node:fs";
+import { isAbsolute } from "node:path";
 import { setTimeout as delay } from "node:timers/promises";
 import { MinimalContextBuilder } from "../context/index.ts";
 import {
@@ -28,7 +30,7 @@ import {
   DEEPSEEK_API_PROFILE,
   type DeepSeekTransport,
 } from "../plugins/provider-deepseek/index.ts";
-import { ReadOnlyPolicy } from "../policy/index.ts";
+import { ReadOnlyPolicy, WorkspaceWritePolicy } from "../policy/index.ts";
 import { SqliteSessionStore } from "../store/index.ts";
 import { type DeepSeekHttpOptions, deepSeekHttpTransport } from "./deepseek-http.ts";
 import { NodeWorkspaceFiles } from "./files.ts";
@@ -36,6 +38,7 @@ import { FileRecordingSink, RecordingModelClient, ReplayModelClient } from "./mo
 import { type PluginEntry, PluginRegistry, type PluginStatus } from "./plugins.ts";
 import { WorkspacePreconditions } from "./preconditions.ts";
 import { AjvArgumentValidator } from "./validation.ts";
+import { NodeWorkspaceWrites } from "./writes.ts";
 
 export type { PluginEntry, PluginStatus } from "./plugins.ts";
 
@@ -75,6 +78,11 @@ export interface RuntimeOptions {
   readonly scheduler?: Scheduler;
   /** Additional absolute host paths to exclude, e.g. a custom store's private data directory. */
   readonly protectedPaths?: readonly string[];
+  /** Host-owned, exact selected roots; absent means writes stay unavailable. Lifetime is this runtime. */
+  readonly workspaceWrites?: {
+    readonly roots: readonly string[];
+    readonly approval?: "ask" | "allow";
+  };
   /** Explicit host connection only; no environment lookup or network before a model request. */
   readonly deepseek?: DeepSeekHttpOptions | { readonly transport: DeepSeekTransport };
   /** Opt-in diagnostic recording, limited to one sequential request stream per runtime. */
@@ -119,6 +127,25 @@ export async function createRuntime(options: RuntimeOptions = {}): Promise<Runti
             }),
         )
       : undefined;
+  const writeRoots = options.workspaceWrites?.roots.map((root) => {
+    if (!isAbsolute(root) || !lstatSync(root).isDirectory() || lstatSync(root).isSymbolicLink())
+      throw Error("Write grants require absolute, real workspace directories");
+    return realpathSync(root);
+  });
+  if (writeRoots && !writeRoots.length) throw Error("Write grants require at least one workspace");
+  const base =
+    options.policy ??
+    (options.workspaceWrites
+      ? new WorkspaceWritePolicy({ approval: options.workspaceWrites.approval ?? "ask" })
+      : new ReadOnlyPolicy());
+  const stricter = (
+    first: PolicyDecision,
+    second: Exclude<PolicyDecision, { kind: "allow" }> | null,
+  ): PolicyDecision => {
+    if (first.kind === "deny") return first;
+    if (second?.kind === "deny") return second;
+    return first.kind === "ask" || second?.kind === "ask" ? { kind: "ask" } : { kind: "allow" };
+  };
   const registry = new PluginRegistry();
   const plugins: PluginStatus[] = [];
   const startup = [
@@ -205,15 +232,7 @@ export async function createRuntime(options: RuntimeOptions = {}): Promise<Runti
   let store: SessionStore | undefined;
   let recovered = false;
   let unavailable = "Model and storage are not configured";
-  const base = options.policy ?? new ReadOnlyPolicy();
-  const stricter = (
-    first: PolicyDecision,
-    second: Exclude<PolicyDecision, { kind: "allow" }> | null,
-  ): PolicyDecision => {
-    if (first.kind === "deny") return first;
-    if (second?.kind === "deny") return second;
-    return first.kind === "ask" || second?.kind === "ask" ? { kind: "ask" } : { kind: "allow" };
-  };
+
   const policy: PermissionPolicy = {
     revision: () => base.revision?.() ?? 0,
     beforePrepare: (tool, profile, args) =>
@@ -279,6 +298,19 @@ export async function createRuntime(options: RuntimeOptions = {}): Promise<Runti
         selectedClient = recorder;
       }
     }
+    const excluded = [
+      ...(store instanceof SqliteSessionStore ? [store.directory] : []),
+      ...(options.modelRecording?.sink instanceof FileRecordingSink
+        ? [options.modelRecording.sink.directory]
+        : []),
+      ...(options.protectedPaths ?? []),
+    ];
+    // Only the durable, snapshot-aware host store can enable the built-in mutation capability.
+    if (writeRoots && !(store instanceof SqliteSessionStore))
+      throw Error("Workspace writes require the snapshot-aware SQLite store");
+    const writes = writeRoots
+      ? new NodeWorkspaceWrites(store as SqliteSessionStore, excluded)
+      : undefined;
     core = new AgentCore({
       model: selectedClient,
       profile,
@@ -288,13 +320,22 @@ export async function createRuntime(options: RuntimeOptions = {}): Promise<Runti
       context: new MinimalContextBuilder(),
       validator: new AjvArgumentValidator(),
       preconditions: options.preconditions ?? new WorkspacePreconditions(),
-      files: new NodeWorkspaceFiles([
-        ...(store instanceof SqliteSessionStore ? [store.directory] : []),
-        ...(options.modelRecording?.sink instanceof FileRecordingSink
-          ? [options.modelRecording.sink.directory]
-          : []),
-        ...(options.protectedPaths ?? []),
-      ]),
+      files: new NodeWorkspaceFiles(excluded),
+      ...(writes
+        ? {
+            writes: {
+              create(context, guard, scope) {
+                const scopedGuard = () => {
+                  guard();
+                  if (!writeRoots?.includes(realpathSync(context.workspaceRoot)))
+                    throw Error("Workspace is outside the explicit write grant");
+                };
+                scopedGuard();
+                return writes.create(context, scopedGuard, scope);
+              },
+            } satisfies import("../contracts/index.ts").WorkspaceWritesFactory,
+          }
+        : {}),
       hasher: {
         digest: (value) =>
           `sha256:${createHash("sha256").update(canonicalizeJson(value)).digest("hex")}` as ActionDigest,

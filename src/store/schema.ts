@@ -1,10 +1,10 @@
 import type { DatabaseSync } from "node:sqlite";
 import { PERSISTED_FORMAT_VERSION } from "../contracts/persisted/index.ts";
 
-export const SCHEMA_VERSION = 1;
+export const SCHEMA_VERSION = 2;
 const APPLICATION_ID = 0x4d4f5959;
 
-const SCHEMA_SQL = `CREATE TABLE metadata (key TEXT PRIMARY KEY, value INTEGER NOT NULL) STRICT;
+const SCHEMA_V1_SQL = `CREATE TABLE metadata (key TEXT PRIMARY KEY, value INTEGER NOT NULL) STRICT;
         CREATE TABLE sessions (
           id TEXT PRIMARY KEY, workspace_root TEXT NOT NULL,
           head_entry_id TEXT REFERENCES entries(id) DEFERRABLE INITIALLY DEFERRED
@@ -31,6 +31,40 @@ const SCHEMA_SQL = `CREATE TABLE metadata (key TEXT PRIMARY KEY, value INTEGER N
           workspace_root TEXT PRIMARY KEY, run_id TEXT NOT NULL UNIQUE REFERENCES runs(id)
         ) STRICT;`;
 
+const SNAPSHOT_SQL = `CREATE TABLE workspace_snapshots (
+          ordinal INTEGER PRIMARY KEY, id TEXT NOT NULL UNIQUE,
+          effect_id TEXT NOT NULL UNIQUE REFERENCES effects(id),
+          run_id TEXT NOT NULL REFERENCES runs(id),
+          restore_of TEXT REFERENCES workspace_snapshots(id), payload TEXT NOT NULL
+        ) STRICT;`;
+const SCHEMA_SQL = `${SCHEMA_V1_SQL}\n${SNAPSHOT_SQL}`;
+
+function validateSchema(db: DatabaseSync, sql: string): void {
+  // Validate before migrating: adding a table must never repair missing prior guarantees.
+  const expected = sql
+    .split(";")
+    .map((item) => item.trim())
+    .filter(Boolean)
+    .sort();
+  const actual = db
+    .prepare("SELECT sql FROM sqlite_schema WHERE name NOT GLOB 'sqlite_*'")
+    .all()
+    .map((row) => row.sql as string)
+    .sort();
+  if (JSON.stringify(actual) !== JSON.stringify(expected))
+    throw new Error("Unsupported or damaged database schema; refusing automatic repair");
+  if (
+    db.prepare("SELECT value FROM metadata WHERE key = 'persisted_format'").get()?.value !==
+    PERSISTED_FORMAT_VERSION
+  )
+    throw new Error("Unsupported persisted format; a migration is required");
+  if (
+    db.prepare("PRAGMA integrity_check").get()?.integrity_check !== "ok" ||
+    db.prepare("PRAGMA foreign_key_check").all().length !== 0
+  )
+    throw new Error("Damaged database integrity; refusing automatic repair");
+}
+
 /** Schema migrations are separate from the version of the JSON records they contain. */
 export function migrate(db: DatabaseSync, beforeCommit: () => void): void {
   const version = db.prepare("PRAGMA user_version").get()?.user_version;
@@ -54,26 +88,20 @@ export function migrate(db: DatabaseSync, beforeCommit: () => void): void {
       db.exec("ROLLBACK");
       throw error;
     }
+  } else if (version === 1 && app === APPLICATION_ID) {
+    validateSchema(db, SCHEMA_V1_SQL);
+    db.exec("BEGIN IMMEDIATE");
+    try {
+      db.exec(SNAPSHOT_SQL);
+      db.exec(`PRAGMA user_version = ${SCHEMA_VERSION}`);
+      beforeCommit();
+      db.exec("COMMIT");
+    } catch (error) {
+      db.exec("ROLLBACK");
+      throw error;
+    }
   } else if (version !== SCHEMA_VERSION || app !== APPLICATION_ID) {
     throw new Error(`Unsupported database schema/application: ${String(version)}/${String(app)}`);
   }
-  // The version alone is not enough: missing indexes or added triggers change guarantees.
-  const expected = SCHEMA_SQL.split(";")
-    .map((sql) => sql.trim())
-    .filter(Boolean)
-    .sort();
-  const actual = db
-    .prepare("SELECT sql FROM sqlite_schema WHERE name NOT GLOB 'sqlite_*'")
-    .all()
-    .map((row) => row.sql as string)
-    .sort();
-  if (JSON.stringify(actual) !== JSON.stringify(expected)) {
-    throw new Error("Unsupported or damaged database schema; refusing automatic repair");
-  }
-  if (
-    db.prepare("SELECT value FROM metadata WHERE key = 'persisted_format'").get()?.value !==
-    PERSISTED_FORMAT_VERSION
-  ) {
-    throw new Error("Unsupported persisted format; a migration is required");
-  }
+  validateSchema(db, SCHEMA_SQL);
 }

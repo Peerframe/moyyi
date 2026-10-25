@@ -17,7 +17,7 @@ DeepSeek compatibility or autonomous task quality. Temporary fixtures are remove
 
 `createRuntime` registers the built-in `fs` plugin before caller-supplied plugins. Select a
 model and storage as described in [core.md](core.md), then create a session with the selected
-workspace. The model receives `read`, `list` and `search` schemas. Duplicate names fail plugin
+workspace. The model receives the `fs` schemas; read/list/search remain the default granted operations. Duplicate names fail plugin
 loading instead of replacing a built-in capability.
 
 The [plugin README](../src/plugins/fs/README.md) describes arguments and JSON results. Search
@@ -78,4 +78,5 @@ directory races. Read cancellation discards unreturned content and closes handle
 I/O settles; it cannot retract a syscall. Windows, network filesystems and adversarial same-user
 race resistance are not claimed. Native containment, writes, shell, real models and interactive
 CLI were outside the original batch 5 delivery; the provider is now merged and the
-[CLI](cli.md) is in batch 7 review. Write/process capabilities remain outside the current scope.
+[CLI](cli.md) is merged. Phase 2 adds separately opted-in [controlled writes](writes.md);
+process capabilities remain out of scope.
