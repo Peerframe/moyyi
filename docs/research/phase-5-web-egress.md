@@ -81,3 +81,57 @@ URLs/queries. Default approval displays the exact request; a host that grants au
 accepts their defined destination/operation scope. Prompt-injection evaluations separately verify
 that untrusted page content cannot create new grants or authorize other capabilities. Real-model
 resistance and live search quality remain unmeasured without an owner-authorized model run.
+
+## Explicit DNS follow-up — 2026-10-26
+
+The system resolver on the delivery host returns `198.18.3.70` for `example.com`. The current
+public-address denial is correct; accepting benchmarking ranges would change the security
+boundary. The owner selected a narrow explicit Cloudflare DoH option after these two bounded
+manual routes were tested on Node **v26.0.0** at **2026-10-26T14:30:53Z**:
+
+| Route | Observation |
+| --- | --- |
+| Independent `dns.promises.Resolver`, server `1.1.1.1`, timeout 2500 ms, one try | Still returned `198.18.3.70`. Rejected before any destination connection. |
+| Native HTTPS GET to Cloudflare JSON DoH, bootstrap `1.1.1.1`, original TLS hostname | TLS 1.3 with `authorized: true`; A records `104.20.23.154` and `172.66.147.243`. Both passed the unchanged public-address predicate. |
+| Destination connection following that DoH answer | Existing `fetchPublicText` pinned `104.20.23.154`; SNI `example.com`, TLS 1.3, `authorized: true`, HTTP 200, 577 bytes containing `Example Domain`, no truncation. |
+
+The probes changed no network settings or source files, read no credentials and used no paid
+model. They used explicit public targets and native HTTPS; the existing trusted resolver/request
+seams supplied or observed the selected route, not fake I/O. They establish transport feasibility,
+not installed-product, durable-effect, live-model or SearXNG acceptance. No further public instances
+were tried. Current conformance tests remain hermetic; live acceptance is tracked separately.
+
+Primary sources and implementations reviewed for this decision:
+
+- **Node v26.0.0**, [DNS](https://github.com/nodejs/node/blob/v26.0.0/doc/api/dns.md)
+  and [HTTPS](https://github.com/nodejs/node/blob/v26.0.0/doc/api/https.md): an independent
+  Resolver does not alter global resolution; custom lookup and ordinary SNI/certificate checks
+  can keep an approved public address bound to the actual HTTPS connection.
+- **Cloudflare JSON DoH documentation**, updated **2026-05-05**:
+  [request/response contract](https://developers.cloudflare.com/1.1.1.1/encryption/dns-over-https/make-api-requests/dns-json/).
+  The provider documents its JSON endpoint but warns that JSON DoH has no general RFC.
+  The selected adapter names this provider explicitly and strictly validates a bounded positive
+  A/CNAME response. It does not claim generic RFC 8484 wire-format support or DNSSEC validation.
+- **OpenClaw v2026.10.7**, commit `157d8c2bc3ea2fa183afdc11088e69690bf8e64e`:
+  [SSRF implementation](https://github.com/openclaw/openclaw/blob/157d8c2bc3ea2fa183afdc11088e69690bf8e64e/src/infra/net/ssrf.ts)
+  and [fetch guard](https://github.com/openclaw/openclaw/blob/157d8c2bc3ea2fa183afdc11088e69690bf8e64e/src/infra/net/fetch-guard.ts).
+  Direct requests resolve/validate and pin the connection; trusted proxy modes are explicit
+  separate trust choices. Its fake-IP exemptions are not adopted because this task retains the
+  public-address invariant. No OpenClaw implementation or permission system is imported.
+- **Undici v8.12.3**, commit `ff9cc5e8556f488c045c884b4de367c5faed8522`:
+  [ProxyAgent](https://github.com/nodejs/undici/blob/ff9cc5e8556f488c045c884b4de367c5faed8522/docs/docs/api/ProxyAgent.md).
+  CONNECT is a transport mechanism; delegating destination DNS to a proxy needs a separately
+  trusted egress policy. No such deployment is part of the current host contract, and native
+  HTTPS already suffices for the demonstrated working route.
+- **Playwright network documentation**, reviewed **2026-10-26**:
+  [network interception and Service Workers](https://playwright.dev/docs/network#missing-network-events-and-service-workers).
+  A browser adds subresource, script, WebSocket and Service Worker traffic. Browser routing
+  hooks alone do not replace the current socket-level destination boundary. Browser work remains
+  separate from this resolver correction.
+
+The selected route adds no dependency and copies or substantially adapts no upstream source.
+`web.dns` defaults to `system`; `cloudflare-doh` explicitly trusts one fixed resolver transport.
+Host-selected DNS infrastructure does not expand target origins or model authority. The same
+approved effect, public-address checks, pinned target TLS, no-redirect behavior, total timeout,
+cancellation/revocation and output limits continue to apply. See
+[ADR 0029](../decisions/0029-explicit-cloudflare-doh.md) for the bounded implementation decision.

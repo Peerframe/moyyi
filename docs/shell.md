@@ -32,6 +32,14 @@ No interactive stdin, persistent terminal or background-service API is provided.
 - Read required system binaries/libraries. Additional toolchain executables and libraries require
   explicit host `executablePaths` (exact executable files) and `readOnlyPaths` grants. A Homebrew
   or custom Node installation is not automatically exposed with the rest of the host home.
+  On macOS, include the exact compatibility paths used by the loader, such as selected public
+  library files under Homebrew's `opt/<formula>/lib`. The sandbox validates both each requested
+  path and its resolved target, grants data access only to that target, and permits only metadata
+  access to the requested alias and its ancestors. It does not discover or grant other aliases,
+  sibling libraries or the whole Homebrew tree. A clean Node startup probe can identify required
+  public libraries; the host must explicitly select their verified compatibility aliases as well.
+  If a Node build loads a default OpenSSL configuration outside these grants, a fixed command may
+  use `OPENSSL_CONF=/dev/null` rather than granting that configuration directory.
 - Host/external network access is denied. Linux uses an isolated network namespace; its own
   loopback/IPC is not a connection to host services. Shell does not
   receive the model connection's keys, SSH agent socket, proxy settings or arbitrary parent env.

@@ -21,6 +21,32 @@ Use interactive mode to approve. One-shot CLI denies pending approvals. `approva
 explicitly authorizes automatic requests within the configured origins for that runtime.
 URL paths and queries leave your computer and may be logged by the remote service.
 
+## DNS selection
+
+DNS defaults to the operating system resolver (`dns: "system"`). A trusted host may explicitly
+select `dns: "cloudflare-doh"` inside its existing `web` configuration when system DNS returns
+fake or otherwise unusable addresses. This sends the authorized destination's hostname to
+Cloudflare's JSON DNS-over-HTTPS API at `https://cloudflare-dns.com/dns-query`, connecting to
+the fixed bootstrap address `1.1.1.1` with normal certificate and hostname verification.
+Cloudflare receives the hostname, not the page path/query or SearXNG search text. This is an
+explicit DNS infrastructure choice; it grants no `web_fetch` access to Cloudflare or other origins.
+No resolver URL, address, header or proxy can be supplied by a model or configured through this option.
+
+DoH runs only after the requested operation is authorized and its external effect has started.
+It accepts complete UTF-8 JSON up to 32 KiB, with a matching A question, successful status and
+no DNS truncation. At most 64 answer records and 16 CNAME links are accepted. Names use ordinary
+DNS hostname labels (including ASCII IDNA labels); complete CNAME chains may be unordered and
+case-insensitive. Cycles, ambiguous owners, unrelated records, unsupported answer types and
+chains without terminal A records fail. CNAMEs trigger no additional queries or HTTP requests.
+Every terminal A address must still pass the existing public IPv4 checks; one is pinned while
+TLS and HTTP continue to use the originally authorized hostname. Addresses are not cached.
+
+There is one total deadline for DNS and the destination response. Cancellation or revocation
+closes an active DoH connection/body as well as the destination connection. DoH errors fail
+without redirects, retries, fallback to another DNS route or raw resolver diagnostics.
+The option implements Cloudflare's documented JSON protocol, not a general DoH endpoint client.
+See [ADR 0029](decisions/0029-explicit-cloudflare-doh.md).
+
 ## Search
 
 If you already have a public HTTPS SearXNG instance with its JSON API enabled, configure its
@@ -79,8 +105,13 @@ fixtures, never proof of real-service compatibility. Live SearXNG acceptance rem
 For an explicit free public HTTP probe, run `node scripts/probe-web.ts`: it uses a scripted model,
 temporary data and the production network path to fetch `https://example.com/` once. It is not a
 CI step. On the delivery host, DNS returned `198.18.3.70`, so the probe failed closed before a
-connection; public browsing in that environment is not accepted. A fake-IP/proxy DNS setup needs
-a network route compatible with these public-address checks, not an address-check bypass.
+connection. A subsequent bounded connectivity probe found that explicitly querying UDP DNS at
+`1.1.1.1` still returned the fake address, while authenticated Cloudflare DoH returned public A
+records and a pinned native HTTPS request to `example.com` succeeded. This is transport evidence,
+not live-model or search-service acceptance. The default probe still uses system DNS; it does not
+silently opt the host into Cloudflare. An explicit `dns: "cloudflare-doh"` host can use that route
+while retaining the public-address checks. Automated tests cover the new resolver's bounds,
+TLS identity, cancellation and exact authorized-host binding without public network access.
 See [ADR 0015](decisions/0015-anthropic-and-web.md) and
 [transport research](research/phase-5-web-egress.md).
 

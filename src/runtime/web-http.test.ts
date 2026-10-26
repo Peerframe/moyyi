@@ -18,6 +18,13 @@ import {
 const url = () => publicHttpsUrl("https://site.example.com/page");
 const limits = { timeoutMs: 1000, maxResponseBytes: 256 };
 const guard = () => {};
+const dnsBody = (addresses = ["93.184.216.34"]) =>
+  JSON.stringify({
+    Status: 0,
+    TC: false,
+    Question: [{ name: "site.example.com", type: 1 }],
+    Answer: addresses.map((data) => ({ name: "site.example.com", type: 1, TTL: 60, data })),
+  });
 function mockWire(
   body: string | Buffer = "body",
   status = 200,
@@ -229,6 +236,203 @@ it("does not begin DNS when cancelled before the scheduled lookup", async () => 
   await expect(pending).rejects.toThrow("cancelled");
   expect(wire.resolve).not.toHaveBeenCalled();
   expect(wire.send).not.toHaveBeenCalled();
+});
+
+it("pins validated DoH results to the destination while preserving its hostname and TLS verification", async () => {
+  const dns = mockWire(dnsBody(), 200, { "content-type": "application/dns-json" });
+  const target = mockWire("page");
+  const send = vi.fn<NonNullable<WebHttpDependencies["request"]>>((options, receive) => {
+    if (options.hostname === "cloudflare-dns.com")
+      return dns.dependencies.request(options, receive);
+    const pinned = vi.fn();
+    options.lookup?.("site.example.com", { family: 4, hints: 0 }, pinned);
+    expect(pinned).toHaveBeenCalledWith(null, "93.184.216.34", 4);
+    return target.dependencies.request(options, receive);
+  });
+  await expect(
+    fetchPublicText(
+      url(),
+      new AbortController().signal,
+      guard,
+      limits,
+      { request: send },
+      "cloudflare-doh",
+    ),
+  ).resolves.toMatchObject({ text: "page" });
+  expect(send).toHaveBeenCalledTimes(2);
+  expect(dns.send.mock.calls[0]?.[0]).toMatchObject({
+    hostname: "cloudflare-dns.com",
+    path: "/dns-query?name=site.example.com&type=A",
+  });
+  expect(target.send.mock.calls[0]?.[0]).toMatchObject({
+    hostname: "site.example.com",
+    servername: "site.example.com",
+    rejectUnauthorized: true,
+    path: "/page",
+  });
+  expect(dns.request()?.destroy).toHaveBeenCalled();
+});
+
+it.each([["198.18.3.70"], ["93.184.216.34", "127.0.0.1"], ["93.184.216.34", "10.0.0.1"]])(
+  "rejects every special/private DoH answer before any target connection: %j",
+  async (...addresses: string[]) => {
+    const dns = mockWire(dnsBody(addresses), 200, { "content-type": "application/dns-json" });
+    await expect(
+      fetchPublicText(
+        url(),
+        new AbortController().signal,
+        guard,
+        limits,
+        { request: dns.dependencies.request },
+        "cloudflare-doh",
+      ),
+    ).rejects.toThrow("public IPv4");
+    expect(dns.send).toHaveBeenCalledTimes(1);
+    expect(dns.send.mock.calls[0]?.[0].hostname).toBe("cloudflare-dns.com");
+  },
+);
+
+it("does not fall back or retry after a resolver transport failure, and hides the exception", async () => {
+  const send = vi.fn(() => {
+    throw Error("private transport diagnostics");
+  });
+  await expect(
+    fetchPublicText(
+      url(),
+      new AbortController().signal,
+      guard,
+      limits,
+      { request: send },
+      "cloudflare-doh",
+    ),
+  ).rejects.toThrow(/^Web destination lookup failed$/);
+  expect(send).toHaveBeenCalledTimes(1);
+});
+
+it.each(["cancel", "timeout", "revoke"])(
+  "closes DoH and ignores late DNS results after %s",
+  async (action) => {
+    const controller = new AbortController();
+    let authorized = true;
+    const started = Promise.withResolvers<void>();
+    const req = new EventEmitter() as ClientRequest;
+    req.destroy = vi.fn(() => req);
+    req.end = vi.fn(() => {
+      started.resolve();
+      return req;
+    });
+    let receive: ((message: IncomingMessage) => void) | undefined;
+    const send = vi.fn<NonNullable<WebHttpDependencies["request"]>>((_options, callback) => {
+      receive = callback;
+      return req;
+    });
+    const pending = fetchPublicText(
+      url(),
+      controller.signal,
+      () => {
+        if (!authorized) throw Error("private reason");
+      },
+      { ...limits, timeoutMs: action === "timeout" ? 20 : 1000 },
+      { request: send },
+      "cloudflare-doh",
+    );
+    await started.promise;
+    if (action === "cancel") controller.abort();
+    if (action === "revoke") authorized = false;
+    await expect(pending).rejects.toThrow(
+      action === "cancel" ? "cancelled" : action === "timeout" ? "timed out" : "revoked",
+    );
+    expect(req.destroy).toHaveBeenCalled();
+    const late = new PassThrough();
+    const message = late as unknown as IncomingMessage;
+    message.statusCode = 200;
+    message.headers = { "content-type": "application/dns-json" };
+    receive?.(message);
+    late.end(dnsBody());
+    await delay(0);
+    expect(message.destroyed).toBe(true);
+    expect(send).toHaveBeenCalledTimes(1);
+  },
+);
+
+it("closes a partially received DoH body on cancellation", async () => {
+  const controller = new AbortController();
+  const started = Promise.withResolvers<void>();
+  const req = new EventEmitter() as ClientRequest;
+  req.destroy = vi.fn(() => req);
+  const stream = new PassThrough();
+  const message = stream as unknown as IncomingMessage;
+  message.statusCode = 200;
+  message.headers = { "content-type": "application/dns-json" };
+  const send = vi.fn<NonNullable<WebHttpDependencies["request"]>>((_options, receive) => {
+    req.end = vi.fn(() => {
+      receive(message);
+      stream.write('{"Status":');
+      started.resolve();
+      return req;
+    });
+    return req;
+  });
+  const pending = fetchPublicText(
+    url(),
+    controller.signal,
+    guard,
+    limits,
+    { request: send },
+    "cloudflare-doh",
+  );
+  await started.promise;
+  controller.abort();
+  await expect(pending).rejects.toThrow("cancelled");
+  expect(stream.destroyed).toBe(true);
+  expect(req.destroy).toHaveBeenCalled();
+  expect(send).toHaveBeenCalledTimes(1);
+});
+
+it("shares one total deadline across DoH and the destination request", async () => {
+  vi.useFakeTimers();
+  try {
+    const requests: ClientRequest[] = [];
+    const send = vi.fn<NonNullable<WebHttpDependencies["request"]>>((options, receive) => {
+      const req = new EventEmitter() as ClientRequest;
+      requests.push(req);
+      req.destroy = vi.fn(() => req);
+      req.end = vi.fn(() => {
+        setTimeout(() => {
+          const stream = new PassThrough();
+          const message = stream as unknown as IncomingMessage;
+          message.statusCode = 200;
+          message.headers = {
+            "content-type":
+              options.hostname === "cloudflare-dns.com" ? "application/dns-json" : "text/plain",
+          };
+          receive(message);
+          stream.end(options.hostname === "cloudflare-dns.com" ? dnsBody() : "late page");
+        }, 40);
+        return req;
+      });
+      return req;
+    });
+    const rejected = expect(
+      fetchPublicText(
+        url(),
+        new AbortController().signal,
+        guard,
+        { ...limits, timeoutMs: 50 },
+        { request: send },
+        "cloudflare-doh",
+      ),
+    ).rejects.toThrow("timed out");
+    await vi.advanceTimersByTimeAsync(40);
+    expect(send).toHaveBeenCalledTimes(2);
+    await vi.advanceTimersByTimeAsync(10);
+    await rejected;
+    expect(requests[1]?.destroy).toHaveBeenCalled();
+    await vi.advanceTimersByTimeAsync(40);
+    expect(send).toHaveBeenCalledTimes(2);
+  } finally {
+    vi.useRealTimers();
+  }
 });
 
 it("rejects interrupted partial bodies instead of presenting a successful page", async () => {

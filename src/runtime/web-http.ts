@@ -4,6 +4,9 @@ import type { ClientRequest, IncomingMessage } from "node:http";
 import { Agent, request as httpsRequest, type RequestOptions } from "node:https";
 import { isIP } from "node:net";
 import type { WebResponse } from "../contracts/index.ts";
+import { resolveCloudflareDns } from "./web-doh.ts";
+
+export type WebDnsMode = "system" | "cloudflare-doh";
 
 /** Trusted test seams, not model arguments or configuration-based private-network exemptions. */
 export interface WebHttpDependencies {
@@ -80,16 +83,19 @@ export function fetchPublicText(
   assertAuthorized: () => void,
   limits: WebHttpLimits,
   dependencies: WebHttpDependencies = {},
+  dns: WebDnsMode = "system",
 ): Promise<WebResponse> {
   return new Promise((resolve, reject) => {
     let settled = false;
     let request: ClientRequest | undefined;
     let response: IncomingMessage | undefined;
+    const dnsController = new AbortController();
     const agent = new Agent({ keepAlive: false, maxSockets: 1, proxyEnv: {} });
     const cleanup = () => {
       clearTimeout(deadline);
       clearInterval(revocation);
       signal.removeEventListener("abort", cancelled);
+      dnsController.abort();
       response?.destroy();
       request?.destroy();
       agent.destroy();
@@ -142,7 +148,11 @@ export function fetchPublicText(
     };
     if (!live()) return;
     const resolveAddresses =
-      dependencies.resolve ?? ((hostname: string) => lookup(hostname, { all: true, family: 4 }));
+      dependencies.resolve ??
+      (dns === "cloudflare-doh"
+        ? (hostname: string) =>
+            resolveCloudflareDns(hostname, dnsController.signal, dependencies.request)
+        : (hostname: string) => lookup(hostname, { all: true, family: 4 }));
     // The deadline also bounds DNS. A late answer is ignored and cannot initiate a connection.
     void Promise.resolve()
       .then(() => (live() ? resolveAddresses(url.hostname) : []))

@@ -209,6 +209,68 @@ describe("native sandbox confinement", () => {
     );
   });
 
+  if (process.platform === "darwin") {
+    it("preserves explicit loader alias metadata without granting sibling data or writes", async () => {
+      const library = join(base, "library");
+      const aliases = join(base, "opt");
+      await mkdir(library);
+      await mkdir(aliases);
+      const target = join(library, "lib-v1");
+      const alias = join(aliases, "lib-compat");
+      const sibling = join(aliases, "other");
+      await writeFile(target, "LIBRARY");
+      await writeFile(sibling, "SIBLING_CANARY");
+      await symlink(target, alias);
+      options = { ...options, readOnlyPaths: [alias] };
+      expect((await run(`cat ${quote(alias)}`)).stdout).toBe("LIBRARY");
+      expect((await run(`cat ${quote(sibling)}`)).stdout).not.toContain("SIBLING_CANARY");
+      expect((await run(`printf changed > ${quote(alias)}`)).code).not.toBe(0);
+      expect(await readFile(target, "utf8")).toBe("LIBRARY");
+    });
+
+    it("does not grant a different target after an explicit loader alias is replaced", async () => {
+      const target = join(base, "library");
+      const alias = join(base, "library-alias");
+      await writeFile(target, "LIBRARY");
+      await symlink(target, alias);
+      options = { ...options, readOnlyPaths: [alias] };
+      const result = await run(`cat ${quote(alias)}`, async () => {
+        await rm(alias);
+        await symlink(outside, alias);
+      });
+      expect(result.code).not.toBe(0);
+      expect(result.stdout).not.toContain("OUTSIDE_CANARY");
+      expect(await readFile(outside, "utf8")).toBe("OUTSIDE_CANARY");
+    });
+  }
+
+  it("checks both requested aliases and their actual targets against protected scopes", async () => {
+    const library = join(base, "library");
+    const aliases = join(base, "aliases");
+    const privateDirectory = join(base, "private");
+    await mkdir(library);
+    await mkdir(aliases);
+    await mkdir(privateDirectory);
+    await writeFile(join(library, "data"), "LIBRARY");
+    await writeFile(join(library, ".env"), "SECRET");
+    await writeFile(join(privateDirectory, "data"), "PRIVATE");
+    for (const [name, target] of [
+      [".env", join(library, "data")],
+      ["secret-alias", join(library, ".env")],
+      ["private-alias", join(privateDirectory, "data")],
+    ] as const) {
+      const alias = join(aliases, name);
+      await symlink(target, alias);
+      await expect(
+        prepareNativeSandbox({
+          ...options,
+          protectedPaths: [privateDirectory],
+          readOnlyPaths: [alias],
+        }),
+      ).rejects.toThrow();
+    }
+  });
+
   it("quotes unusual workspace paths as data in the sandbox policy", async () => {
     const quoted = join(base, 'workspace " (allow default)');
     await mkdir(quoted);
@@ -253,12 +315,14 @@ describe("native sandbox confinement", () => {
 
 async function run(
   commandText: string,
+  afterPrepare?: () => Promise<void>,
 ): Promise<{ code: number | null; signal: string | null; stdout: string; stderr: string }> {
   const marker = "MOYYI_SANDBOX_STARTED\n";
   const plan = await prepareNativeSandbox({
     ...options,
     commandText: `printf ${quote(marker)}; ${commandText}`,
   });
+  await afterPrepare?.();
   return new Promise((resolve, reject) => {
     const child = spawn(plan.command, [...plan.args], {
       cwd: workspace,

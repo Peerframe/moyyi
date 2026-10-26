@@ -7,13 +7,20 @@ import {
   type WebResponse,
   type WorkspaceWriteScope,
 } from "../contracts/index.ts";
-import { fetchPublicText, publicHttpsUrl, type WebHttpDependencies } from "./web-http.ts";
+import {
+  fetchPublicText,
+  publicHttpsUrl,
+  type WebDnsMode,
+  type WebHttpDependencies,
+} from "./web-http.ts";
 
 export interface WebAccessOptions {
   /** Exact HTTPS origins; no wildcard or implicit grant to linked pages. */
   readonly allowedOrigins: readonly string[];
   /** Explicit SearXNG host with JSON search enabled; never selects a public instance. */
   readonly search?: { readonly origin: string };
+  /** Host-selected DNS transport; never changes destination grants or public-address checks. */
+  readonly dns?: WebDnsMode;
   readonly timeoutMs?: number;
   readonly maxResponseBytes?: number;
 }
@@ -24,8 +31,12 @@ export class NodeWebAccess implements WebAccessFactory {
   private readonly timeoutMs: number;
   private readonly maxResponseBytes: number;
   private readonly dependencies: WebHttpDependencies;
+  private readonly dns: WebDnsMode;
 
   constructor(options: WebAccessOptions, dependencies: WebHttpDependencies = {}) {
+    if (options.dns !== undefined && options.dns !== "system" && options.dns !== "cloudflare-doh")
+      throw Error("Web DNS must be system or cloudflare-doh");
+    this.dns = options.dns ?? "system";
     this.origins = new Set(options.allowedOrigins.map(exactOrigin));
     this.searchOrigin = options.search ? exactOrigin(options.search.origin) : undefined;
     this.timeoutMs = bounded(options.timeoutMs ?? 30_000, 1, 120_000, "web timeout");
@@ -129,6 +140,7 @@ export class NodeWebAccess implements WebAccessFactory {
             maxResponseBytes: request.kind === "search" ? this.maxResponseBytes : limit,
           },
           this.dependencies,
+          this.dns,
         );
         guard();
         return request.kind === "search" ? searchResults(response, request.count, limit) : response;
