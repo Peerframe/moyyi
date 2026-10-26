@@ -9,14 +9,18 @@ import {
   symlinkSync,
   writeFileSync,
 } from "node:fs";
+import fsPromises from "node:fs/promises";
+import { syncBuiltinESMExports } from "node:module";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { afterEach, describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import type { RunId } from "../contracts/index.ts";
 import { NodeWorkspaceFiles } from "./files.ts";
 
 const roots: string[] = [];
 afterEach(() => {
+  vi.restoreAllMocks();
+  syncBuiltinESMExports();
   for (const root of roots.splice(0)) rmSync(root, { recursive: true, force: true });
 });
 function setup(content: Record<string, string | Uint8Array> = {}) {
@@ -58,6 +62,182 @@ function setup(content: Record<string, string | Uint8Array> = {}) {
 }
 
 describe("runtime workspace file capability", () => {
+  it("searches an exact file with ancestor rules without scanning siblings", async () => {
+    const t = setup({
+      ".gitignore": "*.tmp\nbuild/\n",
+      "sub/.gitignore": "!keep.tmp\n",
+      "sub/keep.tmp": "before\nneedle\nafter\n",
+      "sub/drop.tmp": "needle",
+      "sub/sibling.ts": "needle sibling",
+      "build/.gitignore": "!a.ts\n",
+      "build/a.ts": "needle",
+    });
+    const opened = vi.spyOn(fsPromises, "open");
+    syncBuiltinESMExports();
+    const result = await t.files.search("sub/keep.tmp", "needle", { contextLines: 1 });
+    expect(result.matches).toEqual([{ path: "sub/keep.tmp", line: 2, text: "needle" }]);
+    expect(result.context?.[0]?.text).toBe("before\nneedle\nafter\n");
+    expect(opened.mock.calls.map(([path]) => path)).toEqual([
+      join(t.workspace, ".gitignore"),
+      join(t.workspace, "sub/.gitignore"),
+      join(t.workspace, "sub/keep.tmp"),
+    ]);
+    expect((await t.files.search("sub/drop.tmp", "needle")).matches).toEqual([]);
+    expect((await t.files.search("build/a.ts", "needle")).matches).toEqual([]);
+    const paths = opened.mock.calls.map(([path]) => path);
+    expect(paths).not.toContain(join(t.workspace, "sub/drop.tmp"));
+    expect(paths).not.toContain(join(t.workspace, "build/.gitignore"));
+    expect(paths).not.toContain(join(t.workspace, "build/a.ts"));
+    expect(paths).not.toContain(join(t.workspace, "sub/sibling.ts"));
+  });
+
+  it("narrows content before opening candidates and never overrides ignore or protected paths", async () => {
+    const t = setup({
+      ".gitignore": "src/ignored.ts\n",
+      "src/deep/keep.ts": "needle",
+      "src/skip.test.ts": "needle EXCLUDED",
+      "src/ignored.ts": "needle IGNORED",
+      "src/private-store/a.ts": "needle",
+      "docs/skip.md": "needle OTHER",
+      ".env": "needle SECRET",
+      "private-store/data.ts": "needle PRIVATE",
+    });
+    const opened = vi.spyOn(fsPromises, "open");
+    syncBuiltinESMExports();
+    const result = await t.files.search(".", "needle", {
+      include: ["src/**/*.ts", "private-store/**", ".env"],
+      exclude: ["**/*.test.ts", "src/private-store/**"],
+    });
+    expect(result.matches.map((hit) => hit.path)).toEqual(["src/deep/keep.ts"]);
+    expect(opened.mock.calls.map(([path]) => path).sort()).toEqual(
+      [join(t.workspace, ".gitignore"), join(t.workspace, "src/deep/keep.ts")].sort(),
+    );
+    expect(JSON.stringify(result)).not.toMatch(/EXCLUDED|IGNORED|OTHER|SECRET|PRIVATE/);
+  });
+
+  it("does not open filtered exact files and keeps default content results compatible", async () => {
+    const t = setup({ "src/a.ts": "needle", "docs/a.md": "needle" });
+    const opened = vi.spyOn(fsPromises, "open");
+    syncBuiltinESMExports();
+    expect(await t.files.search("src/a.ts", "needle", { include: ["docs/**"] })).toEqual({
+      path: "src/a.ts",
+      matches: [],
+      truncated: false,
+      skippedFiles: 0,
+    });
+    expect(opened).not.toHaveBeenCalled();
+    const legacy = await t.files.search(".", "needle");
+    expect(await t.files.search(".", "needle", { mode: "content" })).toEqual(legacy);
+    expect(legacy).not.toHaveProperty("mode");
+    expect(legacy).not.toHaveProperty("files");
+  });
+
+  it("counts distinct matching files instead of lines and omits source text and context", async () => {
+    const t = setup({ "a.ts": "needle\n".repeat(100), "b.ts": "needle", "c.ts": "absent" });
+    const result = await t.files.search(".", "needle", {
+      mode: "files",
+      maxMatches: 2,
+      contextLines: 20,
+    });
+    expect(result.mode).toBe("files");
+    expect(result.files?.slice().sort()).toEqual(["a.ts", "b.ts"]);
+    expect(result.matches).toEqual([]);
+    expect(result).not.toHaveProperty("context");
+    expect(result.truncated).toBe(true);
+    expect(await t.files.search("a.ts", "needle", { mode: "files", maxMatches: 1 })).toEqual({
+      path: "a.ts",
+      mode: "files",
+      files: ["a.ts"],
+      matches: [],
+      truncated: false,
+      skippedFiles: 0,
+    });
+  });
+
+  it("returns the files-mode shape for ignored and unmatched exact targets", async () => {
+    const t = setup({ ".gitignore": "sub/\n", "sub/a.ts": "needle", "b.ts": "absent" });
+    for (const path of ["sub/a.ts", "b.ts"]) {
+      expect(await t.files.search(path, "needle", { mode: "files", contextLines: 8 })).toEqual({
+        path,
+        mode: "files",
+        files: [],
+        matches: [],
+        truncated: false,
+        skippedFiles: 0,
+      });
+    }
+  });
+
+  it("refuses exact leaf aliases while retaining protected parent and root checks", async () => {
+    const t = setup({ "real.ts": "needle", ".env": "needle SECRET" });
+    writeFileSync(join(t.root, "outside.ts"), "needle OUTSIDE");
+    symlinkSync("real.ts", join(t.workspace, "alias.ts"));
+    symlinkSync(".env", join(t.workspace, "private.ts"));
+    symlinkSync(t.root, join(t.workspace, "outside"));
+    linkSync(join(t.root, "outside.ts"), join(t.workspace, "hard.ts"));
+    for (const path of ["alias.ts", "private.ts", "outside/outside.ts", "hard.ts"]) {
+      await expect(t.files.search(path, "needle", { mode: "files" })).rejects.toThrow(
+        /unlinked|protected|escapes/i,
+      );
+    }
+  });
+
+  it("uses canonical ancestor rules for an authorized internal parent alias", async () => {
+    const t = setup({
+      ".gitignore": "real/ignored.ts\n",
+      "real/ignored.ts": "needle",
+      "real/allowed.ts": "needle",
+    });
+    symlinkSync("real", join(t.workspace, "alias"));
+    expect((await t.files.search("alias/ignored.ts", "needle")).matches).toEqual([]);
+    expect((await t.files.search("alias/allowed.ts", "needle")).matches).toEqual([
+      { path: "real/allowed.ts", line: 1, text: "needle" },
+    ]);
+  });
+
+  it("keeps files-only results honest about partial and unreadable scans", async () => {
+    const t = setup({
+      "large.ts": `needle\n${"x".repeat(1024 * 1024)}`,
+      "binary.ts": new Uint8Array([110, 101, 101, 100, 108, 101, 0]),
+    });
+    const partial = await t.files.search("large.ts", "needle", { mode: "files" });
+    expect(partial.files).toEqual(["large.ts"]);
+    expect(partial.truncated).toBe(true);
+    const binary = await t.files.search("binary.ts", "needle", { mode: "files" });
+    expect(binary.files).toEqual([]);
+    expect(binary.skippedFiles).toBe(1);
+    expect(binary.truncated).toBe(true);
+  });
+
+  it.each(["content", "files"] as const)(
+    "discards in-flight exact %s results on revocation",
+    async (mode) => {
+      const t = setup({ "source.ts": "needle" });
+      const pending = t.files.search("source.ts", "needle", { mode });
+      t.revoke();
+      await expect(pending).rejects.toThrow(/revoked/i);
+    },
+  );
+
+  it.each(["content", "files"] as const)(
+    "discards in-flight filtered %s results on cancellation",
+    async (mode) => {
+      const t = setup({ "source.ts": "needle" });
+      const pending = t.files.search(".", "needle", { mode, include: ["*.ts"] });
+      t.controller.abort();
+      await expect(pending).rejects.toThrow(/cancel/i);
+    },
+  );
+
+  it("rejects invalid new options before resolving the search target", async () => {
+    const t = setup();
+    for (const options of [{ include: [] }, { exclude: ["../*"] }, { mode: "other" }]) {
+      await expect(t.files.search("missing", "needle", options as never)).rejects.toThrow(
+        /Search filters|Search mode/,
+      );
+    }
+  });
+
   it("returns merged search context from the same source while preserving exact legacy hits", async () => {
     const text = "before\nexport function picked() {\n  return pickedValue;\n}\nafter\n";
     const t = setup({ "source.ts": text });

@@ -25,10 +25,33 @@ uses literal text, includes line numbers and is case-sensitive by default. It tr
 and hidden workspace files subject to protected paths and `.gitignore`; it does not load global
 Git excludes or `.git/info/exclude`. Direct reads/lists do not use ignore rules. Every result
 reports truncation, and lists/searches report skipped entries. A bounded or skipped search is
-not proof that no other match exists. `search.path` must be an existing directory. Patterns such
+not proof that no other match exists. `search.path` accepts an existing regular file or directory.
+An exact file never widens the search to its siblings; ancestor ignore rules still apply. A missing
+path fails, while a valid search with no matching lines succeeds with empty results. Queries such
 as `foo|bar` remain literal text, not alternation or regular expressions.
 
-Search also returns `context`: merged nearby source windows from the same guarded scan, with
+Use `mode: "files"` to discover matching files before reading their contents. It returns `mode`,
+`files` (distinct workspace-relative paths), `matches: []`, `skippedFiles` and `truncated`, with no
+context. `maxMatches` counts files in this mode, so repeated hits in one file cannot consume the
+whole result allowance. This still performs bounded file reads; it reduces returned content,
+not filesystem authority. The default `content` mode keeps the existing result shape.
+
+Optional `include` and `exclude` each accept 1–8 simple glob strings of 1–128 characters.
+They match **workspace-relative paths**, even when `path` selects a subdirectory. Includes are ORed;
+excludes win. Use `**/*.ts` for nested TypeScript and `**/*.test.ts` to explicitly exclude tests.
+`*.ts` matches workspace-root files only. The existing Node `path.posix.matchesGlob` implements
+literals, `*`, `**` and `?`; wildcards do not automatically select dotfiles, so use explicit dot
+patterns when needed. Absolute paths, parent traversal, backslashes, controls, negation, braces,
+character classes and extglobs are rejected; `**` must occupy a complete path segment. Filters narrow authorized, nonignored candidates
+before reading their bodies; they never revive ignored/protected paths or hide tests by default.
+
+For example, discover implementations with
+`{"path":"src","query":"publishRecord","include":["**/*.ts"],"exclude":["**/*.test.ts"],"mode":"files"}`,
+then search an exact returned file in content mode or read a line range. Field validation errors
+identify safe declared fields and constraints (for example, `/contextLines must be <= 20`), without
+coercion or echoing arbitrary values. A rejected call is not automatically retried.
+
+Content search also returns `context`: merged nearby source windows from the same guarded scan, with
 `path`, `startLine`, `endLine`, `text` and `complete`. The tool defaults to eight lines per side;
 `contextLines` accepts 0–20 (0 keeps navigation-only results). The lower-level workspace capability
 retains a default of 0 for callers that only need hits. Overlapping/adjacent windows in one file
@@ -73,7 +96,9 @@ choice and unsupported ignore patterns, which fail the search rather than weaken
 
 Paths must be workspace-relative and cannot contain parent traversal. The host rechecks the
 workspace, lexical and resolved path, and file identity at operation time. Explicit read/list
-can resolve authorized internal symlinks; recursive traversal skips symlinks. Escaping links,
+can resolve authorized internal symlinks; recursive traversal skips symlinks. Exact-file search
+rejects a symbolic-link leaf; an explicitly selected directory can still resolve an internal link.
+Exact-file parent aliases follow the same canonical resolution and ancestor ignore rules. Escaping links,
 nonregular reads and multiply-linked files are rejected. File content comes from a verified
 descriptor, with bounded reads and identity/metadata checks before returning it.
 
@@ -102,7 +127,7 @@ preconditions, so a protected-path refusal never becomes an approval request.
 
 Host tests use disposable real files; integration tests verify persistence and the next model
 request, actual denial, revoked/expired capabilities and cancellation. Supported ignore examples
-are compared with Git's own `check-ignore` command in tests. The eight file eval scenarios use
+are compared with Git's own `check-ignore` command in tests. The file eval scenarios use
 public runtime commands/events and synthetic canaries. They do not modify the public task corpus
 or read private eval data. See the [handoff](tasks/2026-10-25-batch-5-files.md) for final evidence.
 

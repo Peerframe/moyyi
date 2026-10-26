@@ -249,6 +249,102 @@ describe("fs plugin", () => {
       expect(files.read).not.toHaveBeenCalled();
     },
   );
+  it("snapshots glob lists, forwards exact-file scope and supports file discovery", async () => {
+    const files = capability(),
+      ctx = context(files),
+      tool = await selected("search");
+    const args = {
+      path: "src/target.ts",
+      query: "needle",
+      include: ["src/**/*.ts"],
+      exclude: ["**/*.test.ts"],
+      mode: "files",
+    };
+    files.search.mockResolvedValue({
+      path: args.path,
+      mode: "files",
+      files: [args.path],
+      matches: [],
+      truncated: false,
+      skippedFiles: 0,
+    });
+    const action = await tool.prepare(args, ctx);
+    args.include[0] = "unrelated/**";
+    args.exclude.push("src/**");
+    const result = await tool.execute(action, ctx);
+    expect(files.search).toHaveBeenCalledExactlyOnceWith("src/target.ts", "needle", {
+      maxMatches: 16,
+      caseSensitive: true,
+      contextLines: 8,
+      include: ["src/**/*.ts"],
+      exclude: ["**/*.test.ts"],
+      mode: "files",
+    });
+    expect(body(result)).toEqual({
+      path: "src/target.ts",
+      mode: "files",
+      files: ["src/target.ts"],
+      matches: [],
+      truncated: false,
+      skippedFiles: 0,
+    });
+    expect(files.read).not.toHaveBeenCalled();
+  });
+  it.each([
+    { include: [] },
+    { include: "*.ts" },
+    { include: [1] },
+    { include: [""] },
+    { include: ["x".repeat(129)] },
+    { exclude: Array(9).fill("*.ts") },
+    { exclude: null },
+    { mode: "all" },
+    { mode: null },
+  ])("rejects malformed selection options before calling files: %j", async (options) => {
+    const files = capability();
+    await expect(
+      (await selected("search")).prepare({ query: "hit", ...options }, context(files)),
+    ).rejects.toThrow();
+    expect(files.search).not.toHaveBeenCalled();
+  });
+  it("clips file discovery on whole paths and retains marked omissions", async () => {
+    const files = capability(),
+      ctx = context(files, undefined, 256),
+      tool = await selected("search");
+    const paths = ["src/first.ts", `${"long-directory/".repeat(30)}second.ts`];
+    files.search.mockResolvedValue({
+      path: ".",
+      mode: "files",
+      files: paths,
+      matches: [],
+      truncated: false,
+      skippedFiles: 2,
+    });
+    const result = await tool.execute(
+      await tool.prepare({ query: "hit", mode: "files" }, ctx),
+      ctx,
+    );
+    expect(body(result)).toEqual({
+      path: ".",
+      mode: "files",
+      files: paths.slice(0, 1),
+      matches: [],
+      truncated: true,
+      skippedFiles: 2,
+    });
+    expect(Buffer.byteLength(JSON.stringify(result.content))).toBeLessThanOrEqual(256);
+    files.search.mockResolvedValue({
+      path: ".",
+      mode: "files",
+      files: [paths[1] as string],
+      matches: [],
+      truncated: false,
+      skippedFiles: 0,
+    });
+    const empty = await tool.execute(await tool.prepare({ query: "hit", mode: "files" }, ctx), ctx);
+    expect(body(empty).files).toEqual([]);
+    expect(body(empty).truncated).toBe(true);
+  });
   it.each([-1, 21, 1.5, null, "8"])("rejects invalid tool context %j", async (contextLines) => {
     const files = capability();
     await expect(

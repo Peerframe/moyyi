@@ -12,6 +12,7 @@ import {
   type RuntimeEvent,
   type WorkspaceFiles,
   type FileSearchContext,
+  type FileSearchOptions,
   UNKNOWN_USAGE,
 } from "moyyi/contracts";
 
@@ -128,3 +129,14 @@ async function sourceWindows(files: WorkspaceFiles): Promise<readonly FileSearch
   return result.context;
 }
 void sourceWindows;
+
+async function discoverSource(files: WorkspaceFiles): Promise<readonly string[] | undefined> {
+  const selection: FileSearchOptions = { include: ["src/**/*.ts"], exclude: ["**/*.test.ts"], mode: "files" };
+  const result = await files.search("src", "function", selection);
+  // @ts-expect-error Discovery mode is explicit; arbitrary output modes are not accepted.
+  await files.search("src", "function", { mode: "raw" });
+  // @ts-expect-error Selection patterns are strings, never permission objects.
+  await files.search("src", "function", { include: [{ grant: true }] });
+  return result.mode === "files" ? result.files : undefined;
+}
+void discoverSource;

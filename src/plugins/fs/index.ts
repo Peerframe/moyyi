@@ -24,6 +24,9 @@ interface Arguments {
   readonly maxMatches?: number;
   readonly caseSensitive?: boolean;
   readonly contextLines?: number;
+  readonly include?: readonly string[];
+  readonly exclude?: readonly string[];
+  readonly mode?: "content" | "files";
 }
 type Result =
   | FileRead
@@ -32,6 +35,12 @@ type Result =
   | { readonly error: string; readonly truncated: boolean };
 const encoder = new TextEncoder();
 const pathSchema = { type: "string", minLength: 1, maxLength: 4096 };
+const patternsSchema = {
+  type: "array",
+  minItems: 1,
+  maxItems: 8,
+  items: { type: "string", minLength: 1, maxLength: 128 },
+};
 const schemas: Record<Operation, JsonSchema> = {
   read: {
     type: "object",
@@ -57,16 +66,19 @@ const schemas: Record<Operation, JsonSchema> = {
       maxMatches: { type: "integer", minimum: 1, maximum: 100 },
       caseSensitive: { type: "boolean" },
       contextLines: { type: "integer", minimum: 0, maximum: 20 },
+      include: patternsSchema,
+      exclude: patternsSchema,
+      mode: { type: "string", enum: ["content", "files"] },
     },
     required: ["query"],
     additionalProperties: false,
   },
 };
 const descriptions: Record<Operation, string> = {
-  read: "Read workspace UTF-8; default prefix 16384 bytes, capped by output budget. For search hits use startLine/maxLines (1-based; defaults 1/200). Range mode needs a complete file <=1 MiB. lineRange.complete concerns the window; truncated means file content omitted. Protected/binary files fail.",
-  list: "List bounded entries of a workspace-relative directory (default .). The host enforces protected paths; truncated means the listing is incomplete.",
+  read: "Read UTF-8. startLine/maxLines selects a 1-based window (defaults 1/200, file<=1MiB); complete covers the window only.",
+  list: "List a workspace directory (default .).",
   search:
-    "Literal search in a directory (default .), respecting .gitignore; no regex. Returns hits and merged nearby code (contextLines 0–20 per side, default 8). Complete windows may omit function bodies; use read for gaps. Truncation/skippedFiles cannot prove absence.",
+    "Literal file/dir search (default .); honors .gitignore. include/exclude: workspace-relative *, **, ? globs; ** whole segments; dotfiles explicit; exclude wins. mode files: unique paths; content default: hits/context (8 lines/side). maxMatches counts lines/files. Read gaps; truncated/skipped cannot prove absence.",
 };
 
 export const fsPlugin: Plugin = {
@@ -119,6 +131,9 @@ function tool(operation: Operation): ToolDefinition {
             maxMatches: Math.max(1, Math.min(args.maxMatches ?? 20, Math.floor(budget / 512))),
             caseSensitive: args.caseSensitive ?? true,
             contextLines: args.contextLines ?? 8,
+            ...(args.include === undefined ? {} : { include: args.include }),
+            ...(args.exclude === undefined ? {} : { exclude: args.exclude }),
+            ...(args.mode === undefined ? {} : { mode: args.mode }),
           });
         }
         assertActive(context);
@@ -201,12 +216,33 @@ function argumentsFor(operation: Operation, value: unknown): Arguments {
       contextLines > 20)
   )
     throw new Error("Invalid contextLines");
+  const patterns = (name: "include" | "exclude"): readonly string[] | undefined => {
+    const value = args[name];
+    if (value === undefined) return undefined;
+    if (
+      !Array.isArray(value) ||
+      value.length < 1 ||
+      value.length > 8 ||
+      value.some(
+        (pattern) => typeof pattern !== "string" || !pattern.length || pattern.length > 128,
+      )
+    )
+      throw new Error(`Invalid ${name}: expected 1–8 glob strings of 1–128 characters`);
+    return value as string[];
+  };
+  const include = patterns("include"),
+    exclude = patterns("exclude");
+  if (args.mode !== undefined && args.mode !== "content" && args.mode !== "files")
+    throw new Error("Invalid mode: expected content or files");
   return {
     path,
     query: args.query,
     caseSensitive: args.caseSensitive ?? true,
     ...(maxMatches === undefined ? {} : { maxMatches }),
     ...(contextLines === undefined ? {} : { contextLines }),
+    ...(include === undefined ? {} : { include }),
+    ...(exclude === undefined ? {} : { exclude }),
+    ...(args.mode === undefined ? {} : { mode: args.mode }),
   };
 }
 
@@ -233,6 +269,15 @@ function outcome(status: ToolOutcome["status"], result: Result, budget: number):
         largest(result.entries.length, (length) =>
           fits({ ...base, entries: result.entries.slice(0, length) }),
         ),
+      ),
+    };
+  } else if ("matches" in result && result.mode === "files") {
+    const files = result.files ?? [];
+    limited = {
+      ...base,
+      files: files.slice(
+        0,
+        largest(files.length, (length) => fits({ ...base, files: files.slice(0, length) })),
       ),
     };
   } else if ("matches" in result) {

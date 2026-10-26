@@ -8,12 +8,14 @@ import type {
   FileReadOptions,
   FileSearch,
   FileSearchContext,
+  FileSearchOptions,
   ToolContext,
   WorkspaceFiles,
   WorkspaceFilesFactory,
 } from "../contracts/index.ts";
 import { assertUnprotected } from "./preconditions.ts";
 import { searchContext } from "./search-context.ts";
+import { searchSelection } from "./search-selection.ts";
 
 const MAX_FILE_BYTES = 1024 * 1024;
 const MAX_SCAN_BYTES = 16 * 1024 * 1024;
@@ -86,18 +88,8 @@ export class NodeWorkspaceFiles implements WorkspaceFilesFactory {
       read: (path: string, options?: FileReadOptions) => scope.read(path, options),
       list: (path: string, options?: { maxEntries?: number }) =>
         scope.list(path, options?.maxEntries),
-      search: (
-        path: string,
-        query: string,
-        options?: { maxMatches?: number; caseSensitive?: boolean; contextLines?: number },
-      ) =>
-        scope.search(
-          path,
-          query,
-          options?.maxMatches,
-          options?.caseSensitive,
-          options?.contextLines,
-        ),
+      search: (path: string, query: string, options?: FileSearchOptions) =>
+        scope.search(path, query, options),
     });
   }
 }
@@ -420,15 +412,20 @@ class ReadScope {
     }
   }
 
-  search(
-    path: string,
-    query: string,
-    maximum?: number,
-    caseSensitive = true,
-    contextLines = 0,
-  ): Promise<FileSearch> {
+  search(path: string, query: string, options: FileSearchOptions = {}): Promise<FileSearch> {
     return this.operation(async (root) => {
-      const cap = bounded(maximum, 50, 200);
+      const cap = bounded(options.maxMatches, 50, 200);
+      const caseSensitive = options.caseSensitive === undefined ? true : options.caseSensitive;
+      const contextLines = options.contextLines === undefined ? 0 : options.contextLines;
+      const mode = options.mode === undefined ? "content" : options.mode;
+      if (mode !== "content" && mode !== "files")
+        throw new FileAccessError("denied", "Search mode must be content or files");
+      let selected: (path: string) => boolean;
+      try {
+        selected = searchSelection(options.include, options.exclude);
+      } catch (error) {
+        throw new FileAccessError("denied", (error as Error).message);
+      }
       if (!Number.isSafeInteger(contextLines) || contextLines < 0 || contextLines > 20)
         throw new FileAccessError("denied", "Search context must be 0 to 20 lines per side");
       if (
@@ -443,9 +440,15 @@ class ReadScope {
           "Search requires a single-line literal query of 1 to 256 characters",
         );
       const start = await this.target(root, path);
-      if (!start.stat.isDirectory())
-        throw new FileAccessError("denied", "Search requires a directory");
+      if (!start.stat.isDirectory() && !start.stat.isFile())
+        throw new FileAccessError("denied", "Search requires a regular file or directory");
+      if (start.stat.isFile()) {
+        const lexical = await this.io(() => lstat(start.lexical));
+        if (lexical.isSymbolicLink() || lexical.nlink !== 1 || !same(lexical, start.stat))
+          throw new FileAccessError("denied", "Search requires a regular unlinked file");
+      }
       const matches: { path: string; line: number; text: string }[] = [];
+      const files: string[] = [];
       const context: FileSearchContext[] = [];
       let contextBytes = 0;
       let visited = 0,
@@ -454,6 +457,14 @@ class ReadScope {
         truncated = false,
         skippedFiles = 0;
       const needle = caseSensitive ? query : query.toLowerCase();
+      const count = () => (mode === "files" ? files.length : matches.length);
+      const result = (withContext = true): FileSearch => ({
+        path: start.relative,
+        matches,
+        truncated,
+        skippedFiles,
+        ...(mode === "files" ? { mode, files } : withContext && contextLines ? { context } : {}),
+      });
       const loadRules = async (directory: Target, inherited: Rules): Promise<Rules> => {
         const local = portable(relative(root.path, resolve(directory.path, ".gitignore")));
         let stat: Stats;
@@ -504,16 +515,79 @@ class ReadScope {
         return excluded;
       };
       let inherited: Rules = [];
-      // Explicit subdirectory searches still inherit root/ancestor ignore rules.
+      // Exact files and subdirectories inherit every ancestor rule; a file is never a rule root.
       let ancestor = await this.target(root, ".");
       inherited = await loadRules(ancestor, inherited);
       const segments = start.relative === "." ? [] : start.relative.split("/");
-      for (let index = 0; index < segments.length; index++) {
+      const directories = start.stat.isFile() ? segments.length - 1 : segments.length;
+      for (let index = 0; index < directories; index++) {
         const name = segments.slice(0, index + 1).join("/");
-        if (ignored(name, true, inherited))
-          return { path: start.relative, matches, truncated: false, skippedFiles: 0 };
+        if (ignored(name, true, inherited)) return result(false);
         ancestor = await this.target(root, name);
         inherited = await loadRules(ancestor, inherited);
+      }
+      const scanFile = async (item: Target, path: string): Promise<void> => {
+        // Filters are selection, not authority. Never open excluded candidate contents.
+        if (!selected(path)) return;
+        const bytes = Math.max(
+          1,
+          Math.min(MAX_FILE_BYTES, MAX_SCAN_BYTES - scanned, item.stat.size + 1),
+        );
+        scanned += bytes;
+        try {
+          await this.unchanged(root, item);
+          const read = await this.readFile(root, path, bytes);
+          await this.unchanged(root, item);
+          if (start.stat.isFile()) {
+            const lexical = await this.io(() => lstat(start.lexical));
+            if (lexical.isSymbolicLink() || lexical.nlink !== 1 || !same(lexical, start.stat))
+              throw new FileAccessError("denied", "Search target changed during access");
+          }
+          truncated ||= read.truncated;
+          const lines = read.text.split("\n");
+          const hits: number[] = [];
+          for (let index = 0; index < lines.length; index++) {
+            const line = lines[index] as string;
+            if ((caseSensitive ? line : line.toLowerCase()).includes(needle)) {
+              if (mode === "files") {
+                files.push(path);
+                break;
+              }
+              if (line.length > MAX_LINE_CHARS) truncated = true;
+              matches.push({
+                path,
+                line: index + 1,
+                text: line.slice(0, MAX_LINE_CHARS).toWellFormed(),
+              });
+              hits.push(index + 1);
+              if (matches.length >= cap) {
+                truncated = true;
+                break;
+              }
+            }
+          }
+          if (mode === "content" && contextLines > 0 && hits.length) {
+            const windows = searchContext(
+              read,
+              hits,
+              contextLines,
+              MAX_SEARCH_CONTEXT_BYTES - contextBytes,
+            );
+            context.push(...windows.context);
+            contextBytes += windows.bytes;
+            truncated ||= windows.truncated;
+          }
+        } catch (error) {
+          this.guard();
+          if (error instanceof FileAccessError || isMissing(error)) {
+            skippedFiles++;
+            truncated = true;
+          } else throw error;
+        }
+      };
+      if (start.stat.isFile()) {
+        if (!ignored(start.relative, false, inherited)) await scanFile(start, start.relative);
+        return result();
       }
       const walk = async (directory: Target, rules: Rules, depth: number): Promise<void> => {
         if (depth > MAX_DEPTH) {
@@ -521,7 +595,7 @@ class ReadScope {
           return;
         }
         await this.directory(root, directory, async (name, symbolic) => {
-          if (++visited > MAX_ENTRIES || scanned >= MAX_SCAN_BYTES || matches.length >= cap) {
+          if (++visited > MAX_ENTRIES || scanned >= MAX_SCAN_BYTES || count() >= cap) {
             truncated = true;
             return false;
           }
@@ -545,65 +619,15 @@ class ReadScope {
           if (item.stat.isDirectory()) {
             await walk(item, await loadRules(item, rules), depth + 1);
           } else if (item.stat.isFile()) {
-            const bytes = Math.max(
-              1,
-              Math.min(MAX_FILE_BYTES, MAX_SCAN_BYTES - scanned, item.stat.size + 1),
-            );
-            scanned += bytes;
-            try {
-              const read = await this.readFile(root, path, bytes);
-              truncated ||= read.truncated;
-              const lines = read.text.split("\n");
-              const hits: number[] = [];
-              for (let index = 0; index < lines.length; index++) {
-                const line = lines[index] as string;
-                if ((caseSensitive ? line : line.toLowerCase()).includes(needle)) {
-                  if (line.length > MAX_LINE_CHARS) truncated = true;
-                  matches.push({
-                    path,
-                    line: index + 1,
-                    text: line.slice(0, MAX_LINE_CHARS).toWellFormed(),
-                  });
-                  hits.push(index + 1);
-                  if (matches.length >= cap) {
-                    truncated = true;
-                    break;
-                  }
-                }
-              }
-              if (contextLines > 0 && hits.length) {
-                const windows = searchContext(
-                  read,
-                  hits,
-                  contextLines,
-                  MAX_SEARCH_CONTEXT_BYTES - contextBytes,
-                );
-                context.push(...windows.context);
-                contextBytes += windows.bytes;
-                truncated ||= windows.truncated;
-              }
-            } catch (error) {
-              this.guard();
-              if (error instanceof FileAccessError || isMissing(error)) {
-                skippedFiles++;
-                truncated = true;
-              } else throw error;
-            }
+            await scanFile(item, path);
           } else skippedFiles++;
-          const complete =
-            visited < MAX_ENTRIES && scanned < MAX_SCAN_BYTES && matches.length < cap;
+          const complete = visited < MAX_ENTRIES && scanned < MAX_SCAN_BYTES && count() < cap;
           if (!complete) truncated = true;
           return complete;
         });
       };
       await walk(start, inherited, 0);
-      return {
-        path: start.relative,
-        matches,
-        truncated,
-        skippedFiles,
-        ...(contextLines ? { context } : {}),
-      };
+      return result();
     });
   }
 }

@@ -5,16 +5,19 @@ import type { ReconcileOutcome } from "./tools.ts";
 export interface WorkspaceFiles {
   read(path: string, options?: FileReadOptions): Promise<FileRead>;
   list(path: string, options?: { readonly maxEntries?: number }): Promise<FileList>;
-  search(
-    path: string,
-    query: string,
-    options?: {
-      readonly maxMatches?: number;
-      readonly caseSensitive?: boolean;
-      /** Nearby LF-delimited lines per side, 0–20. Capability default 0; fs tool default 8. */
-      readonly contextLines?: number;
-    },
-  ): Promise<FileSearch>;
+  search(path: string, query: string, options?: FileSearchOptions): Promise<FileSearch>;
+}
+
+export interface FileSearchOptions {
+  /** Maximum matching lines in content mode, or distinct matching files in files mode. */
+  readonly maxMatches?: number;
+  readonly caseSensitive?: boolean;
+  /** Nearby LF-delimited lines per side, 0–20. Capability default 0; fs tool default 8. */
+  readonly contextLines?: number;
+  /** Bounded workspace-relative globs; includes are ORed and exclusions always win. */
+  readonly include?: readonly string[];
+  readonly exclude?: readonly string[];
+  readonly mode?: "content" | "files";
 }
 
 export interface FileReadOptions {
@@ -49,6 +52,9 @@ export interface FileList {
 
 export interface FileSearch {
   readonly path: string;
+  /** Only files mode adds these fields; matches stays empty and context is omitted. */
+  readonly mode?: "files";
+  readonly files?: readonly string[];
   readonly matches: readonly {
     readonly path: string;
     readonly line: number;

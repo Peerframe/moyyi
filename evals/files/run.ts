@@ -18,6 +18,11 @@ import {
 } from "../../src/contracts/index.ts";
 import { scriptedProfile, scriptedProvider } from "../../src/plugins/provider-scripted/index.ts";
 import { createRuntime, type Runtime } from "../../src/runtime/index.ts";
+import {
+  type FileNavigationEvidence,
+  fileNavigationScenarios,
+  runFileNavigationScenario,
+} from "./scenario.ts";
 
 interface Request {
   readonly name: string;
@@ -264,7 +269,12 @@ console.log(
 console.log(
   "This checks execution boundaries and file-result propagation, not model task capability or an OS sandbox.",
 );
-const results: { id: string; passed: boolean; evidence?: Evidence; error?: string }[] = [];
+const results: {
+  id: string;
+  passed: boolean;
+  evidence?: Evidence | FileNavigationEvidence;
+  error?: string;
+}[] = [];
 for (const scenario of scenarios) {
   let observation: Observation | undefined;
   try {
@@ -283,6 +293,17 @@ for (const scenario of scenarios) {
     console.error(`FAIL ${scenario.id}: ${message}`);
   }
 }
+for (const id of fileNavigationScenarios) {
+  try {
+    const evidence = await runFileNavigationScenario(id);
+    results.push({ id, passed: true, evidence });
+    console.log(`PASS ${id} (scripted navigation mechanism)`);
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    results.push({ id, passed: false, error: message });
+    console.error(`FAIL ${id}: ${message}`);
+  }
+}
 const passed = results.filter((result) => result.passed).length;
 const destination = fileURLToPath(new URL("../results/files.json", import.meta.url));
 mkdirSync(dirname(destination), { recursive: true });
@@ -294,6 +315,12 @@ writeFileSync(
       modelCapabilityScore: false,
       evidenceScope:
         "Public runtime protocol, session.load transcript, scripted next-request records and synthetic canary contents; no direct database inspection.",
+      groups: {
+        existingFileConformance: scenarios.map((scenario) => scenario.id),
+        scriptedNavigationMechanisms: fileNavigationScenarios,
+      },
+      navigationEvidenceScope:
+        "Exact source/results and request propagation through the real file plugin, runtime and core; pass-through capability/policy observers check rejection before workspace I/O. Scripted repairs are not model understanding or autonomous task-quality evidence.",
       generatedAt: new Date().toISOString(),
       passed,
       total: results.length,

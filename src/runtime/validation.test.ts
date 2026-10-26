@@ -15,6 +15,88 @@ const validate = (raw: string, candidate: JsonSchema = schema, limit = 4096) =>
   new AjvArgumentValidator().validate(candidate, raw, limit);
 
 describe("AjvArgumentValidator", () => {
+  it("identifies bounded fields, required fields, item constraints and types without mutation", () => {
+    const candidate = {
+      type: "object",
+      properties: {
+        contextLines: { type: "integer", minimum: 0, maximum: 20 },
+        include: { type: "array", maxItems: 8, items: { type: "string", maxLength: 128 } },
+      },
+      required: ["contextLines"],
+      additionalProperties: false,
+    };
+    expect(validate('{"contextLines":25}', candidate)).toEqual({
+      valid: false,
+      reason: "/contextLines must be <= 20",
+    });
+    expect(validate("{}", candidate)).toEqual({
+      valid: false,
+      reason: "/contextLines is required",
+    });
+    expect(validate('{"contextLines":"20"}', candidate)).toEqual({
+      valid: false,
+      reason: "/contextLines must be integer",
+    });
+    expect(
+      validate(JSON.stringify({ contextLines: 8, include: ["x".repeat(129)] }), candidate),
+    ).toEqual({ valid: false, reason: "/include/0 must have at most 128 characters" });
+    expect(validate('{"contextLines":20}', candidate)).toEqual({
+      valid: true,
+      value: { contextLines: 20 },
+    });
+  });
+  it("does not echo arbitrary property names, invalid JSON, enum values or schema errors", () => {
+    const secret = "PRIVATE_VALUE\n".repeat(100);
+    const cases: [string, JsonSchema][] = [
+      [JSON.stringify({ count: 1, [secret]: secret }), schema],
+      [
+        JSON.stringify({ [secret]: secret }),
+        { type: "object", additionalProperties: { type: "number" } },
+      ],
+      [`not-json-${secret}`, schema],
+      [JSON.stringify(secret), { enum: [`${secret}-other`] }],
+      ["1", { type: secret }],
+      ["{}", { type: "object", properties: { [secret]: { type: "string" } }, required: [secret] }],
+      [
+        JSON.stringify({ nested: { [secret]: 1 } }),
+        {
+          type: "object",
+          properties: { nested: { type: "object", additionalProperties: { type: "string" } } },
+        },
+      ],
+    ];
+    for (const [raw, candidate] of cases) {
+      const result = validate(raw, candidate, 20_000);
+      expect(result.valid).toBe(false);
+      if (result.valid) throw new Error("Expected rejection");
+      expect(result.reason).not.toContain("PRIVATE_VALUE");
+      expect(
+        [...result.reason].some((char) => char.charCodeAt(0) < 32 || char.charCodeAt(0) === 127),
+      ).toBe(false);
+      expect(Buffer.byteLength(result.reason)).toBeLessThanOrEqual(512);
+    }
+  });
+  it("limits diagnostic paths to declared names without misidentifying dynamic children", () => {
+    const candidate = {
+      type: "object",
+      properties: {
+        options: { type: "object", additionalProperties: { type: "integer", minimum: 0 } },
+      },
+    };
+    expect(validate('{"options":{"private-key":-1}}', candidate)).toEqual({
+      valid: false,
+      reason: "A value within /options must be >= 0",
+    });
+    const referenced = {
+      type: "object",
+      properties: { count: { $ref: "#/definitions/count" } },
+      definitions: { count: { type: "integer", maximum: 3 } },
+    };
+    expect(validate('{"count":5}', referenced)).toEqual({
+      valid: false,
+      reason: "/count must be <= 3",
+    });
+  });
   it("validates without coercing types, adding defaults, or removing properties", () => {
     expect(validate('{"count":1}')).toEqual({ valid: true, value: { count: 1 } });
     expect(validate('{"count":"1"}').valid).toBe(false);
