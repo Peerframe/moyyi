@@ -230,7 +230,58 @@ export default {
     assert(!existsSync(data));
   });
 
-  assert.equal(cases.length, 10);
+  for (const [stopReason, part, diagnosis] of [
+    [
+      "max_tokens",
+      { type: "text", text: "Retain this unfinished answer." },
+      "budget exhausted: model_output_tokens",
+    ],
+    [
+      "end_turn",
+      { type: "reasoning", kind: "visible", text: "Synthetic reasoning without an answer." },
+      "failed: Model response contained no answer text",
+    ],
+  ]) {
+    scenario(`early-${stopReason}-without-answer-exits-nonzero`, () => {
+      const host = join(root, `terminal-${stopReason}-host.mjs`);
+      const counter = join(root, `terminal-${stopReason}-requests`);
+      writeFileSync(
+        host,
+        `import { appendFileSync } from 'node:fs';
+const usage = { status: 'unknown', inputTokens: null, outputTokens: null, cacheReadTokens: null, cacheWriteTokens: null, reasoningTokens: null };
+const origin = { provider: 'terminal-fixture', model: 'fixture' };
+export default {
+  model: origin, limits: { maxModelRequests: 3, maxRetries: 2 },
+  plugins: [{ plugin: { name: 'terminal-fixture', apiVersion: 1, setup(host) {
+    host.registerModelProvider({ id: origin.provider,
+      models: [{ origin, contextWindowTokens: 100000, maxOutputTokens: 100, parallelToolCalls: false, reasoning: 'none', promptCache: 'none', editFormat: 'search_replace' }],
+      createClient() { return { async *stream() {
+        appendFileSync(${JSON.stringify(counter)}, 'request\\n');
+        yield { type: 'part_completed', index: 0, part: ${JSON.stringify(part)} };
+        yield { type: 'completed', stopReason: ${JSON.stringify(stopReason)}, providerStopReason: null, usage };
+      } }; }
+    });
+  } } }]
+};`,
+      );
+      const result = run([
+        "--host",
+        host,
+        "-C",
+        workspace,
+        "--data",
+        join(root, `terminal-${stopReason}-data`),
+        "Inspect the synthetic task",
+      ]);
+      status(result, 1);
+      assert(result.stdout.includes(`run | ${diagnosis}`));
+      assert(!result.stdout.includes("run | completed"));
+      assert.equal(readFileSync(counter, "utf8"), "request\n", "No replacement or retry request");
+      if (part.type === "text") assert(result.stdout.includes(part.text));
+    });
+  }
+
+  assert.equal(cases.length, 12);
   console.log(
     JSON.stringify({
       passed: true,

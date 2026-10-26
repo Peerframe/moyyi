@@ -156,6 +156,12 @@ call before preparation/execution. An absent, truncated or tool-only final answe
 Budget notices extend the current user turn in context; they do not rewrite the system or old
 prefixes. The exact request, including tool choice, is recorded without a persisted schema change.
 
+[ADR 0034](decisions/0034-incomplete-response-outcomes.md) applies response completeness to
+every attempt. Before the final request, token truncation exhausts `model_output_tokens`; an
+empty answer or unsupported terminal fails the run. Partial content and usage remain recorded,
+and no automatic continuation is added. The existing final-request outcome stays unchanged.
+Protocol completion does not certify factual correctness or independently checked task success.
+
 The DeepSeek adapter accepts a documented text/reasoning/function subset and delegates fixed-origin
 HTTP and credentials to runtime. Context includes the persisted assistant stop reason in the
 nonpersisted model port, so partial responses cannot masquerade as complete history. All actual

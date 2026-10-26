@@ -7,7 +7,37 @@ Owner 已授权先做整体计划，再针对已证实的缺口优化。本计�
 
 ## 持续交付：日常任务闭环（当前）
 
-### 当前验收：日常产物与冲突停止（2026-10-27）
+### 当前交付：全链路复核与不完整响应状态（2026-10-27）
+
+PR #33 已合并到 `77667eb`，[main CI](https://github.com/Peerframe/moyyi/actions/runs/40401791094)
+通过；它只补验收记录，原安装产品 `351126b` 的打包输入未变。
+
+本轮先做自主检索模型对照：同原题、固定源码 `1838248`、各自新会话，Flash/Pro 各4次，
+Responses+low/8192，零重试，共8次HTTP200。私有对照适配仅改模型，不新增产品Pro入口。
+19个工具结果完整送到下一请求，140文件源码前后指纹一致；两者最终均正常end_turn。
+Flash仍为1/3/4/5满足、2/6部分；Pro为3/5满足、1/2/4/6部分，且把空enabled、目录单链接、
+YAML header百分号约束解释错。Pro没有显示准确性改进，不切默认、不继续同题取绿。
+固定顺序/缓存差异、后续自主输入不等价、题干8次而运行上限4次及原评分扩展限制仍保留。
+记录封存于 `~/.moyyi/acceptance/autonomous-model-control-2026-10-27/`，这8次与以前25次独立计账。
+
+接着从模型终止→core→SQLite→CLI检查，发现前面轮次的截断/空答案/未知停止可被误报completed，
+仅最后一轮已有防护。修复前核心eval原21项通过、新增4项全部复现误报；不是原题语义失败的解释。
+按[ADR 0034](../decisions/0034-incomplete-response-outcomes.md)只修共享完成判定：
+早期max_tokens报告model_output_tokens耗尽，其余不完整答案失败；保留内容、用量与未完成输入，
+不自动继续、不执行未完成工具调用，不改最后一轮预算规则、persisted格式或原题标准。
+
+定向runtime/core与DeepSeek真实codec录制/回放检查58/58，新增核心eval25/25已通过；
+`npm run check`通过110文件/2393测试，132个本地文档链接通过。独立审查无阻断。
+产品 `d988461` 的外部安装包验收通过：CLI12/12、client12/12、documents9/9、隔离、严格类型及PTY7/7。
+[PR #34](https://github.com/Peerframe/moyyi/pull/34)的
+[产品提交双平台CI](https://github.com/Peerframe/moyyi/actions/runs/40408671809)通过。
+本机已备份会话、配置与旧包并更新，372文件逐个匹配，tar SHA256
+`df2b9b4c72cd40ecee297c83138bfcdc0aa2b0f1cfab994f1aabcf08fd21e382`。
+实际安装CLI12/12及原DeepSeek会话打开/help/exit通过；安装及状态修复验证不读Key、不发模型请求。
+模型、权限、启动器与host字节未变，旧PR #32包保留。最终证据提交CI与合并后main检查在PR记录。
+产品事实错误仍未解决，不能把状态修复或正常结束当成原题通过。无公开发布。
+
+### 上次验收：日常产物与冲突停止（2026-10-27）
 
 PR #32 已审查、合并到 `1bcfac5897dc8c94acd76c0fef47233cf716e9b8`，
 [main CI](https://github.com/Peerframe/moyyi/actions/runs/40390967762)双平台通过；安装产品`351126b`
