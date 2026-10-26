@@ -178,7 +178,7 @@ try {
   );
   for (const [key, count] of [
     ["cli", 10],
-    ["client", 11],
+    ["client", 12],
     ["documents", 9],
   ] as const) {
     const result = checks[key] as {

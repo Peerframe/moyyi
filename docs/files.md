@@ -30,6 +30,18 @@ An exact file never widens the search to its siblings; ancestor ignore rules sti
 path fails, while a valid search with no matching lines succeeds with empty results. Queries such
 as `foo|bar` remain literal text, not alternation or regular expressions.
 
+An explicit `read` that confirms an initially missing, authorized workspace path fails with
+`Requested workspace path does not exist; use list or search to locate the file`. Discover the
+actual path rather than assuming an unchanged guessed path will work on retry. This is a
+bounded error string in the existing failed result, not a new authority or an automatic search.
+The runtime verifies existing ancestors, protection rules and identities before reporting absence.
+This extra diagnosis is limited to 32 relative path segments; deeper missing paths retain the
+generic failure, while successful reads retain their existing limits.
+Denied/protected paths, unresolved aliases, filesystem access errors, and a previously resolved
+target that disappears remain refusals or unavailable/changed errors. A missing workspace is not
+a missing file. The distinction applies to explicit text reads, including ranges; automatic
+instructions/Skills, documents, lists and searches retain their existing error contracts.
+
 Use `mode: "files"` to discover matching files before reading their contents. It returns `mode`,
 `files` (distinct workspace-relative paths), `matches: []`, `skippedFiles` and `truncated`, with no
 context. `maxMatches` counts files in this mode, so repeated hits in one file cannot consume the

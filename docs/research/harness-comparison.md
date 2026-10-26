@@ -59,3 +59,39 @@ This route stopped at the startup boundary. No paid comparison, upstream quality
 claim that moyyi performs better follows from it. It does not justify expanding the sandbox
 or building a new harness before a usable, comparable entry is established. The private evidence
 coordinate is `~/.moyyi/acceptance/harness-comparison-2026-10-27/`.
+
+## OpenCode Responses continuation precheck, 2026-10-27
+
+A distinct route used the released OpenCode v1.19.4 macOS arm64 binary. The Git tag resolves to
+`148842ef7cb1bc34192b3fff57d0f9721ab9c801`; the release metadata separately names target commitish
+`c0c7bae726798d02592f8d3305891ba2f0cd880a`, which is not treated as the tag identity. The downloaded
+release ZIP matches GitHub's published SHA256
+`c400a2f8c8ab7e99478a7f4dd1a466b57bf33888e520d85c55780a5464c4b689`.
+
+The executable ran under the existing readonly native sandbox, with a temporary workspace,
+private empty configuration/state/cache and only a fixed loopback synthetic Responses endpoint.
+No global installation, owner configuration, real credential or provider request was used.
+The custom OpenAI Responses route sent `deepseek-flash`, `reasoning.effort:low`,
+`max_output_tokens:8192`, `store:false`, and only glob/grep/read tools. Titles, default plugins,
+automatic compaction, external Skills, snapshots and update/model fetching were disabled.
+
+Two preplanned offline conditions set `OPENCODE_EXPERIMENTAL_NATIVE_LLM=false` and `true`,
+each with DeepSeek-shaped plaintext reasoning, a real read tool call, and a second response.
+The saved requests prove the configuration and wire behavior; runtime-selection logs were not
+retained, so actual native selection versus SDK fallback is not independently established.
+Both exited zero after two local synthetic requests and delivered the exact file text to the
+second request. **Neither retransmitted the reasoning content.** A normal exit and successful
+read are therefore insufficient for this profile's continuation requirement. The
+[DeepSeek contract](https://api-docs.deepseek.com/guides/responses_api/) uses plaintext reasoning
+content, and its [thinking guide](https://api-docs.deepseek.com/guides/thinking_mode/) requires
+reasoning preservation during tool continuation. The fixed
+[native protocol code](https://github.com/anomalyco/opencode/blob/148842ef7cb1bc34192b3fff57d0f9721ab9c801/packages/llm/src/protocols/openai-responses.ts#L446)
+contains a plaintext-filtering branch for `store:false`, consistent with this compatibility risk;
+the probe does not prove which implementation branch produced each result.
+
+Stop this stock baseline route as unsupported under the required profile. Do not pay for an
+invalid comparison, substitute Chat/nonthinking mode, or repair the response in a proxy and
+label it stock OpenCode. No model-quality conclusion follows. Error/retry gate and full negative
+containment acceptance were not completed because the necessary continuation check failed first.
+The private probe, raw synthetic requests, source references and hashes are retained under
+`~/.moyyi/acceptance/opencode-control-2026-10-27/`; real requests and credential reads are both zero.

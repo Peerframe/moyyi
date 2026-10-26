@@ -180,13 +180,22 @@ It reuses SQLite, the local protocol and CLI; [ADR 0032](decisions/0032-session-
 defines the bounded views and restart acceptance. The candidate is installed and verified; final
 integration is tracked on the PR. This does not repair or rescore model interpretation failures.
 
-The cross-layer review found no further demonstrated harness defect that justifies an accuracy
-patch now. Complete evidence delivery, actual file execution and model selection/interpretation
-are separate checks. Keep Flash + Responses + low; do not repeat the failed question, add another
-review loop or enlarge retrieval without new evidence. A second-provider comparison is conditional
-on an explicitly configured service and credentials, not a current delivery dependency. Remaining
-semantic mistakes require checking key claims and completeness in actual user work; history views
-make recorded actions inspectable but are not factual validators.
+A subsequent per-requirement audit reopened one concrete diagnostic gap. All returned tool text
+reached the original task's final request, but several necessary implementations were never read;
+this is not complete task evidence. Two already-delivered facts were also misinterpreted. The
+model repeated a guessed nonexistent path after a generic unavailable/changed error. The current
+candidate therefore distinguishes confirmed initial absence for explicit reads, under existing
+path and lifetime checks; [ADR 0033](decisions/0033-confirmed-missing-read-diagnostics.md) owns the
+bounded change and unchanged four-plus-four live acceptance. It does not change prompts or claim
+to solve the independent semantic errors. Installed PR #31 stays the baseline until verification.
+
+The maintained OpenCode v1.19.4 baseline was actually exercised with a synthetic Responses
+service: normal read continuation worked, but plaintext reasoning was not replayed under either
+requested SDK/native setting. Exact underlying selection was not logged. This fails the required
+DeepSeek profile before a paid comparison; [evidence](research/harness-comparison.md#opencode-responses-continuation-precheck-2026-10-27)
+records the stop instead of silently switching APIs or repairing the baseline in a proxy.
+Keep Flash + Responses + low and the original task criteria. Do not repeat a paid trial until
+green or infer full capability from a successful tool return.
 
 The owner authorized ongoing work, necessary paid validation and sequential merging/installation
 only after review and passing CI. PRs #28 and #29 are merged, closing the measured DNS/native-loader
