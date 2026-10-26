@@ -1,6 +1,6 @@
 # ADR 0031: Make confined command verification usable
 
-Date: 2026-10-27. Status: accepted for implementation under the owner's ongoing product-work
+Date: 2026-10-27. Status: implemented and verified under the owner's ongoing product-work
 authorization. D3/D6, the native sandbox default and separate process authority remain unchanged.
 
 ## Observed problem
@@ -95,3 +95,9 @@ in the next model request; the original seven cases retain their assertions.
 Run the unchanged full check, both CI platforms and external installed-package acceptance before
 integration. A further real task is evidence about that candidate only. A correct artifact or a
 zero exit code alone cannot establish correct programmatic verification or general model accuracy.
+
+Product `8eb8317362994a46704ee965559c0a89725b4b22` passes the full local check (2,311 tests),
+document/shell evals, both CI platforms and clean external/owner installation. The unchanged live
+release-note task passed its original checker in four requests, with exact output readback; the
+model did not call shell. This is a correct-artifact result, not evidence that the model learned
+autonomous programmatic checking. Retain both earlier trials and stop this bounded comparison.

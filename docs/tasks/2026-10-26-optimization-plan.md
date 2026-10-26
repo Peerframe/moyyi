@@ -193,6 +193,26 @@ Linux原文档撤权测试发现launcher及原进程组退出后worker PID仍可
 本机定向14/14、完整 `npm run check` 106文件/2311项、documents eval4/4、shell eval8/8通过。
 独立复核无阻断。Docker daemon不可用且有限探针已结束；本机模拟不能替代后续真实Linux CI。
 
+修复产品 `8eb8317362994a46704ee965559c0a89725b4b22` 的
+[Linux/macOS CI](https://github.com/Peerframe/moyyi/actions/runs/40373993007)全部通过，
+包含原Linux撤权/取消生命周期断言；这些生命周期断言未跳过、无重跑取绿。干净独立包验收与本机363文件匹配，
+tar SHA256 `28417c7163feb6c61ccad693b567a9e11dbe0a637407e35a0cb68d83e846f1e0`。
+安装前备份 `~/.moyyi/backups/pre-pr30-2026-10-26T18-05-46.722Z`，旧包保留；host/launcher
+字节及默认权限、Flash/Responses/low不变。安装版Node heredoc读取JSON计算12、scratch读写、
+工作区写/外部读写/凭据/联网拒绝、精确结果进入下一轮合成context均通过；PTY6/6、旧会话恢复/help/exit通过。
+
+本次唯一真实候选试验仍用同题/fixture/checker/15次/180s，首请求只有shell description变化；
+没有加任务提示或把旧失败覆盖。21项门控、15次假请求和503后封存先通过，之后实际4次HTTP200、零重试。
+首稿就包含A-07，原checker通过，271字节hash `056c6fdb5e292510aec201fb3409ad3eb1f88d05e424b2fcdd7a2d4d1648b2f9`；
+完整输入送达第2轮，最终文件完整读回送达第4轮，输入和canary未变。模型没有调用shell，
+因此只是实际任务单例通过，不是自主程序核对已建立，更不说明旧遗漏由shell修正。
+该有界对照到此结束，不追加同题调用追逐所需工具轨迹。
+私有证据 `~/.moyyi/acceptance/release-verification-candidate-2026-10-27/`，
+manifest `147428174e6408e006fdcf8b6f320d43e171f922e51855cf6448e3d78bb7a3a4`，
+独立assessment `777e4ac693e8b2a1c52288ed7a8e4d59e1c44ee8b00c6306bf1e6e5e28755b1e`。
+独立复核重跑原checker并核对全部字节、SQLite/snapshot、wire和未变输入，结论一致；
+最终答复只声称读回，没有伪称执行Node核验。
+
 唯一live与独立复核：`~/.moyyi/acceptance/public-daily-2026-10-27/`。
 manifest `c514f3026f68f692bdbc2742b2dd71f371f992f16e2578d0414d05f0eed05fb6`；
 assessment `9487737f369fde1e2d57aa88ce372e146fd94cc7094e84f113e1235b17d35bf9`。
