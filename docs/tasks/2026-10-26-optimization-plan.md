@@ -19,7 +19,8 @@ GUI、OCR、MCP、长期记忆和模型训练继续后置。下面各节的旧�
 - PR #27 固定头 `1753b89` 经独立安全/安装接线审查无阻断，原CI通过，已按新授权合并。
   主线为 `b6e952c8f6eb0bed2ad21bd76d707488ce089b81`，
   [main CI](https://github.com/Peerframe/moyyi/actions/runs/40341366800)成功。
-  当前分支 `codex/daily-workflows` 从该main独立创建；安装产品仍为 `e64fa0e`，未把证据提交当作重装。
+  当前独立分支 `codex/daily-workflows` / [PR #28](https://github.com/Peerframe/moyyi/pull/28) 从该main创建；
+  产品 `487ccfb` 已安装，证据文档更新不代表另一次重装。
 - 新原题4+公共题4回归已完成：8次HTTP200、零重试、两份源码快照未变；Flash+Responses+low，
   已安装 `e64fa0e`、路径导航启用。**公共 source-dataflow-report 原checker通过**，实际报告已生成。
   原Skills源码解释仍不通过：把“解析字段未返回”错误说成“原始文本丢弃”，遗漏消费者链和配置生命周期。
@@ -33,15 +34,38 @@ GUI、OCR、MCP、长期记忆和模型训练继续后置。下面各节的旧�
   这是一例摘要保真证据，不是长期可靠率或缓存节省承诺。生产压缩实现未改。
 - 编辑闭环的离线预检发现Homebrew Node兼容别名元数据被sandbox丢弃；仅扩大公共库目录仍失败，
   已局部修复为host明确别名及祖先的metadata授权，数据仍绑定已验证真实目标。真实OS29项、shell11项、
-  shell eval7项通过；实际Node26启动通过。安装版编辑/检查/undo的真实模型验收待新包。
+  shell eval7项通过；实际Node26启动通过。安装版编辑/检查/undo的真实模型验收已通过，见下。
 - 联网预检确认系统DNS和独立UDP resolver均返回198.18虚拟IP，原地址检查正确拒绝。
   明确Cloudflare DoH后仍验证全部公有A地址、固定目标IP与原域名TLS，真实Example Domain读取通过。
   候选接入为host显式`web.dns: "cloudflare-doh"`，默认system，不改DNS/代理系统设置，
-  不放宽公有地址/origin规则，不引入浏览器或新依赖；详见web文档和ADR0029。完整runtime/安装验收待执行。
+  不放宽公有地址/origin规则，不引入浏览器或新依赖；详见web文档和ADR0029。完整runtime、安装和真实RFC任务现已执行，见下。
 
 整合检查保留一次本机默认 `npm run check` 的失败：类型和Biome通过，11项在5秒原超时下失败，
 全部位于多进程/真实解析用例；其他2232项通过。未改超时、断言或跳过用例，随后用4个worker
 重跑同一全套测试，**103文件/2243项全部通过**；没有更改仓库并发配置。原CI仍按原配置执行。
+
+PR #28 产品 `487ccfb4f434952a63a890582dec3651e0751e0d` 的
+[原CI](https://github.com/Peerframe/moyyi/actions/runs/40344895500)全部成功；
+`npm run verify:package -- --offline` 干净打包、CLI/client/PTY、文档七格式/报告/读回、隔离和依赖图通过。
+本机已安装tar SHA256 `8d8864f0a316cddbcb327f1505451c24ff3b3385b3c94ffd5b1b745d661c07db`，
+360文件逐字节核验；会话/配置备份为 `~/.moyyi/backups/pre-pr28-2026-10-26T15-04-33.004Z`，
+旧包保留，现有会话resume/help/exit通过。原host、manager、启动器字节未变，安装零模型请求。
+
+- 真实编辑闭环：公开listener-leak fixture，正常工具修复→原生沙箱执行固定checker→逆序undo两次。
+  修复前监听器3/3且仍响应，修复后0/0且静默，撤销后原故障恢复；原字节/权限、未改文件、固定checker、
+  外部canary全部核验。8次HTTP200、零重试。没有把model生成JS拿到未隔离宿主执行。
+- 实际联网：安装版通过显式DoH完整读取RFC8259（28,360字节、16页、HTTP200、未截断），
+  4次请求内create+readback。5项指定事实和节号/引文均正确。初稿额外混入JSON.stringify与重复键的
+  两处不准确扩展，不能称全文首次无误。人工指出后另4次正常edit删除，独立核对实际修订文件；
+  模型连续3次edit后没有readback，runner正确拒绝该轮完整通过。初稿、修订稿及失败均保留，停止追加同题请求。
+- 独立解释诊断：把原题已实际收到的9份工具结果和原错误答复交给一次独立复核，不补缺失代码/标准答案。
+  1次HTTP200，8,192输出token全部为reasoning，无答复，按原限制停止、没有发第二次修订。
+  此诊断不改变原题分数，也不支持往生产加入强制review框架。相关维护中公开方案已经查阅；
+  当前先交付已证实有效的工具/入口，再用代表性任务推进准确性，避免同题循环。
+
+下一检查点是正常CLI的显式工作区写入、沙箱命令、网页origin和请求上限选项，以及可见snapshot/check回执。
+当前真实闭环通过可信私有验收host实现，普通用户仍需手写host才能开启，不能把这个可用性缺口掩盖成已完成。
+默认只读、逐次审批、Flash+Responses+low、零重试保持；不扩大现有题目的预算/判分，不公开发布。
 
 私有证据仍放在 `~/.moyyi/acceptance/`：`regression-2026-10-26-daily`、
 `daily-work-2026-10-26`。保存真实请求/输出和失败记录，不提交凭据、会话或私人录制。

@@ -73,3 +73,9 @@ other processes running under your OS account. Snapshots do not preserve ACLs/xa
 promise whole-workspace rollback. A hard kill can leave private staging files for manual cleanup.
 See [ADR 0012](decisions/0012-controlled-workspace-writes.md) and the
 [acceptance record](tasks/2026-10-25-phase-2-writes.md) for evidence and remaining limits.
+
+A separate installed live trial repaired the public listener-leak fixture, ran its fixed checker
+in the native sandbox, and undid both edits in reverse order. Original bytes and ordinary mode
+were restored and the original checker failure returned; unrelated files and the checker stayed
+unchanged. This is one bounded task, not a project-edit reliability rate. See the
+[current evidence](tasks/2026-10-26-optimization-plan.md).

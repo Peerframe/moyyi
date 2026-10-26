@@ -17,8 +17,8 @@ is deferred. Accepted D1–D6 remain in force.
 **Current checkpoint: verified daily workflows.** Seven-format document reading is merged and
 both fixed live document tasks passed. The owner has authorized necessary paid validation and
 sequential review/CI/merge/install for this continuing product goal; official publication remains
-separate. The next bounded outcomes are controlled edit/check/undo, long-session fidelity and real
-web reading. The fresh original 4+4 regression now passes public report delivery; the complex Skills
+separate. Installed live trials now cover controlled edit/check/undo, long-session fidelity and real
+web reading. The next bounded outcome is an explicit everyday CLI entry for these grants. The fresh original 4+4 regression now passes public report delivery; the complex Skills
 explanation still fails its original rubric and is not relabeled as solved. A real eight-turn
 conversation, process reopen, compaction and further reopen preserved all ten checked facts and
 constraints. OCR, demand-driven MCP/GUI/memory and model training stay deferred.
@@ -31,12 +31,14 @@ and the referenced PR before changing code. No current authorization is inferred
 | Coordinate | Audited state | What it means |
 |---|---|---|
 | Merged product baseline | `b6e952c8f6eb0bed2ad21bd76d707488ce089b81`, through [PR #27](https://github.com/Peerframe/moyyi/pull/27) | Independent review found no blocker; fixed-head CI and [merged main CI](https://github.com/Peerframe/moyyi/actions/runs/40341366800) passed. Includes seven-format document reading and prior navigation. |
-| Current candidate | `codex/daily-workflows`, based on the merged document baseline | Explicit Cloudflare DoH under the existing public-address/TLS boundary, and precise macOS toolchain-alias metadata. Candidate checks and installed acceptance are tracked in the optimization plan. |
-| Current local installation | Product `e64fa0e26839cb913a7f7b90b900c65f10fe0597`; tar SHA256 `469c6012258c2090523ad6cfedac7093e4d538fd10d2d06a7b0cd20f1e158ae7` | [Linux/macOS CI](https://github.com/Peerframe/moyyi/actions/runs/40329152425) passed. 357 installed files match; seven complete document formats, report write/readback, isolation, dependency graph and existing-session startup passed offline. Backup and prior package retained. Flash + Responses + low, daily read-only/max3/zero-retry settings unchanged; installation used zero paid requests. Later evidence-only commits do not imply another installation. |
+| Current candidate | [PR #28](https://github.com/Peerframe/moyyi/pull/28), product `487ccfb4f434952a63a890582dec3651e0751e0d` | Explicit Cloudflare DoH and precise macOS toolchain-alias metadata. [Original Linux/macOS CI](https://github.com/Peerframe/moyyi/actions/runs/40344895500), clean package and actual installation passed; live scope is below. |
+| Current local installation | Product `487ccfb`; tar SHA256 `8d8864f0a316cddbcb327f1505451c24ff3b3385b3c94ffd5b1b745d661c07db` | 360 files match the clean accepted package. CLI/client/PTY, seven-format documents/report/readback, isolation and dependency graph passed; existing-session resume/help/exit passed. Backup and previous package retained. Flash + Responses + low, daily read-only/max3/zero-retry host unchanged. |
 | Prior installed baseline | Product `69312969533659578cc1da21b510d8395a099ef3`; tar SHA256 `12b2aee9c116e432ab23780c32c793adc094708995dc7d7f393a1ac1fe3774a5` | 244-file identity and CLI/client/PTY/offline navigation evidence remain valid for this prior package. The document upgrade has its own acceptance receipt and backup in the [optimization plan](tasks/2026-10-26-optimization-plan.md). Flash + Responses + low, daily read-only/max3/zero-retry settings are retained. |
 | Document live acceptance | Installed `e64fa0e`; 2026-10-26, Flash + Responses + low | Both fixed tasks passed their unchanged checkers once: actual comparison/report files, seven facts/hashes/quotes, approved total CNY 5,500, readback and unchanged inputs. Eight HTTP 200 requests, zero retries; each attempted shell once and was denied before using controlled create/read. [Evidence and limits](tasks/2026-10-26-optimization-plan.md#文档真实任务验收2026-10-26). |
 | Latest autonomous investigations | Installed `e64fa0e`, 2026-10-26, fresh original4+public4 baseline | Eight HTTP200 requests, zero retries, unchanged snapshots/prompts/rubric/checker. Public source-dataflow report exists and its official checker passes. Original Skills explanation still makes a raw-text/parsed-field error and omits consumers/lifecycle. No corpus reliability claim. |
 | Real long-session acceptance | Installed `e64fa0e`, separate processes | Eight live conversation turns, one summary, one follow-up; all ten corrected facts/constraints/pending-state fields correct after reopen. Resume makes no request; original transcript retained; early facts are inside the summarized span. One case, not a universal fidelity claim. |
+| Real edit/check/undo acceptance | Installed `487ccfb`, native sandbox | Public listener-leak fixture repaired and checked, then both snapshots undone in reverse order. Original bytes/mode and original failure restored; checker and outside canary unchanged. Eight HTTP200 requests, zero retries. |
+| Real web report acceptance | Installed `487ccfb`, explicit DoH | Actual full RFC8259 fetched, report created and read back in four requests; required five facts correct. Two incidental unsupported claims needed human review and a separate four-request revision. Revised bytes independently checked; the model omitted revision readback, so that later workflow is not marked fully passed. |
 | Public release | None | Local candidate installation is not npm/GitHub publication or a release tag. |
 
 The merged public corpus has 32 tasks. Two new fixed document tasks are prepared as a separate
@@ -83,12 +85,12 @@ recovery and cancellation apply throughout the loop, not only after an answer.
 |---|---|---|---|
 | Start, resume and use a local agent | [CLI](cli.md), explicit host, Node/toolchain, credentials for live use | [Installed CLI/PTY/client acceptance](installation.md); a bounded DeepSeek file/tool continuation passed after #19 | Setup still requires trusted host configuration. A successful connection is not task competence. |
 | Inspect a project and explain its behavior | File tools, instructions, context, provider and final answer | Real tool continuation and bounded final closeout; candidate source windows, exact scopes, filters and discovery outputs are verified against actual files; opt-in path context and scripted read/create/verify delivery now have offline evidence | The latest live follow-up passes public report delivery but still fails the original Skills explanation criteria. Native tool-text transport is accepted; one trial per task is not a reliability baseline. |
-| Change files, inspect changes and undo | [Write grant, approvals, snapshots](writes.md); shell grant if checks need a process | Real filesystem/SQLite offline checks, conflict/revocation/recovery cases | No comparable end-to-end live-model project-edit score. The owner's normal host remains read-only. |
+| Change files, inspect changes and undo | [Write grant, approvals, snapshots](writes.md); shell grant if checks need a process | Filesystem/SQLite safety checks plus one real repair/check/undo task with exact content/mode restoration | One task is not an edit reliability rate; daily host remains read-only and enabling the grants still requires explicit configuration. |
 | Run commands and stop them | [Shell plugin](shell.md), explicit process grants, supported native sandbox/toolchain | Native-process conformance and documented platform tests | macOS detached descendants/host hard-kill limitations remain. Docker is a planned optional adapter, not an implemented fallback. |
 | Continue long work without losing state | [Store and long sessions](long-sessions.md), resume, explicit compaction | Crash/recovery and scripted lifecycle tests; a live eight-turn/reopen/compact/reopen case preserved ten facts and constraints | One semantic case does not establish long-task reliability or cache savings. |
 | Apply project guidance and reusable Skills | [Instructions](instructions.md), [Skills](skills.md), trusted selection and read grants | Refresh, selection, bounds and authority conformance; [OpenBot reuse](openbot-provenance.md) already includes YAML-validation experience | Guidance quality is not guaranteed by correct loading; automatic nested instruction discovery is not implemented. |
 | Read supported documents and produce checkable results | [Documents](documents.md), workspace read grant and native parser sandbox | Complete application-generated files, scripted next-context/report/readback checks and independently installed package isolation passed on macOS and Linux; actual owner installation rechecked | Two fixed live tasks passed once; this is not a reliability rate or large-document benchmark. OCR, legacy/macro formats, formula calculation and visual layout are unsupported. |
-| Research online or use another provider | [Web](web.md), configured SearXNG/grants, [Anthropic](anthropic.md) | Offline protocol/authority and HTML extraction checks | Live Anthropic/SearXNG acceptance and browser workflows remain unverified or outside current support; document support is tracked separately above. |
+| Research online or use another provider | [Web](web.md), configured SearXNG/grants, [Anthropic](anthropic.md) | Offline authority/extraction checks and an installed live RFC fetch/report task | RFC task required factual review; live Anthropic/SearXNG and browser workflows remain unverified or outside current support. |
 
 ## Locate the right owner before choosing a fix
 
@@ -162,8 +164,9 @@ verifier, mandatory subagents, full-repository graph or larger request allowance
 ## Next bounded delivery and decision rules
 
 The owner authorized ongoing work, necessary paid validation and sequential merging/installation
-only after review and passing CI. PR #27 is merged; the next independent candidate addresses the
-measured DNS and native-loader obstacles to daily workflows. The original source rubric and
+only after review and passing CI. PR #27 is merged; PR #28 closes the measured DNS/native-loader
+obstacles and has installed live evidence. The next independent PR makes the grants usable from
+the normal CLI, preserving default read-only operation and per-effect approval. The original source rubric and
 historical failures remain evidence; they do not justify reopening every accepted architecture choice.
 
 | Order | Deliverable | Acceptance boundary |
@@ -171,13 +174,15 @@ historical failures remain evidence; they do not justify reopening every accepte
 | 0 — closed | Review and merge #25–#27, retain evidence | Fixed-head reviews and CI passed; merged main CI passed. |
 | 1 — merged and installed | Read PDF, DOCX, XLSX, PPTX, ODT, ODS, ODP with source/hash/range/coverage | Real native parsing and denial, limits, cancellation/revocation; offline check and actual external installed-package gates on macOS/Linux. No OCR/layout/formula claim. |
 | 2 — partially verified | Original regression and new document comparison/report tasks | Document comparison/report and public source report pass once; original Skills explanation remains failed. Original rubrics and 4+4 comparison envelopes unchanged; zero retries, Flash/Responses/low. |
-| 3 — current | Daily editing/undo, long-session recovery, actual web reading | One bounded real task for each, with actual files/facts checked. Long-session case passed; editing and native web reading are in acceptance. |
+| 3 — current | Daily editing/undo, long-session recovery, actual web reading | Installed bounded trials completed; edit/undo and ten long-session facts passed. Web core facts passed with incidental claims repaired after review. Next: explicit CLI grants, visible receipts, and actual launcher acceptance. |
 | 4 — deferred | OCR; demand-driven MCP, GUI and long-term memory | Separate decisions and work. Qwen/shasha training is also deferred. |
 
 If the required evidence reaches the model but conclusions are wrong, isolate interpretation and
 answer construction rather than automatically expanding retrieval or requests. Normal completion,
-a written report or a passing document task cannot erase an original task failure. Once this
-slice's offline and installed gates pass, finish the PR and installation; do not expand unrelated
+a written report or a passing document task cannot erase an original task failure. An independent one-review diagnostic consumed its entire 8,192-output-token ceiling in reasoning
+and produced no answer; it stopped after one request. It provides no evidence for adding a
+mandatory review loop. Keep the failed original score and prioritize the usable entry point. Once
+this slice's offline and installed gates pass, finish the PR and installation; do not expand unrelated
 mechanisms. Future paid calls, merges and publication require their applicable authorization.
 
 OpenBot reuse follows the [provenance record](openbot-provenance.md): selected parsing technology

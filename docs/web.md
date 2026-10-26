@@ -129,3 +129,10 @@ fails without returning raw HTML or sending another request. This is a bounded t
 article selection, computed CSS visibility, browser-equivalent parsing or a prompt-injection
 filter. Scripts-only pages may be empty. Normal page prose still cannot grant authority.
 See [ADR 0020](decisions/0020-bounded-html-text.md) for dependency and OpenBot reuse evidence.
+
+A separate installed live trial fetched the complete RFC8259 text through explicit Cloudflare
+DoH, created a report and read it back. The five required facts were correct; two incidental
+claims required human review and a later edit. The revised file was independently checked, but
+the model omitted its requested second readback, so that revision workflow is not marked fully
+passed. This demonstrates real bounded fetching and delivery, not universal factual correctness
+or search-service acceptance. See the [current evidence](tasks/2026-10-26-optimization-plan.md).
