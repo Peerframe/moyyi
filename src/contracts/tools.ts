@@ -1,3 +1,4 @@
+import type { WorkspaceDocuments } from "./documents.ts";
 import type { WorkspaceFiles, WorkspaceWrites } from "./files.ts";
 import type {
   ActionDigest,
@@ -73,6 +74,8 @@ export interface ToolContext {
   readonly limits: { readonly maxOutputBytes: number };
   /** Absent in hosts without file support; never fall back to direct host access. */
   readonly files?: WorkspaceFiles;
+  /** Fixed offline extraction, only during read_document execution under the read grant. */
+  readonly documents?: WorkspaceDocuments;
   /** Runtime binds apply to the current approved action; unavailable to read tools. */
   readonly writes?: WorkspaceWrites;
   /** A scoped, sandboxed process; absent without a separate explicit host grant. */

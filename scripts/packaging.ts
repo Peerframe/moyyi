@@ -15,6 +15,8 @@ import {
 import { tmpdir } from "node:os";
 import { basename, join, relative } from "node:path";
 import { fileURLToPath } from "node:url";
+import { cleanPackageLock } from "./package-lock.ts";
+import { officeRuntimeFiles } from "./vendor-documents.ts";
 
 export const repository = realpathSync(fileURLToPath(new URL("..", import.meta.url)));
 export const installedGuides = [
@@ -24,6 +26,7 @@ export const installedGuides = [
   "docs/deepseek.md",
   "docs/anthropic.md",
   "docs/files.md",
+  "docs/documents.md",
   "docs/writes.md",
   "docs/shell.md",
   "docs/long-sessions.md",
@@ -76,7 +79,21 @@ export function expectedPackageFiles(root = repository): readonly string[] {
     const base = `dist/${source.slice(0, -3)}`;
     return [`${base}.js`, `${base}.d.ts`, `${base}.js.map`];
   });
-  return ["package.json", "README.md", "LICENSE", ...installedGuides, ...compiled].sort();
+  const parser = [
+    ...officeRuntimeFiles(root),
+    "package.json",
+    "UPSTREAM_PACKAGE.json",
+    "SOURCE.json",
+  ].map((path) => `dist/vendor/officeparser/${path}`);
+  return [
+    "package.json",
+    "npm-shrinkwrap.json",
+    "README.md",
+    "LICENSE",
+    ...installedGuides,
+    ...compiled,
+    ...parser,
+  ].sort();
 }
 export function assertPackageFiles(actual: readonly string[], expected: readonly string[]): void {
   assert.equal(new Set(actual).size, actual.length, "Package contains duplicate paths");
@@ -156,6 +173,7 @@ export function buildCandidate(): Candidate {
     );
     return candidate;
   } finally {
+    cleanPackageLock(repository);
     rmSync(temporary, { recursive: true, force: true });
   }
 }

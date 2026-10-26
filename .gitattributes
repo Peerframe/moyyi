@@ -1,0 +1,5 @@
+# PDF cross-reference records contain significant whitespace; retain fixture bytes exactly.
+/src/runtime/fixtures/encrypted.pdf binary
+/src/runtime/fixtures/image-only.pdf binary
+/src/runtime/fixtures/documents/standard/**/*.pdf binary
+/src/runtime/fixtures/documents/standard/*.pdf binary

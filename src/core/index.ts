@@ -34,6 +34,7 @@ import {
   type ToolResultPart,
   type TranscriptEntry,
   type WebAccessFactory,
+  type WorkspaceDocumentsFactory,
   type WorkspaceFilesFactory,
   type WorkspaceProcessesFactory,
   type WorkspaceWritesFactory,
@@ -72,6 +73,7 @@ export interface CoreDeps {
   ) => Promise<readonly ContextSection[]>;
   readonly limits?: Partial<RunLimits>;
   readonly files?: WorkspaceFilesFactory;
+  readonly documents?: WorkspaceDocumentsFactory;
   readonly processes?: WorkspaceProcessesFactory;
   readonly writes?: WorkspaceWritesFactory;
   readonly web?: WebAccessFactory;
@@ -724,6 +726,7 @@ export class AgentCore {
         limits: this.#limits,
         ...(this.#deps.files ? { files: this.#deps.files } : {}),
         ...(this.#deps.processes ? { processes: this.#deps.processes } : {}),
+        ...(this.#deps.documents ? { documents: this.#deps.documents } : {}),
         ...(this.#deps.writes ? { writes: this.#deps.writes } : {}),
         ...(this.#deps.web ? { web: this.#deps.web } : {}),
         now: () => this.#deps.clock.now(),

@@ -4,6 +4,7 @@ import type {
   PreconditionVerifier,
   RunLimits,
   WebAccessFactory,
+  WorkspaceDocumentsFactory,
   WorkspaceFilesFactory,
   WorkspaceProcessesFactory,
   WorkspaceWritesFactory,
@@ -38,6 +39,7 @@ export interface ExecutionHost {
   readonly hasher: ActionHasher;
   readonly limits: RunLimits;
   readonly files?: WorkspaceFilesFactory;
+  readonly documents?: WorkspaceDocumentsFactory;
   readonly processes?: WorkspaceProcessesFactory;
   readonly writes?: WorkspaceWritesFactory;
   readonly web?: WebAccessFactory;
@@ -235,6 +237,18 @@ async function executeCall(call: ToolCallPart, host: ExecutionHost): Promise<Too
       ...context,
       ...(host.files && profile.class !== "external"
         ? { files: host.files.create(context, guard) }
+        : {}),
+      ...(host.documents &&
+      phase === "execute" &&
+      profile.class === "read" &&
+      tool.name === "read_document"
+        ? {
+            documents: host.documents.create(context, guard, {
+              phase,
+              ...(effect ? { effect } : {}),
+              ...(action ? { action } : {}),
+            }),
+          }
         : {}),
       ...(host.web && profile.class === "external"
         ? {

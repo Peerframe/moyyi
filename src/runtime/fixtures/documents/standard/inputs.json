@@ -1,0 +1,16 @@
+{
+  "sample.pdf": "MOYYI DOCUMENT pdf",
+  "sample.docx": "MOYYI DOCUMENT docx",
+  "sample.xlsx": "MOYYI DOCUMENT xlsx",
+  "sample.pptx": "MOYYI DOCUMENT pptx",
+  "sample.odt": "MOYYI DOCUMENT odt",
+  "sample.ods": "MOYYI DOCUMENT ods",
+  "sample.odp": "MOYYI DOCUMENT odp",
+  "eval/aster.pdf": "Project Aster; Owner Mei; Allocation 1200 CNY; Status approved; Due 2026-11-03.",
+  "eval/birch.docx": "Project Birch; Owner Noah; Allocation 3400 CNY; Status blocked; Due 2026-11-05.",
+  "eval/cedar.xlsx": "Project Cedar; Owner Lina; Allocation 900 CNY; Status approved; Due 2026-11-08.",
+  "eval/dahlia.pptx": "Project Dahlia; Owner Omar; Allocation 1600 CNY; Status approved; Due 2026-11-09.",
+  "eval/elm.odt": "Project Elm; Owner Iris; Allocation 2300 CNY; Status blocked; Due 2026-11-10.",
+  "eval/fir.ods": "Project Fir; Owner Jun; Allocation 1100 CNY; Status approved; Due 2026-11-12.",
+  "eval/ginkgo.odp": "Project Ginkgo; Owner Ava; Allocation 700 CNY; Status approved; Due 2026-11-15."
+}

@@ -9,7 +9,7 @@ import {
 export const shellTool: ToolDefinition = {
   name: "shell",
   description:
-    "Run a bounded /bin/sh command in the explicitly granted workspace using the operating-system sandbox. Network and sensitive paths are blocked; environment is clean. Commands may change files without snapshots or rollback. Cancellation or interruption may leave partial changes: verify before retrying. No persistent/background terminal is provided.",
+    "Bounded /bin/sh in granted workspace with OS isolation, clean env; no network/sensitive paths. No write snapshots/rollback. Cancel/interrupt may leave changes: verify before retrying. No persistent/background terminal.",
   inputSchema: {
     type: "object",
     properties: {

@@ -32,9 +32,9 @@ const schemas: Record<string, JsonSchema> = {
 };
 const descriptions = {
   create:
-    "Create a new UTF-8 file inside the granted workspace. Existing files are never overwritten; parent directory must exist. Approval shows the exact content. Returns a snapshotId for undo.",
-  edit: "Replace exactly one literal occurrence of oldText in a workspace UTF-8 file with newText. Refuses missing or ambiguous matches. Approval binds the current content hash and replacement. Returns a snapshotId for undo.",
-  undo: "Restore one file from a prior workspace snapshot, or remove a file created by that snapshot. Refuses if its content or permissions have changed since that action. Requires approval and creates a new snapshot, so undo itself can be undone.",
+    "Create workspace UTF-8 file; refuse existing files or missing parent. Approval shows exact content. Returns undo snapshotId.",
+  edit: "Replace one literal oldText with newText in workspace UTF-8; refuse missing/ambiguous matches. Approval binds content hash/replacement. Returns undo snapshotId.",
+  undo: "Restore snapshot file or remove snapshot-created file; refuse changed content/permissions. Requires approval; creates a new undoable snapshot.",
 };
 
 export function workspaceWriteTools(): readonly ToolDefinition[] {

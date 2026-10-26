@@ -1,6 +1,8 @@
 node_modules/
 dist/
 artifacts/
+# Generated from package-lock.json only while packaging; never maintain a second lock.
+/npm-shrinkwrap.json
 *.tgz
 coverage/
 .moyyi/

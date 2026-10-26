@@ -38,8 +38,9 @@ selected YAML-validation experience and independently rewritten HTML-extraction 
 4. **Long-session fidelity.** Measure real-model retained facts and unfinished work across resume
    and compaction, beyond the existing deterministic lifecycle checks.
 5. **External-service acceptance.** Verify Anthropic and the configured search service before
-   claiming live support; browsing and binary-document workflows need separate implementation
-   and acceptance. Do not weaken isolation to make a task pass.
+   claiming live support; browsing still needs separate implementation. Seven-format document reading
+   is now an independent candidate with offline acceptance; model understanding still needs
+   separate live acceptance. Do not weaken isolation to make a task pass.
 
 These are outcomes, not automatic authorizations for paid calls, merges or publication. A single
 focused delivery should close one meaningful user outcome or one measured prerequisite, then

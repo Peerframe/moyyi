@@ -1,3 +1,4 @@
+import { createHash } from "node:crypto";
 import { constants, lstatSync, realpathSync, type Stats } from "node:fs";
 import { lstat, open, opendir, realpath } from "node:fs/promises";
 import { basename, dirname, isAbsolute, relative, resolve, sep } from "node:path";
@@ -71,6 +72,15 @@ export class NodeWorkspaceFiles implements WorkspaceFilesFactory {
       }
       return [lexical, resolve(realpathSync(ancestor), ...missing)];
     });
+  }
+
+  /** Internal byte snapshot for the fixed document parser; never exposed through ToolContext.files. */
+  readDocumentSnapshot(
+    context: Pick<ToolContext, "workspaceRoot" | "signal">,
+    assertAuthorized: () => void,
+    path: string,
+  ): Promise<{ path: string; bytes: Buffer; sha256: string }> {
+    return new ReadScope(context, assertAuthorized, this.excluded).readDocumentSnapshot(path);
   }
 
   readProjectInstructions(
@@ -210,6 +220,63 @@ class ReadScope {
     const current = await this.target(root, portable(relative(root.path, target.lexical)) || ".");
     if (current.path !== target.path || !same(current.stat, target.stat))
       throw new FileAccessError("denied", "Target changed during access");
+  }
+
+  readDocumentSnapshot(input: string): Promise<{ path: string; bytes: Buffer; sha256: string }> {
+    return this.operation(async (root) => {
+      const cap = 10 * 1024 * 1024;
+      const target = await this.target(root, input);
+      if (!target.stat.isFile() || target.stat.nlink !== 1)
+        throw new FileAccessError("denied", "Document must be a regular file with one link");
+      if (target.stat.size > cap)
+        throw new FileAccessError("unavailable", "Document input exceeds the 10 MiB limit");
+      await this.unchanged(root, target);
+      this.guard();
+      const handle = await open(
+        target.path,
+        constants.O_RDONLY | constants.O_NOFOLLOW | constants.O_NONBLOCK,
+      );
+      try {
+        this.guard();
+        const before = await this.io(() => handle.stat());
+        if (!before.isFile() || before.nlink !== 1 || !same(before, target.stat))
+          throw new FileAccessError("denied", "Document changed before opening");
+        if (before.size > cap)
+          throw new FileAccessError("unavailable", "Document input exceeds the 10 MiB limit");
+        await this.unchanged(root, target);
+        const bytes = Buffer.alloc(before.size + 1);
+        let length = 0;
+        while (length < bytes.length) {
+          const result = await this.io(() =>
+            handle.read(bytes, length, Math.min(64 * 1024, bytes.length - length), length),
+          );
+          if (!result.bytesRead) break;
+          length += result.bytesRead;
+        }
+        const after = await this.io(() => handle.stat());
+        if (
+          !same(before, after) ||
+          before.size !== after.size ||
+          length !== before.size ||
+          before.mtimeMs !== after.mtimeMs ||
+          before.ctimeMs !== after.ctimeMs
+        )
+          throw new FileAccessError(
+            "unavailable",
+            "Document changed while reading; snapshot discarded",
+          );
+        await this.unchanged(root, target);
+        const complete = bytes.subarray(0, length);
+        this.guard();
+        return {
+          path: target.relative,
+          bytes: complete,
+          sha256: createHash("sha256").update(complete).digest("hex"),
+        };
+      } finally {
+        await handle.close();
+      }
+    });
   }
 
   readProjectInstructions(): Promise<FileRead | null> {

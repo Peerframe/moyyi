@@ -11,11 +11,13 @@ and version `0.0.0`; the tarball SHA-256 and source revision identify a candidat
   installation is rejected by the package OS field. Other operating systems/architectures are
   not certified by these checks.
 - Dependencies must be obtainable from npm or an existing cache. The tarball does not bundle
-  Node.js or third-party dependencies. Direct dependency versions remain pinned; future transitive
-  resolutions are governed by those dependencies' constraints, not frozen by the artifact hash.
-- Shell tools additionally need the existing native sandbox: macOS Seatbelt or Linux bubblewrap
+  Node.js. The candidate carries the reviewed Office Node distribution and a generated shrinkwrap;
+  other production packages come from npm/cache. The install gate checks actual dependency
+  resolutions against the source lock, including Office's PDF.js. See [document packaging](documents.md).
+- Shell and document parsing additionally need the existing native sandbox: macOS Seatbelt or Linux bubblewrap
   with the required user-namespace policy. Installing moyyi does not install or enable those OS
-  facilities. File-only and offline demo use do not require a shell grant. See [shell limits](shell.md).
+  facilities. Document parsing needs no shell grant; ordinary text reading and the offline demo
+  remain available if the document sandbox is unavailable. See [shell limits](shell.md).
 
 ## Build and verify from the repository
 
@@ -27,7 +29,8 @@ npm run verify:package
 
 `verify:package` creates a clean compiled npm tarball, validates its complete file list, installs
 that exact file into disposable local and global-prefix consumers outside the repository, and
-runs CLI, terminal, public-client and TypeScript checks. Install scripts are disabled; npm may fetch
+runs CLI, terminal, public-client and TypeScript checks, seven-format document reads, a scripted
+document-to-report write/readback workflow, native parser isolation probes and exact parser dependency checks. Install scripts are disabled; npm may fetch
 the pinned production dependencies and their transitive dependencies from the public registry.
 The acceptance programs make no model or web requests. Existing user/global installations and data
 are untouched. Python 3 is needed for the existing POSIX terminal acceptance script; it is not a
@@ -73,7 +76,7 @@ Try the offline script with a disposable workspace containing a README:
 
 The demo has 32 scripted read/answer pairs; it is not an intelligent model. Live operation uses
 the existing explicit `--host /absolute/private/host.mjs` configuration. See [CLI](cli.md),
-[DeepSeek](deepseek.md), [Anthropic](anthropic.md) and [web](web.md). Paid requests still require
+[DeepSeek](deepseek.md), [Anthropic](anthropic.md), [documents](documents.md) and [web](web.md). Paid requests still require
 your deliberate model connection and tasks. Installation does not discover credentials, enable
 tools, relax approvals or prove remote API compatibility.
 

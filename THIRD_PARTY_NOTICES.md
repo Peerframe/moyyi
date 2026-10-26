@@ -1,11 +1,14 @@
 # Third-party notices
 
-## OpenBot: bounded Agent Skills YAML validation
+## OpenBot: bounded YAML validation and document parsing
 
 `src/plugins/skills/parse.ts` adapts the bounded YAML AST-validation approach from
 `packages/employee-publisher/src/agent-skills.ts`, OpenBot revision
 `010439bb9002fabb7e1facd8450ee85edbafa309`. The moyyi schema checks and runtime integration are new.
-The source is licensed under MIT:
+`src/runtime/document-worker.ts` also adapts the PDF/Office extraction methods from
+`apps/server-python/src/openbot_server/parser_worker.ts` at the same fixed commit. Two synthetic
+PDF test fixtures (encrypted and image-only) are copied from that commit.
+The source and fixtures are licensed under MIT:
 
 Copyright (c) 2026 OpenBot contributors
 
@@ -32,3 +35,22 @@ SOFTWARE.
 The npm-installed dependencies retain their own licenses in their package directories. The Skills
 parser adds `yaml` 2.9.1 (ISC), used through its public API rather than vendored source. Its exact
 version and integrity are recorded in `package-lock.json`.
+
+
+## officeparser Node distribution
+
+The compiled candidate redistributes the Node files of officeparser 7.8.0 from
+https://github.com/harshankur/officeParser (commit 09b27018450ed4df88fe01494343b43556813b71).
+The original MIT LICENSE accompanies `dist/vendor/officeparser/`, together with original package
+metadata and SOURCE.json. The sole metadata adaptation pins its PDF.js dependency to 6.3.289;
+Node parser source files are unchanged. Browser bundles and the old SBOM are not included.
+
+## Document codec dependencies
+
+PDF.js / pdfjs-dist 6.3.289 is licensed under Apache-2.0; its installed package retains LICENSE
+and the separate notices accompanying fonts, CMaps, ICC/WASM and other distributed assets.
+Office's XML/ZIP/file-type dependencies retain their own MIT licenses. Tesseract.js 7.0.0 and
+tesseract.js-core 7.0.0 (Apache-2.0) remain transitive dependencies even though OCR is disabled.
+No OCR language package is added. Optional canvas platform dependencies retain their package
+licenses. `package-lock.json` fixes the source closure; candidate installation verifies the actual
+closure and keeps these original dependency licenses. No upstream copyright is transferred to moyyi.

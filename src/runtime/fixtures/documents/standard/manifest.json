@@ -1,0 +1,102 @@
+{
+  "authorship": "Independently authored public synthetic moyyi fixtures; no private or downloaded documents.",
+  "files": {
+    "eval/aster.pdf": {
+      "bytes": 1471,
+      "reader": "pypdf strict=True",
+      "sha256": "bccd03ac37758eaa324d1a365cfc4fbd3d7428b088053afd84ca1db82ef54416",
+      "text": "Project Aster; Owner Mei; Allocation 1200 CNY; Status approved; Due 2026-11-03."
+    },
+    "eval/birch.docx": {
+      "bytes": 34347,
+      "reader": "python-docx",
+      "sha256": "2ccb52af194965c70c4b7eedd4c58ec1baa6f17299c2536154fbe1ec83cbe88d",
+      "text": "Project Birch; Owner Noah; Allocation 3400 CNY; Status blocked; Due 2026-11-05."
+    },
+    "eval/cedar.xlsx": {
+      "bytes": 4977,
+      "reader": "openpyxl",
+      "sha256": "8d92adb82eddb74171c9f3a108ccd96d058f323a047054b4441f28121a20a6fe",
+      "text": "Project Cedar; Owner Lina; Allocation 900 CNY; Status approved; Due 2026-11-08."
+    },
+    "eval/dahlia.pptx": {
+      "bytes": 28298,
+      "reader": "python-pptx",
+      "sha256": "c5abce15e9035cc2b16ca75eb921b9b5e4c944d75459c10e829bdfe7e229f86a",
+      "text": "Project Dahlia; Owner Omar; Allocation 1600 CNY; Status approved; Due 2026-11-09."
+    },
+    "eval/elm.odt": {
+      "bytes": 11748,
+      "reader": "LibreOffice round-trip to docx, then Python reader",
+      "sha256": "1959605ebbecf202bdea12cf3717e59b7319ae68325864d588c1e5123d000335",
+      "text": "Project Elm; Owner Iris; Allocation 2300 CNY; Status blocked; Due 2026-11-10."
+    },
+    "eval/fir.ods": {
+      "bytes": 9187,
+      "reader": "LibreOffice round-trip to xlsx, then Python reader",
+      "sha256": "7b4b5cadc2c379e7900731981cee2c1e65539b308ba95a91522d18a7016a4bfd",
+      "text": "Project Fir; Owner Jun; Allocation 1100 CNY; Status approved; Due 2026-11-12."
+    },
+    "eval/ginkgo.odp": {
+      "bytes": 20185,
+      "reader": "LibreOffice round-trip to pptx, then Python reader",
+      "sha256": "6402ed2576dc563e4fe8fbaef00655650e2e2320ac54084197e99938712de606",
+      "text": "Project Ginkgo; Owner Ava; Allocation 700 CNY; Status approved; Due 2026-11-15."
+    },
+    "sample.docx": {
+      "bytes": 34307,
+      "reader": "python-docx",
+      "sha256": "1a12daebab203e63cd0581852e1e7e1bcfe673d1c0b0f364271777616a2a60eb",
+      "text": "MOYYI DOCUMENT docx"
+    },
+    "sample.odp": {
+      "bytes": 18911,
+      "reader": "LibreOffice round-trip to pptx, then Python reader",
+      "sha256": "e1149d3d78d62ccc082a34b2cdb198d52396e0b964575378254a338dedd1d186",
+      "text": "MOYYI DOCUMENT odp"
+    },
+    "sample.ods": {
+      "bytes": 8282,
+      "reader": "LibreOffice round-trip to xlsx, then Python reader",
+      "sha256": "4bb5331e66a1876b42cb8daca8169ffbccd7fb3f737954324fcbaf722068d138",
+      "text": "MOYYI DOCUMENT ods"
+    },
+    "sample.odt": {
+      "bytes": 11096,
+      "reader": "LibreOffice round-trip to docx, then Python reader",
+      "sha256": "452275ae97643678b1954a6c259c23fccf13b9f7fd0df10a3fab4b5ccd701f0f",
+      "text": "MOYYI DOCUMENT odt"
+    },
+    "sample.pdf": {
+      "bytes": 1406,
+      "reader": "pypdf strict=True",
+      "sha256": "ea804c155f54581ea14495db2909ef76aa02cf4243ef8f467989fe220143c962",
+      "text": "MOYYI DOCUMENT pdf"
+    },
+    "sample.pptx": {
+      "bytes": 28255,
+      "reader": "python-pptx",
+      "sha256": "2a47352e2215839fc36dfc8c648428e7b998f2cf44b368e90abcc7ca5499d713",
+      "text": "MOYYI DOCUMENT pptx"
+    },
+    "sample.xlsx": {
+      "bytes": 4932,
+      "reader": "openpyxl",
+      "sha256": "def07dd764672724298d6010aa3e664183f03fb46c7507709e98cbdba7eae8bf",
+      "text": "MOYYI DOCUMENT xlsx"
+    }
+  },
+  "fixedMetadata": "2000-01-01T00:00:00Z",
+  "libreoffice": "LibreOfficeDev 26.8.0.0.alpha0 2c87e51eeaa2b413ff4ae097b2705eea1995d8e5",
+  "packages": {
+    "lxml": "6.1.1",
+    "openpyxl": "3.1.5",
+    "pypdf": "6.10.0",
+    "python-docx": "1.2.0",
+    "python-pptx": "1.0.2",
+    "reportlab": "4.4.9"
+  },
+  "python": "3.12.14",
+  "schema": 1,
+  "zlib": "1.2.12"
+}
