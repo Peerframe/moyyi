@@ -9,7 +9,7 @@ import {
 export const shellTool: ToolDefinition = {
   name: "shell",
   description:
-    "Bounded /bin/sh in granted workspace with OS isolation, clean env; no network/sensitive paths. No write snapshots/rollback. Cancel/interrupt may leave changes: verify before retrying. No persistent/background terminal.",
+    "Bounded commands in granted workspace with OS isolation, clean env; no network/sensitive paths. No write snapshots/rollback. Cancel/interrupt may leave changes: verify before retrying. No persistent/background terminal.",
   inputSchema: {
     type: "object",
     properties: {
@@ -66,3 +66,47 @@ export const shellPlugin: Plugin = {
     host.registerTool(shellTool);
   },
 };
+
+export interface ShellConfiguration {
+  readonly workspaceAccess: "unconfigured" | "read-only" | "read-write";
+  readonly interpreter: "sh" | "zsh-sh";
+  /** Host-selected names, not paths or a scan of the owner's environment. */
+  readonly executableNames: readonly string[];
+}
+
+/** Describe the same startup configuration used by the runtime; this grants no authority. */
+export function createShellPlugin(configuration: ShellConfiguration): Plugin {
+  if (!["unconfigured", "read-only", "read-write"].includes(configuration.workspaceAccess))
+    throw Error("Invalid shell workspace description");
+  if (!["sh", "zsh-sh"].includes(configuration.interpreter))
+    throw Error("Invalid shell interpreter description");
+  if (!Array.isArray(configuration.executableNames)) throw Error("Invalid shell executable names");
+  // Keep arbitrary host path text out of model guidance and bound this metadata independently.
+  const selected = [...new Set(configuration.executableNames)];
+  const names = selected
+    .filter((name) => typeof name === "string" && /^[A-Za-z0-9][A-Za-z0-9._+-]{0,63}$/.test(name))
+    .sort()
+    .slice(0, 16);
+  const omitted = names.length !== selected.length;
+  const launcher =
+    configuration.interpreter === "zsh-sh"
+      ? "macOS launcher is /bin/zsh in sh emulation"
+      : "Linux launcher is /bin/sh";
+  // Unavailable tools must not spend a small model's context on unusable environment details.
+  const description =
+    configuration.workspaceAccess === "unconfigured"
+      ? `Command execution is unconfigured and unavailable; use permitted file tools. ${launcher}. Policy still applies; no command authority is granted.`
+      : [
+          shellTool.description,
+          `Configured workspace access: ${configuration.workspaceAccess}. ${configuration.workspaceAccess === "read-only" ? "Use authorized file tools for changes." : "Command changes have no snapshots."} Private temporary files: $TMPDIR.`,
+          `${launcher}; no startup files. Use portable syntax, not Bash-specific features.`,
+          `Host-selected additional executable names on PATH: ${names.length ? names.join(", ") : "none"}.${omitted ? " Some names are omitted." : ""} Prefer selected interpreters for checks. Other interpreters/packages are not implied; do not install them or bypass isolation.`,
+          "This is configuration information, not permission or a successful launch check. Grants, policy, approval and revocation still apply.",
+        ].join(" ");
+  return {
+    ...shellPlugin,
+    setup(host) {
+      host.registerTool({ ...shellTool, description });
+    },
+  };
+}

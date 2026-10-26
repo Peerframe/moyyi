@@ -43,6 +43,19 @@ Arguments are `command`, optional workspace-relative `cwd` (default `.`), and `t
 (default 30,000, maximum 120,000). The runtime also enforces the enclosing run deadline.
 No interactive stdin, persistent terminal or background-service API is provided.
 
+The tool description reports the host's captured command configuration, workspace access mode
+and selected executable names (for example `node`). It does not expose absolute host paths or
+promise other interpreters/packages. An unconfigured host is explicitly described as unavailable;
+policy and approval still decide every invocation. Host configuration is captured when the
+runtime is created, so mutating the original object does not change guidance or grants.
+
+macOS launches the system `/bin/zsh --emulate sh -f -c`, with startup files disabled and
+`TMPPREFIX` inside the private scratch directory. This supports heredocs without opening the
+system temp directory or allowing workspace writes. Linux retains `/bin/sh`. Use portable
+command syntax; sh emulation does not promise full Bash/POSIX compatibility. See the observed
+failure, exact OS-identity allowlist correction and tradeoffs in
+[ADR 0031](decisions/0031-confined-command-verification.md).
+
 ## What the command can access
 
 - Read ordinary files in the exact granted workspace and use a writable private temporary home.
@@ -110,8 +123,9 @@ select public binaries/libraries, not directories containing user secrets.
 npm run eval:shell
 ```
 
-Seven scripted scenarios run the real runtime, SQLite, shell and OS boundary on disposable files.
+Eight scripted scenarios run the real runtime, SQLite, shell and OS boundary on disposable files.
 They check approved task effects, denial, read-only defaults, secret/outside protection, timeout
-and output flood. No private evals or model calls are loaded. Unit/integration suites cover the
+and output flood, plus a readonly Node heredoc calculation whose exact output reaches the next
+model request. No private evals or model calls are loaded. Unit/integration suites cover the
 remaining lifecycle and recovery cases. See [comparison protocol](research/harness-comparison.md)
 for same-model measurement requirements; no real-model score is claimed.

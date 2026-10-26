@@ -11,6 +11,7 @@ import {
 } from "../../src/contracts/index.ts";
 import { scriptedProfile, scriptedProvider } from "../../src/plugins/provider-scripted/index.ts";
 import { createRuntime, type Runtime } from "../../src/runtime/index.ts";
+import { discoverNodeToolchain } from "../../src/runtime/node-toolchain.ts";
 
 const cases = [
   {
@@ -31,6 +32,21 @@ const cases = [
     timeoutMs: 200,
   },
   { id: "output-flood-stops", command: "while :; do printf 0123456789; done", status: "unknown" },
+  {
+    id: "read-only-node-heredoc",
+    command: `node <<'MOYYI_NODE'
+const fs = require("node:fs");
+const input = JSON.parse(fs.readFileSync("numbers.json", "utf8"));
+console.log(JSON.stringify({
+  label: input.label,
+  count: input.values.length,
+  total: input.values.reduce((sum, value) => sum + value, 0)
+}));
+MOYYI_NODE`,
+    status: "succeeded",
+    node: true,
+    input: '{"label":"fixture-sum","values":[3,7,2]}\n',
+  },
 ] as const;
 const terminal = (stopReason: "tool_use" | "end_turn"): ModelStreamEvent => ({
   type: "completed",
@@ -46,6 +62,7 @@ export async function runShellEval(): Promise<void> {
     mkdirSync(root);
     writeFileSync(join(root, ".env"), "SECRET_CANARY");
     writeFileSync(join(directory, "outside"), "OUTSIDE_CANARY");
+    if ("input" in scenario) writeFileSync(join(root, "numbers.json"), scenario.input);
     let runtime: Runtime | undefined;
     try {
       const provider = scriptedProvider([
@@ -82,7 +99,16 @@ export async function runShellEval(): Promise<void> {
         model: scriptedProfile.origin,
         plugins: [{ plugin: provider.plugin }],
         limits: { maxToolOutputBytes: 2048 },
-        ...("grant" in scenario ? {} : { workspaceProcesses: { roots: [root] } }),
+        ...("grant" in scenario
+          ? {}
+          : {
+              workspaceProcesses: {
+                roots: [root],
+                ...("node" in scenario
+                  ? { workspaceAccess: "read-only", ...(await discoverNodeToolchain()) }
+                  : {}),
+              },
+            }),
       });
       const active = runtime;
       const events: RuntimeEvent[] = [];
@@ -123,6 +149,27 @@ export async function runShellEval(): Promise<void> {
       assert.equal(readFileSync(join(root, ".env"), "utf8"), "SECRET_CANARY");
       assert.equal(readFileSync(join(directory, "outside"), "utf8"), "OUTSIDE_CANARY");
       if (scenario.status === "unknown") assert.equal(provider.client.requests.length, 1);
+      if ("node" in scenario) {
+        assert.equal(readFileSync(join(root, "numbers.json"), "utf8"), scenario.input);
+        assert.equal(provider.client.requests.length, 2);
+        const result = results[0];
+        assert.ok(result?.content[0]?.type === "text");
+        const receipt = JSON.parse(result.content[0].text);
+        assert.equal(receipt.exitCode, 0);
+        assert.equal(receipt.termination, "exited");
+        assert.equal(receipt.truncated, false);
+        assert.deepEqual(JSON.parse(receipt.output), { label: "fixture-sum", count: 3, total: 12 });
+        const delivered = provider.client.requests[1]?.messages
+          .flatMap((message) => message.content)
+          .find((part) => part.type === "tool_result" && part.callId === result.callId);
+        assert.deepEqual(delivered, result);
+        const description = provider.client.requests[0]?.tools.find(
+          (tool) => tool.name === "shell",
+        )?.description;
+        assert.ok(description);
+        assert.ok(description.includes("read-only"));
+        assert.match(description, /\bnode\b/u);
+      }
       console.log(
         JSON.stringify({
           scenario: scenario.id,
@@ -130,6 +177,7 @@ export async function runShellEval(): Promise<void> {
           observedStatus: results[0]?.status,
           filesystemVerified: true,
           canariesUnchanged: true,
+          ...("node" in scenario ? { inputUnchanged: true, nextRequestHasExactResult: true } : {}),
           source: "synthetic",
           liveModel: false,
         }),

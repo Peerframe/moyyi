@@ -1,3 +1,4 @@
+import { readFileSync } from "node:fs";
 import { readFile } from "node:fs/promises";
 import { join } from "node:path";
 import { afterEach, expect, it, vi } from "vitest";
@@ -77,7 +78,24 @@ function gone(pid: number): void {
   } catch (error) {
     code = (error as NodeJS.ErrnoException).code;
   }
-  expect(code).toBe("ESRCH");
+  let diagnostic = `Expected PID ${pid} to be reaped`;
+  if (process.platform === "linux" && pid > 0 && code !== "ESRCH") {
+    try {
+      const status = readFileSync(`/proc/${pid}/status`, "utf8");
+      const stat = readFileSync(`/proc/${pid}/stat`, "utf8");
+      const start = stat
+        .slice(stat.lastIndexOf(")") + 2)
+        .trim()
+        .split(/\s+/u)[19];
+      diagnostic += `; ${status
+        .split("\n")
+        .filter((line) => /^(?:Name|State|PPid|NSpid):/u.test(line))
+        .join("; ")}; starttime=${start}`;
+    } catch {
+      diagnostic += "; proc metadata unavailable after liveness check";
+    }
+  }
+  expect(code, diagnostic).toBe("ESRCH");
 }
 it("cancels a live TERM-resistant parser and waits for confirmed exit", async () => {
   const controller = new AbortController();

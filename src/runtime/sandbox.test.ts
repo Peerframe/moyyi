@@ -1,4 +1,4 @@
-import { spawn } from "node:child_process";
+import { spawn, spawnSync } from "node:child_process";
 import { existsSync, statSync } from "node:fs";
 import { link, mkdir, mkdtemp, readFile, realpath, rm, symlink, writeFile } from "node:fs/promises";
 import { createServer } from "node:net";
@@ -80,6 +80,79 @@ describe("native sandbox confinement", () => {
     expect(result.code).not.toBe(0);
     expect(await readFile(join(workspace, "source"), "utf8")).toBe("SOURCE");
   });
+
+  it("supports here documents through the selected shell in a read-only workspace", async () => {
+    options = { ...options, workspaceAccess: "read-only" };
+    const content = `literal $HOME \`not-a-command\`\n${"x".repeat(12_000)}\n`;
+    const result = await run(`cat <<'EOF'\n${content}EOF`);
+    expect(result).toEqual({ code: 0, signal: null, stdout: content, stderr: "" });
+  });
+
+  it("pipes quoted arguments and preserves an explicit failing exit status", async () => {
+    options = { ...options, workspaceAccess: "read-only" };
+    const result = await run("printf '%s\\n' 'two words' '$(printf forbidden)' | cat; exit 7");
+    expect(result).toEqual({
+      code: 7,
+      signal: null,
+      stdout: "two words\n$(printf forbidden)\n",
+      stderr: "",
+    });
+  });
+
+  it("runs Node stdin checks with heredocs while keeping only scratch writable", async () => {
+    options = { ...options, workspaceAccess: "read-only", ...(await discoverNodeToolchain()) };
+    await writeFile(join(workspace, "source"), "SOURCE");
+    const script = `const fs = require('node:fs');
+process.stdout.write(fs.readFileSync('source'));
+fs.writeFileSync(process.env.TMPDIR + '/cache', 'SCRATCH');
+try { fs.writeFileSync('source', 'changed'); process.exitCode = 1; }
+catch (error) { if (!['EPERM', 'EACCES', 'EROFS'].includes(error.code)) throw error; }`;
+    expect(await run(`node - <<'EOF'\n${script}\nEOF`)).toEqual({
+      code: 0,
+      signal: null,
+      stdout: "SOURCE",
+      stderr: "",
+    });
+    expect(await readFile(join(workspace, "source"), "utf8")).toBe("SOURCE");
+    expect(await readFile(join(scratch, "cache"), "utf8")).toBe("SCRATCH");
+  });
+
+  it("does not load startup files from its private home", async () => {
+    for (const name of [".zshenv", ".zprofile", ".zshrc", ".zlogin", ".profile", ".bashrc"])
+      await writeFile(join(scratch, name), "printf STARTUP_CANARY\\n");
+    expect(await run("printf clean")).toEqual({
+      code: 0,
+      signal: null,
+      stdout: "clean",
+      stderr: "",
+    });
+  });
+
+  if (process.platform === "darwin")
+    it("keeps host process arguments and environment hidden after allowing uname identity", async () => {
+      const host = spawn(process.execPath, ["-e", "setInterval(() => {}, 1000)", "ARGV_CANARY"], {
+        env: { PATH: "/usr/bin:/bin", MOYYI_HOST_CANARY: "ENVIRONMENT_CANARY" },
+        stdio: "ignore",
+      });
+      const closed = new Promise<void>((resolve) => host.once("close", () => resolve()));
+      try {
+        await new Promise<void>((resolve, reject) => {
+          host.once("spawn", resolve);
+          host.once("error", reject);
+        });
+        const args = ["eww", "-p", String(host.pid)];
+        const visible = spawnSync("/bin/ps", args, { encoding: "utf8", timeout: 2000 });
+        expect(visible.status).toBe(0);
+        expect(visible.stdout).toContain("ARGV_CANARY");
+        expect(visible.stdout).toContain("ENVIRONMENT_CANARY");
+        const denied = await run(`/bin/ps ${args.map(quote).join(" ")}`);
+        expect(denied.code).not.toBe(0);
+        expect(denied.stdout).not.toMatch(/ARGV_CANARY|ENVIRONMENT_CANARY/);
+      } finally {
+        host.kill("SIGKILL");
+        await closed;
+      }
+    });
 
   it("denies reads and writes outside the workspace including symlink aliases", async () => {
     await symlink(outside, join(workspace, "alias"));
@@ -168,6 +241,7 @@ describe("native sandbox confinement", () => {
       "PATH",
       "PWD",
       "TMPDIR",
+      ...(process.platform === "darwin" ? ["TMPPREFIX"] : []),
     ]);
     expect((await run("env")).stdout).not.toMatch(
       /(?:API_KEY|TOKEN|BASH_ENV|NODE_OPTIONS|SSH_AUTH_SOCK)=/,
