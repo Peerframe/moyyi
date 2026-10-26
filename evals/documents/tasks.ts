@@ -1,8 +1,8 @@
 import { createHash } from "node:crypto";
+import { readFileSync } from "node:fs";
 import { readFile, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
-import { documentBytes } from "../../src/runtime/fixtures/document-fixtures.ts";
 import type { EvalTask } from "../harness/types.ts";
 
 // Checker/reference data are host-side only. The runtime receives just the instruction and files.
@@ -67,7 +67,9 @@ const projects = [
 const body = (p: (typeof projects)[number]) =>
   `Project ${p.project}; Owner ${p.owner}; Allocation ${p.amount} CNY; Status ${p.status}; Due ${p.due}.`;
 const bytes = (p: (typeof projects)[number]) =>
-  documentBytes(p.path.split(".")[1] as Parameters<typeof documentBytes>[0], body(p));
+  readFileSync(
+    new URL(`../../src/runtime/fixtures/documents/standard/eval/${p.path}`, import.meta.url),
+  );
 const sha256 = (value: Uint8Array) => createHash("sha256").update(value).digest("hex");
 const fixtureDir = fileURLToPath(new URL("./fixture", import.meta.url));
 async function prepare(workspace: string): Promise<void> {

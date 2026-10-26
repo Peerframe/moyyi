@@ -53,6 +53,25 @@ describe("generated shipped dependency lock", () => {
     expect(() => cleanPackageLock(root)).toThrow("preserving it");
     expect(readFileSync(path, "utf8")).toBe("USER CONTENT");
   });
+  it("preserves libc platform constraints in the generated shipped lock", () => {
+    const { root, lock, save } = fixture();
+    lock.packages["node_modules/@napi-rs/canvas-linux-x64-musl"] = {
+      version: "1.0.9",
+      optional: true,
+      os: ["linux"],
+      cpu: ["x64"],
+      libc: ["musl"],
+    };
+    save();
+    generatePackageLock(root);
+    const generated = JSON.parse(readFileSync(join(root, "npm-shrinkwrap.json"), "utf8"));
+    expect(generated.packages["node_modules/@napi-rs/canvas-linux-x64-musl"].libc).toEqual([
+      "musl",
+    ]);
+    expect(readFileSync(join(root, "npm-shrinkwrap.json"))).toEqual(
+      readFileSync(join(root, "package-lock.json")),
+    );
+  });
   it("refuses the vulnerable nested PDF version and accidental OCR language packs", () => {
     const { root, lock, save } = fixture();
     lock.packages["node_modules/officeparser/node_modules/pdfjs-dist"] = { version: "6.1.200" };

@@ -1,4 +1,4 @@
-import { mkdirSync, writeFileSync } from "node:fs";
+import { copyFileSync, mkdirSync } from "node:fs";
 import { join } from "node:path";
 import { crc32 } from "node:zlib";
 
@@ -126,8 +126,8 @@ export function documentBytes(format: FixtureDocumentFormat, text: string): Buff
 export function writeDocumentFixtures(directory: string): void {
   mkdirSync(directory, { recursive: true });
   for (const format of documentFormats)
-    writeFileSync(
+    copyFileSync(
+      new URL(`./documents/standard/sample.${format}`, import.meta.url),
       join(directory, `sample.${format}`),
-      documentBytes(format, `MOYYI DOCUMENT ${format}`),
     );
 }
