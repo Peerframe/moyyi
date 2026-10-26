@@ -1,6 +1,6 @@
 # ADR 0034: Incomplete responses cannot complete a run
 
-Date: 2026-10-27. Status: implementation candidate.
+Date: 2026-10-27. Status: implemented and installed; integration tracked on [PR #34](https://github.com/Peerframe/moyyi/pull/34).
 
 ## Whole-task diagnosis
 
@@ -69,5 +69,9 @@ is not required to demonstrate this fix.
 
 Source acceptance: `npm run check` passes 110 files / 2,393 tests; `npm run eval:core` passes
 25/25 scenarios. The focused runtime/core and real-codec recording/replay suites pass 58/58.
-Independent code/test review found no blocker. Package, CI and installation status is recorded
-in the [current delivery record](../tasks/2026-10-26-optimization-plan.md).
+Independent code/test review found no blocker. Product `d988461` passed the external package
+gate and [Linux/macOS CI](https://github.com/Peerframe/moyyi/actions/runs/40408671809).
+All 372 installed files match the accepted package. The actual installed CLI passes 12/12
+scenarios, including both new early-terminal cases; opening an existing owner session for
+help/exit succeeds without model calls. Backups and the old package remain available. Final
+integration is recorded on the PR and in the [current delivery record](../tasks/2026-10-26-optimization-plan.md).

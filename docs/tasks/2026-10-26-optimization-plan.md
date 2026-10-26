@@ -28,8 +28,14 @@ YAML header百分号约束解释错。Pro没有显示准确性改进，不切默
 
 定向runtime/core与DeepSeek真实codec录制/回放检查58/58，新增核心eval25/25已通过；
 `npm run check`通过110文件/2393测试，132个本地文档链接通过。独立审查无阻断。
-外部安装包、CI与本机更新仍按此分支交付并记录实际结果。产品事实错误仍未解决，
-不能把状态修复或正常结束当成原题通过。无公开发布。
+产品 `d988461` 的外部安装包验收通过：CLI12/12、client12/12、documents9/9、隔离、严格类型及PTY7/7。
+[PR #34](https://github.com/Peerframe/moyyi/pull/34)的
+[产品提交双平台CI](https://github.com/Peerframe/moyyi/actions/runs/40408671809)通过。
+本机已备份会话、配置与旧包并更新，372文件逐个匹配，tar SHA256
+`df2b9b4c72cd40ecee297c83138bfcdc0aa2b0f1cfab994f1aabcf08fd21e382`。
+实际安装CLI12/12及原DeepSeek会话打开/help/exit通过；安装及状态修复验证不读Key、不发模型请求。
+模型、权限、启动器与host字节未变，旧PR #32包保留。最终证据提交CI与合并后main检查在PR记录。
+产品事实错误仍未解决，不能把状态修复或正常结束当成原题通过。无公开发布。
 
 ### 上次验收：日常产物与冲突停止（2026-10-27）
 
