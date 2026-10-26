@@ -95,3 +95,51 @@ label it stock OpenCode. No model-quality conclusion follows. Error/retry gate a
 containment acceptance were not completed because the necessary continuation check failed first.
 The private probe, raw synthetic requests, source references and hashes are retained under
 `~/.moyyi/acceptance/opencode-control-2026-10-27/`; real requests and credential reads are both zero.
+
+
+## Linux Codex route decision, 2026-10-27
+
+A later source check considered Linux to avoid the macOS managed-preference startup failure.
+In the reviewed release `rust-v0.164.0` / `6aaac694803004a63c6f393d153c96d22521a6b9`,
+[managed requirements loading](https://github.com/openai/codex/blob/6aaac694803004a63c6f393d153c96d22521a6b9/codex-rs/config/src/loader/managed_requirements.rs#L82-L98)
+does not use the macOS loader on Linux. This is a different platform route, not a policy-bypass
+switch. However, its
+[Responses request type](https://github.com/openai/codex/blob/6aaac694803004a63c6f393d153c96d22521a6b9/codex-rs/codex-api/src/common.rs#L279-L304)
+and request construction do not expose `max_output_tokens`. The strict configuration also lacks
+that setting. Thus a gate that only counts, validates and forwards requests cannot supply the
+fixed 8,192-token output ceiling. Linux alone does not establish a matching stock configuration.
+
+The source can serialize plaintext `reasoning_text`; that is not a live continuation test.
+No Linux binary was prepared or model request sent after the output-limit gap was established.
+The local Docker context existed, but the daemon's bounded five-second `_ping` returned no bytes;
+only the coordinator's hung `docker info` client was stopped. Docker and other workloads were
+not restarted. This environment observation is separate from the source-level profile gap.
+
+A future explicit adapter that injects an output ceiling or patches the client must disclose
+that change under this protocol and prove the resulting request/continuation/containment behavior.
+It must not be labeled stock Codex. Such an adapter remains a possible bounded experiment, not
+an implemented comparator or a reason to delay the installed product's daily-task acceptance.
+
+
+## DSH preview source check, 2026-10-27
+
+DeepSeek's official documentation links its new harness preview. The reviewed prerelease is
+[`@deepseek-ai/dsh@0.2.1-rc.3`](https://github.com/deepseek-ai/deepseek-harness/releases/tag/dsh-v0.2.1-rc.3),
+commit `1f81c047fc48fa190a683e469daa699857e9afe8`, released 2026-10-23 under MIT. A release
+coordinate does not establish maturity or baseline compatibility.
+
+Its [native DeepSeek adapter](https://github.com/deepseek-ai/deepseek-harness/blob/1f81c047fc48fa190a683e469daa699857e9afe8/packages/llm/llm-deepseek/README.md#L83-L115)
+uses Anthropic Messages. Flash, low effort and an output cap are available, but
+[configuration rejects a protocol override](https://github.com/deepseek-ai/deepseek-harness/blob/1f81c047fc48fa190a683e469daa699857e9afe8/packages/llm/llm-deepseek/src/config.ts#L225-L228).
+The optional [pi-ai custom Responses route](https://github.com/deepseek-ai/deepseek-harness/blob/1f81c047fc48fa190a683e469daa699857e9afe8/docs/user/guide/providers.md#L27-L33)
+is a distinct route; no actual DeepSeek plaintext-reasoning continuation trace was obtained here.
+Its [headless entry](https://github.com/deepseek-ai/deepseek-harness/blob/1f81c047fc48fa190a683e469daa699857e9afe8/packages/bundle/headless/README.md#L42-L55)
+and [agent-loop configuration](https://github.com/deepseek-ai/deepseek-harness/blob/1f81c047fc48fa190a683e469daa699857e9afe8/packages/core/agent-loop/README.md#L46-L61)
+do not establish a total-request cap; [retries default to five](https://github.com/deepseek-ai/deepseek-harness/blob/1f81c047fc48fa190a683e469daa699857e9afe8/packages/llm/llm-retry/README.md#L50).
+
+Independent `DSH_HOME` and a Node headless entry make a later bounded offline probe possible,
+but startup containment, zero-retry operation, auxiliary-request accounting and matching
+Responses continuation remain unverified. This source check installed nothing, read no real
+credential and sent no model request. It is not a successful or failed quality comparison and
+adds no framework or dependency to moyyi. If pursued, label the custom Responses route and
+external gate explicitly instead of calling the native Messages route protocol-equivalent.

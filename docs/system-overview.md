@@ -46,6 +46,9 @@ and the referenced PR before changing code. No current authorization is inferred
 | Real everyday launcher acceptance | Installed `0a539c7`, actual `moyyi-deepseek start` | Five recorded model attempts, no retry notice; approved edit, readonly native Node checker and exact 1,060-byte readback passed. Whole-file read legitimately omits optional range metadata; an offline supplemental verifier retained the runner failure and checked the original file/results/next context without new calls. No HTTP wire/status capture or general reliability claim. |
 | Additional public task sample | Installed `0a539c7`, 2026-10-27, unchanged four tasks and original per-task limits | 16 HTTP200 requests, zero retries. Lifecycle analysis, release evidence audit and website copy/injection tasks passed. Exact release-note transformation omitted one public record and failed despite complete source and output readback. Protected inputs remained unchanged and all separate evidence audits passed. A five-request command-capability control produced a correct first draft but both attempted checks failed; it does not establish a verification fix. |
 | Corrected candidate live task | Installed `8eb8317`, original release-note task/checker/15-request/180s limit | Four HTTP200 requests, zero retries; first draft is the exact 271-byte expected file including the previously omitted record. Complete source and final-file readback reached subsequent requests, protected inputs unchanged. No shell call occurred: task correctness passed once, autonomous programmatic checking remains unestablished. The previous 3/4 sample and failed-check control are retained. |
+| New daily artifact sample | Installed `351126b`, three previously unexecuted public tasks, original 15-request/180s budgets | 17 HTTP200 requests, zero retries: quoted CSV 6, exact worksheet edit 7, conflicting ledger 4. CSV and worksheet pass their original checkers with actual file/readback evidence. The ledger fails the original checker while honestly reporting partial/blocked; its visible instruction did not explicitly forbid a partial ledger or specify JSON field hierarchy, so attribution includes a task-specification gap. Old scores remain unchanged. |
+| Clarified ledger diagnostic | Same installation, one separately labeled post-hoc trial; same fixture/checker/budget | Four HTTP200 requests, zero retries. General publication and top-level-field requirements were added without giving conflict facts. No ledger was produced and the final answer honestly reports blocked. The report still fails: it assigns source-a's INV-001 amount of 80.00 to INV-002 despite complete evidence that source-a.csv lists INV-002 as 120.00. Array-vs-string checker failures remain partly underspecified; the wrong amount independently establishes factual failure. Do not include this variant in original-corpus scores or repeat it until green. |
+| Frozen decision-point effort diagnostic | Same installation; two historical request bodies, each continued once with low/none | Four HTTP200 requests, zero retries; wire pairs differ only in effort. Neither Skills arm proposes the targeted missing reader/core reads. Ledger low lists both source amounts correctly; none proposes contradictory duplicate `total` keys. All eight returned tool calls remain data, with zero execution/follow-up. This is not a task rerun, original score or evidence of stable effort superiority; default low remains. |
 | Public release | None | Local candidate installation is not npm/GitHub publication or a release tag. |
 
 The merged public corpus has 32 tasks. Two new fixed document tasks are prepared as a separate
@@ -201,6 +204,40 @@ old raw-text-loss error. No missing read occurred, so this experiment does not m
 error's effect on autonomous behavior. Keep the failure and end this local diagnostic slice;
 repeating it or adding another file-read change would not address the remaining two layers.
 
+A whole-task review also separates the Skills rubric from its visible question. Tracing the
+host-to-model path is explicitly requested, so the untraced actual reader and core per-request call sites are a real
+investigation gap; the answer acknowledges it. The renderer was read and explained. Rebuilding runtime after changing the enabled
+selection and not automatically reading references are rubric requirements,
+but the visible question asks about editing skill files and does not explicitly ask those two
+extensions. Keep items 4/6 partial and the original overall failure; their omission proves rubric
+coverage is incomplete, not by itself that an explicit user requirement was ignored or a false
+fact was asserted. The current 4+4 envelope also differs from the historical original's eight
+requests for one task; do not call those an equal-budget comparison. None of these qualifications
+removes the untraced central chain or the separately demonstrated ledger amount error. The
+answer already explains that scripts are not automatically executed; that is not a fresh omission.
+
+A separate daily-artifact sample extends actual use beyond source explanation: exact CSV
+transformation and a formatting-preserving worksheet edit passed with real outputs and readback.
+The ledger task exposed a third owner to inspect before changing product code: its checker
+required publication/JSON structure that the visible task had not fully specified. Its original
+failure remains, with that attribution caveat. One separately labeled clarification met the
+publication condition but introduced a demonstrable row/value association error despite complete
+source delivery. No byte transport, filesystem or budget defect explains that observation.
+This is evidence to investigate factual interpretation and verification, not to silently add more
+retrieval, rewrite task scores or put a question-specific instruction into the agent. Successful
+examples are available in the owner's local `moyyi-demo/daily-artifacts-2026-10-27` directory;
+failed originals and the separate diagnostic are retained in their private acceptance records.
+
+One further four-request diagnostic freezes the actual pre-decision wire bodies instead of
+rerunning tasks: the last Skills tool-enabled request and the ledger's pre-report request each
+receive low/none once, with no other request-field change. No returned tools execute. Neither
+Skills arm proposes the missing reader/core reads; the ledger low proposal has both correct
+source amounts, while none's proposed raw JSON contradicts itself with duplicate amount keys.
+Do not let ordinary JSON parsing overwrite that first wrong key during assessment. This shows
+no basis to switch effort or patch the runtime, and no stable accuracy conclusion follows from
+one observation per arm. End this diagnostic, retain default low and the original failures;
+there is no identified byte-delivery, write or budget repair left in this slice.
+
 The maintained OpenCode v1.19.4 baseline was actually exercised with a synthetic Responses
 service: normal read continuation worked, but plaintext reasoning was not replayed under either
 requested SDK/native setting. Exact underlying selection was not logged. This fails the required
@@ -222,7 +259,7 @@ and historical failures remain evidence; they do not justify reopening every acc
 |---|---|---|
 | 0 — closed | Review and merge #25–#29, retain evidence | Fixed-head reviews and CI passed; merged main CI passed, including the recorded infrastructure-only macOS rerun. |
 | 1 — merged and installed | Read PDF, DOCX, XLSX, PPTX, ODT, ODS, ODP with source/hash/range/coverage | Real native parsing and denial, limits, cancellation/revocation; offline check and actual external installed-package gates on macOS/Linux. No OCR/layout/formula claim. |
-| 2 — partially verified | Original regression, document tasks and representative public tasks | Document comparison/report and public source report pass once; original Skills explanation remains failed. A separate unchanged four-task sample passed three; exact release-note transformation missed a public record despite complete evidence. Original rubrics and 4+4 comparison envelopes remain unchanged. |
+| 2 — partially verified | Original regression, document tasks and representative public tasks | Document comparison/report and public source report pass once; original Skills explanation remains failed. The earlier four-task sample remains 3/4, with its release-note failure and separate later pass retained. A new three-task sample passes CSV/worksheet and fails ledger; one separate clarified diagnostic still misassociates a source amount. Original rubrics and 4+4 comparison envelopes remain unchanged. |
 | 3 — delivered | Daily editing/undo, long-session recovery, actual web reading | Installed bounded trials completed; edit/undo and ten long-session facts passed. Web core facts passed with incidental claims repaired after review. Explicit CLI grants and receipts are installed; one actual launcher repair/check/full-readback task passed after correcting a private verifier assumption offline. |
 | 4 — deferred | OCR; demand-driven MCP, GUI and long-term memory | Separate decisions and work. Qwen/shasha training is also deferred. |
 
