@@ -33,8 +33,20 @@ interface ProjectedEntry {
 export class MinimalContextBuilder implements ContextBuilder {
   build(input: ContextInput): ContextResult {
     const projection = project(input.path);
-    const request = render(input, projection);
-    const requiredTokens = budget(request, input.profile.contextWindowTokens);
+    let request = render(input, projection);
+    let requiredTokens: number;
+    let omitted: readonly string[] = [];
+    try {
+      requiredTokens = budget(request, input.profile.contextWindowTokens);
+    } catch (error) {
+      if (!(error instanceof ContextCapacityError)) throw error;
+      omitted = input.sections.filter((section) => section.optional === true).map(({ id }) => id);
+      if (omitted.length === 0) throw error;
+      // Only explicitly supplemental sections can be removed. History, instructions, tools and
+      // unsettled effects retain their original bounds and still fail if they cannot fit.
+      request = renderRequired(input, projection);
+      requiredTokens = budget(request, input.profile.contextWindowTokens);
+    }
     const included = new Set(projection.map(({ entry }) => entry.id));
     return {
       request,
@@ -48,6 +60,9 @@ export class MinimalContextBuilder implements ContextBuilder {
           `Conservative text budget: ${requiredTokens}/${input.profile.contextWindowTokens}.`,
           "Only recorded compaction spans are replaced; original entries remain in storage.",
           "Stable section and tool ordering supports prefix reuse; actual provider cache hits are unknown until reported.",
+          ...(omitted.length
+            ? [`Optional context omitted for capacity: ${omitted.join(", ")}.`]
+            : []),
         ],
       },
     };
@@ -130,9 +145,18 @@ export class MinimalContextBuilder implements ContextBuilder {
       replaces: { fromEntryId: first.id, toEntryId: last.id },
       request,
       promptVersion: "moyyi-compaction-v1",
-      originalTokens: estimate(render(input, projection)),
+      originalTokens: estimate(renderRequired(input, projection)),
     };
   }
+}
+
+function renderRequired(input: ContextInput, projection: readonly ProjectedEntry[]): ModelRequest {
+  // Supplemental sections may enter or leave requests as capacity changes. Compaction savings
+  // compare required content only, including when that content is already over capacity.
+  return render(
+    { ...input, sections: input.sections.filter((section) => section.optional !== true) },
+    projection,
+  );
 }
 
 /** Newer summaries may subsume old summaries, but crossing spans are ambiguous and rejected. */

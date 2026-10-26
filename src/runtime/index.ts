@@ -43,6 +43,7 @@ import {
 import { shellPlugin } from "../plugins/shell/index.ts";
 import { skillsPlugin } from "../plugins/skills/index.ts";
 import { createWebPlugin } from "../plugins/web/index.ts";
+import { workspaceNavigationPlugin } from "../plugins/workspace-navigation/index.ts";
 import {
   ReadOnlyPolicy,
   WebPolicy,
@@ -105,6 +106,8 @@ export interface RuntimeOptions {
   readonly skills?: SkillSelection;
   /** Disable automatic root AGENTS.md reads. Default working instructions remain enabled. */
   readonly projectInstructions?: false;
+  /** Explicit opt-in for bounded path-only navigation; omitted or false performs no scan. */
+  readonly workspaceNavigation?: boolean;
   readonly developmentPlugins?: readonly DevelopmentPlugin[];
   readonly plugins?: readonly PluginEntry[];
   readonly model?: ModelOrigin;
@@ -164,6 +167,9 @@ export async function createRuntime(
   options: RuntimeOptions = {},
   services: RuntimeServices = {},
 ): Promise<Runtime> {
+  if (options.workspaceNavigation !== undefined && typeof options.workspaceNavigation !== "boolean")
+    throw Error("Workspace navigation must be a boolean");
+  const workspaceNavigation = options.workspaceNavigation === true;
   const model = options.model ? { ...options.model } : undefined;
   const deepseekReasoningEffort = resolveDeepSeekReasoningEffort(options.deepseekReasoningEffort);
   if (options.deepseekReasoningEffort !== undefined && model?.provider !== "deepseek")
@@ -267,6 +273,7 @@ export async function createRuntime(
     { plugin: defaultInstructionsPlugin },
     ...(options.projectInstructions === false ? [] : [{ plugin: projectInstructionsPlugin }]),
     ...(skills?.enabled.length ? [{ plugin: skillsPlugin }] : []),
+    ...(workspaceNavigation ? [{ plugin: workspaceNavigationPlugin }] : []),
     { plugin: fsPlugin },
     { plugin: shellPlugin },
     { plugin: createWebPlugin(options.web?.search?.origin) },
@@ -356,9 +363,9 @@ export async function createRuntime(
 
   const policy: PermissionPolicy = {
     revision: () => base.revision?.() ?? 0,
-    beforeContextRead: (path) => {
+    beforeContextRead: (path, operation = "read") => {
       try {
-        const initial = base.beforeContextRead?.(path);
+        const initial = base.beforeContextRead?.(path, operation);
         if (!initial || !["allow", "ask", "deny"].includes(initial.kind))
           return { kind: "deny", reason: "Automatic context reads are not granted" };
         const profile = {
@@ -370,9 +377,9 @@ export async function createRuntime(
         return stricter(
           stricter(
             initial,
-            registry.evaluatePolicy({ tool: "read", profile, args, phase: "prepare" }),
+            registry.evaluatePolicy({ tool: operation, profile, args, phase: "prepare" }),
           ),
-          registry.evaluatePolicy({ tool: "read", profile, args, phase: "execute" }),
+          registry.evaluatePolicy({ tool: operation, profile, args, phase: "execute" }),
         );
       } catch {
         return { kind: "deny", reason: "Automatic context reads are not granted" };
@@ -491,6 +498,7 @@ export async function createRuntime(
           signal,
           options.projectInstructions !== false,
           skills,
+          workspaceNavigation,
         ),
       ...(options.limits === undefined ? {} : { limits: options.limits }),
     });

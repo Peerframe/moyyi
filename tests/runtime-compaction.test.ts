@@ -5,6 +5,8 @@ import { afterEach, expect, it, vi } from "vitest";
 import { fixtureTransport } from "../evals/deepseek/scenario.ts";
 import { MinimalContextBuilder } from "../src/context/index.ts";
 import {
+  type ContextInput,
+  type ContextSection,
   type EntryId,
   type ModelProfile,
   type ModelStreamEvent,
@@ -47,6 +49,7 @@ async function harness(
     failCompaction?: boolean;
     size?: number;
     reasoning?: boolean;
+    sections?: readonly ContextSection[];
   } = {},
 ) {
   const directory = mkdtempSync(join(tmpdir(), "moyyi-compaction-"));
@@ -146,6 +149,11 @@ async function harness(
               models: [options.profile ?? scriptedProfile],
               createClient: () => client,
             });
+            if (options.sections)
+              host.registerContextSource({
+                id: "compaction-sections",
+                collect: async () => options.sections ?? [],
+              });
           },
         },
       },
@@ -234,6 +242,89 @@ it("allows complete reasoning as audit-only content", async () => {
   const compact = (await test.snapshot()).entries.find((entry) => entry.body.kind === "compaction");
   expect(compact?.body).toMatchObject({ summary: [{ type: "text", text: summary }] });
 });
+
+it.each(["omitted-to-omitted", "admitted-to-omitted", "omitted-to-admitted"] as const)(
+  "judges summary savings on required content when navigation changes %s",
+  async (transition) => {
+    const shrinking = transition === "omitted-to-admitted";
+    const response = shrinking ? summary : "expanded evidence ".repeat(300);
+    const options = shrinking ? {} : { turns: 3, size: 0 };
+    const planner = vi.spyOn(MinimalContextBuilder.prototype, "planCompaction");
+    let original: ContextInput;
+    try {
+      const probe = await harness([final(response)], options);
+      await probe.compact();
+      const captured = planner.mock.calls[0]?.[0];
+      if (!captured) throw Error("Missing compaction input");
+      original = captured;
+    } finally {
+      planner.mockRestore();
+    }
+    const builder = new MinimalContextBuilder();
+    const plan = builder.planCompaction(original);
+    const template = original.path.at(-1);
+    if (!plan || !template) throw Error("Missing compaction plan");
+    const candidate: TranscriptEntry = {
+      ...template,
+      id: "projected_compaction" as EntryId,
+      parentId: template.id,
+      body: {
+        kind: "compaction",
+        replaces: plan.replaces,
+        summary: [{ type: "text", text: response }],
+        producedBy: { origin: original.profile.origin, promptVersion: plan.promptVersion },
+      },
+    };
+    const projected = { ...original, path: [...original.path, candidate] };
+    const originalTokens = builder.build(original).report.estimatedTokens;
+    const projectedTokens = builder.build(projected).report.estimatedTokens;
+    if (originalTokens === undefined || projectedTokens === undefined)
+      throw Error("Missing context estimates");
+    expect(projectedTokens < originalTokens).toBe(shrinking);
+    const navigation: ContextSection = {
+      id: "navigation",
+      stability: "turn",
+      optional: true,
+      content: [
+        {
+          type: "text",
+          text: "n".repeat(shrinking ? originalTokens - projectedTokens + 1000 : 10_000),
+        },
+      ],
+    };
+    const sections = [...original.sections, navigation];
+    const fullBefore = builder.build({ ...original, sections }).report.estimatedTokens;
+    const fullAfter = builder.build({ ...projected, sections }).report.estimatedTokens;
+    if (fullBefore === undefined || fullAfter === undefined) throw Error("Missing full estimates");
+    const profile = {
+      ...scriptedProfile,
+      contextWindowTokens:
+        transition === "admitted-to-omitted"
+          ? fullBefore
+          : shrinking
+            ? fullAfter
+            : projectedTokens + 1000,
+    };
+    const before = builder.build({ ...original, sections, profile });
+    const after = builder.build({ ...projected, sections, profile });
+    expect(navigation.content.some((part) => before.request.system.includes(part))).toBe(
+      transition === "admitted-to-omitted",
+    );
+    expect(navigation.content.some((part) => after.request.system.includes(part))).toBe(shrinking);
+    const test = await harness([final(response)], { ...options, profile, sections: [navigation] });
+    expect(await test.compact()).toMatchObject(
+      shrinking
+        ? { kind: "completed" }
+        : { kind: "failed", reason: expect.stringContaining("Summary does not reduce") },
+    );
+    const snapshot = await test.snapshot();
+    expect(snapshot.entries.filter((entry) => entry.body.kind === "compaction")).toHaveLength(
+      shrinking ? 1 : 0,
+    );
+    if (!shrinking) expect(pathToHead(snapshot)).toEqual(test.seed);
+    expect(test.client.requests).toHaveLength(1);
+  },
+);
 
 it("makes no model request when there are not three completed user turns", async () => {
   const test = await harness([final(summary)], { turns: 2 });

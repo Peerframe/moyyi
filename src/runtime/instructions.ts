@@ -8,6 +8,7 @@ import type {
   PermissionPolicy,
   ProjectInstructionsResult,
   SkillSource,
+  WorkspaceNavigationResult,
 } from "../contracts/index.ts";
 import type { NodeWorkspaceFiles } from "./files.ts";
 import type { SkillSelection } from "./skills.ts";
@@ -28,6 +29,7 @@ export async function collectContext(
   signal: AbortSignal,
   enabled: boolean,
   skills?: SkillSelection,
+  navigationEnabled = false,
 ): Promise<readonly ContextSection[]> {
   const controller = new AbortController();
   const scopeSignal = AbortSignal.any([signal, controller.signal]);
@@ -147,6 +149,71 @@ export async function collectContext(
     skillGuard();
     return result;
   };
+  let navigationPending: Promise<WorkspaceNavigationResult> | undefined;
+  let navigationRevision: number | undefined;
+  const navigationGrants = new Map<string, { operation: "list" | "read"; path: string }>();
+  const navigationEpoch = () => {
+    try {
+      return policy.revision?.();
+    } catch {
+      throw Error("Workspace navigation permission changed");
+    }
+  };
+  const navigationGranted = (operation: "list" | "read", path: string) => {
+    try {
+      return (
+        policy.beforeContextRead?.(path, operation).kind === "allow" &&
+        policy.beforePrepare(operation, readProfile, { path }).kind === "allow"
+      );
+    } catch {
+      return false;
+    }
+  };
+  const navigationGuard = () => {
+    live();
+    if (
+      navigationEpoch() !== navigationRevision ||
+      [...navigationGrants.values()].some(
+        ({ operation, path }) => !navigationGranted(operation, path),
+      ) ||
+      navigationEpoch() !== navigationRevision
+    )
+      throw Error("Workspace navigation permission changed");
+  };
+  const navigationAllowed = (operation: "list" | "read", path: string) => {
+    navigationGuard();
+    if (!navigationGranted(operation, path)) return false;
+    navigationGrants.set(JSON.stringify([operation, path]), { operation, path });
+    return true;
+  };
+  const readNavigation = async (): Promise<WorkspaceNavigationResult> => {
+    live();
+    if (!navigationPending) {
+      navigationRevision = navigationEpoch();
+      // Publish the promise before the first authorization callback or asynchronous I/O.
+      navigationPending = Promise.resolve().then(async () => {
+        try {
+          if (!navigationAllowed("list", ".")) return Object.freeze({ kind: "blocked" as const });
+          const result = await files.readWorkspaceNavigation(
+            { workspaceRoot, signal: scopeSignal },
+            navigationGuard,
+            navigationAllowed,
+          );
+          navigationGuard();
+          return result.kind === "blocked"
+            ? Object.freeze({ kind: "blocked" as const })
+            : Object.freeze({ ...result, paths: Object.freeze([...result.paths]) });
+        } catch {
+          throw Error(
+            "Cannot load workspace navigation safely: check directory access, ignore rules and limits",
+          );
+        }
+      });
+    }
+    const result = await navigationPending;
+    navigationGuard();
+    return result;
+  };
   let removeAbort = () => {};
   const cancelled = new Promise<never>((_, reject) => {
     const abort = () => reject(Error("Context collection cancelled"));
@@ -164,6 +231,9 @@ export async function collectContext(
             signal: scopeSignal,
             ...(enabled ? { projectInstructions: Object.freeze({ readRoot }) } : {}),
             ...(skills?.enabled.length ? { skills: Object.freeze({ readEnabled }) } : {}),
+            ...(navigationEnabled
+              ? { workspaceNavigation: Object.freeze({ read: readNavigation }) }
+              : {}),
           }),
         ),
       ),
@@ -172,6 +242,7 @@ export async function collectContext(
     live();
     if (pending) guard();
     if (skillPending) skillGuard();
+    if (navigationPending) navigationGuard();
     return sections.flat();
   } finally {
     active = false;

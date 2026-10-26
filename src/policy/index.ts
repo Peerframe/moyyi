@@ -34,9 +34,11 @@ export class ReadOnlyPolicy implements PermissionPolicy {
     return this.epoch;
   }
 
-  beforeContextRead(_path: string): PolicyDecision {
+  beforeContextRead(_path: string, operation: "read" | "list" = "read"): PolicyDecision {
+    if (operation !== "read" && operation !== "list")
+      return { kind: "deny", reason: "Unsupported automatic context operation" };
     return this.decide(
-      "read",
+      operation,
       {
         class: "read",
         reversibility: "not_applicable",
@@ -91,8 +93,8 @@ export class WorkspaceWritePolicy implements PermissionPolicy {
   revision(): number {
     return this.epoch;
   }
-  beforeContextRead(path: string): PolicyDecision {
-    return this.reads.beforeContextRead(path);
+  beforeContextRead(path: string, operation: "read" | "list" = "read"): PolicyDecision {
+    return this.reads.beforeContextRead(path, operation);
   }
   beforePrepare(tool: string, profile: EffectProfile, args: unknown): PolicyDecision {
     if (profile.class === "read") return this.reads.beforePrepare(tool, profile, args);
@@ -150,9 +152,9 @@ export class WorkspaceProcessPolicy implements PermissionPolicy {
   revision(): number {
     return this.epoch + (this.files.revision?.() ?? 0);
   }
-  beforeContextRead(path: string): PolicyDecision {
+  beforeContextRead(path: string, operation: "read" | "list" = "read"): PolicyDecision {
     return (
-      this.files.beforeContextRead?.(path) ?? {
+      this.files.beforeContextRead?.(path, operation) ?? {
         kind: "deny",
         reason: "No automatic context read grant",
       }
@@ -217,9 +219,9 @@ export class WebPolicy implements PermissionPolicy {
   revision(): number {
     return this.epoch + (this.previous.revision?.() ?? 0);
   }
-  beforeContextRead(path: string): PolicyDecision {
+  beforeContextRead(path: string, operation: "read" | "list" = "read"): PolicyDecision {
     return (
-      this.previous.beforeContextRead?.(path) ?? {
+      this.previous.beforeContextRead?.(path, operation) ?? {
         kind: "deny",
         reason: "No automatic context read grant",
       }

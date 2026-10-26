@@ -84,6 +84,7 @@ export interface CompactionPlan {
   readonly replaces: { readonly fromEntryId: EntryId; readonly toEntryId: EntryId };
   readonly request: ModelRequest;
   readonly promptVersion: string;
+  /** Required request tokens before compaction, excluding optional context sections. */
   readonly originalTokens: number;
 }
 
@@ -120,8 +121,9 @@ export interface PermissionPolicy {
   /** Mutable grant owners increment this epoch on every grant/revocation. */
   revision?(): number;
   /** Automatic context reads have no approval flow. Missing, ask or deny means no read. */
-  /** AGENTS.md uses a workspace-relative path; selected skills use their absolute host path. */
-  beforeContextRead?(path: string): PolicyDecision;
+  /** Workspace context uses relative paths; selected skills use absolute host paths. */
+  /** Directory navigation asks for list; omission retains the existing read operation. */
+  beforeContextRead?(path: string, operation?: "read" | "list"): PolicyDecision;
   /** Called before `prepare`, which reads state and therefore needs read permission too. */
   beforePrepare(tool: string, profile: EffectProfile, args: unknown): PolicyDecision;
   /** Called with the prepared action; the decision binds to its digest. */

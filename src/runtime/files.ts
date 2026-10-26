@@ -12,6 +12,7 @@ import type {
   ToolContext,
   WorkspaceFiles,
   WorkspaceFilesFactory,
+  WorkspaceNavigationResult,
 } from "../contracts/index.ts";
 import { assertUnprotected } from "./preconditions.ts";
 import { searchContext } from "./search-context.ts";
@@ -25,6 +26,10 @@ const MAX_IGNORE_BYTES = 16 * 1024;
 const MAX_ALL_IGNORE_BYTES = 64 * 1024;
 const MAX_LINE_CHARS = 2_000;
 const MAX_SEARCH_CONTEXT_BYTES = 64 * 1024;
+const MAX_NAVIGATION_PATHS = 200;
+const MAX_NAVIGATION_BYTES = 8192;
+const MAX_NAVIGATION_DEPTH = 4;
+const MAX_NAVIGATION_DIRECTORIES = 64;
 const classes = new Set(
   "alnum alpha blank cntrl digit graph lower print punct space upper xdigit".split(" "),
 );
@@ -39,6 +44,7 @@ class FileAccessError extends Error {
 type Root = { path: string; stat: Stats };
 type Target = { lexical: string; path: string; stat: Stats; relative: string };
 type Rules = readonly { base: string; matcher: Ignore }[];
+type NavigationAllowed = (operation: "list" | "read", path: string) => boolean;
 
 /** Host adapter only. No model-selected path, flag or ignore rule can widen the workspace. */
 export class NodeWorkspaceFiles implements WorkspaceFilesFactory {
@@ -80,6 +86,14 @@ export class NodeWorkspaceFiles implements WorkspaceFilesFactory {
     assertAuthorized: () => void,
   ): Promise<FileRead> {
     return new ReadScope(context, assertAuthorized, this.excluded).readSkillDocument(name);
+  }
+
+  readWorkspaceNavigation(
+    context: Pick<ToolContext, "workspaceRoot" | "signal">,
+    assertAuthorized: () => void,
+    allowed: NavigationAllowed,
+  ): Promise<WorkspaceNavigationResult> {
+    return new ReadScope(context, assertAuthorized, this.excluded).readWorkspaceNavigation(allowed);
   }
 
   create(context: ToolContext, assertAuthorized: () => void): WorkspaceFiles {
@@ -296,8 +310,15 @@ class ReadScope {
       };
     });
   }
-  private async readFile(root: Root, input: string, cap: number): Promise<FileRead> {
+  private async readFile(
+    root: Root,
+    input: string,
+    cap: number,
+    directIdentity?: Stats,
+  ): Promise<FileRead> {
     const target = await this.target(root, input);
+    if (directIdentity && (target.path !== target.lexical || !same(target.stat, directIdentity)))
+      throw new FileAccessError("denied", "Automatic rule reads must not follow changed aliases");
     if (!target.stat.isFile() || target.stat.nlink !== 1)
       throw new FileAccessError("denied", "Only regular files with one link may be read");
     await this.unchanged(root, target);
@@ -349,6 +370,118 @@ class ReadScope {
     }
   }
 
+  async readWorkspaceNavigation(allowed: NavigationAllowed): Promise<WorkspaceNavigationResult> {
+    const permitted = (operation: "list" | "read", path: string): boolean => {
+      this.guard();
+      try {
+        return allowed(operation, path);
+      } catch {
+        this.guard();
+        return false;
+      }
+    };
+    // Even root resolution is forbidden when automatic directory discovery is not granted.
+    if (!permitted("list", ".")) return { kind: "blocked" };
+    try {
+      return await this.operation(async (root) => {
+        const paths: string[] = [];
+        let skippedEntries = 0,
+          truncated = false,
+          visited = 0,
+          admittedDirectories = 1,
+          stopped = false;
+        const skip = () => {
+          skippedEntries++;
+          truncated = true;
+        };
+        const continueScan = () => {
+          if (visited >= MAX_ENTRIES || paths.length >= MAX_NAVIGATION_PATHS) {
+            truncated = stopped = true;
+            return false;
+          }
+          return true;
+        };
+        const loadRules = this.ignoreRules(root, (path) => {
+          // A denied existence check is not evidence that ignore rules are absent.
+          if (!permitted("read", path))
+            throw new FileAccessError("denied", "Workspace navigation ignore read is blocked");
+        });
+        const pending: { target: Target; rules: Rules; depth: number }[] = [
+          { target: await this.target(root, "."), rules: [], depth: 0 },
+        ];
+        for (let index = 0; index < pending.length && !stopped; index++) {
+          const current = pending[index] as (typeof pending)[number];
+          await this.unchanged(root, current.target);
+          const rules = await loadRules(current.target, current.rules);
+          await this.directory(root, current.target, async (name, symbolic, directory) => {
+            if (visited >= MAX_ENTRIES || paths.length >= MAX_NAVIGATION_PATHS) {
+              truncated = stopped = true;
+              return false;
+            }
+            visited++;
+            const path = portable(relative(root.path, resolve(current.target.path, name)));
+            if (symbolic) {
+              skip();
+              return continueScan();
+            }
+            if (ignored(path, directory, rules)) return continueScan();
+            if (directory) {
+              if (
+                current.depth >= MAX_NAVIGATION_DEPTH ||
+                admittedDirectories >= MAX_NAVIGATION_DIRECTORIES ||
+                !permitted("list", path)
+              ) {
+                skip();
+                return continueScan();
+              }
+              // Bound queued directories and the grants rechecked by every I/O guard. A
+              // later identity failure must not refund an already-admitted policy path.
+              admittedDirectories++;
+            }
+            let item: Target;
+            try {
+              item = await this.target(root, path);
+            } catch (error) {
+              this.guard();
+              if (error instanceof FileAccessError || isMissing(error)) {
+                skip();
+                return continueScan();
+              }
+              throw error;
+            }
+            // Automatic discovery never follows aliases, including same-workspace aliases.
+            if (item.path !== item.lexical || item.stat.isDirectory() !== directory) {
+              skip();
+              return continueScan();
+            }
+            if (directory) {
+              pending.push({ target: item, rules, depth: current.depth + 1 });
+            } else if (item.stat.isFile() && item.stat.nlink === 1) {
+              // Reserve the longest metadata representation, including counts added later.
+              const candidate = {
+                kind: "loaded",
+                paths: [...paths, path],
+                truncated: false,
+                skippedEntries: MAX_ENTRIES,
+              };
+              if (Buffer.byteLength(JSON.stringify(candidate)) > MAX_NAVIGATION_BYTES) {
+                truncated = stopped = true;
+                return false;
+              }
+              paths.push(path);
+            } else skip();
+            return continueScan();
+          });
+        }
+        return { kind: "loaded", paths: paths.sort(), truncated, skippedEntries };
+      });
+    } catch {
+      // A partial index must not escape after rules, workspace identity or authority fail.
+      this.guard();
+      return { kind: "blocked" };
+    }
+  }
+
   list(path: string, maximum?: number): Promise<FileList> {
     return this.operation(async (root) => {
       const cap = bounded(maximum, 100, 500);
@@ -393,7 +526,7 @@ class ReadScope {
   private async directory(
     root: Root,
     target: Target,
-    visit: (name: string, symbolic: boolean) => Promise<boolean>,
+    visit: (name: string, symbolic: boolean, directory: boolean) => Promise<boolean>,
   ): Promise<void> {
     await this.unchanged(root, target);
     this.guard();
@@ -404,12 +537,55 @@ class ReadScope {
       for (;;) {
         const entry = await this.io(() => directory.read());
         if (!entry) break;
-        if (!(await visit(entry.name, entry.isSymbolicLink()))) break;
+        if (!(await visit(entry.name, entry.isSymbolicLink(), entry.isDirectory()))) break;
       }
       await this.unchanged(root, target);
     } finally {
       await directory.close();
     }
+  }
+
+  private ignoreRules(
+    root: Root,
+    beforeRead?: (path: string) => void,
+  ): (directory: Target, inherited: Rules) => Promise<Rules> {
+    let ignoreBytes = 0;
+    return async (directory: Target, inherited: Rules): Promise<Rules> => {
+      const local = portable(relative(root.path, resolve(directory.path, ".gitignore")));
+      beforeRead?.(local);
+      let stat: Stats;
+      try {
+        stat = await this.io(() => lstat(resolve(directory.path, ".gitignore")));
+      } catch (error) {
+        if (isMissing(error)) return inherited;
+        throw error;
+      }
+      // Git does not follow symbolic .gitignore files. Never substitute a resolved alias.
+      if (stat.isSymbolicLink()) return inherited;
+      ignoreBytes += stat.size;
+      if (!stat.isFile() || stat.size > MAX_IGNORE_BYTES || ignoreBytes > MAX_ALL_IGNORE_BYTES)
+        throw new FileAccessError("ignore", "Ignore rules exceed supported limits; search stopped");
+      let content: FileRead;
+      try {
+        content = await this.readFile(root, local, MAX_IGNORE_BYTES, beforeRead ? stat : undefined);
+      } catch {
+        this.guard();
+        throw new FileAccessError(
+          "ignore",
+          "Cannot safely read complete .gitignore rules; search stopped",
+        );
+      }
+      if (content.truncated)
+        throw new FileAccessError("ignore", "Ignore rules changed or exceed limits");
+      validateIgnore(content.text);
+      return [
+        ...inherited,
+        {
+          base: directory.relative === "." ? "" : directory.relative,
+          matcher: ignore({ ignorecase: false }).add(content.text),
+        },
+      ];
+    };
   }
 
   search(path: string, query: string, options: FileSearchOptions = {}): Promise<FileSearch> {
@@ -453,7 +629,6 @@ class ReadScope {
       let contextBytes = 0;
       let visited = 0,
         scanned = 0,
-        ignoreBytes = 0,
         truncated = false,
         skippedFiles = 0;
       const needle = caseSensitive ? query : query.toLowerCase();
@@ -465,55 +640,7 @@ class ReadScope {
         skippedFiles,
         ...(mode === "files" ? { mode, files } : withContext && contextLines ? { context } : {}),
       });
-      const loadRules = async (directory: Target, inherited: Rules): Promise<Rules> => {
-        const local = portable(relative(root.path, resolve(directory.path, ".gitignore")));
-        let stat: Stats;
-        try {
-          stat = await this.io(() => lstat(resolve(directory.path, ".gitignore")));
-        } catch (error) {
-          if (isMissing(error)) return inherited;
-          throw error;
-        }
-        // Git does not follow symbolic .gitignore files. Never substitute a resolved alias.
-        if (stat.isSymbolicLink()) return inherited;
-        ignoreBytes += stat.size;
-        if (!stat.isFile() || stat.size > MAX_IGNORE_BYTES || ignoreBytes > MAX_ALL_IGNORE_BYTES)
-          throw new FileAccessError(
-            "ignore",
-            "Ignore rules exceed supported limits; search stopped",
-          );
-        let content: FileRead;
-        try {
-          content = await this.readFile(root, local, MAX_IGNORE_BYTES);
-        } catch {
-          this.guard();
-          throw new FileAccessError(
-            "ignore",
-            "Cannot safely read complete .gitignore rules; search stopped",
-          );
-        }
-        if (content.truncated)
-          throw new FileAccessError("ignore", "Ignore rules changed or exceed limits");
-        validateIgnore(content.text);
-        return [
-          ...inherited,
-          {
-            base: directory.relative === "." ? "" : directory.relative,
-            matcher: ignore({ ignorecase: false }).add(content.text),
-          },
-        ];
-      };
-      const ignored = (name: string, directory: boolean, rules: Rules): boolean => {
-        let excluded = false;
-        for (const rule of rules) {
-          const path = rule.base ? name.slice(rule.base.length + 1) : name;
-          if (rule.base && !name.startsWith(`${rule.base}/`)) continue;
-          const result = rule.matcher.test(path + (directory ? "/" : ""));
-          if (result.ignored) excluded = true;
-          else if (result.unignored) excluded = false;
-        }
-        return excluded;
-      };
+      const loadRules = this.ignoreRules(root);
       let inherited: Rules = [];
       // Exact files and subdirectories inherit every ancestor rule; a file is never a rule root.
       let ancestor = await this.target(root, ".");
@@ -630,6 +757,18 @@ class ReadScope {
       return result();
     });
   }
+}
+
+function ignored(name: string, directory: boolean, rules: Rules): boolean {
+  let excluded = false;
+  for (const rule of rules) {
+    const path = rule.base ? name.slice(rule.base.length + 1) : name;
+    if (rule.base && !name.startsWith(`${rule.base}/`)) continue;
+    const result = rule.matcher.test(path + (directory ? "/" : ""));
+    if (result.ignored) excluded = true;
+    else if (result.unignored) excluded = false;
+  }
+  return excluded;
 }
 
 function validateIgnore(text: string): void {

@@ -484,7 +484,11 @@ export class AgentCore {
         producedBy: { origin: this.#deps.profile.origin, promptVersion: plan.promptVersion },
       });
       try {
-        const projected = this.#deps.context.build({ ...input, path: [...input.path, candidate] });
+        const projected = this.#deps.context.build({
+          ...input,
+          path: [...input.path, candidate],
+          sections: input.sections.filter((section) => section.optional !== true),
+        });
         if (
           projected.report.estimatedTokens === undefined ||
           projected.report.estimatedTokens >= plan.originalTokens

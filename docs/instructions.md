@@ -71,3 +71,34 @@ do not approve any action; loaded text is captured in the request audit instead.
 Run `npm run eval:instructions` for deterministic context/authority conformance. No credentials,
 network or real model are used; this does not measure real-model task quality. See
 [ADR 0017](decisions/0017-working-and-project-instructions.md) for sources and tradeoffs.
+
+## Optional workspace navigation
+
+A trusted host can enable a bounded path overview before each model request:
+
+```ts
+const runtime = await createRuntime({
+  // Existing provider, model and storage options go here.
+  workspaceNavigation: true,
+});
+```
+
+The default is off. Enabling it lists regular file paths without reading source bodies; bounded
+.gitignore files are read to apply discovery exclusions. Paths are untrusted navigation, not
+facts or instructions. The model still needs to inspect relevant files. The scan respects
+protected paths, ignores, cancellation and operation-specific permissions. Custom policies must
+allow `beforeContextRead(path, "list")` and normal list preparation, plus read grants for necessary
+ignore-file checks; a missing hook, ask or deny cannot become approval. Plugin restrictions apply
+in both phases. Unavailable means unknown, not empty.
+
+Limits are 200 paths, 8 KiB of serialized result data, depth four, 10,000 visited entries and 64
+admitted directories including the root. Truncation/skipped entries are explicit; an omitted path
+is not proof of absence. The overview refreshes for every request; the enable flag is captured at
+runtime startup. Changing it requires a new runtime. It grants no writes, shell or network access.
+
+The whole section may be omitted when it would exceed the existing context limit. Required
+instructions, history, tools and final-request restrictions are retained; a required request that
+still does not fit fails as before. Context reports identify omitted optional sections. Recorded
+requests retain exactly the admitted context. The offline instruction eval includes a four-request
+scripted read/create/verify/final workflow with the original public checker; this does not measure
+real-model accuracy. See [ADR 0027](decisions/0027-bounded-workspace-navigation.md).
