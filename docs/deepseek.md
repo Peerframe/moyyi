@@ -2,12 +2,12 @@
 
 Batch 6 adds a programmatic DeepSeek provider and deterministic record/replay. The subsequent
 batch 7 [CLI](cli.md) connects it through explicit trusted host configuration. The default runtime still makes no network request without explicit configuration.
-Automated checks use synthetic protocol responses. Owner-authorized minimal probes exposed
-reasoning-metadata, final-answer-phase and tool-commentary incompatibilities. An earlier complete
-private response decodes offline to `OK` with final usage. The subsequent read-task prefix ends
-before a response terminal; advancing beyond its commentary rejection is not completed live
-acceptance. Real tool continuation remains unverified. See the
-[compatibility follow-up](tasks/2026-10-25-deepseek-compatibility.md).
+Automated checks use synthetic protocol responses. Earlier live probes exposed reasoning-metadata,
+final-answer-phase and tool-commentary incompatibilities, retained in the historical
+[compatibility follow-up](tasks/2026-10-25-deepseek-compatibility.md). The subsequent #19 installation
+passed a bounded live file-read/tool-continuation task and offline replay. Broader project-answer
+quality has not passed its original criteria. See the [system overview](system-overview.md) for
+the distinct merged, installed-candidate and task-acceptance states.
 
 ## Offline entry points
 
@@ -127,7 +127,12 @@ No live command is run by the automated tests, demo or this compatibility implem
    known server revision, and actual usage/charge. A reported alias alone means the underlying model
    revision remains **unknown**. Keep raw private records local and report only sanitized evidence.
 
-The tool smoke has not completed. Three earlier separately authorized single-request
+### Historical compatibility snapshot, before the successful #19 smoke
+
+The following failures are retained as historical evidence. They do not describe the current
+installation or authorize another request; current outcomes are in the [system overview](system-overview.md).
+
+At that checkpoint the tool smoke had not completed. Three separately authorized single-request
 probes received HTTP 200, without retries. The second captured a partial stream exposing auxiliary
 reasoning metadata; its prefix still correctly reports interruption. The third captured all 23 events,
 including a final `OK`, but the installed decoder rejected `phase: "final_answer"`. Offline replay
@@ -144,9 +149,10 @@ workspace was also mistakenly inside protected `.moyyi`; separate offline checks
 there and successful reads in an external temporary workspace. No permission rule was relaxed.
 
 Actual billing, underlying model revision, phase-sensitive continuation, real-agent pass@1/pass^k,
-tool continuation, normal task latency and model quality remain unverified. No further paid request
-is authorized by this documentation. Once the fix is reviewed and installed, a new explicitly bounded
-live run is still needed; an old normalized error recording will replay its original error.
+tool continuation, normal task latency and model quality were unverified at that checkpoint.
+The subsequent #19 tool-continuation run is summarized at the top of this document; it does not
+retroactively change these incomplete records. An old normalized error recording still replays
+its original error. No further paid request is authorized by this documentation.
 The CLI, controlled writes, native commands, compaction and second provider are merged.
 The local installable candidate is described in [installation.md](installation.md); no official
 release or live acceptance is implied.
