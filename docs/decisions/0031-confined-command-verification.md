@@ -56,6 +56,33 @@ These are environment/contract defects, separate from the model's factual mistak
 No core loop, persisted format, model/effort/output/request limit, task-specific hint or automatic
 verification framework changes. No upstream source or prompt is copied or substantially adapted.
 
+## Linux parser cleanup found by the integration gate
+
+The first Linux CI run failed the existing live document-parser revocation test: the launcher and
+its old process group had exited, but the parser's host PID still existed. This is a separate
+integration blocker, not a reason to skip the test or treat macOS results as Linux evidence.
+The document sandbox uses bubblewrap 0.9.0 `--new-session`; its namespace init is outside the
+launcher's original process group. Killing the launcher first starts asynchronous namespace
+teardown, so launcher `close` alone is insufficient to confirm parser cleanup.
+The reviewed release resolves to
+[`8e51677abd7e3338e4952370bf7d902e37d8cbb6`](https://github.com/containers/bubblewrap/blob/8e51677abd7e3338e4952370bf7d902e37d8cbb6/bubblewrap.c):
+its startup information/release handshake, session creation and init reaping code establish
+these process roles. Node's [v26 `close` contract](https://nodejs.org/download/release/v26.0.0/docs/api/child_process.html#event-close)
+only covers the child process and its stdio streams. The failed CI did not capture `/proc` state,
+so it cannot distinguish a running worker from a zombie; neither proves completed cleanup.
+
+Use bubblewrap's dedicated `--info-fd` for its trusted `child-pid`, rather than parsing worker
+stdout. Keep the monitor alive to reap namespace init, signal that init's session, and confirm
+both identities have exited. Capture and recheck the namespace identity before signaling; do
+not signal an unrelated or unconfirmed process. Hold the bounded binary input until the trusted
+startup information is complete and authority is rechecked. A fixed worker cannot complete its
+normal parse before receiving that input. Missing/malformed startup information fails closed.
+The existing parser deadline and bounded cleanup interval remain; an unconfirmed shutdown is a
+parser failure. No additional workspace, credential or network access is introduced.
+
+The original live worker/launcher/group `ESRCH` assertions remain. Deterministic lifecycle cases
+supplement them; only a passing real Linux gate can establish that platform's integration result.
+
 ## Acceptance and limits
 
 Real native checks cover heredocs including stdin Node, private scratch use, quoting/pipes/exit

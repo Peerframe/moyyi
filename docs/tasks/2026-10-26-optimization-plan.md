@@ -178,6 +178,21 @@ assessment `61a1cfe04b2341b5fd5fb860ce5daff3ba3e3a4b07288040c6ea2e93c0d09b92`。
 8/8通过。macOS CI新增同一shell conformance命令，使heredoc机制在两平台持续受检；
 原CI门槛保留。打包/安装及修复后的有限live验收继续在本分支记录。
 
+[PR #30](https://github.com/Peerframe/moyyi/pull/30) 初始产品 `7d665900e9c56e8be69d56d6cfaa94b5e183c079`
+的 `npm run verify:package -- --offline` 通过：源码目录外CLI10/client10、PTY6、文档9项
+（七格式）、隔离/依赖图/严格类型/卸载均通过；363文件，tar SHA256
+`e2bd8770c0cfd473159b3dd5d0651d470258231daacaa36579d7a1f64882eafc`。
+[首次CI](https://github.com/Peerframe/moyyi/actions/runs/40370944349) 的macOS通过，
+Linux原文档撤权测试发现launcher及原进程组退出后worker PID仍可见；原ESRCH断言保留，
+没有跳过测试或重跑取绿。此候选未覆盖本机安装，后续修复和最终验收单独记录。
+
+按bubblewrap 0.9.0固定源码核对后，parser通过独立info FD确认namespace init身份，
+等待身份和权限确认后才发送文档，保留monitor回收init；不能只用launcher退出代表取消完成。
+30秒/1500ms上限、原worker/launcher/group ESRCH断言不变，身份不确定不向该PID发信号，
+未确认清理返回parser_failed。增加11个确定性监控反例并保留真实生命周期测试，
+本机定向14/14、完整 `npm run check` 106文件/2311项、documents eval4/4、shell eval8/8通过。
+独立复核无阻断。Docker daemon不可用且有限探针已结束；本机模拟不能替代后续真实Linux CI。
+
 唯一live与独立复核：`~/.moyyi/acceptance/public-daily-2026-10-27/`。
 manifest `c514f3026f68f692bdbc2742b2dd71f371f992f16e2578d0414d05f0eed05fb6`；
 assessment `9487737f369fde1e2d57aa88ce372e146fd94cc7094e84f113e1235b17d35bf9`。
