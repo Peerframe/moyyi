@@ -28,6 +28,7 @@ and the referenced PR before changing code. No current authorization is inferred
 |---|---|---|
 | Merged product baseline | `b2d4790fda242d2ff8ba7bc3f8306bc2e06743a9`, through [PR #24](https://github.com/Peerframe/moyyi/pull/24) | Includes core/store/CLI, file writes, native process sandbox, web, Skills, runtime evals and bounded request closeout. |
 | Unmerged product candidate | [PR #25](https://github.com/Peerframe/moyyi/pull/25), reviewed head `650a00b06bcabc308d9cebeffc0e037658eb6457` | Range reads, evidence guidance, configurable reasoning, search context and two additional source tasks. These are not merged-main capabilities. |
+| Unmerged documentation candidate | [PR #26](https://github.com/Peerframe/moyyi/pull/26), plan-update baseline `d9269cec776709586fdb589d029420bb14c7d814` | The system entry and the current optimization plan are delivered here. Product optimization continues in existing PR #25; neither PR is merged or stacked on the other. |
 | Owner's installed candidate | Product `b019f30229a76a3dbe502ee5786ccf5bbb7f5a3e`; later PR head only adds its task record | Exact package/installation checks passed. Host uses Flash + Responses + low; the ordinary read-only host's three-request limit is separate from the eight-request acceptance run. This is a local configuration, not a library default. |
 | Latest autonomous investigation | [Fixed PR #25 result](https://github.com/Peerframe/moyyi/blob/650a00b06bcabc308d9cebeffc0e037658eb6457/docs/tasks/2026-10-26-search-context.md) | Eight requests, zero retries, normal final answer, original six criteria **not passed**. Lifecycle explanation improved in that run; consumers and raw-text/authority claims remain incomplete or contradictory. |
 | Public release | None | Local candidate installation is not npm/GitHub publication or a release tag. |
@@ -115,25 +116,34 @@ verifier, mandatory subagents, full-repository graph or larger request allowance
 
 ## Next bounded delivery and decision rules
 
-The next product delivery is **one coherent investigation-tool contract**, followed by measurement
-of the entire task. It has not been implemented by this documentation change.
+The owner has authorized planning first, then targeted optimization. The
+[current delivery plan](tasks/2026-10-26-optimization-plan.md) expands the following three levels;
+it is the scoped execution record for this checkpoint, not a new planning system. The plan updates
+PR #26, while product work continues in PR #25. No new stacked PR or automatic merge is required.
 
-| Order | Deliverable | Observable exit condition |
+| Level | User result and deliverable | Exit condition and evidence boundary |
 |---|---|---|
-| 1 | Exact file/directory scope, bounded include/exclude selection, files-versus-content output, actionable schema errors through the existing read capability | The same synthetic navigation probes work; exact-file search never expands to siblings; filtered searches preserve ignore/protected-path/revocation guarantees; scope, omissions and bounds remain visible. No extra model call is needed for the mechanism. |
-| 2 | Run the existing task harness against a fixed representative selection, retaining the original project task | Use source dataflow/lifecycle candidates plus existing research/data-consistency tasks. Confirm required capabilities first: many public research tasks write `report.json`, so a read-only profile cannot be scored as if it supported them. Keep checkers unchanged and report unsupported tasks separately. |
-| 3 | Compare old/new navigation, then a compatible mature-harness baseline only if it resolves an outstanding question | Same model/API/effort, source, per-task limits and total authorized budget. Report evidence delivered, final facts, false success, errors, requests and bytes separately. Never spend the previous exhausted eight-request grant again. |
+| 1 — this delivery | Make source investigation tools select the requested material and explain repairable input errors: exact file/directory scope, bounded include/exclude globs, `files`/`content` search modes and safe field-level schema errors | Real disposable-file/runtime probes establish exact scope, filtering, deduplication, bounded results and actionable errors; denial/revocation/cancellation and existing task checks still pass. This proves tool behavior, not reliable model conclusions. Product completion is recorded after implementation and checks, not by this plan. |
+| 2 — later quality measurement | Establish whether the whole agent completes representative investigations correctly, retaining the original project task and adding fixed source dataflow/lifecycle, research and data-consistency cases | Compare fixed old/new versions with the same model/API/effort, inputs, supported capabilities and limits. Report factual results, evidence delivered, false success, failures, requests and bytes separately. Existing checkers remain unchanged; unsupported tasks are explicit. The previous eight-request grant is exhausted: this delivery makes zero paid calls and does not request a new budget. |
+| 3 — later user workflows | Establish controlled editing, long-session fidelity and online-research outcomes | Independently verify modification/checks/review/undo; retained facts and unfinished work across resume/compaction; and actual service/source quality for online research. Each outcome needs its own bounded task and evidence; the current offline tool work does not close these gaps. |
 
-Do not add LSP or a repository graph before the basic interface comparison establishes remaining
-navigation loss. If delivered evidence is sufficient and conclusions still fail, stop changing
-search and isolate interpretation/answer construction with the existing task cases. A missing
-consumer is not repaired by an unsupported final claim; a known incorrect claim is not repaired
-by counting more files read. The original six criteria remain required for that original task.
+Level 1 preserves `contextLines` 0–20, every existing request/input/output/scan/time limit,
+Flash + Responses + low, and the original six criteria. It changes the existing guarded file
+capability, tool contract and argument validation, not prompts, the core loop or persisted format.
+It adds no LSP, repository graph or additional agents. File filters never grant access or silently
+hide tests; invalid-input feedback must not echo arbitrary values or private content.
 
-Writes, long sessions and online research need their own user-outcome acceptance later. GUI,
-MCP/memory, additional models and training remain roadmap work, not ways to hide the current gap.
-Reuse from OpenBot is selected by a demonstrated need and [provenance rules](openbot-provenance.md),
-not by a goal of migrating the old product wholesale.
+Stop an ineffective line of work when its claimed failure is no longer observed: if the required
+evidence reaches the model but conclusions still fail, stop expanding search and isolate
+interpretation/answer construction. If navigation improvements do not improve evidence selection
+under unchanged limits, do not keep widening context or adding tools without a demonstrated gap.
+Once the defined offline exit conditions pass, finish that delivery rather than adding unrelated
+mechanism tests; record live quality as unmeasured. A compatible mature-harness comparison or future
+index is useful only when it can resolve a concrete remaining question, under a new bounded run.
+
+GUI, MCP/memory, additional models and training remain roadmap work. Reuse from OpenBot follows a
+demonstrated need and [provenance rules](openbot-provenance.md), without migrating the old product
+roles or treating new capabilities as proof that existing tasks are correct.
 
 ## Keep this useful
 
