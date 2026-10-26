@@ -27,9 +27,9 @@ and the referenced PR before changing code. No current authorization is inferred
 | Coordinate | Audited state | What it means |
 |---|---|---|
 | Merged product baseline | `b2d4790fda242d2ff8ba7bc3f8306bc2e06743a9`, through [PR #24](https://github.com/Peerframe/moyyi/pull/24) | Includes core/store/CLI, file writes, native process sandbox, web, Skills, runtime evals and bounded request closeout. |
-| Unmerged product candidate | [PR #25](https://github.com/Peerframe/moyyi/pull/25), reviewed product `520ef829e96a9892a5bcd3c4547f58cfc7da8378`, delivery head `6eeb61ef0881d4dc4db85e0c54c62281c62fb6c7` | Range reads, evidence guidance, configurable reasoning, search context, exact-file/filter/files-mode navigation, safe schema errors and two additional source tasks. The source-only eval host now also preserves explicit reasoning effort. These are not merged-main capabilities. |
-| Unmerged documentation candidate | [PR #26](https://github.com/Peerframe/moyyi/pull/26), plan baseline `21f51ee1350ee68f807573ba7b737ab3fff18843`; this update records its second-step measurements | The system entry and the current optimization plan are delivered here. Product optimization continues in existing PR #25; neither PR is merged or stacked on the other. |
-| Owner's installed candidate | Product `520ef829e96a9892a5bcd3c4547f58cfc7da8378`; later PR head changes source-only eval code and records | [Clean package, 238 installed-file identities and five installed navigation scenarios passed](https://github.com/Peerframe/moyyi/blob/8b74bed/docs/tasks/2026-10-26-investigation-navigation.md). Host uses Flash + Responses + low; the ordinary read-only host's three-request limit is separate from the eight-request acceptance run. This is a local configuration, not a library default. |
+| Unmerged product candidate | [PR #25](https://github.com/Peerframe/moyyi/pull/25), reviewed product `c3b128b1b9865bf191b291fa2a3c2b0584888dfe` | Range reads, evidence guidance, configurable reasoning, search context, exact-file/filter/files-mode navigation, safe schema errors and two additional source tasks. The eval host preserves explicit reasoning effort. Native numbered source evidence and explicit remaining tool opportunities now extend this candidate; API profile v2 prevents mixing old recordings. These are not merged-main capabilities. |
+| Unmerged documentation candidate | [PR #26](https://github.com/Peerframe/moyyi/pull/26), plan baseline `381bbf142fc22828d89f5057177d9a9a4bcc4609`; this update records the subsequent product correction | The system entry and the current optimization plan are delivered here. Product optimization continues in existing PR #25; neither PR is merged or stacked on the other. |
+| Owner's installed candidate | Product `c3b128b1b9865bf191b291fa2a3c2b0584888dfe`; package SHA256 `ea42056f9eabafe42f8096036b0c10b50da65e028ad83d3967ca6817d25b740a` | [Clean package, 241 installed-file identities and three installed source/action-budget scenarios passed](https://github.com/Peerframe/moyyi/pull/25). Actual CLI resume/help/exit also passed; no live API request was used for these checks. Host uses Flash + Responses + low; the ordinary read-only host's three-request limit is separate from the eight-request acceptance run. This is a local configuration, not a library default. |
 | Latest autonomous investigations | [Fixed two-task result](https://github.com/Peerframe/moyyi/blob/6eeb61ef0881d4dc4db85e0c54c62281c62fb6c7/docs/tasks/2026-10-26-fixed-multitask-evaluation.md) | Eight requests total, four per task, zero retries, Flash/Responses/low. Original six criteria **not passed**: incomplete consumers and false claims despite delivered evidence. Public dataflow facts are correct, but required report file is absent: official failure. This is not an equal-budget comparison with the original historical eight-request task. |
 | Public release | None | Local candidate installation is not npm/GitHub publication or a release tag. |
 
@@ -113,6 +113,16 @@ recovery and cancellation apply throughout the loop, not only after an answer.
    historical briefs are evidence, not a standing queue. Do not claim a new product-quality fix from
    the helper patch, repeat exhausted budgets, or keep expanding search after decisive evidence arrived.
 
+5. **A subsequent product correction is installed, with live quality still separate.**
+   [ADR 0026](https://github.com/Peerframe/moyyi/blob/c3b128b1b9865bf191b291fa2a3c2b0584888dfe/docs/decisions/0026-readable-evidence-and-action-budget.md)
+   pins OpenCode, Goose and Aider source/tests and the DeepSeek protocol. The correction removes
+   nested model-visible JSON around read source, preserves numbered source/metadata/continuation
+   under existing bounds, and reports the last tool opportunity before the final no-tool request.
+   It adds neither a framework nor a universal factual verifier. Local bounded-concurrency tests
+   passed 1993/1993; the unchanged default Linux CI passed 1992 with one existing platform skip,
+   all conformance steps and package acceptance. The owner's installed runtime passed three
+   synthetic mechanism scenarios. Those results do not certify autonomous factual correctness.
+
 The [upstream source comparison](research/2026-10-26-agent-navigation.md) supports improving the
 tool contract and measurement together. It does not justify a new agent core, universal factual
 verifier, mandatory subagents, full-repository graph or larger request allowance.
@@ -131,9 +141,11 @@ PR #26, while product work continues in PR #25. No new stacked PR or automatic m
 | 3 — later user workflows | Establish controlled editing, long-session fidelity and online-research outcomes | Independently verify modification/checks/review/undo; retained facts and unfinished work across resume/compaction; and actual service/source quality for online research. Each outcome needs its own bounded task and evidence; the current offline tool work does not close these gaps. |
 
 Level 1 and the bounded level-2 diagnostic are delivered. General task quality is still unproven.
-The next improvement must address a reproduced contradiction in answer construction or a verified
-action-ordering defect. This run does not justify another navigation interface, prompt patch or
-relaxation of final-tool protection. Level 3 has not started; this eight-request grant is exhausted.
+The installed follow-up addresses source presentation and action-opportunity reporting, with
+[implementation, CI and installation evidence](https://github.com/Peerframe/moyyi/pull/25).
+It preserves final-tool protection and does not introduce task-specific answer hints. Live
+acceptance of the native wire format and unchanged task criteria remains a separate gate; the
+previous eight-request grant is exhausted. Level 3 has not started.
 
 Level 1 preserves `contextLines` 0–20, every existing request/input/output/scan/time limit,
 Flash + Responses + low, and the original six criteria. It changes the existing guarded file

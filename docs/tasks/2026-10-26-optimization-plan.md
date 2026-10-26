@@ -25,7 +25,7 @@ Owner 已授权先做整体计划，再针对已证实的缺口优化。本计�
 PR #25 交付记录 `8b74bed`；[完整证据](https://github.com/Peerframe/moyyi/blob/8b74bed/docs/tasks/2026-10-26-investigation-navigation.md)。
 默认 check 1929/1929、文件场景 13/13、指令场景 31/31、DeepSeek 离线 18/18，
 实现 CI 全通过；干净安装包 238 文件逐字节匹配，本机五个导航场景 5/5。
-本机已更新到该产品提交，原配置/数据保留，Flash + Responses + low 不变。
+该轮本机更新到该产品提交；后续安装版本见下方修复。原配置/数据保留，Flash + Responses + low 不变。
 
 第一层关闭了精确文件、筛选、文件发现、可操作错误四类缺口，该轮没有付费调用。
 第二步已执行两道固定真实任务，见[完整结果](https://github.com/Peerframe/moyyi/blob/6eeb61ef0881d4dc4db85e0c54c62281c62fb6c7/docs/tasks/2026-10-26-fixed-multitask-evaluation.md)：
@@ -37,6 +37,20 @@ PR #25 交付记录 `8b74bed`；[完整证据](https://github.com/Peerframe/moyy
 通过。本轮真实运行已显式low，不能把helper修复当作事实错误根因。此修复不进入运行包；
 新干净包与本机238文件逐字节一致，CLI正常，host字节未变，无需重复安装同包。
 第二层的有界诊断已交付，任务可靠性尚未达标；第三层用户成果未开始。
+
+Owner 随后要求实际查 GitHub 并完成优化。产品提交 `c3b128b1b9865bf191b291fa2a3c2b0584888dfe`
+已经落实并安装：[ADR 0026](https://github.com/Peerframe/moyyi/blob/c3b128b1b9865bf191b291fa2a3c2b0584888dfe/docs/decisions/0026-readable-evidence-and-action-budget.md)
+固定 OpenCode、Goose、Aider 的源码与测试版本。fs read 现在分开元数据和编号原文；DeepSeek
+使用原生文本数组消除模型可见的重复 JSON 包装；预算 notice 明示最后工具机会，保留最终
+none 和硬限额。不是针对原题塞答案，没有复制上游代码、增加框架或改变模型/档位。
+
+本机限定并发完整测试1993/1993；[原CI](https://github.com/Peerframe/moyyi/actions/runs/40289557220)
+全部通过（Linux1992通过/1既有平台跳过），原conformance与打包门槛保留。本机默认check的
+已修CLI容量回归和既有并发超时也保留在PR记录，未扩大容量/超时或删断言。干净包241文件
+逐字节匹配本机，CLI10/client10/PTY5、安装版3场景和实际已有会话恢复/help/exit通过；
+新安装SHA为 `ea42056f9eabafe42f8096036b0c10b50da65e028ad83d3967ca6817d25b740a`。
+这些是产品行为证据，不能当成模型事实正确率。旧8次账本封存，新真实试验需独立授权。
+
 PR #25/#26 均未合并，没有公开发布。下文保留约定的范围与验收条件。
 
 ## 整体路径与判断依据
