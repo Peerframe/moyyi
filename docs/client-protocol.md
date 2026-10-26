@@ -53,7 +53,12 @@ across a process or network boundary must supply its own authenticated transport
 the TypeScript union is not an untrusted-wire validator.
 
 Tool results and effect states describe observed execution. A denied edit leaves the file intact;
-a completed conversation can still contain denied or failed tools. Unknown external/process effects
+a completed conversation can still contain denied or failed tools. Token-capped early responses
+return `budget_exhausted` with budget `model_output_tokens`; empty or otherwise incomplete early
+answers return `failed`. The final reserved request retains `model_requests` exhaustion semantics.
+These outcomes preserve partial content and usage, persist an interrupted run and do not trigger
+automatic continuation. `completed` is protocol completion, not a task-quality verdict. See
+[ADR 0034](decisions/0034-incomplete-response-outcomes.md). Unknown external/process effects
 remain unresolved rather than being silently replayed on restart. See the
 [architecture](architecture.md), [write](writes.md), [shell](shell.md) and [web](web.md) boundaries.
 

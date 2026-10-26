@@ -691,7 +691,14 @@ export class AgentCore {
             })),
           });
         if (run.controller.signal.aborted) break;
-        if (!response.error) {
+        const completeStop = ["end_turn", "refusal"].includes(response.stopReason);
+        const hasAnswer = response.parts.some(
+          (part) =>
+            (part.type === "text" || part.type === "refusal") && part.text.trim().length > 0,
+        );
+        // A stream terminal is not necessarily a complete answer. Pending steering remains
+        // recorded, but cannot turn a truncated/empty response into an automatic continuation.
+        if (!response.error && completeStop && hasAnswer && calls.length === 0) {
           await run.queue;
           if (run.pendingSteering > 0 || run.steeringRevision > consumedSteering) {
             retries = 0;
@@ -699,19 +706,24 @@ export class AgentCore {
           }
         }
         run.finishing = true;
-        if (
-          finalRequest &&
-          !response.error &&
-          (!["end_turn", "refusal"].includes(response.stopReason) ||
-            !response.parts.some(
-              (part) =>
-                (part.type === "text" || part.type === "refusal") && part.text.trim().length > 0,
-            ))
-        )
+        if (finalRequest && !response.error && (!completeStop || !hasAnswer))
           return { kind: "budget_exhausted", budget: "model_requests" };
-        return response.error
-          ? { kind: "failed", reason: response.error.message }
-          : { kind: "completed" };
+        if (response.error) return { kind: "failed", reason: response.error.message };
+        if (response.stopReason === "max_tokens")
+          return { kind: "budget_exhausted", budget: "model_output_tokens" };
+        if (!completeStop)
+          return {
+            kind: "failed",
+            reason: `Model response did not complete (stop reason: ${response.stopReason})`,
+          };
+        if (calls.length)
+          return {
+            kind: "failed",
+            reason: "Model response ended without completing its tool calls",
+          };
+        if (!hasAnswer)
+          return { kind: "failed", reason: "Model response contained no answer text" };
+        return { kind: "completed" };
       }
       retries = 0;
       const host: ExecutionHost = {

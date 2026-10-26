@@ -177,7 +177,7 @@ try {
     ),
   );
   for (const [key, count] of [
-    ["cli", 10],
+    ["cli", 12],
     ["client", 12],
     ["documents", 9],
   ] as const) {

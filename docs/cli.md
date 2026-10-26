@@ -144,6 +144,13 @@ apply. Reasoning is retained by the runtime but not printed by this client. Outp
 control characters and bidirectional formatting are escaped. This is a readline terminal client,
 not a full-screen TUI. No command is executed from model/file content.
 
+`run | completed` means a complete response was received, not that its facts or task results
+were independently verified. A truncated response is retained but ends with a nonzero one-shot
+exit, even when requests remain: `budget exhausted: model_output_tokens`. Empty or otherwise
+incomplete answers similarly fail without an automatic retry. The final reserved request keeps
+the existing `model_requests` exhaustion diagnosis. A complete refusal or an honest partial-work
+report can still complete the response protocol; inspect its content and actual results.
+
 ## Explicit development plugins
 
 ```sh

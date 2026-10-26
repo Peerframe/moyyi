@@ -746,6 +746,115 @@ describe("runtime core with real SQLite persistence", () => {
     expect(test.client.requests).toHaveLength(1);
   });
 
+  it.each([
+    { label: "empty", text: "", stopReason: "end_turn" as const },
+    { label: "whitespace", text: " \n\t", stopReason: "end_turn" as const },
+    { label: "reasoning-only", text: "Unfinished reasoning", stopReason: "end_turn" as const },
+    { label: "truncated", text: "Unfinished answer", stopReason: "max_tokens" as const },
+    { label: "unknown stop", text: "Unproven answer", stopReason: "other" as const },
+    { label: "interrupted stop", text: "Partial answer", stopReason: "interrupted" as const },
+  ])(
+    "does not report a $label pre-final response as completed",
+    async ({ label, text, stopReason }) => {
+      const usage = {
+        status: "final" as const,
+        inputTokens: 17,
+        outputTokens: 9,
+        cacheReadTokens: 3,
+        cacheWriteTokens: null,
+        reasoningTokens: label === "reasoning-only" ? 9 : 0,
+      };
+      const part =
+        label === "reasoning-only"
+          ? { type: "reasoning" as const, kind: "visible" as const, text }
+          : { type: "text" as const, text };
+      const providerStopReason = { status: stopReason, source: "synthetic-terminal" };
+      const selected = syntheticTool();
+      const test = await harness(
+        [
+          [
+            { type: "part_completed", index: 0, part },
+            { ...done, stopReason, providerStopReason, usage },
+          ],
+          finalTurn("Must remain unused"),
+        ],
+        [selected],
+        { limits: { maxModelRequests: 3, maxRetries: 2 } },
+      );
+      await test.start();
+      expect(await test.finish()).toEqual(
+        stopReason === "max_tokens"
+          ? { kind: "budget_exhausted", budget: "model_output_tokens" }
+          : {
+              kind: "failed",
+              reason:
+                stopReason === "end_turn"
+                  ? "Model response contained no answer text"
+                  : `Model response did not complete (stop reason: ${stopReason})`,
+            },
+      );
+      expect(test.client.requests).toHaveLength(1);
+      expect(test.client.requests[0]?.toolChoice).toBeUndefined();
+      expect(test.client.remaining).toBe(1);
+      expect(test.scheduler.sleep).not.toHaveBeenCalled();
+      expect(selected.prepare).not.toHaveBeenCalled();
+      expect(selected.execute).not.toHaveBeenCalled();
+      const snapshot = await test.snapshot();
+      expect(snapshot.runs[0]?.status).toBe("interrupted");
+      expect(snapshot.effects).toEqual([]);
+      expect(results(snapshot)).toEqual([]);
+      const assistant = snapshot.entries.filter((entry) => entry.body.kind === "assistant_message");
+      expect(assistant).toHaveLength(1);
+      expect(assistant[0]?.body).toMatchObject({
+        content: [part],
+        stopReason,
+        providerStopReason,
+        usage,
+      });
+      expect(
+        snapshot.entries.some(
+          (entry) => entry.body.kind === "notice" && entry.body.code === "model_retry",
+        ),
+      ).toBe(false);
+    },
+  );
+
+  it("fails a pre-final end_turn with proposed calls without executing them", async () => {
+    const selected = syntheticTool();
+    const proposed = call();
+    const test = await harness(
+      [
+        [
+          { type: "part_completed", index: 0, part: proposed },
+          { type: "part_completed", index: 1, part: { type: "text", text: "Claimed complete" } },
+          done,
+        ],
+        finalTurn("Must remain unused"),
+      ],
+      [selected],
+      { limits: { maxModelRequests: 3 } },
+    );
+    await test.start();
+    expect(await test.finish()).toEqual({
+      kind: "failed",
+      reason: "Model response ended without completing its tool calls",
+    });
+    expect(test.client.requests).toHaveLength(1);
+    expect(test.client.remaining).toBe(1);
+    expect(selected.prepare).not.toHaveBeenCalled();
+    expect(selected.execute).not.toHaveBeenCalled();
+    const snapshot = await test.snapshot();
+    expect(snapshot.runs[0]?.status).toBe("interrupted");
+    expect(snapshot.effects).toEqual([]);
+    expect(results(snapshot)).toMatchObject([{ callId: proposed.callId, status: "failed" }]);
+    expect(
+      snapshot.entries.find((entry) => entry.body.kind === "assistant_message")?.body,
+    ).toMatchObject({
+      content: [proposed, { type: "text", text: "Claimed complete" }],
+      stopReason: "end_turn",
+    });
+  });
+
   it("accepts an explicit final refusal without manufacturing task success evidence", async () => {
     const test = await harness(
       [
@@ -764,6 +873,32 @@ describe("runtime core with real SQLite persistence", () => {
     await test.start();
     expect(await test.finish()).toEqual({ kind: "completed" });
     expect((await test.snapshot()).effects).toHaveLength(0);
+  });
+
+  it("accepts a nonblank pre-final refusal without consuming another request", async () => {
+    const test = await harness(
+      [
+        [
+          {
+            type: "part_completed",
+            index: 0,
+            part: { type: "refusal", text: "I cannot do that." },
+          },
+          { ...done, stopReason: "refusal" },
+        ],
+        finalTurn("Must remain unused"),
+      ],
+      undefined,
+      { limits: { maxModelRequests: 3 } },
+    );
+    await test.start();
+    expect(await test.finish()).toEqual({ kind: "completed" });
+    expect(test.client.requests).toHaveLength(1);
+    expect(test.client.remaining).toBe(1);
+    const snapshot = await test.snapshot();
+    expect(snapshot.runs[0]?.status).toBe("completed");
+    expect(snapshot.effects).toEqual([]);
+    expect(results(snapshot)).toEqual([]);
   });
 
   it("counts a transient failure before closeout and never retries a final failure", async () => {
@@ -908,6 +1043,71 @@ describe("runtime core with real SQLite persistence", () => {
           ),
         ),
       ).toBe(true);
+    } finally {
+      unblock.resolve();
+    }
+  });
+
+  it("retains accepted steering but does not continue after a truncated response", async () => {
+    const selected = syntheticTool();
+    const text = "Only the start of an answer.";
+    const steering = "Please address this newly supplied requirement.";
+    const test = await harness(
+      [
+        [
+          { type: "text_delta", index: 0, text },
+          { type: "part_completed", index: 0, part: { type: "text", text } },
+          { ...done, stopReason: "max_tokens" },
+        ],
+        finalTurn("Must remain unused"),
+      ],
+      [selected],
+      { limits: { maxModelRequests: 3 } },
+    );
+    const unblock = Promise.withResolvers<void>();
+    const delta = Promise.withResolvers<void>();
+    const original = test.client.stream.bind(test.client);
+    test.client.stream = async function* (request, signal) {
+      for await (const event of original(request, signal)) {
+        if (event.type === "part_completed") await unblock.promise;
+        yield event;
+      }
+    };
+    test.runtime.subscribe((event) => {
+      if (event.type === "assistant.delta") delta.resolve();
+    });
+    const runId = await test.start();
+    try {
+      await delta.promise;
+      await test.runtime.send({
+        type: "run.steer",
+        runId,
+        input: [{ type: "text", text: steering }],
+      });
+      expect(test.events.some((event) => event.type === "command.rejected")).toBe(false);
+      unblock.resolve();
+      expect(await test.finish()).toEqual({
+        kind: "budget_exhausted",
+        budget: "model_output_tokens",
+      });
+      expect(test.client.requests).toHaveLength(1);
+      expect(test.client.remaining).toBe(1);
+      expect(selected.prepare).not.toHaveBeenCalled();
+      expect(selected.execute).not.toHaveBeenCalled();
+      const snapshot = await test.snapshot();
+      expect(snapshot.runs[0]?.status).toBe("interrupted");
+      expect(snapshot.effects).toEqual([]);
+      expect(
+        snapshot.entries
+          .filter((entry) => entry.body.kind === "user_message")
+          .map((entry) => entry.body),
+      ).toMatchObject([
+        { content: [{ type: "text", text: "Inspect this." }], steering: false },
+        { content: [{ type: "text", text: steering }], steering: true },
+      ]);
+      expect(
+        snapshot.entries.find((entry) => entry.body.kind === "assistant_message")?.body,
+      ).toMatchObject({ content: [{ type: "text", text }], stopReason: "max_tokens" });
     } finally {
       unblock.resolve();
     }

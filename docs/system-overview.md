@@ -49,6 +49,8 @@ and the referenced PR before changing code. No current authorization is inferred
 | New daily artifact sample | Installed `351126b`, three previously unexecuted public tasks, original 15-request/180s budgets | 17 HTTP200 requests, zero retries: quoted CSV 6, exact worksheet edit 7, conflicting ledger 4. CSV and worksheet pass their original checkers with actual file/readback evidence. The ledger fails the original checker while honestly reporting partial/blocked; its visible instruction did not explicitly forbid a partial ledger or specify JSON field hierarchy, so attribution includes a task-specification gap. Old scores remain unchanged. |
 | Clarified ledger diagnostic | Same installation, one separately labeled post-hoc trial; same fixture/checker/budget | Four HTTP200 requests, zero retries. General publication and top-level-field requirements were added without giving conflict facts. No ledger was produced and the final answer honestly reports blocked. The report still fails: it assigns source-a's INV-001 amount of 80.00 to INV-002 despite complete evidence that source-a.csv lists INV-002 as 120.00. Array-vs-string checker failures remain partly underspecified; the wrong amount independently establishes factual failure. Do not include this variant in original-corpus scores or repeat it until green. |
 | Frozen decision-point effort diagnostic | Same installation; two historical request bodies, each continued once with low/none | Four HTTP200 requests, zero retries; wire pairs differ only in effort. Neither Skills arm proposes the targeted missing reader/core reads. Ledger low lists both source amounts correctly; none proposes contradictory duplicate `total` keys. All eight returned tool calls remain data, with zero execution/follow-up. This is not a task rerun, original score or evidence of stable effort superiority; default low remains. |
+| Autonomous model control | Installed `351126b`; same fixed source/task, separate fresh Flash/Pro sessions, four requests each | Eight HTTP200 requests, zero retries. All 19 tool results reached the next request; source unchanged. Both fail the original rubric: Flash 1/3/4/5 met and 2/6 partial; Pro 3/5 met and 1/2/4/6 partial, with three additional mistakes about delivered code. First requests differ only by model; later autonomous inputs differ. This private provider control does not add builtin Pro support or justify a default switch. |
+| Response-completion candidate | [ADR 0034](decisions/0034-incomplete-response-outcomes.md), based on main `77667eb` | Whole-lifecycle audit reproduces four early incomplete terminals incorrectly reported as completed. Candidate corrects core outcome, persisted run status and CLI exit without extra requests or changed task scores. Source/package/installation evidence is tracked in the current task record until integration. |
 | Public release | None | Local candidate installation is not npm/GitHub publication or a release tag. |
 
 The merged public corpus has 32 tasks. Two new fixed document tasks are prepared as a separate
@@ -178,6 +180,17 @@ The owner's latest direction is to diagnose the complete task path before choosi
 Across the current evidence, interpretation/selection mistakes after full source delivery are
 separate from execution defects and from human-client usability. Another same-question prompt
 change or larger retrieval budget is not a supported general remedy.
+
+**Current delivery: honest response-completion status.** The new independent autonomous model
+control closes the model-switch hypothesis for this sample without a quality gain: keep Flash,
+Responses and low, preserve both failures and do not repeat the question until green. Auditing
+the complete lifecycle then found an engineering defect outside retrieval: early truncated or
+blank responses could persist as completed and exit zero. [ADR 0034](decisions/0034-incomplete-response-outcomes.md)
+corrects that shared boundary. Its exit condition is passing source, decoder/replay, external
+CLI, CI and actual-install checks, with no extra model call or changed task criterion. This fixes
+misleading completion, not the semantic errors in the two normally completed control answers.
+Further accuracy work must target a separately demonstrated interpretation/verification gap;
+neither a generic stop hook nor a symbol index is yet justified as its solution.
 
 [PR #31](https://github.com/Peerframe/moyyi/pull/31) closes the human-client gap: discover work after
 restarting, inspect recorded file/snapshot/process results, then resume under current permissions.

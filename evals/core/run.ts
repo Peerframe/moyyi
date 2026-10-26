@@ -357,6 +357,51 @@ const scenarios: readonly Scenario[] = [
     limits: { maxModelRequests: 1 },
     check: checkNoFinalAnswer,
   },
+  ...(["end_turn", "max_tokens", "other", "interrupted"] as const).map(
+    (stopReason): Scenario => ({
+      id: `early-${stopReason}-without-complete-answer`,
+      responses: [
+        [
+          {
+            type: "part_completed",
+            index: 0,
+            part: { type: "text", text: stopReason === "end_turn" ? " \n" : "Partial answer" },
+          },
+          terminal(stopReason),
+        ],
+        finalAnswer,
+      ],
+      limits: { maxModelRequests: 4, maxRetries: 2 },
+      check(observation) {
+        noExecution(observation);
+        assert.equal(observation.evidence.modelRequests, 1);
+        assert.deepEqual(observation.retryDelays, []);
+        assert.deepEqual(
+          observation.evidence.outcome,
+          stopReason === "max_tokens"
+            ? { kind: "budget_exhausted", budget: "model_output_tokens" }
+            : {
+                kind: "failed",
+                reason:
+                  stopReason === "end_turn"
+                    ? "Model response contained no answer text"
+                    : `Model response did not complete (stop reason: ${stopReason})`,
+              },
+        );
+        const assistant = observation.entries.find(
+          (entry) => entry.body.kind === "assistant_message",
+        );
+        assert.equal(assistant?.body.kind, "assistant_message");
+        if (assistant?.body.kind === "assistant_message") {
+          assert.equal(assistant.body.stopReason, stopReason);
+          assert.deepEqual(assistant.body.usage, UNKNOWN_USAGE);
+          assert.deepEqual(assistant.body.content, [
+            { type: "text", text: stopReason === "end_turn" ? " \n" : "Partial answer" },
+          ]);
+        }
+      },
+    }),
+  ),
   {
     id: "retry-consumes-allowance-before-final-answer",
     responses: [[transient(false)], call(), finalAnswer],

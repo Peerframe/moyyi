@@ -11,7 +11,12 @@ import {
   successfulFixtures,
 } from "../evals/deepseek/scenario.ts";
 import { fileResultValue } from "../evals/support/file-result.ts";
-import type { FileRead, RunOutcome, SessionId } from "../src/contracts/index.ts";
+import {
+  type FileRead,
+  type RunOutcome,
+  type SessionId,
+  UNKNOWN_USAGE,
+} from "../src/contracts/index.ts";
 import { deepSeekFixture } from "../src/plugins/provider-deepseek/fixtures.ts";
 import { DEEPSEEK_API_PROFILE, deepSeekProfile } from "../src/plugins/provider-deepseek/index.ts";
 import { createRuntime } from "../src/runtime/index.ts";
@@ -162,23 +167,110 @@ describe("DeepSeek fixture transport through runtime, files, recording and repla
     expect(result.first.events.some((event) => event.type === "approval.requested")).toBe(false);
   });
 
-  it("records and replays an incomplete model response without retry or tool execution", async () => {
-    const response = deepSeekFixture([{ type: "message", text: "Only a partial answer." }], {
-      responseId: "fixture_partial",
-      status: "incomplete",
-      incompleteReason: "max_output_tokens",
-      usage: null,
-    });
-    const result = await runRoundTrip({ responses: [response] });
-    assertEquivalent(result);
-    expect(result.first.results).toEqual([]);
-    expect(result.records).toHaveLength(1);
-    expect(result.records[0]?.events.at(-1)).toMatchObject({
-      type: "completed",
-      stopReason: "max_tokens",
-      usage: { status: "unknown" },
-    });
-  });
+  it.each([
+    {
+      label: "reported",
+      usage: undefined,
+      expectedUsage: {
+        status: "final",
+        inputTokens: 20,
+        outputTokens: 8,
+        cacheReadTokens: 4,
+        cacheWriteTokens: null,
+        reasoningTokens: 3,
+      },
+    },
+    { label: "unknown", usage: null, expectedUsage: UNKNOWN_USAGE },
+  ])(
+    "records and replays a pre-final output cap with $label usage without retry or execution",
+    async ({ usage, expectedUsage }) => {
+      const response = deepSeekFixture([{ type: "message", text: "Only a partial answer." }], {
+        responseId: "fixture_partial",
+        status: "incomplete",
+        incompleteReason: "max_output_tokens",
+        usage,
+      });
+      const result = await runRoundTrip({ responses: [response] });
+      assertEquivalent(result);
+      expect(result.first.outcome).toEqual({
+        kind: "budget_exhausted",
+        budget: "model_output_tokens",
+      });
+      expect(result.first.results).toEqual([]);
+      expect(result.first.effectStates).toEqual([]);
+      expect(result.records).toHaveLength(1);
+      expect(result.wireRequests).toHaveLength(1);
+      expect(result.wireRequests[0]?.tool_choice).not.toBe("none");
+      expect(result.records[0]?.events.at(-1)).toMatchObject({
+        type: "completed",
+        stopReason: "max_tokens",
+        usage: expectedUsage,
+      });
+      for (const session of [result.first, result.replay]) {
+        const assistant = session.entries.filter(
+          (entry) => entry.body.kind === "assistant_message",
+        );
+        expect(assistant).toHaveLength(1);
+        expect(assistant[0]?.body).toMatchObject({
+          content: [{ type: "text", text: "Only a partial answer." }],
+          stopReason: "max_tokens",
+          providerStopReason: {
+            status: "incomplete",
+            incompleteReason: "max_output_tokens",
+            responseId: "fixture_partial",
+          },
+          usage: expectedUsage,
+        });
+        expect(
+          session.entries.some(
+            (entry) => entry.body.kind === "notice" && entry.body.code === "model_retry",
+          ),
+        ).toBe(false);
+      }
+    },
+  );
+
+  it.each([
+    { label: "empty", items: [], content: [] },
+    {
+      label: "whitespace",
+      items: [{ type: "message" as const, text: " \n\t" }],
+      content: [{ type: "text", text: " \n\t" }],
+    },
+    {
+      label: "reasoning-only",
+      items: [{ type: "reasoning" as const, text: "Unfinished reasoning" }],
+      content: [{ type: "reasoning", text: "Unfinished reasoning" }],
+    },
+  ])(
+    "records and replays a failed $label completed stream instead of reporting task completion",
+    async ({ items, content }) => {
+      const result = await runRoundTrip({ responses: [deepSeekFixture(items)] });
+      assertEquivalent(result);
+      expect(result.first.outcome).toEqual({
+        kind: "failed",
+        reason: "Model response contained no answer text",
+      });
+      expect(result.first.results).toEqual([]);
+      expect(result.first.effectStates).toEqual([]);
+      expect(result.records).toHaveLength(1);
+      expect(result.wireRequests).toHaveLength(1);
+      expect(result.records[0]?.events.at(-1)).toMatchObject({
+        type: "completed",
+        stopReason: "end_turn",
+      });
+      for (const session of [result.first, result.replay]) {
+        expect(
+          session.entries.find((entry) => entry.body.kind === "assistant_message")?.body,
+        ).toMatchObject({
+          content,
+          stopReason: "end_turn",
+          providerStopReason: { status: "completed", incompleteReason: null },
+          usage: { status: "final", inputTokens: 20, outputTokens: 8 },
+        });
+      }
+    },
+  );
 
   it("records a broken SSE prefix as partial error and faithfully replays its failed outcome", async () => {
     const response = deepSeekFixture([{ type: "message", text: "Retain this partial text." }]);

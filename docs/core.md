@@ -14,7 +14,7 @@ tool result, sends it back to the model, and prints the final answer. It uses an
 temporary SQLite directory. It performs no model API request, no real file-tool operation and
 no network operation. The answer is scripted; this demonstrates execution, not model intelligence.
 
-The fault eval reports 21 deterministic protocol/lifecycle scenarios and writes synthetic
+The fault eval reports 25 deterministic protocol/lifecycle scenarios and writes synthetic
 evidence to ignored `evals/results/core.json`. It observes committed events and reloads entries
 through the client protocol; direct database and real-process crash checks are in the tests.
 It does not load `evals/private`, change public-task checkers, or claim a public-corpus score.
@@ -27,6 +27,14 @@ can only answer from existing context. Empty/truncated/tool-only final responses
 exhaustion; a complete answer may honestly describe partial results. Protocol completion is not
 a task-quality score. Cancellation and other resource limits can still prevent an answer.
 See [ADR 0021](decisions/0021-request-budget-closeout.md) for recording and provider compatibility.
+
+The same completeness requirement applies before the last request. A token-capped response stops
+with `budget_exhausted: model_output_tokens`; an empty/reasoning-only answer, unknown terminal
+or uncompleted tool proposals fail the run. Partial content, usage and the original stop reason
+remain recorded. There is no automatic retry or continuation, including for pending steering;
+accepted steering remains in history. Valid completed responses keep ordinary steering behavior.
+See [ADR 0034](decisions/0034-incomplete-response-outcomes.md). This diagnoses an incomplete
+response, not the truth or completeness of its claims.
 
 ## Runtime API
 
