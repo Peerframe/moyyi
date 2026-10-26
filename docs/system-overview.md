@@ -28,9 +28,9 @@ and the referenced PR before changing code. No current authorization is inferred
 |---|---|---|
 | Merged product baseline | `b2d4790fda242d2ff8ba7bc3f8306bc2e06743a9`, through [PR #24](https://github.com/Peerframe/moyyi/pull/24) | Includes core/store/CLI, file writes, native process sandbox, web, Skills, runtime evals and bounded request closeout. |
 | Unmerged product candidate | [PR #25](https://github.com/Peerframe/moyyi/pull/25), reviewed product `c3b128b1b9865bf191b291fa2a3c2b0584888dfe` | Range reads, evidence guidance, configurable reasoning, search context, exact-file/filter/files-mode navigation, safe schema errors and two additional source tasks. The eval host preserves explicit reasoning effort. Native numbered source evidence and explicit remaining tool opportunities now extend this candidate; API profile v2 prevents mixing old recordings. These are not merged-main capabilities. |
-| Unmerged documentation candidate | [PR #26](https://github.com/Peerframe/moyyi/pull/26), plan baseline `381bbf142fc22828d89f5057177d9a9a4bcc4609`; this update records the subsequent product correction | The system entry and the current optimization plan are delivered here. Product optimization continues in existing PR #25; neither PR is merged or stacked on the other. |
+| Unmerged documentation candidate | [PR #26](https://github.com/Peerframe/moyyi/pull/26), plan baseline `b846e45842d7ac33fd85239454c411522cc8a05c`; this update records the installed correction’s live follow-up | The system entry and the current optimization plan are delivered here. Product optimization continues in existing PR #25; neither PR is merged or stacked on the other. |
 | Owner's installed candidate | Product `c3b128b1b9865bf191b291fa2a3c2b0584888dfe`; package SHA256 `ea42056f9eabafe42f8096036b0c10b50da65e028ad83d3967ca6817d25b740a` | [Clean package, 241 installed-file identities and three installed source/action-budget scenarios passed](https://github.com/Peerframe/moyyi/pull/25). Actual CLI resume/help/exit also passed; no live API request was used for these checks. Host uses Flash + Responses + low; the ordinary read-only host's three-request limit is separate from the eight-request acceptance run. This is a local configuration, not a library default. |
-| Latest autonomous investigations | [Fixed two-task result](https://github.com/Peerframe/moyyi/blob/6eeb61ef0881d4dc4db85e0c54c62281c62fb6c7/docs/tasks/2026-10-26-fixed-multitask-evaluation.md) | Eight requests total, four per task, zero retries, Flash/Responses/low. Original six criteria **not passed**: incomplete consumers and false claims despite delivered evidence. Public dataflow facts are correct, but required report file is absent: official failure. This is not an equal-budget comparison with the original historical eight-request task. |
+| Latest autonomous investigations | [Live follow-up on the installed correction](https://github.com/Peerframe/moyyi/blob/a04707c1ca37f35d7f1d1d916b4a44c84f128318/docs/tasks/2026-10-26-readable-evidence.md) | Eight newly authorized requests total, four per task, zero retries, Flash/Responses/low. Native tool-text continuation accepted. Original six criteria: three pass, three partial, overall failure, plus an incorrect default-policy inference. Public 11 facts correct, required report absent: official failure. Both source snapshots unchanged. The grant is exhausted; one run each is not stability evidence or the original historical eight-request task budget. |
 | Public release | None | Local candidate installation is not npm/GitHub publication or a release tag. |
 
 The corpus has 30 tasks on this main baseline; PR #25 adds two. Reference/checker tests and scripted
@@ -75,7 +75,7 @@ recovery and cancellation apply throughout the loop, not only after an answer.
 | User outcome | Entry and dependencies | Available evidence | Remaining limit |
 |---|---|---|---|
 | Start, resume and use a local agent | [CLI](cli.md), explicit host, Node/toolchain, credentials for live use | [Installed CLI/PTY/client acceptance](installation.md); a bounded DeepSeek file/tool continuation passed after #19 | Setup still requires trusted host configuration. A successful connection is not task competence. |
-| Inspect a project and explain its behavior | File tools, instructions, context, provider and final answer | Real tool continuation and bounded final closeout; candidate source windows, exact scopes, filters and discovery outputs are verified against actual files | Fixed two-task diagnostic available; original factual criteria still fail. One trial per task is not a representative reliability baseline. |
+| Inspect a project and explain its behavior | File tools, instructions, context, provider and final answer | Real tool continuation and bounded final closeout; candidate source windows, exact scopes, filters and discovery outputs are verified against actual files | The latest live follow-up still fails the full original criteria and public file delivery. Native tool-text transport is accepted; one trial per task is not a reliability baseline. |
 | Change files, inspect changes and undo | [Write grant, approvals, snapshots](writes.md); shell grant if checks need a process | Real filesystem/SQLite offline checks, conflict/revocation/recovery cases | No comparable end-to-end live-model project-edit score. The owner's normal host remains read-only. |
 | Run commands and stop them | [Shell plugin](shell.md), explicit process grants, supported native sandbox/toolchain | Native-process conformance and documented platform tests | macOS detached descendants/host hard-kill limitations remain. Docker is a planned optional adapter, not an implemented fallback. |
 | Continue long work without losing state | [Store and long sessions](long-sessions.md), resume, explicit compaction | Crash/recovery tests and scripted compaction lifecycle; local resume startup verified | Real-model summary fidelity, long-task quality and cache savings are unmeasured. |
@@ -100,20 +100,24 @@ recovery and cancellation apply throughout the loop, not only after an answer.
    file-pattern filtering, files-only discovery and safe field errors are implemented in `520ef82`.
    Offline and installed checks remain valid. The fixed two-task run exercised the new discovery,
    filtering and exact-file interfaces successfully; that does not establish task correctness.
-2. **Evidence selection and interpretation both remain incomplete.** The original question missed
-   final consumers, but also contradicted complete raw-text preservation evidence already delivered.
-   It asserted a metadata check was absent without reading its implementation. The public task read
-   all inputs and explained them correctly, yet spent all tool-enabled rounds finding/reading them
-   and failed to create its report. Keep official task failure separate from answer-only diagnosis.
-3. **Measurement now has a fixed two-task diagnostic, not a reliability score.** Each task received
-   four requests under one eight-request ledger. The original historical ceiling was eight, so this
-   is not a controlled old/new comparison. A source-only eval helper effort omission was fixed and
-   verified offline; all actual trial requests were already low, so it does not explain their failures.
+2. **Full-chain and lifecycle claims remain incomplete after the follow-up.** The current answer
+   correctly distinguishes raw-text preservation from parsed fields and describes real mtime/ctime
+   checks. It still omits runtime/core/render consumers, changing skill selection by rebuilding the
+   runtime, and an explicit no-automatic-references/scripts statement. It also extrapolates the
+   default permission policy without reading it. The original rubric remains three pass/three
+   partial, overall failure; improved individual claims do not establish stable accuracy.
+3. **The public task fails in action ordering, with evidence already available by the final request.**
+   All four inputs arrive intact and the final JSON has eleven correct facts. But source is read
+   only in the third, last tool-capable request; its result first reaches the fourth no-tool request.
+   The model does not create the report despite the last-tool notice. A legitimate four-request
+   sequence exists with the current tools and authority, so neither more tools nor more warnings
+   can be presumed to fix the planning failure. A temporary answer projection passes the checker
+   only as a diagnostic; the actual task remains failed.
 4. **The overall record stays tied to observed results.** This page owns the product snapshot;
    historical briefs are evidence, not a standing queue. Do not claim a new product-quality fix from
    the helper patch, repeat exhausted budgets, or keep expanding search after decisive evidence arrived.
 
-5. **A subsequent product correction is installed, with live quality still separate.**
+5. **A subsequent product correction is installed and its native wire format has live evidence.**
    [ADR 0026](https://github.com/Peerframe/moyyi/blob/c3b128b1b9865bf191b291fa2a3c2b0584888dfe/docs/decisions/0026-readable-evidence-and-action-budget.md)
    pins OpenCode, Goose and Aider source/tests and the DeepSeek protocol. The correction removes
    nested model-visible JSON around read source, preserves numbered source/metadata/continuation
@@ -121,7 +125,7 @@ recovery and cancellation apply throughout the loop, not only after an answer.
    It adds neither a framework nor a universal factual verifier. Local bounded-concurrency tests
    passed 1993/1993; the unchanged default Linux CI passed 1992 with one existing platform skip,
    all conformance steps and package acceptance. The owner's installed runtime passed three
-   synthetic mechanism scenarios. Those results do not certify autonomous factual correctness.
+   synthetic mechanism scenarios. The new eight-request live follow-up accepts native tool text but still fails both task criteria; offline mechanism results do not certify autonomous factual correctness.
 
 The [upstream source comparison](research/2026-10-26-agent-navigation.md) supports improving the
 tool contract and measurement together. It does not justify a new agent core, universal factual
@@ -137,15 +141,15 @@ PR #26, while product work continues in PR #25. No new stacked PR or automatic m
 | Level | User result and deliverable | Exit condition and evidence boundary |
 |---|---|---|
 | 1 — delivered offline in PR #25 | Make source investigation tools select the requested material and explain repairable input errors: exact file/directory scope, bounded include/exclude globs, `files`/`content` search modes and safe field-level schema errors | Real disposable-file/runtime probes establish exact scope, filtering, deduplication, bounded results and actionable errors; denial/revocation/cancellation and existing task checks still pass. This proves tool behavior, not reliable model conclusions. [Implementation and installation evidence](https://github.com/Peerframe/moyyi/blob/8b74bed/docs/tasks/2026-10-26-investigation-navigation.md): default check 1929/1929, file eval 13/13, clean package and installed scenarios 5/5; implementation CI passed. |
-| 2 — fixed diagnostic delivered, quality still failing | Two preselected autonomous tasks: original project question and public source-dataflow-report, four requests each | Original six criteria and public checker unchanged; both tasks fail. Coverage, wrong claims, missing artifact, requests and usage are separately recorded in the fixed result above. Eight requests used and sealed; no remaining authorization. This is one trial each, not equal-budget old/new improvement or reliability evidence. |
+| 2 — fixed diagnostic delivered, quality still failing | Two preselected autonomous tasks: original project question and public source-dataflow-report, four requests each | Original six criteria and public checker unchanged; both the earlier diagnostic and the new installed-correction follow-up fail. Latest original: three pass/three partial plus one unsupported default-policy claim. Latest public: eleven correct facts, no file. Eight new requests used and sealed, no remaining authorization; same four-per-task allocation as the preceding run, still not reliability evidence or a full historical eight-request original-task test. |
 | 3 — later user workflows | Establish controlled editing, long-session fidelity and online-research outcomes | Independently verify modification/checks/review/undo; retained facts and unfinished work across resume/compaction; and actual service/source quality for online research. Each outcome needs its own bounded task and evidence; the current offline tool work does not close these gaps. |
 
 Level 1 and the bounded level-2 diagnostic are delivered. General task quality is still unproven.
 The installed follow-up addresses source presentation and action-opportunity reporting, with
 [implementation, CI and installation evidence](https://github.com/Peerframe/moyyi/pull/25).
-It preserves final-tool protection and does not introduce task-specific answer hints. Live
-acceptance of the native wire format and unchanged task criteria remains a separate gate; the
-previous eight-request grant is exhausted. Level 3 has not started.
+It preserves final-tool protection and does not introduce task-specific answer hints. The native wire format is now accepted in the live follow-up. Full-chain/default-policy verification
+and autonomous discovery/read/write ordering remain unsolved under the unchanged task criteria.
+The new eight-request grant is also exhausted. Level 3 has not started.
 
 Level 1 preserves `contextLines` 0–20, every existing request/input/output/scan/time limit,
 Flash + Responses + low, and the original six criteria. It changes the existing guarded file
