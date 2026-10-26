@@ -17,8 +17,9 @@ Runtime alone reads the complete bounded source through the existing guarded des
 checks identity before/after reading, hashes the snapshot and sends bytes to one fixed parser.
 Neither the plugin nor the model receives the binary. The parser process has a native Seatbelt or
 bubblewrap boundary, a fresh environment and a private scratch directory. It receives fixed Node
-and codec dependencies but no workspace, user home, credentials or network access. No unsandboxed
-fallback exists. Parser failure does not remove ordinary text capabilities. A deadline, output caps,
+and codec dependencies but no workspace, user home, credentials or network access. Only absolute paths from a fresh, clean Node library probe become filesystem grants;
+[Linux vDSO objects](https://manpages.ubuntu.com/manpages/noble/man7/vdso.7.html) have no disk path
+and grant no access. No unsandboxed fallback exists. Parser failure does not remove ordinary text capabilities. A deadline, output caps,
 cancel/revocation polling and confirmed process-group termination bound its lifetime.
 
 Body text and metadata are separate tool-result text parts. Source SHA-256, byte size, normalized

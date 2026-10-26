@@ -91,14 +91,7 @@ export function documentSandbox(worker: string, scratch: string): NativeSandboxP
       maxBuffer: 128 * 1024,
     },
   );
-  const libraries: unknown = JSON.parse(libraryOutput);
-  if (
-    !Array.isArray(libraries) ||
-    libraries.length > 2000 ||
-    libraries.some((p) => typeof p !== "string" || !p.startsWith("/") || p.length > 4096)
-  )
-    throw Error("Document Node library discovery failed");
-  for (const library of libraries as string[]) {
+  for (const library of absoluteLibraryPaths(JSON.parse(libraryOutput))) {
     if (!existsSync(library)) continue; // macOS dyld shared-cache paths need not exist on disk.
     const actual = realpathSync(library);
     files.add(library);
@@ -208,4 +201,17 @@ export function documentSandbox(worker: string, scratch: string): NativeSandboxP
   for (const [key, value] of Object.entries(env)) args.push("--setenv", key, value);
   args.push("--remount-ro", "/", "--", node, ...nodeArgs);
   return { command, args, env, backend: "bubblewrap" };
+}
+
+/** Kernel virtual objects (for example Linux vDSO) are not paths and grant no filesystem access. */
+export function absoluteLibraryPaths(value: unknown): string[] {
+  if (
+    !Array.isArray(value) ||
+    value.length > 2000 ||
+    value.some(
+      (p) => typeof p !== "string" || p.length > 4096 || p.includes("\0") || !p.isWellFormed(),
+    )
+  )
+    throw Error("Document Node library discovery failed");
+  return value.filter((p: string) => p.startsWith("/"));
 }

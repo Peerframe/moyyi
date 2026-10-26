@@ -3,7 +3,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { expect, it, vi } from "vitest";
-import { documentSandbox } from "./document-sandbox.ts";
+import { absoluteLibraryPaths, documentSandbox } from "./document-sandbox.ts";
 
 it("discovers a clean Node closure without inheriting host native addons or loader options", async () => {
   const scratch = await realpath(await mkdtemp(join(tmpdir(), "moyyi-document-closure-")));
@@ -25,4 +25,17 @@ it("discovers a clean Node closure without inheriting host native addons or load
     hostReport.mockRestore();
     await rm(scratch, { recursive: true, force: true });
   }
+});
+
+it("does not treat Linux kernel virtual objects as disk paths", () => {
+  expect(
+    absoluteLibraryPaths([
+      "linux-vdso.so.1",
+      "/lib/x86_64-linux-gnu/libc.so.6",
+      "linux-gate.so.1",
+      "relative.so",
+    ]),
+  ).toEqual(["/lib/x86_64-linux-gnu/libc.so.6"]);
+  expect(() => absoluteLibraryPaths([null])).toThrow("discovery failed");
+  expect(() => absoluteLibraryPaths(["/bad\0name"])).toThrow("discovery failed");
 });
