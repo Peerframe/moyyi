@@ -1,6 +1,6 @@
 # ADR 0033: Distinguish confirmed missing reads from changed targets
 
-Date: 2026-10-27. Status: implemented candidate; installation and live acceptance pending.
+Date: 2026-10-27. Status: implemented and installed; bounded live follow-up recorded.
 
 ## Whole-task evidence
 
@@ -70,4 +70,14 @@ Source verification: `npm run check` passes 110 files / 2,380 tests.
 `npm run eval:files` passes 17/17 scenarios, including the four-request missing/discover/read/answer
 sequence and exact next-request propagation. Dedicated absence/boundary tests pass 30/30.
 Installed-client assertions additionally bind each diagnostic/discovery/read result to its call ID;
-external package, CI and the fresh live trial remain separate delivery gates.
+external package and Linux/macOS CI passed, and all 372 installed files match product
+`351126b`. The installed preflight passed eight scripted requests without network or real keys.
+
+The one live follow-up used eight HTTP 200 requests, four per unchanged task, zero retries.
+The public report passed its original file checker with readback. The original Skills task still
+fails its six-item rubric: items 1/3/5 met, 2/4/6 partial. The real reader/core chain was not
+investigated; restart and reference-loading rules already delivered were omitted from the answer.
+Raw-text preservation and revocation are now correctly explained in substance. All fourteen
+original tools succeeded, so no new missing-file diagnosis occurred; changes in the answer cannot
+be attributed to this patch. This closes the bounded diagnostic delivery, not general accuracy.
+See the [current evidence](../tasks/2026-10-26-optimization-plan.md) for package and trial coordinates.

@@ -9,7 +9,7 @@ Owner 已授权先做整体计划，再针对已证实的缺口优化。本计�
 
 ### 当前增量：明确缺失路径与复核证据覆盖（2026-10-27）
 
-PR #31 已合并到`c3b52fc3c4db1a10889bdf7401b22ebb1e33586b`，本机安装产品`106d413`，
+PR #31 已合并到`c3b52fc3c4db1a10889bdf7401b22ebb1e33586b`，作为本轮基线产品`106d413`，
 [main CI](https://github.com/Peerframe/moyyi/actions/runs/40383746672)通过。本轮分支`codex/file-read-diagnostics`。
 逐项重审原题发现：9/9工具结果全部进入最终请求，但reader/core/context实现没读到，不能称整题证据齐全；
 原文保留和撤权的已见源码又被解释错，二者并存。不存在文件和变化目标的通用错误使本次推理猜测瞬态失败，
@@ -19,7 +19,7 @@ PR #31 已合并到`c3b52fc3c4db1a10889bdf7401b22ebb1e33586b`，本机安装产�
 固定失败格式不变，不加入目录猜测、不自动搜索、不改prompt/core/persisted，不提高请求上限。
 其他I/O、别名、撤权/取消、晚期删除或无法确定的情况保持原拒绝/变化/不可用语义，诊断上限32段。
 原成功读取不受诊断深度限制；详见[ADR0033](../decisions/0033-confirmed-missing-read-diagnostics.md)。
-离线完成后，独立安装候选，再只跑一次原题4＋公共题4，保留Flash+Responses+low和原标准/快照。
+本轮已在独立安装候选上执行一次原题4＋公共题4，保留Flash+Responses+low和原标准/快照。
 
 成熟项目对照没有付费开跑：固定OpenCode v1.19.4发布资产经hash核验，在只读原生沙箱和空私有配置中，
 SDK/native开关两种预设条件各发2次本地假Responses请求；实际read结果进入后续请求，但推理正文均未重放。
@@ -29,7 +29,26 @@ SDK/native开关两种预设条件各发2次本地假Responses请求；实际rea
 
 原`npm run check`已通过110文件/2380项，`eval:files`17/17。专属缺失/边界测试30/30；
 源码及安装包新增场景绑定对应call ID，核对明确失败、真实list及完整read均进入下轮，原断言保留。
-新真实runner在独立私有目录准备31项离线门禁测试通过；尚未绑定产品包、未读Key、未发请求。
+[PR #32](https://github.com/Peerframe/moyyi/pull/32) 产品`351126b7d7308c7d2c66e58286123d304babff15`
+的[Linux/macOS CI](https://github.com/Peerframe/moyyi/actions/runs/40388079129)通过。
+`npm run verify:package -- --offline`：CLI10/10、client12/12、documents9/9、PTY7/7、
+依赖图、严格类型/反例、原生隔离与卸载保留数据通过。干净包SHA256
+`d12a349ef1e02f6e0e55368798af840bd5ba5f09c19fa589851ccaf72597240c`已安装，372文件匹配；
+旧PR31包和`~/.moyyi/backups/pre-pr32-2026-10-26T19-41-57.826Z`会话/配置备份保留。
+安装版启动旧会话及/help、/sessions、/results、/exit通过，0模型请求。
+新runner的31项离线门禁通过；绑定实际安装包后的8次合成请求验证缺失恢复、精确送达、拒绝越权与报告读回，
+0网络/0真实Key读取。之后按Owner持续付费授权记录计划绑定，执行唯一一次真实4+4，8次HTTP200、零重试，账本已封存。
+
+真实结果：公共报告按原checker通过，实际创建并读回。原题仍未通过六项全必需标准：
+1/3/5满足，2/4/6部分满足。原文保留和撤权结论本轮正确，不能继续沿用旧错误标签；
+实际reader/core调用链未查完，选择变更需重建runtime、不自动读取引用两个已送达事实遗漏。
+原题14工具均成功，新缺失诊断没有触发，因此不宣称本次代码修复导致回答改善。
+这次同时定位到调查链缺口与答案完整性缺口，不以所有返回结果送达冒充所需证据齐全。
+私有封存记录`~/.moyyi/acceptance/file-read-diagnostics-2026-10-27/`包含原请求/ledger/answer/evidence、
+原rubric与source指纹及独立语义审查。实际8次合计297,079请求字节，4与8均为none收尾；
+原文件/外部canary未变。原题历史8次上限与4+4比较不是等预算，旧失败均保留。
+本次文件诊断切片到此结束；不能为原题转绿重跑，或把剩余调查/表达问题继续归到读取错误。
+
 
 ### 上次增量：重启后找回任务与查看实际成果（2026-10-27）
 
