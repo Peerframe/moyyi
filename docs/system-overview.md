@@ -50,14 +50,17 @@ and the referenced PR before changing code. No current authorization is inferred
 | Clarified ledger diagnostic | Same installation, one separately labeled post-hoc trial; same fixture/checker/budget | Four HTTP200 requests, zero retries. General publication and top-level-field requirements were added without giving conflict facts. No ledger was produced and the final answer honestly reports blocked. The report still fails: it assigns source-a's INV-001 amount of 80.00 to INV-002 despite complete evidence that source-a.csv lists INV-002 as 120.00. Array-vs-string checker failures remain partly underspecified; the wrong amount independently establishes factual failure. Do not include this variant in original-corpus scores or repeat it until green. |
 | Frozen decision-point effort diagnostic | Same installation; two historical request bodies, each continued once with low/none | Four HTTP200 requests, zero retries; wire pairs differ only in effort. Neither Skills arm proposes the targeted missing reader/core reads. Ledger low lists both source amounts correctly; none proposes contradictory duplicate `total` keys. All eight returned tool calls remain data, with zero execution/follow-up. This is not a task rerun, original score or evidence of stable effort superiority; default low remains. |
 | Autonomous model control | Installed `351126b`; same fixed source/task, separate fresh Flash/Pro sessions, four requests each | Eight HTTP200 requests, zero retries. All 19 tool results reached the next request; source unchanged. Both fail the original rubric: Flash 1/3/4/5 met and 2/6 partial; Pro 3/5 met and 1/2/4/6 partial, with three additional mistakes about delivered code. First requests differ only by model; later autonomous inputs differ. This private provider control does not add builtin Pro support or justify a default switch. |
-| Current product and local installation | [PR #34](https://github.com/Peerframe/moyyi/pull/34), product `d988461`; [ADR 0034](decisions/0034-incomplete-response-outcomes.md) | Early incomplete responses no longer persist as completed or exit zero. Check 2,393 tests, core 25/25, external package and [Linux/macOS CI](https://github.com/Peerframe/moyyi/actions/runs/40408671809) pass. All 372 installed files match tar SHA256 `df2b9b4c72cd40ecee297c83138bfcdc0aa2b0f1cfab994f1aabcf08fd21e382`; actual installed CLI 12/12 and existing-session startup pass without model calls. Backup and prior PR #32 package retained. Defaults/grants unchanged; final integration is tracked on the PR. |
+| Prior product and local installation | [PR #34](https://github.com/Peerframe/moyyi/pull/34), product `d988461`; [ADR 0034](decisions/0034-incomplete-response-outcomes.md) | Early incomplete responses no longer persist as completed or exit zero. Check 2,393 tests, core 25/25, external package and [Linux/macOS CI](https://github.com/Peerframe/moyyi/actions/runs/40408671809) pass. All 372 installed files match tar SHA256 `df2b9b4c72cd40ecee297c83138bfcdc0aa2b0f1cfab994f1aabcf08fd21e382`; actual installed CLI 12/12 and existing-session startup pass without model calls. Backup and prior PR #32 package retained. Defaults/grants unchanged; final integration is tracked on the PR. |
+| Current product and local installation | [PR #35](https://github.com/Peerframe/moyyi/pull/35), product `4e3cddb` | Removed premature read truncation within existing budgets; [ADR 0026](decisions/0026-readable-evidence-and-action-budget.md#read-budget-correction-2026-10-27). Check 2,407 tests, files 19/19, external CLI12/client13/documents9, isolation/types/PTY7 and [Linux/macOS product CI](https://github.com/Peerframe/moyyi/actions/runs/40414496931) passed. 372 installed files match tar SHA256 `4d7bb7122b1a6cd758e3010a374befc0f455675d29bb3e96e867c17a93896278`; actual installed client13 includes full long-line delivery. Backup and prior PR #34 package retained; final integration is tracked on the PR. |
+| Private Pi trajectory control | Released v1.4.0, fixed original source/task, Flash/Responses/low, actual cap4 | Four HTTP200, zero retries. Six tool results reached subsequent requests; three fourth-response reads did not. Fifth local request blocked, no final answer despite CLI exit0. Source unchanged and cleanup confirmed. Native tools, lack of countdown/final-none and other predeclared differences prevent a causal quality ranking; [record](research/harness-comparison.md#pi-responses-control-2026-10-27). No agent dependency added. |
 | Public release | None | Local candidate installation is not npm/GitHub publication or a release tag. |
 
 The merged public corpus has 32 tasks. Two new fixed document tasks are prepared as a separate
 acceptance group; they do not change the original task selection or rubrics. Reference/checker tests and scripted
-conformance are not real-model corpus results. No same-model, same-budget comparison with a mature
-harness has been executed; a [bounded offline feasibility probe](research/harness-comparison.md#bounded-feasibility-check-2026-10-27)
-stopped before any model request. Earlier full-source and model/effort diagnostics are recorded in
+conformance are not real-model corpus results. The private [Pi original-task control](research/harness-comparison.md#pi-responses-control-2026-10-27)
+has now run once with the same model/profile and actual request cap; it stopped without an answer.
+It is not a corpus benchmark or an equivalent internal budget policy. Earlier unsupported routes
+remain separately recorded. Earlier full-source and model/effort diagnostics are recorded in
 [PR #25's fixed evidence record](https://github.com/Peerframe/moyyi/blob/650a00b06bcabc308d9cebeffc0e037658eb6457/docs/decisions/0022-evidence-guidance-and-focused-reads.md)
 and [reasoning record](https://github.com/Peerframe/moyyi/blob/650a00b06bcabc308d9cebeffc0e037658eb6457/docs/tasks/2026-10-26-configurable-reasoning.md).
 Do not repeat those experiments merely because a new contributor has not read them.
@@ -188,14 +191,17 @@ the same prefix on continuation, though its full serialized result needs only 6,
 The [ADR 0026 correction](decisions/0026-readable-evidence-and-action-budget.md#read-budget-correction-2026-10-27)
 retains all final limits and uses the existing fitter. Real-runtime conformance now verifies the
 complete record reaches the next request and that a default prefix has no implicit 200-line cap.
-Source, installed-package and CI evidence must remain distinct. This defect was reproduced under
+Source, external installed-package, actual owner installation and product CI checks have passed;
+final-head integration is tracked on PR #35. Actual installed CLI12/client13 and existing-session
+startup pass without model calls. This defect was reproduced under
 the daily default budget, not the larger budget of the original Skills control, and does not
 explain its already-delivered facts being omitted or interpreted incorrectly.
 
-Separately, a pinned Pi release is being checked as a private same-model baseline under a
-readonly snapshot, explicit containment and an external four-request gate. It is not a product
-dependency or a proposal to replace moyyi's core. Native prompt/tools and lack of moyyi's
-countdown/final-no-tool rule must be disclosed; one result cannot establish general superiority.
+Separately, the pinned Pi release completed its sole private same-model control under a readonly
+snapshot and four-request gate. It had not answered when its fifth local request was blocked.
+Preserve this result and the native prompt/tool/budget-policy differences; it provides no semantic
+answer ranking and no reason to replace the core or add a framework dependency. Do not repeat the
+question until green or use this result to erase moyyi's documented interpretation failures.
 
 **Previous delivery: honest response-completion status.** The independent autonomous model
 control closes the model-switch hypothesis for this sample without a quality gain: keep Flash,

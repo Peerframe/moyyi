@@ -28,9 +28,10 @@ and raw trial records to reproduce failures; never substitute a final assistant 
 Do not present omitted tasks as passed, zero missing usage, or unsupported cases as model failures.
 
 Reference evaluation structures were reviewed in the [upstream comparison](phase-3-execution-backends.md).
-Actual baseline adapters and live runs remain unexecuted. Their acceptance requires explicit model
-access/budget and verifying each selected baseline's compatible API at that time. Current offline
-reports describe conformance only; they do not establish that moyyi is better at solving tasks.
+The full public-corpus baseline remains unexecuted. A later private original-task Pi control is
+recorded below, with its differences and unsuccessful delivery; it does not establish aggregate
+quality or that moyyi is better at solving tasks. Model access, budget and each selected baseline's
+compatible API must be verified for the particular run.
 
 ## Bounded feasibility check, 2026-10-27
 
@@ -143,3 +144,46 @@ Responses continuation remain unverified. This source check installed nothing, r
 credential and sent no model request. It is not a successful or failed quality comparison and
 adds no framework or dependency to moyyi. If pursued, label the custom Responses route and
 external gate explicitly instead of calling the native Messages route protocol-equivalent.
+
+## Pi Responses control, 2026-10-27
+
+The released [Pi v1.4.0](https://github.com/earendil-works/pi/releases/tag/v1.4.0),
+commit [`4a080252f06caf63a525d7873c5d94d3c23887e0`](https://github.com/earendil-works/pi/tree/4a080252f06caf63a525d7873c5d94d3c23887e0),
+MIT, was privately installed with scripts disabled. It is not a moyyi dependency. A documented
+tool-call extension admits only fixed public snapshot files/directories; the existing native
+sandbox denies other files, credentials, writes and external network. The child sees a dummy key
+and one local proxy. The parent persists each reservation/body before lazily reading the existing
+credential, forwards unchanged Responses bytes to the fixed provider endpoint, and never retries.
+This is a released Pi runtime with explicit private containment/configuration and an external gate,
+not a claim about stock Pi's security or an unchanged stock CLI configuration.
+
+Offline actual-process checks established plaintext reasoning and complete read continuation,
+four read-only tools, forbidden path/network/write denial, cap-four/fifth-local-rejection, HTTP503
+without retry, and cancellation/process cleanup. New live-wrapper checks covered durable budgets,
+the actual Pi continuation and source preservation. Preparation assertion/evidence-mapping errors
+were retained, corrected and rechecked separately; they used no provider requests or credentials.
+
+The sole live run used the unchanged original Skills question, public source `1838248`, original
+rubric, Flash + Responses + low, max output 8,192 and four actual requests, with zero retries.
+All four returned HTTP200 and valid completed streams. Pi proposed more reading in response four;
+its fifth local request was rejected before credential/transport dispatch. Its CLI exited zero,
+but the terminal model message was an error and there was **no final answer**. This is unfinished
+task delivery at the request cap, not a semantic answer to score and not a provider failure.
+
+Six tool results reached subsequent model requests exactly. Three successful runtime reads after
+response four did not reach any model request; they cannot count as evidence the model consumed.
+Actual source, canaries and permissions were preserved, the process group exited, and temporary
+files were removed. Usage totals: 14,422 input tokens (8,192 cached, a subset), 529 output tokens
+(75 reasoning, a subset); 56,746 request bytes and 117,789 response bytes. Billed cost was not
+observed. Raw evidence is sealed at `~/.moyyi/acceptance/pi-control-2026-10-27-live/`; manifest SHA256
+`99bcec51298f1abf0d5469fef27c10ec705fff8884375671134bb750a84ea018`.
+
+The comparator is the already recorded moyyi Flash four-request control, not a new rerun. Both use
+the original prompt mentioning eight requests despite the enforced four-request cap. Pi retains
+its native guidance/tools and has no injected countdown or last-request `tool_choice:none`;
+moyyi has those controls and optional initial path navigation. Native read/search behavior differs,
+as do dates, ordering, cache and autonomous follow-up input. Pi also has a 30-second response-header
+timeout within the outer 300-second bound; it did not trigger. These differences preclude a causal
+ranking. The observation does not show that switching harnesses, adding tools, or increasing
+retrieval will repair already-delivered facts. Preserve the unfinished result and stop this
+single-control slice rather than repeatedly calling until an answer appears.
