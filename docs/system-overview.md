@@ -32,12 +32,14 @@ and the referenced PR before changing code. No current authorization is inferred
 |---|---|---|
 | Prior merged baseline | `448fb2a246d327f45a1329dc920eb7c473e59ee0`, through [PR #29](https://github.com/Peerframe/moyyi/pull/29) | Independent review found no blocker; final-head CI and [merged main CI](https://github.com/Peerframe/moyyi/actions/runs/40359647505) passed. The first main macOS job acquired no runner and was cancelled before any steps; a job-only rerun passed without changing the head or workflow. |
 | Prior product delivery | [PR #30](https://github.com/Peerframe/moyyi/pull/30), product `8eb8317362994a46704ee965559c0a89725b4b22` | Confined macOS heredocs/Node stdin, captured shell toolchain metadata and confirmed Linux parser namespace cleanup; [ADR 0031](decisions/0031-confined-command-verification.md). Original check passes 2,311 tests; [Linux/macOS CI](https://github.com/Peerframe/moyyi/actions/runs/40373993007), clean external package and actual owner installation passed. Product hash identifies packaged source; PR status and final CI identify integration. |
-| Current product delivery | [PR #31](https://github.com/Peerframe/moyyi/pull/31), product `106d4130bd2d153c130c1810fa7694e470760848` | Find sessions across workspaces, inspect matching recorded effects/receipts, resume with current grants; [ADR 0032](decisions/0032-session-discovery-and-recorded-results.md). Original check passes 2,350 tests; [Linux/macOS CI](https://github.com/Peerframe/moyyi/actions/runs/40381859391), clean external package and owner installation passed. Independent review found no blocker; integration state is recorded on the PR. |
-| Current local installation | Product `106d413`; tar SHA256 `40ff38c844f4b99ce68e4266acf2be8a67c846550a711126b1cc6c909deee92a` | 372 files match. External CLI 10/10, client 11/11, documents 9/9, isolation, strict types and PTY 7/7 passed. Actual owner installation repeats PTY 7/7 and opens an existing DeepSeek session for help/catalog/results/exit, with zero model requests. Backup and prior PR #30 package retained. Host stays Flash + Responses + low, default read-only/max3/zero-retry. |
+| Prior product delivery | [PR #31](https://github.com/Peerframe/moyyi/pull/31), product `106d4130bd2d153c130c1810fa7694e470760848` | Find sessions across workspaces, inspect matching recorded effects/receipts, resume with current grants; [ADR 0032](decisions/0032-session-discovery-and-recorded-results.md). Original check passes 2,350 tests; [Linux/macOS CI](https://github.com/Peerframe/moyyi/actions/runs/40381859391), clean external package and owner installation passed. Independent review found no blocker; integration state is recorded on the PR. |
+| Current product delivery | [PR #32](https://github.com/Peerframe/moyyi/pull/32), product `351126b7d7308c7d2c66e58286123d304babff15` | Confirmed initial missing text reads have a distinct bounded diagnosis; [ADR 0033](decisions/0033-confirmed-missing-read-diagnostics.md). Original checks pass 2,380 tests, file conformance 17/17, [Linux/macOS CI](https://github.com/Peerframe/moyyi/actions/runs/40388079129) and clean external package passed. Review found no blocker; integration state is tracked on the PR. |
+| Current local installation | Product `351126b`; tar SHA256 `d12a349ef1e02f6e0e55368798af840bd5ba5f09c19fa589851ccaf72597240c` | 372 files match. External CLI 10/10, client 12/12, documents 9/9, isolation, strict types and PTY 7/7 passed. Actual installation opens an existing DeepSeek session for help/catalog/results/exit without model requests. An eight-request scripted installed-runtime preflight confirms missing-path recovery, exact next-request evidence, denied writes and report readback. Backup and prior PR #31 package retained. Host stays Flash + Responses + low, default read-only/max3/zero-retry. |
 | Prior command verification installation | Product `8eb8317`; tar SHA256 `28417c7163feb6c61ccad693b567a9e11dbe0a637407e35a0cb68d83e846f1e0` | Actual installed Node heredoc computed from JSON, preserved files, denied workspace write/credentials/network and delivered the exact result to the next scripted request. These unchanged command mechanisms retain their scoped evidence. |
 | Prior installed baseline | Product `69312969533659578cc1da21b510d8395a099ef3`; tar SHA256 `12b2aee9c116e432ab23780c32c793adc094708995dc7d7f393a1ac1fe3774a5` | 244-file identity and CLI/client/PTY/offline navigation evidence remain valid for this prior package. The document upgrade has its own acceptance receipt and backup in the [optimization plan](tasks/2026-10-26-optimization-plan.md). Flash + Responses + low, daily read-only/max3/zero-retry settings are retained. |
 | Document live acceptance | Installed `e64fa0e`; 2026-10-26, Flash + Responses + low | Both fixed tasks passed their unchanged checkers once: actual comparison/report files, seven facts/hashes/quotes, approved total CNY 5,500, readback and unchanged inputs. Eight HTTP 200 requests, zero retries; each attempted shell once and was denied before using controlled create/read. [Evidence and limits](tasks/2026-10-26-optimization-plan.md#文档真实任务验收2026-10-26). |
-| Latest autonomous investigations | Installed `e64fa0e`, 2026-10-26, fresh original4+public4 baseline | Eight HTTP200 requests, zero retries, unchanged snapshots/prompts/rubric/checker. Public source-dataflow report exists and its official checker passes. Original Skills explanation still makes a raw-text/parsed-field error and omits consumers/lifecycle. No corpus reliability claim. |
+| Prior autonomous investigations | Installed `e64fa0e`, 2026-10-26, original4+public4 baseline | Eight HTTP200 requests, zero retries, unchanged snapshots/prompts/rubric/checker. Public source-dataflow report exists and its official checker passes. Original Skills explanation makes a raw-text/parsed-field error and omits consumers/lifecycle. These historical scores are unchanged. |
+| Latest autonomous investigations | Installed `351126b`, 2026-10-27, same original4+public4 envelope | Eight HTTP200 requests, zero retries. Public source-dataflow report passes its original checker. Original Skills rubric still fails: items 1/3/5 met, 2/4/6 partial. Raw-text and revocation explanations are now materially correct, but the reader/core chain is untraced and delivered restart/reference rules are omitted. All 14 original tools succeeded, so the new missing-read diagnosis was not exercised; no causal quality improvement claim. |
 | Real long-session acceptance | Installed `e64fa0e`, separate processes | Eight live conversation turns, one summary, one follow-up; all ten corrected facts/constraints/pending-state fields correct after reopen. Resume makes no request; original transcript retained; early facts are inside the summarized span. One case, not a universal fidelity claim. |
 | Real edit/check/undo acceptance | Installed `487ccfb`, native sandbox | Public listener-leak fixture repaired and checked, then both snapshots undone in reverse order. Original bytes/mode and original failure restored; checker and outside canary unchanged. Eight HTTP200 requests, zero retries. |
 | Real web report acceptance | Installed `487ccfb`, explicit DoH | Actual full RFC8259 fetched, report created and read back in four requests; required five facts correct. Two incidental unsupported claims needed human review and a separate four-request revision. Revised bytes independently checked; the model omitted revision readback, so that later workflow is not marked fully passed. |
@@ -180,13 +182,32 @@ It reuses SQLite, the local protocol and CLI; [ADR 0032](decisions/0032-session-
 defines the bounded views and restart acceptance. The candidate is installed and verified; final
 integration is tracked on the PR. This does not repair or rescore model interpretation failures.
 
-The cross-layer review found no further demonstrated harness defect that justifies an accuracy
-patch now. Complete evidence delivery, actual file execution and model selection/interpretation
-are separate checks. Keep Flash + Responses + low; do not repeat the failed question, add another
-review loop or enlarge retrieval without new evidence. A second-provider comparison is conditional
-on an explicitly configured service and credentials, not a current delivery dependency. Remaining
-semantic mistakes require checking key claims and completeness in actual user work; history views
-make recorded actions inspectable but are not factual validators.
+A subsequent per-requirement audit reopened one concrete diagnostic gap. All returned tool text
+reached the original task's final request, but several necessary implementations were never read;
+this is not complete task evidence. Two already-delivered facts were also misinterpreted. The
+model repeated a guessed nonexistent path after a generic unavailable/changed error. The current
+candidate therefore distinguishes confirmed initial absence for explicit reads, under existing
+path and lifetime checks; [ADR 0033](decisions/0033-confirmed-missing-read-diagnostics.md) owns the
+bounded change and unchanged four-plus-four live acceptance. It does not change prompts or claim
+to solve independent semantic errors. The candidate has now passed source, external-package,
+installed-runtime and dual-platform CI checks; PR #31 remains the retained rollback package.
+
+The sole fixed live follow-up preserved both tasks, source snapshots and standards. The public
+report passed again, with actual file delivery and readback. The original answer meets three of
+six mandatory items and partially meets three: it still did not investigate the actual reader/core
+consumer, and it omitted restart/reference facts already in its context. Its raw-text and
+revocation explanations are now correct in substance; imprecise headings are not counted as the
+old raw-text-loss error. No missing read occurred, so this experiment does not measure the new
+error's effect on autonomous behavior. Keep the failure and end this local diagnostic slice;
+repeating it or adding another file-read change would not address the remaining two layers.
+
+The maintained OpenCode v1.19.4 baseline was actually exercised with a synthetic Responses
+service: normal read continuation worked, but plaintext reasoning was not replayed under either
+requested SDK/native setting. Exact underlying selection was not logged. This fails the required
+DeepSeek profile before a paid comparison; [evidence](research/harness-comparison.md#opencode-responses-continuation-precheck-2026-10-27)
+records the stop instead of silently switching APIs or repairing the baseline in a proxy.
+Keep Flash + Responses + low and the original task criteria. Do not repeat a paid trial until
+green or infer full capability from a successful tool return.
 
 The owner authorized ongoing work, necessary paid validation and sequential merging/installation
 only after review and passing CI. PRs #28 and #29 are merged, closing the measured DNS/native-loader

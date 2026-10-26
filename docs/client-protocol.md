@@ -60,12 +60,14 @@ remain unresolved rather than being silently replayed on restart. See the
 ## Installed-candidate evidence
 
 The package gate copies `scripts/package-fixtures/client.mjs` to a temporary consumer outside the
-repository and runs it using only the installed package's bare exports. Its eleven scenarios cover:
+repository and runs it using only the installed package's bare exports. Its twelve scenarios cover:
 
 - Session creation, streaming, frozen event snapshots and an observer that throws while trying to
   alter history. Other observers still receive the original events and the run completes.
 - Installed root instructions refreshed from actual workspace files.
 - Explicitly selected Skills refreshed from the configured library.
+- Confirmed missing-read feedback reaching the next request, followed by workspace discovery and
+  a real read without changing the original file.
 - A real file creation that cannot occur with a stale digest, then succeeds after exact approval.
 - A denied edit with unchanged workspace and sibling canaries.
 - Busy admission, persistent steering, cancellation and rejection of an active development reload.

@@ -239,6 +239,47 @@ try {
   assert(runtime.plugins.some((plugin) => plugin.name === "skills" && plugin.state === "loaded"));
   cases.push("installed-selected-skill-refresh");
 
+  const beforeDiagnostic = requests.length;
+  const diagnosticCalls = [
+    tool("read", { path: "guessed-file.txt" }),
+    tool("list", { path: "." }),
+    tool("read", { path: "protected.txt" }),
+  ];
+  steps.push(
+    ...diagnosticCalls,
+    answer("Recovered through workspace discovery after the confirmed missing path."),
+  );
+  await turn("Locate the actual file after a wrong initial path and read its content.");
+  assert.equal(requests.length - beforeDiagnostic, 4);
+  const [returned, listed, readBack] = diagnosticCalls.map((call, index) => {
+    const callId = call[0].part.callId;
+    const results = requests[beforeDiagnostic + index + 1].messages
+      .flatMap((message) => message.content)
+      .filter((part) => part.type === "tool_result" && part.callId === callId);
+    assert.equal(results.length, 1);
+    return results[0];
+  });
+  assert.equal(returned.status, "failed");
+  assert.deepEqual(JSON.parse(returned.content[0].text), {
+    error: "Requested workspace path does not exist; use list or search to locate the file",
+    truncated: false,
+  });
+  assert.equal(listed.status, "succeeded");
+  assert(
+    JSON.parse(listed.content[0].text).entries.some((entry) => entry.path === "protected.txt"),
+  );
+  assert.equal(readBack.status, "succeeded");
+  assert.equal(readBack.content.length, 2);
+  const metadata = JSON.parse(readBack.content[0].text);
+  assert.equal(metadata.format, "file-read-v1");
+  assert.equal(metadata.path, "protected.txt");
+  assert.equal(metadata.truncated, false);
+  assert.equal(metadata.presentation.sourceBytes, 9);
+  assert.equal(metadata.presentation.outputTruncated, false);
+  assert.equal(readBack.content[1].text, "1: UNCHANGED");
+  assert.equal(readFileSync(join(workspace, "protected.txt"), "utf8"), "UNCHANGED");
+  cases.push("installed-missing-read-diagnostic-and-discovery-recovery");
+
   steps.push(
     tool("create", { path: "created.txt", text: "APPROVED_CONTENT" }),
     answer("Recorded creation."),

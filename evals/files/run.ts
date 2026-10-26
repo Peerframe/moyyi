@@ -48,6 +48,7 @@ interface Observation {
 interface Scenario {
   readonly id: string;
   readonly calls: readonly Request[];
+  readonly maxRequests?: number;
   check(observation: Observation): void;
 }
 const terminal = (stopReason: "end_turn" | "tool_use"): ModelStreamEvent => ({
@@ -84,6 +85,31 @@ function denied(observation: Observation): void {
   assert.doesNotMatch(JSON.stringify(observation.requests), /OUTSIDE_SECRET_928|ENV_SECRET_281/);
 }
 const scenarios: readonly Scenario[] = [
+  {
+    id: "missing-path-diagnostic-and-discovery-recovery",
+    maxRequests: 4,
+    calls: [
+      { name: "read", args: { path: "src/guessed-name.ts" } },
+      { name: "list", args: { path: "src" } },
+      { name: "read", args: { path: "src/main.ts" } },
+    ],
+    check({ results, evidence, requests }) {
+      assert.deepEqual(evidence.resultStatuses, ["failed", "succeeded", "succeeded"]);
+      assert.equal(evidence.modelRequests, 4);
+      assert.equal(requests.at(-1)?.toolChoice, "none");
+      const failure = fileResultValue<{ error: string; truncated: boolean }>(results[0]);
+      assert.equal(
+        failure.error,
+        "Requested workspace path does not exist; use list or search to locate the file",
+      );
+      assert.equal(failure.truncated, false);
+      assert.deepEqual(
+        payload<FileList>(results[1]).entries.map((entry) => entry.path),
+        ["src/main.ts"],
+      );
+      assert.equal(payload<FileRead>(results[2]).text, "export const marker = 'needle';\n");
+    },
+  },
   {
     id: "real-list-search-read-loop",
     calls: [
@@ -193,7 +219,10 @@ async function run(scenario: Scenario): Promise<Observation> {
     runtime = await createRuntime({
       dataDirectory: join(directory, "data"),
       model: scriptedProfile.origin,
-      limits: { timeoutMs: 15000 },
+      limits: {
+        timeoutMs: 15000,
+        ...(scenario.maxRequests === undefined ? {} : { maxModelRequests: scenario.maxRequests }),
+      },
       plugins: [{ plugin: provider.plugin }],
     });
     assert.ok(runtime.plugins.every((plugin) => plugin.state === "loaded"));

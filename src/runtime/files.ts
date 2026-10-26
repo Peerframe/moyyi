@@ -36,7 +36,7 @@ const classes = new Set(
 );
 
 class FileAccessError extends Error {
-  readonly code: "denied" | "unavailable" | "binary" | "ignore";
+  readonly code: "denied" | "unavailable" | "not_found" | "binary" | "ignore";
   constructor(code: FileAccessError["code"], message: string) {
     super(message);
     this.code = code;
@@ -191,7 +191,7 @@ class ReadScope {
     this.rootIdentity ??= root;
     return root;
   }
-  private async target(root: Root, input: string): Promise<Target> {
+  private async target(root: Root, input: string, diagnoseMissing = false): Promise<Target> {
     if (
       typeof input !== "string" ||
       !input.length ||
@@ -205,13 +205,58 @@ class ReadScope {
     const lexical = resolve(root.path, input);
     if (!within(root.path, lexical)) throw new FileAccessError("denied", "Path escapes workspace");
     this.protected(lexical);
-    const path = await this.io(() => realpath(lexical));
+    let path: string;
+    try {
+      path = await this.io(() => realpath(lexical));
+    } catch (error) {
+      // Only the first explicit read resolution may diagnose absence. ENOENT from a
+      // later identity/open/read check means the observed target changed, not absence.
+      if (diagnoseMissing && isMissing(error)) await this.missingRead(root, lexical);
+      throw error;
+    }
     if (!within(root.path, path)) throw new FileAccessError("denied", "Symlink escapes workspace");
     this.protected(path);
     const stat = await this.io(() => lstat(path));
     if (stat.isSymbolicLink())
       throw new FileAccessError("denied", "Target changed during resolution");
     return { lexical, path, stat, relative: portable(relative(root.path, path)) || "." };
+  }
+  private async missingRead(root: Root, lexical: string): Promise<void> {
+    const parts = relative(root.path, lexical).split(sep);
+    // Limit extra diagnostic metadata work, without narrowing successful explicit reads.
+    if (parts.length > MAX_DEPTH) return;
+    let directory: Target = {
+      lexical: root.path,
+      path: root.path,
+      stat: root.stat,
+      relative: ".",
+    };
+    const ancestors = [directory];
+    for (let index = 0; index < parts.length; index++) {
+      await this.unchanged(root, directory);
+      // Validate the resolved suffix before probing below an alias. A forbidden
+      // ancestor must not reveal whether its requested descendant exists.
+      this.protected(resolve(directory.path, ...parts.slice(index)));
+      const candidate = resolve(directory.path, parts[index] as string);
+      try {
+        await this.io(() => lstat(candidate));
+      } catch (error) {
+        if (!isMissing(error)) throw error;
+        for (const ancestor of ancestors) await this.unchanged(root, ancestor);
+        this.guard();
+        // This is a guarded observation, not atomic absence against a hostile same-user
+        // process. Keep the existing descriptor/identity race limits of this adapter.
+        throw new FileAccessError(
+          "not_found",
+          "Requested workspace path does not exist; use list or search to locate the file",
+        );
+      }
+      // An existing leaf (including a dangling symlink) is not a missing path.
+      if (index === parts.length - 1) return;
+      directory = await this.target(root, portable(relative(root.path, candidate)));
+      if (!directory.stat.isDirectory()) return;
+      ancestors.push(directory);
+    }
   }
   private async unchanged(root: Root, target: Target): Promise<void> {
     const currentRoot = await this.root();
@@ -337,12 +382,12 @@ class ReadScope {
     return this.operation(async (root) => {
       const cap = bounded(options?.maxBytes, 64 * 1024, MAX_FILE_BYTES);
       if (options?.startLine === undefined && options?.maxLines === undefined)
-        return this.readFile(root, path, cap);
+        return this.readFile(root, path, cap, undefined, true);
       const startLine = bounded(options.startLine, 1, 1_000_000);
       const maxLines = bounded(options.maxLines, 200, 1_000);
       // Locate lines only in a complete bounded scan through the same guarded descriptor path.
       // A prefix cannot prove an EOF or the line positions beyond its scan limit.
-      const full = await this.readFile(root, path, MAX_FILE_BYTES);
+      const full = await this.readFile(root, path, MAX_FILE_BYTES, undefined, true);
       if (full.truncated)
         throw new FileAccessError("unavailable", "Line-range reads require a file within 1 MiB");
       let from = 0;
@@ -382,8 +427,9 @@ class ReadScope {
     input: string,
     cap: number,
     directIdentity?: Stats,
+    diagnoseMissing = false,
   ): Promise<FileRead> {
-    const target = await this.target(root, input);
+    const target = await this.target(root, input, diagnoseMissing);
     if (directIdentity && (target.path !== target.lexical || !same(target.stat, directIdentity)))
       throw new FileAccessError("denied", "Automatic rule reads must not follow changed aliases");
     if (!target.stat.isFile() || target.stat.nlink !== 1)
