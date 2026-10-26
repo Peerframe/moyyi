@@ -83,9 +83,32 @@ Node探针复用现有文档解析逻辑，只授权当前可执行文件、实�
 - `python3 scripts/verify-cli-pty.py` 6/6：原5项+真实主CLI使用startup grants，经TTY审批create、
   只读Node检查（工作区写入/外部修改/继承canary拒绝）和按真实snapshot undo；目前是源码入口与合成模型。
 - 代码范围分工后相互复核无阻断；默认authority和零重试不变。当前产品修改无新增付费调用。
-  本机manager候选66项离线参数/execve/非交互/Key隔离检查通过，尚未替换生效manager。
-- 余下：干净安装包、远程原CI、实际安装/配置备份，以及正常启动器的有界真实任务。通过后逐个合并，
-  不叠PR、不公开发布。既有复杂源码题仍失败，已封存；不靠这次入口改动宣称修复模型解释能力。
+  本机manager候选66项离线参数/execve/非交互/Key隔离检查通过，现已备份后应用。
+- [PR #29](https://github.com/Peerframe/moyyi/pull/29) 产品 `0a539c71c4898ede49b4a4c2959807adb6788563`
+  的[原Linux/macOS CI](https://github.com/Peerframe/moyyi/actions/runs/40353835298)成功。
+  `npm run verify:package -- --offline` 干净包及实际独立安装PTY6/6、CLI/client、文档/隔离/依赖图全部通过。
+  首次打包前漏暂存一份已测试的CLI集成测试，回执正确标dirty；该回执保留，补提交后重新干净验证，
+  不把dirty包冒充干净证据。两次产物相同，最终tar SHA为
+  `b57fd5e96730a0e53c1d5df67a1a2a63cc65fcf2789a219a03e7686881490554`。
+- 本机363文件匹配；备份为 `~/.moyyi/backups/pre-pr29-2026-10-26T15-58-35.624Z`，旧包保留。
+  生效manager已更新为经过66项测试的候选，host/模型/档位/默认权限不变；实际安装PTY6/6、
+  老DeepSeek会话resume/help/exit、metadata-only配置检查通过，这些步骤零付费/零Key值读取。
+- 2026-10-27正常 `moyyi-deepseek start` 真实任务：Flash+Responses+low，CLI明确8次上限，
+  实际记录5次预算attempt和5份assistant请求，无retry notice；只批准city.js编辑及
+  `node check.cjs`（只读Seatbelt、无网络）。打开时3/3监听器且能响应，dispose后0/0且静默；
+  同一引用注册/移除的修复代码独立检查正确。最后edit之后实际checker和完整1060字节/35行readback
+  均进入后续模型上下文；实际文件/快照/SQLite哈希一致，checker、其它输入、权限和外部canary未变。
+  此入口没有HTTP拦截，不声称抓到了HTTP200或实际wire。
+- 原私有runner在最终核对时错误假设默认全文read也有可选`lineRange`，保留其failed-no-replay账本和错误。
+  没有重跑live或增加请求；独立离线补验按两种既有read契约检查，严格逐字节（不trim换行）、元数据、
+  顺序、快照和context送达；显式range历史见证与6个篡改/截断反例也通过。补验结论是本次真实入口单例通过，
+  不改原冻结账本，不把运行结束当作成功。实际结果、完整报告及代码在
+  `~/.moyyi/acceptance/daily-cli-2026-10-26/live/supplemental-verification.json` 与 `review.md`。
+- live前还修复了私有PTY driver的无界TERM等待，实际忽略TERM进程组在7.1秒内被KILL并回收；
+  最终安装版离线预检5次scripted、拒绝checker修改/任意curl、正常edit/check/readback通过，之后才发唯一live。
+
+当前余下是本PR证据提交的CI和顺序合并。安装运行代码不随纯证据文档更新重复替换。
+复杂源码题的原失败继续保留；本次入口单例通过不建立广泛编码可靠率，也没有公开发布。
 
 私有证据仍放在 `~/.moyyi/acceptance/`：`regression-2026-10-26-daily`、
 `daily-work-2026-10-26`。保存真实请求/输出和失败记录，不提交凭据、会话或私人录制。
