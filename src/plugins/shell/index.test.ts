@@ -10,6 +10,32 @@ const base: ToolContext = {
   limits: { maxOutputBytes: 4096 },
 };
 describe("shell tool contract", () => {
+  it.each(["read-only", "read-write"] as const)(
+    "includes %s host authority in approval",
+    async (workspaceAccess) => {
+      const proposal = await shellTool.prepare(
+        { command: "node check.js" },
+        {
+          ...base,
+          processes: {
+            prepare: async (request) => ({
+              ...request,
+              workspaceRoot: "/fixture",
+              workspaceAccess,
+              directoryIdentity: "1:2/1:2",
+              backend: "seatbelt",
+            }),
+            run: async () => {
+              throw Error("Approval must not execute");
+            },
+          },
+        },
+      );
+      expect(proposal.summary).toContain(workspaceAccess);
+      expect(JSON.parse(proposal.preview as string).workspaceAccess).toBe(workspaceAccess);
+      expect(proposal.payload).toMatchObject({ workspaceAccess });
+    },
+  );
   it("fails closed without a capability", async () => {
     await expect(shellTool.prepare({ command: "true" }, base)).rejects.toThrow("unavailable");
     await expect(shellTool.execute(action, base)).rejects.toThrow("unavailable");

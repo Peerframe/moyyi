@@ -16,7 +16,13 @@ Options:
       --data DIR         Private session data directory (default: ~/.moyyi/data)
       --session ID       Resume a stored session
   -i, --interactive      Keep a terminal session open after an initial prompt
-      --approve-reads    Ask before each read/list/search execution
+      --approve-reads    Ask before each read/list/search/document execution
+      --allow-write      Ask before snapshot-backed writes in this workspace
+      --allow-shell      Ask before commands; workspace stays read-only, network denied
+      --shell-toolchain node  Explicitly enable this Node executable and its exact libraries
+      --web-origin URL   Allow HTTPS fetches for this exact origin (repeatable; asks)
+      --web-dns MODE     system (default) or cloudflare-doh; requires --web-origin
+      --max-requests N   Model requests per turn, 1..128; includes the final answer
       --dev              Enable development-only plugin loading and reload
       --dev-plugin N=P   Explicit plugin name and local module path (repeatable)
 
@@ -35,6 +41,12 @@ export interface CliOptions {
   readonly sessionId?: SessionId;
   readonly interactive: boolean;
   readonly approveReads: boolean;
+  readonly allowWrite: boolean;
+  readonly allowShell: boolean;
+  readonly shellToolchain?: "node";
+  readonly webOrigins: readonly string[];
+  readonly webDns?: "system" | "cloudflare-doh";
+  readonly maxRequests?: number;
   readonly dev: boolean;
   readonly development: readonly { name: string; path: string }[];
   readonly prompt?: string;
@@ -53,6 +65,12 @@ export function parseCliOptions(argv: readonly string[], cwd = process.cwd()): C
       session: { type: "string" },
       interactive: { type: "boolean", short: "i" },
       "approve-reads": { type: "boolean" },
+      "allow-write": { type: "boolean" },
+      "allow-shell": { type: "boolean" },
+      "shell-toolchain": { type: "string" },
+      "web-origin": { type: "string", multiple: true },
+      "web-dns": { type: "string" },
+      "max-requests": { type: "string" },
       dev: { type: "boolean" },
       "dev-plugin": { type: "string", multiple: true },
     },
@@ -65,6 +83,41 @@ export function parseCliOptions(argv: readonly string[], cwd = process.cwd()): C
     throw Error("Invalid session ID");
   if (values["dev-plugin"]?.length && !values.dev)
     throw Error("--dev-plugin requires --dev and explicit trust in local code");
+  const toolchain = values["shell-toolchain"];
+  if (toolchain !== undefined && (toolchain !== "node" || !values["allow-shell"]))
+    throw Error("--shell-toolchain node requires --allow-shell");
+  const webOrigins = [
+    ...new Set(
+      (values["web-origin"] ?? []).map((value) => {
+        let url: URL;
+        try {
+          url = new URL(value);
+        } catch {
+          throw Error("--web-origin requires an HTTPS origin");
+        }
+        if (url.protocol !== "https:" || (value !== url.origin && value !== `${url.origin}/`))
+          throw Error(
+            "--web-origin requires an HTTPS origin without credentials, path, query or fragment",
+          );
+        return url.origin;
+      }),
+    ),
+  ];
+  if (webOrigins.length > 32) throw Error("At most 32 --web-origin grants are allowed");
+  const dns = values["web-dns"];
+  if (dns !== undefined && (!webOrigins.length || !["system", "cloudflare-doh"].includes(dns)))
+    throw Error("--web-dns requires --web-origin and system or cloudflare-doh");
+  const requestText = values["max-requests"];
+  if (
+    requestText !== undefined &&
+    (!/^[1-9][0-9]{0,2}$/.test(requestText) || Number(requestText) > 128)
+  )
+    throw Error("--max-requests must be an integer from 1 to 128");
+  if (
+    values.demo &&
+    (values["allow-write"] || values["allow-shell"] || webOrigins.length || requestText)
+  )
+    throw Error("Daily capability options require --host; --demo is a fixed read-only script");
   const names = new Set<string>();
   const development = (values["dev-plugin"] ?? []).map((spec) => {
     const equal = spec.indexOf("="),
@@ -85,6 +138,12 @@ export function parseCliOptions(argv: readonly string[], cwd = process.cwd()): C
     workspaceRoot: resolve(cwd, values.cwd ?? "."),
     interactive: values.interactive ?? false,
     approveReads: values["approve-reads"] ?? false,
+    allowWrite: values["allow-write"] ?? false,
+    allowShell: values["allow-shell"] ?? false,
+    webOrigins,
+    ...(toolchain === undefined ? {} : { shellToolchain: toolchain as "node" }),
+    ...(dns === undefined ? {} : { webDns: dns as "system" | "cloudflare-doh" }),
+    ...(requestText === undefined ? {} : { maxRequests: Number(requestText) }),
     dev: values.dev ?? false,
     development,
     ...(values.host === undefined ? {} : { host: resolve(cwd, values.host) }),

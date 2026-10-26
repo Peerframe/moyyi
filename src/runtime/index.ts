@@ -133,6 +133,8 @@ export interface RuntimeOptions {
   };
   /** Separate host opt-in for sandboxed commands; no credential or network inheritance. */
   readonly workspaceProcesses?: {
+    /** CLI checks select read-only; existing explicit hosts retain read-write by default. */
+    readonly workspaceAccess?: "read-only" | "read-write";
     readonly roots: readonly string[];
     readonly approval?: "ask" | "allow";
     /** Additional trusted, read-only toolchain directories; never model-supplied. */

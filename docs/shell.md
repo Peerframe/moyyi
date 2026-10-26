@@ -6,21 +6,38 @@ no upstream Agent SDK is used. D6 is recorded in [ADR 0013](decisions/0013-nativ
 
 ## Enable deliberately
 
+For checks in a selected project, use the existing trusted host with explicit launch options:
+
+```sh
+moyyi --host /absolute/host.mjs -C /absolute/project --allow-shell --shell-toolchain node
+```
+
+`--allow-shell` grants commands a **read-only workspace** and keeps command approval at `ask`.
+`--shell-toolchain node` is optional and requires `--allow-shell`. It exposes the Node executable
+running moyyi and its exact startup libraries, not all installed developer tools. Add
+`--allow-write` separately for snapshot-backed create/edit/undo; this does not make shell commands
+writable. Launch options do not update the host module or change the next launch's defaults.
+See [CLI usage](cli.md) for host-policy conflicts and request budgets.
+
 Add this to your existing explicit trusted host module passed with `--host FILE`:
 
 ```ts
 workspaceProcesses: {
   roots: ["/absolute/path/to/project"],
   approval: "ask",
+  workspaceAccess: "read-only",
 },
 ```
 
 The rest of the host module still selects a model and its connection. This example does not
 supply credentials or make a request. A file-write grant does not enable commands. The default
 runtime remains read-only; `--demo` retains its finite read-only demonstration. The existing CLI
-shows the exact command/cwd/timeout/backend approval and uses Ctrl-C to request cancellation.
+shows the exact command/cwd/timeout/backend/access mode approval and uses Ctrl-C to request cancellation.
 An explicit host may choose `approval: "allow"` within its selected roots. Installed code and host
 modules are trusted; model output and project files cannot create grants or change the backend.
+Existing explicit hosts that omit `workspaceAccess` retain their `read-write` command grant.
+Hosts can also select `read-write` explicitly. These command writes have no automatic snapshots
+or undo; the new CLI shell grant always selects `read-only`.
 
 Arguments are `command`, optional workspace-relative `cwd` (default `.`), and `timeoutMs`
 (default 30,000, maximum 120,000). The runtime also enforces the enclosing run deadline.
@@ -28,18 +45,24 @@ No interactive stdin, persistent terminal or background-service API is provided.
 
 ## What the command can access
 
-- Read/write ordinary files in the exact granted workspace, and use a private temporary home.
+- Read ordinary files in the exact granted workspace and use a writable private temporary home.
+  Workspace writes require the explicit host's `read-write` mode. Read-only checks cannot create,
+  replace, delete, rename or chmod project files, including from child commands. Tools that write
+  caches, coverage or build output need their own no-write mode or a destination in `$TMPDIR`;
+  an unsuccessful check does not widen authority automatically.
 - Read required system binaries/libraries. Additional toolchain executables and libraries require
   explicit host `executablePaths` (exact executable files) and `readOnlyPaths` grants. A Homebrew
   or custom Node installation is not automatically exposed with the rest of the host home.
-  On macOS, include the exact compatibility paths used by the loader, such as selected public
+  For manually configured grants on macOS, include the exact compatibility paths used by the loader, such as selected public
   library files under Homebrew's `opt/<formula>/lib`. The sandbox validates both each requested
   path and its resolved target, grants data access only to that target, and permits only metadata
-  access to the requested alias and its ancestors. It does not discover or grant other aliases,
-  sibling libraries or the whole Homebrew tree. A clean Node startup probe can identify required
-  public libraries; the host must explicitly select their verified compatibility aliases as well.
-  If a Node build loads a default OpenSSL configuration outside these grants, a fixed command may
-  use `OPENSSL_CONF=/dev/null` rather than granting that configuration directory.
+  access to the requested alias and its ancestors. `--shell-toolchain node` uses the same bounded,
+  clean Node startup probe as document parsing and discovers only compatibility names resolving
+  to those exact libraries. It grants no sibling libraries or whole Homebrew directories. Neither
+  the host's loaded native addons nor project code supplies this inventory. Global npm packages,
+  external dependency stores and additional native-addon libraries are not automatically granted.
+  The clean command environment fixes `OPENSSL_CONF=/dev/null`; it does not expose the host's
+  OpenSSL configuration directory or inherit Node loader options.
 - Host/external network access is denied. Linux uses an isolated network namespace; its own
   loopback/IPC is not a connection to host services. Shell does not
   receive the model connection's keys, SSH agent socket, proxy settings or arbitrary parent env.

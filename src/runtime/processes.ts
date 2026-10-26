@@ -24,6 +24,8 @@ const STOP_DEADLINE_MS = 1_500;
 type Identity = { readonly path: string; readonly dev: number; readonly ino: number };
 export interface WorkspaceProcessOptions {
   readonly roots: readonly string[];
+  /** Existing explicit hosts retain read-write; CLI check grants select read-only explicitly. */
+  readonly workspaceAccess?: "read-only" | "read-write";
   readonly protectedPaths?: readonly string[];
   /** Explicit trusted tool installations; never taken from model input or PATH. */
   readonly executablePaths?: readonly string[];
@@ -37,6 +39,8 @@ export class NodeWorkspaceProcesses implements WorkspaceProcessesFactory {
 
   constructor(options: WorkspaceProcessOptions) {
     if (!options.roots.length) throw Error("Process grants require at least one workspace");
+    if (!["read-only", "read-write"].includes(options.workspaceAccess ?? "read-write"))
+      throw Error("Invalid process workspace access mode");
     this.roots = options.roots.map((root) => {
       if (!isAbsolute(root)) throw Error("Process workspace must be absolute");
       const stat = lstatSync(root);
@@ -48,6 +52,7 @@ export class NodeWorkspaceProcesses implements WorkspaceProcessesFactory {
     });
     this.options = {
       roots: this.roots.map(({ path }) => path),
+      workspaceAccess: options.workspaceAccess ?? "read-write",
       protectedPaths: [...(options.protectedPaths ?? [])],
       executablePaths: [...(options.executablePaths ?? [])],
       readOnlyPaths: [...(options.readOnlyPaths ?? [])],
@@ -78,6 +83,7 @@ export class NodeWorkspaceProcesses implements WorkspaceProcessesFactory {
         cwd: relative(root.path, cwd.path).split(sep).join("/") || ".",
         timeoutMs: request.timeoutMs,
         workspaceRoot: root.path,
+        workspaceAccess: this.options.workspaceAccess ?? "read-write",
         backend,
         directoryIdentity: `${root.dev}:${root.ino}/${cwd.dev}:${cwd.ino}`,
       });
@@ -107,6 +113,7 @@ export class NodeWorkspaceProcesses implements WorkspaceProcessesFactory {
           fresh.workspaceRoot !== proposal.workspaceRoot ||
           fresh.cwd !== proposal.cwd ||
           fresh.backend !== proposal.backend ||
+          fresh.workspaceAccess !== proposal.workspaceAccess ||
           fresh.directoryIdentity !== proposal.directoryIdentity
         )
           throw Error("Process workspace changed after approval; nothing executed");
@@ -116,6 +123,7 @@ export class NodeWorkspaceProcesses implements WorkspaceProcessesFactory {
           guard();
           const plan = await prepareNativeSandbox({
             workspaceRoot: proposal.workspaceRoot,
+            workspaceAccess: proposal.workspaceAccess,
             cwd: resolve(proposal.workspaceRoot, proposal.cwd),
             protectedPaths: this.options.protectedPaths ?? [],
             executablePaths: this.options.executablePaths ?? [],
@@ -128,6 +136,7 @@ export class NodeWorkspaceProcesses implements WorkspaceProcessesFactory {
           const current = prepare(proposal);
           if (
             current.directoryIdentity !== proposal.directoryIdentity ||
+            current.workspaceAccess !== proposal.workspaceAccess ||
             plan.backend !== proposal.backend
           )
             throw Error("Process workspace changed while preparing isolation; nothing executed");
@@ -179,8 +188,9 @@ function parseApproved(value: unknown): PreparedProcess {
   validateRequest(result);
   if (
     Object.keys(result).sort().join(",") !==
-      "backend,command,cwd,directoryIdentity,timeoutMs,workspaceRoot" ||
+      "backend,command,cwd,directoryIdentity,timeoutMs,workspaceAccess,workspaceRoot" ||
     typeof result.workspaceRoot !== "string" ||
+    !["read-only", "read-write"].includes(result.workspaceAccess) ||
     typeof result.directoryIdentity !== "string" ||
     !["seatbelt", "bubblewrap"].includes(result.backend)
   )

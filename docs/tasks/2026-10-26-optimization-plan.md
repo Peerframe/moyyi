@@ -63,9 +63,29 @@ PR #28 产品 `487ccfb4f434952a63a890582dec3651e0751e0d` 的
   此诊断不改变原题分数，也不支持往生产加入强制review框架。相关维护中公开方案已经查阅；
   当前先交付已证实有效的工具/入口，再用代表性任务推进准确性，避免同题循环。
 
-下一检查点是正常CLI的显式工作区写入、沙箱命令、网页origin和请求上限选项，以及可见snapshot/check回执。
-当前真实闭环通过可信私有验收host实现，普通用户仍需手写host才能开启，不能把这个可用性缺口掩盖成已完成。
-默认只读、逐次审批、Flash+Responses+low、零重试保持；不扩大现有题目的预算/判分，不公开发布。
+PR #28 的最后证据头 `947dc6e` 独立复核无阻断，
+[该头CI](https://github.com/Peerframe/moyyi/actions/runs/40349596700)成功后按授权合并；
+main为 `86dc4337ea117656595af3d999da42e462051af6`，
+[合并main CI](https://github.com/Peerframe/moyyi/actions/runs/40350509270)成功。
+
+### 日常CLI入口（当前候选）
+
+独立分支 `codex/daily-cli` 从最新main创建。正常CLI新增显式工作区写入、只读沙箱命令、
+当前Node工具链、精确网页origin/DNS和请求上限选项；默认host不变，自定义policy/既有capability冲突拒绝。
+`--allow-write`只开放有快照的文件工具，不把命令变为可写；命令模式进审批digest和执行重查。
+Node探针复用现有文档解析逻辑，只授权当前可执行文件、实际启动库及精确别名，不开放整个Homebrew。
+真实effect与tool_result匹配后才显示路径/snapshotId或命令退出回执，不把模型文字提升为验证证据。
+见[ADR0030](../decisions/0030-explicit-daily-cli-grants.md)及[CLI说明](../cli.md)。
+
+- 原 `npm run check`：类型、Biome、105文件/2287项全部通过；未改原阈值/并发/判分。
+- shell相关71项、文档47项、CLI回执36项、CLI参数31项、host授权4项通过（有重叠，不累加成独立总数）；
+  `eval:shell`7/7、`eval:documents`4/4通过真实原生沙箱/7格式。新增模式Linux行为仍待原CI。
+- `python3 scripts/verify-cli-pty.py` 6/6：原5项+真实主CLI使用startup grants，经TTY审批create、
+  只读Node检查（工作区写入/外部修改/继承canary拒绝）和按真实snapshot undo；目前是源码入口与合成模型。
+- 代码范围分工后相互复核无阻断；默认authority和零重试不变。当前产品修改无新增付费调用。
+  本机manager候选66项离线参数/execve/非交互/Key隔离检查通过，尚未替换生效manager。
+- 余下：干净安装包、远程原CI、实际安装/配置备份，以及正常启动器的有界真实任务。通过后逐个合并，
+  不叠PR、不公开发布。既有复杂源码题仍失败，已封存；不靠这次入口改动宣称修复模型解释能力。
 
 私有证据仍放在 `~/.moyyi/acceptance/`：`regression-2026-10-26-daily`、
 `daily-work-2026-10-26`。保存真实请求/输出和失败记录，不提交凭据、会话或私人录制。

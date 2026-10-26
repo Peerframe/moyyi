@@ -3,7 +3,8 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { expect, it, vi } from "vitest";
-import { absoluteLibraryPaths, documentSandbox } from "./document-sandbox.ts";
+import { documentSandbox } from "./document-sandbox.ts";
+import { absoluteLibraryPaths } from "./node-toolchain.ts";
 
 it("discovers a clean Node closure without inheriting host native addons or loader options", async () => {
   const scratch = await realpath(await mkdtemp(join(tmpdir(), "moyyi-document-closure-")));
@@ -11,7 +12,7 @@ it("discovers a clean Node closure without inheriting host native addons or load
     throw Error("Host addon inventory must not authorize parser reads");
   });
   try {
-    const plan = documentSandbox(
+    const plan = await documentSandbox(
       fileURLToPath(new URL("./document-worker.ts", import.meta.url)),
       scratch,
     );

@@ -26,7 +26,7 @@ export async function assertDocumentConfinement(documentSandbox, worker) {
   try {
     const address = server.address();
     assert.ok(address && typeof address !== "string");
-    const plan = documentSandbox(worker, scratch);
+    const plan = await documentSandbox(worker, scratch);
     const code = `
       import {readFileSync,writeFileSync} from 'node:fs';
       import {connect} from 'node:net';

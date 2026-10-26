@@ -2,9 +2,12 @@ import type {
   ActionDigest,
   ClientCommand,
   EffectId,
+  EffectRecord,
   RunId,
   RuntimeEvent,
   SessionId,
+  ToolCallId,
+  ToolResultPart,
   TranscriptEntry,
 } from "../contracts/index.ts";
 import type { Runtime } from "../runtime/index.ts";
@@ -54,6 +57,63 @@ export function terminalText(text: string): string {
     .join("");
 }
 
+function receiptTool(effect: EffectRecord): boolean {
+  return (
+    (["create", "edit", "undo"].includes(effect.tool) &&
+      effect.profile.class === "workspace_write" &&
+      effect.profile.reversibility === "snapshot") ||
+    (effect.tool === "shell" && effect.profile.class === "process")
+  );
+}
+
+function receiptText(effect: EffectRecord, result: ToolResultPart): string | undefined {
+  if (
+    result.status !== effect.state ||
+    !["succeeded", "failed"].includes(effect.state) ||
+    result.content.length !== 1
+  )
+    return;
+  const part = result.content[0];
+  if (part?.type !== "text" || part.text.length > 65_536) return;
+  let data: Record<string, unknown>;
+  try {
+    const value: unknown = JSON.parse(part.text);
+    if (!value || typeof value !== "object" || Array.isArray(value)) return;
+    data = value as Record<string, unknown>;
+  } catch {
+    return;
+  }
+  if (effect.profile.class === "workspace_write") {
+    const hash = (value: unknown) =>
+      value === null || (typeof value === "string" && /^[a-f0-9]{64}$/.test(value));
+    if (
+      effect.state !== "succeeded" ||
+      effect.profile.verification !== "postcheck" ||
+      typeof data.path !== "string" ||
+      !data.path ||
+      data.path.length > 4_096 ||
+      data.snapshotId !== effect.id ||
+      effect.id.length > 512 ||
+      !hash(data.beforeHash) ||
+      !hash(data.afterHash)
+    )
+      return;
+    const path = terminalText(data.path).replaceAll("\n", "\\n");
+    const display = path.length > 512 ? `${path.slice(0, 512)}… (path truncated)` : path;
+    return `${effect.tool} path=${JSON.stringify(display)} snapshotId=${JSON.stringify(effect.id)}`;
+  }
+  if (
+    typeof data.termination !== "string" ||
+    !["exited", "cancelled", "timeout", "output_limit", "revoked", "unknown"].includes(
+      data.termination,
+    ) ||
+    (data.exitCode !== null && !Number.isSafeInteger(data.exitCode)) ||
+    typeof data.truncated !== "boolean"
+  )
+    return;
+  return `shell exitCode=${data.exitCode} termination=${data.termination} outputTruncated=${data.truncated}`;
+}
+
 /** A protocol client. It never executes assistant text or grants policy authority. */
 export function createCliSession(runtime: Runtime, options: CliSessionOptions): CliSession {
   const completion = Promise.withResolvers<number>();
@@ -68,6 +128,9 @@ export function createCliSession(runtime: Runtime, options: CliSessionOptions): 
   let unsubscribe = () => {};
   const seenEntries = new Set<string>();
   const approvals = new Map<EffectId, { digest: ActionDigest }>();
+  const receiptEffects = new Map<ToolCallId, EffectRecord>();
+  const receiptResults = new Map<ToolCallId, ToolResultPart>();
+  const shownReceipts = new Set<EffectId>();
   let approvalAttempt: { effectId: EffectId; digest: ActionDigest } | undefined;
   let pendingCommand: { type: ClientCommand["type"]; rejected: boolean } | undefined;
 
@@ -79,6 +142,16 @@ export function createCliSession(runtime: Runtime, options: CliSessionOptions): 
   const output = (label: string, value: string) => {
     endStreamLine();
     for (const line of terminalText(value).split("\n")) write(`${label} | ${line}\n`);
+  };
+  const showReceipt = (callId: ToolCallId) => {
+    const effect = receiptEffects.get(callId);
+    const result = receiptResults.get(callId);
+    if (!effect || !result || shownReceipts.has(effect.id)) return;
+    const text = receiptText(effect, result);
+    if (text === undefined) return;
+    shownReceipts.add(effect.id);
+    receiptResults.delete(callId);
+    output("receipt", text);
   };
   const prompt = () => {
     if (options.interactive && !closing) {
@@ -228,8 +301,13 @@ export function createCliSession(runtime: Runtime, options: CliSessionOptions): 
         for (const part of body.content)
           if (part.type === "text") output(body.steering ? "user steering" : "user", part.text);
     } else if (body.kind === "tool_results") {
-      for (const result of body.results)
+      for (const result of body.results) {
         output("tool result", `${result.callId}: ${result.status}`);
+        if (!loading && runId && entry.runId === runId && receiptEffects.has(result.callId)) {
+          receiptResults.set(result.callId, result);
+          showReceipt(result.callId);
+        }
+      }
     } else if (body.kind === "notice") output("notice", `${body.code}: ${body.text}`);
     else if (body.kind === "compaction")
       output("context summary", body.summary.map((part) => part.text).join("\n"));
@@ -244,6 +322,9 @@ export function createCliSession(runtime: Runtime, options: CliSessionOptions): 
         if (event.sessionId !== sessionId) return;
         runId = event.runId;
         streamedText = "";
+        receiptEffects.clear();
+        receiptResults.clear();
+        shownReceipts.clear();
         break;
       case "assistant.delta":
         if (event.runId !== runId) return;
@@ -269,6 +350,12 @@ export function createCliSession(runtime: Runtime, options: CliSessionOptions): 
         break;
       case "effect.updated":
         if (event.effect.runId !== runId) return;
+        // Only executor-journaled effects can qualify a matching result as a receipt.
+        // Ordinary tool text, assistant claims and replayed transcript entries cannot.
+        if (receiptTool(event.effect)) {
+          receiptEffects.set(event.effect.callId, event.effect);
+          showReceipt(event.effect.callId);
+        }
         if (
           event.effect.state !== "awaiting_approval" &&
           approvals.get(event.effect.id)?.digest === event.effect.digest
@@ -281,6 +368,9 @@ export function createCliSession(runtime: Runtime, options: CliSessionOptions): 
         if (event.runId !== runId) return;
         runId = undefined;
         approvals.clear();
+        receiptEffects.clear();
+        receiptResults.clear();
+        shownReceipts.clear();
         streamedText = "";
         output(
           "run",

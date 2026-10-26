@@ -130,4 +130,91 @@ with tempfile.TemporaryDirectory(prefix="moyyi-cli-pty-") as root:
                 process.kill()
                 process.wait()
         os.close(master)
-print("5/5 POSIX PTY scenarios passed; temporary session files removed. No API or credentials.")
+
+
+# Same PTY driver, now using a synthetic host and the real daily CLI grants. This also runs
+# against the independently installed package in verify:package, outside the source tree.
+with tempfile.TemporaryDirectory(prefix="moyyi-daily-pty-") as temporary:
+    root = pathlib.Path(temporary)
+    workspace = root / "workspace"
+    workspace.mkdir()
+    (workspace / "note.txt").write_text("source fact\n")
+    outside = root / "outside.txt"
+    outside.write_text("OUTSIDE_CANARY")
+    (workspace / "check.cjs").write_text("""
+const fs = require('node:fs');
+if (fs.readFileSync('report.txt','utf8') !== 'source fact\\n') process.exit(2);
+for (const path of ['forbidden.txt','../outside.txt']) {
+  let denied = false; try { fs.writeFileSync(path,'BAD'); } catch { denied = true; }
+  if (!denied) process.exit(3);
+}
+if (process.env.MOYYI_SYNTHETIC_SECRET) process.exit(4);
+console.log('readonly verified');
+""")
+    host = root / "host.mjs"
+    host.write_text("""
+const usage={status:'unknown',inputTokens:null,outputTokens:null,cacheReadTokens:null,cacheWriteTokens:null,reasoningTokens:null};
+const origin={provider:'daily-fixture',model:'fixture'};
+let step=0;
+function snapshot(value) {
+  if (typeof value==='string') { try { return snapshot(JSON.parse(value)); } catch { return null; } }
+  if (!value || typeof value!=='object') return null;
+  if (typeof value.snapshotId==='string') return value.snapshotId;
+  for (const child of Object.values(value)) { const found=snapshot(child); if(found)return found; }
+  return null;
+}
+export default {model:origin,projectInstructions:false,limits:{maxRetries:0},plugins:[{plugin:{name:'daily-fixture',apiVersion:1,setup(host){
+host.registerModelProvider({id:origin.provider,models:[{origin,contextWindowTokens:32000,maxOutputTokens:1000,parallelToolCalls:false,reasoning:'none',promptCache:'none',editFormat:'search_replace'}],createClient(){return{async *stream(request){
+step++; let name,args;
+if(step===1){name='create';args={path:'report.txt',text:'source fact\\n'};}
+else if(step===2){name='shell';args={command:'node check.cjs',cwd:'.',timeoutMs:10000};}
+else if(step===3){
+ if(!JSON.stringify(request.messages).includes('readonly verified'))throw Error('Sandbox check did not pass');
+ name='undo';args={snapshotId:snapshot(request.messages)}; if(!args.snapshotId)throw Error('Missing real snapshot receipt');
+}else {yield{type:'part_completed',index:0,part:{type:'text',text:'Daily CLI create/check/undo finished.'}};yield{type:'completed',stopReason:'end_turn',providerStopReason:null,usage};return;}
+yield{type:'part_completed',index:0,part:{type:'tool_call',callId:'daily_'+step,providerCallId:'daily_'+step,providerItemId:null,name,rawArguments:JSON.stringify(args),argumentsSource:'verbatim'}};
+yield{type:'completed',stopReason:'tool_use',providerStopReason:null,usage};
+}};}});}}}]};
+""")
+    master, slave = pty.openpty()
+    command = [node, entry, "--host", str(host), "-C", str(workspace), "--data", str(root / "data"),
+               "--allow-write", "--allow-shell", "--shell-toolchain", "node", "--max-requests", "4"]
+    process = subprocess.Popen(command, stdin=slave, stdout=slave, stderr=slave, close_fds=True,
+                               env={**os.environ, "MOYYI_SYNTHETIC_SECRET": "CANARY"})
+    os.close(slave)
+    transcript, cursor = "", 0
+    try:
+        wait(r"grants \| Commands: approval, read-only workspace")
+        wait(r"session \| session_[\w-]+")
+        wait(r"moyyi> ")
+        send("Run the fixed offline daily task\n")
+        for tool in ["create", "shell", "undo"]:
+            effect = wait(r"approval \| (effect_[\w-]+)").group(1)
+            wait(r"Use /approve .* or /deny .*")
+            send("/approve " + effect + "\n")
+            wait(r"tool \| " + tool + ": succeeded", timeout=20)
+            if tool == "create":
+                assert (workspace / "report.txt").read_text() == "source fact\n"
+        wait(r"run \| completed")
+        assert not (workspace / "report.txt").exists(), "Undo did not remove created report"
+        assert not (workspace / "forbidden.txt").exists(), "Command wrote the read-only workspace"
+        assert outside.read_text() == "OUTSIDE_CANARY"
+        send("/exit\n")
+        until = time.monotonic() + 5
+        while process.poll() is None and time.monotonic() < until:
+            ready, _, _ = select.select([master], [], [], 0.05)
+            if ready:
+                try: transcript += os.read(master, 65536).decode("utf-8", errors="replace")
+                except OSError as error:
+                    if error.errno != errno.EIO: raise
+        assert process.poll() == 0, transcript[-5000:]
+        print("PASS PTY daily flags: approved create, read-only Node check, exact snapshot undo")
+    finally:
+        if process.poll() is None:
+            process.terminate()
+            try: process.wait(timeout=5)
+            except subprocess.TimeoutExpired:
+                process.kill()
+                process.wait()
+        os.close(master)
+print("6/6 POSIX PTY scenarios passed; temporary session files removed. No API or credentials.")

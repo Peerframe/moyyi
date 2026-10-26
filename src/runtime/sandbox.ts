@@ -7,6 +7,7 @@ import { assertUnprotected } from "./preconditions.ts";
 
 export interface NativeSandboxOptions {
   readonly workspaceRoot: string;
+  readonly workspaceAccess?: "read-only" | "read-write";
   readonly cwd: string;
   readonly protectedPaths: readonly string[];
   /** Trusted host grants, never tool arguments. Libraries need a separate read-only grant. */
@@ -83,6 +84,9 @@ export async function prepareNativeSandbox(
 ): Promise<NativeSandboxPlan> {
   if (process.platform !== "darwin" && process.platform !== "linux")
     throw Error("Native command sandbox is unavailable on this platform");
+  const workspaceAccess = options.workspaceAccess ?? "read-write";
+  if (!["read-only", "read-write"].includes(workspaceAccess))
+    throw Error("Invalid sandbox workspace access mode");
   if (
     !options.commandText.length ||
     options.commandText.length > 32_768 ||
@@ -199,6 +203,7 @@ export async function prepareNativeSandbox(
     LANG: "C",
     LC_ALL: "C",
     PWD: cwd,
+    OPENSSL_CONF: "/dev/null",
   });
   if (process.platform === "darwin") {
     await access("/usr/bin/sandbox-exec", constants.X_OK);
@@ -226,7 +231,8 @@ export async function prepareNativeSandbox(
         ? [`(allow file-read-metadata ${literal([...loaderMetadata])})`]
         : []),
       `(allow file-read* ${filters(reads)})`,
-      `(allow file-read* file-write* ${filters([workspace, scratch])})`,
+      `(allow file-read* ${filters([workspace])})`,
+      `(allow file-read* file-write* ${filters(workspaceAccess === "read-write" ? [workspace, scratch] : [scratch])})`,
       '(allow file-read* (literal "/dev/null") (literal "/dev/random") (literal "/dev/urandom"))',
       '(allow file-write-data (literal "/dev/null"))',
       `(deny file-read* file-write* (regex #${quote(protectedPattern)}))`,
@@ -264,19 +270,19 @@ export async function prepareNativeSandbox(
     "/proc",
     "--dev",
     "/dev",
-    "--bind",
+    workspaceAccess === "read-write" ? "--bind" : "--ro-bind",
     workspace,
     workspace,
     "--bind",
     scratch,
     scratch,
   );
-  // A bind mount pins each containing directory against rename while ordinary children stay
-  // writable. Masking only the secret leaf would still allow moving its host parent directory.
+  // Writable workspaces need containing-directory pins against protected-descendant renames.
+  // Read-only workspaces must not gain writable child mounts through these pins.
   for (const path of [...pinnedAncestors]
     .filter((path) => path !== workspace)
     .sort((a, b) => a.length - b.length))
-    args.push("--bind", path, path);
+    args.push(workspaceAccess === "read-write" ? "--bind" : "--ro-bind", path, path);
   // A zero-mode, read-only bind denies reads instead of returning a misleading empty secret.
   // Pin its source too: the child must not chmod the same inode through its scratch alias.
   let mask: string | undefined;
@@ -290,7 +296,7 @@ export async function prepareNativeSandbox(
     else if (mask) args.push("--ro-bind", mask, path);
   }
   // The synthetic namespace parents must not become an additional writable filesystem.
-  // This is non-recursive: the explicit workspace/scratch bind mounts retain write access.
+  // This is non-recursive: only explicitly writable mounts retain write access.
   args.push("--remount-ro", "/");
   for (const [key, value] of Object.entries(env)) args.push("--setenv", key, value);
   args.push("--chdir", cwd, "--", "/bin/sh", "-c", options.commandText);

@@ -27,7 +27,7 @@ const roots: string[] = [];
 afterEach(() => {
   for (const root of roots.splice(0)) rmSync(root, { recursive: true, force: true });
 });
-function setup(maxOutputBytes = 32_768) {
+function setup(maxOutputBytes = 32_768, workspaceAccess?: "read-only" | "read-write") {
   const root = realpathSync(mkdtempSync(join(tmpdir(), "moyyi-process-test-")));
   roots.push(root);
   const workspace = join(root, "workspace");
@@ -45,6 +45,7 @@ function setup(maxOutputBytes = 32_768) {
   };
   const factory = new NodeWorkspaceProcesses({
     roots: [workspace],
+    ...(workspaceAccess ? { workspaceAccess } : {}),
     protectedPaths: [join(workspace, "private-store")],
   });
   const capability = factory.create(context, guard, { phase: "prepare" });
@@ -114,6 +115,21 @@ describe.skipIf(process.platform !== "darwin" && process.platform !== "linux")(
       expect(result.output).toContain("stderr");
       expect(t.read("result")).toBe("created");
       await expect(cap.run()).rejects.toThrow(/single approved/);
+    });
+
+    it("binds the host read-only mode to approval and rejects a different mode", async () => {
+      const t = setup(32_768, "read-only");
+      const proposal = await t.prepare("printf unexpected > result");
+      expect(proposal.workspaceAccess).toBe("read-only");
+      const result = await t.execute(proposal).run();
+      expect(result.termination).toBe("exited");
+      expect(result.exitCode).not.toBe(0);
+      expect(existsSync(join(t.workspace, "result"))).toBe(false);
+      await expect(t.execute({ ...proposal, workspaceAccess: "read-write" }).run()).rejects.toThrow(
+        "changed after approval",
+      );
+      expect(existsSync(join(t.workspace, "result"))).toBe(false);
+      expect((await setup().prepare("true")).workspaceAccess).toBe("read-write");
     });
 
     it("binds a normalized real subdirectory to approval", async () => {

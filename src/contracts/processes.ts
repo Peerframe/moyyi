@@ -8,6 +8,8 @@ export interface ProcessRequest {
 /** Host-normalized proposal bound into the action digest. */
 export interface PreparedProcess extends ProcessRequest {
   readonly workspaceRoot: string;
+  /** Host-selected filesystem mode, bound to approval and never supplied by the tool caller. */
+  readonly workspaceAccess: "read-only" | "read-write";
   /** Opaque host identity, rechecked after approval to reject replaced directories. */
   readonly directoryIdentity: string;
   readonly backend: "seatbelt" | "bubblewrap";

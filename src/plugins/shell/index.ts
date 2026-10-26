@@ -33,7 +33,7 @@ export const shellTool: ToolDefinition = {
     });
     return {
       digest: "executor-binds-process" as ActionDigest,
-      summary: `Run command in ${process.cwd} (${process.backend}, network denied)`,
+      summary: `Run command in ${process.cwd} (${process.workspaceAccess}, ${process.backend}, network denied)`,
       preview: canonicalizeJson({ ...process, network: "denied", rollback: "unavailable" }),
       preconditions: [{ kind: "path_resolves_within", path: process.cwd, root: "." }],
       payload: process,

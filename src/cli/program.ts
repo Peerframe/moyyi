@@ -69,6 +69,15 @@ export async function main(argv: readonly string[]): Promise<number> {
       ...(host ? { host } : {}),
       dataDirectory: options.dataDirectory ?? host?.dataDirectory ?? defaultDataDirectory(),
       approveReads: options.approveReads,
+      launch: {
+        workspaceRoot,
+        allowWrite: options.allowWrite,
+        allowShell: options.allowShell,
+        webOrigins: options.webOrigins,
+        ...(options.shellToolchain ? { shellToolchain: options.shellToolchain } : {}),
+        ...(options.webDns ? { webDns: options.webDns } : {}),
+        ...(options.maxRequests === undefined ? {} : { maxRequests: options.maxRequests }),
+      },
       ...(options.dev ? { developmentPlugins: development } : {}),
     });
   } catch {
@@ -173,6 +182,20 @@ export async function main(argv: readonly string[]): Promise<number> {
     for (const plugin of runtime.plugins)
       if (plugin.state === "failed")
         write(`plugin | ${terminalText(plugin.name)} failed to load.\n`);
+    if (options.allowWrite)
+      write("grants | File writes: approval and snapshots; selected workspace only.\n");
+    if (options.allowShell)
+      write("grants | Commands: approval, read-only workspace, private scratch, no network.\n");
+    if (options.shellToolchain)
+      write("grants | Toolchain: this Node executable and its exact startup libraries.\n");
+    for (const origin of options.webOrigins)
+      write(`grants | HTTPS fetch: ${terminalText(origin)}; approval required.\n`);
+    if (options.webDns === "cloudflare-doh")
+      write("grants | DNS: explicit Cloudflare DoH; authorized hostnames sent to Cloudflare.\n");
+    if (options.maxRequests !== undefined)
+      write(
+        `budget | At most ${options.maxRequests} model requests per turn, including final answer.\n`,
+      );
     await session.start();
     if (interactive && options.dev && development.length) {
       watcher = watchDevelopmentPlugins(development, changed, () =>

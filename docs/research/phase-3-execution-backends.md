@@ -1,5 +1,37 @@
 # Phase 3 execution backends: upstream comparison
 
+## Daily CLI extension, 2026-10-26
+
+The daily CLI reuses this native adapter and the document parser's fixed Node dependency probe.
+An explicit `--shell-toolchain node` selects the current `process.execPath`, not a PATH lookup,
+project script or host-addon inventory. One clean subprocess returns only bounded `sharedObjects`;
+the helper grants regular files and exact compatibility aliases, never an inferred directory.
+The temporary probe home is removed on success or failure. Discovery does not install packages.
+
+The reviewed baseline remains Node **v26.0.0**. Its
+[diagnostic-report documentation](https://github.com/nodejs/node/blob/v26.0.0/doc/api/report.md)
+documents `sharedObjects` and explains that `--report-exclude-network` disables reverse DNS during
+report generation. The probe also excludes report environment data. Its
+[CLI documentation](https://github.com/nodejs/node/blob/v26.0.0/doc/api/cli.md) documents startup
+configuration through `NODE_OPTIONS` and `OPENSSL_CONF`; a newly constructed environment omits
+inherited loader options and fixes `OPENSSL_CONF=/dev/null`. No model-selected argument reaches
+the discovery subprocess. Its time/output limits remain 5 seconds and 128 KiB.
+
+CLI shell grants explicitly select a read-only project; controlled file-write grants do not
+change that mode. The selected access mode is included in process preparation and approval.
+Existing trusted hosts retain read-write compatibility when the new setting is omitted.
+The existing [SRT v0.0.81 source pin](https://github.com/anthropics/sandbox-runtime/blob/c40cf14a65d025e3cd27f071f13a73c12b3b1f92/src/sandbox/macos-sandbox-utils.ts)
+also separates read authority from write roots. On Linux, the
+[bubblewrap v0.9.0 manual](https://github.com/containers/bubblewrap/blob/v0.9.0/bwrap.xml) defines
+`--ro-bind` and the non-recursive behavior of `--remount-ro`: therefore protected-descendant pins
+must also remain read-only, rather than reintroducing writable child mounts. Scratch remains
+writable and existing secret masks/network denial remain in force. Tests that require project
+output must use their supported no-write mode or scratch; failure does not trigger wider grants.
+
+This is a narrow reuse of moyyi's existing adapter, not a new sandbox framework. No new dependency
+or upstream source is copied. Native platform conformance, lifecycle and package checks remain
+the acceptance gates; this extension does not alter paid-task budgets or claim broader tool support.
+
 Research date: 2026-10-25. D6 was subsequently accepted: native OS sandbox default, Docker optional.
 See [ADR 0013](../decisions/0013-native-process-sandbox.md) for the accepted decision and
 [phase 3 handoff](../tasks/2026-10-25-phase-3-shell.md) for implementation evidence.

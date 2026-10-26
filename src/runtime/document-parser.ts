@@ -56,9 +56,9 @@ export async function parseDocument(
         import.meta.url,
       ),
     );
-    let plan: ReturnType<typeof documentSandbox>;
+    let plan: Awaited<ReturnType<typeof documentSandbox>>;
     try {
-      plan = documentSandbox(worker, scratch);
+      plan = await documentSandbox(worker, scratch);
     } catch {
       throw new DocumentAccessError("sandbox_unavailable");
     }
@@ -79,7 +79,7 @@ export async function parseDocument(
 }
 
 function runParser(
-  plan: ReturnType<typeof documentSandbox>,
+  plan: Awaited<ReturnType<typeof documentSandbox>>,
   scratch: string,
   input: Buffer,
   signal: AbortSignal,
