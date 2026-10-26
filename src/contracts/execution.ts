@@ -1,3 +1,4 @@
+import type { WorkspaceDocuments } from "./documents.ts";
 import type { WorkspaceFiles, WorkspaceWrites } from "./files.ts";
 import type { ActionDigest, EffectRecord } from "./persisted/index.ts";
 import type { WorkspaceProcesses } from "./processes.ts";
@@ -37,6 +38,14 @@ export interface WorkspaceWritesFactory {
     assertAuthorized: () => void,
     scope: WorkspaceWriteScope,
   ): WorkspaceWrites;
+}
+
+export interface WorkspaceDocumentsFactory {
+  create(
+    context: ToolContext,
+    assertAuthorized: () => void,
+    scope: WorkspaceWriteScope,
+  ): WorkspaceDocuments;
 }
 
 export interface WorkspaceProcessesFactory {

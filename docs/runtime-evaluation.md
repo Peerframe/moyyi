@@ -120,7 +120,8 @@ the exact checkout, host configuration, OS/toolchain and provider settings requi
 | `write` | File tools cannot create parent directories, move/delete existing files or change metadata. `listing-sheet`, `js-to-ts-split`, `stale-cache-cleanup`, `vault-move`, `obsolete-engine-cleanup` and `metadata-batch-rename` need shell for these operations. |
 | `shell` | Requires the existing supported OS sandbox and an explicitly available read-only Node/toolchain for coding checks. No network installation of missing tools or packages. |
 | Git history | `.git` remains protected even with shell. `git-history-ci-repair` cannot inspect the required history with this adapter. Report this restriction separately from model performance. |
-| Web/browser/documents | No web or browser grant in this adapter. Existing research inputs are offline fixtures; real browsing and binary document work are not claimed. |
+| Web/browser | No web or browser grant in this adapter. Existing research inputs are offline fixtures; live browsing is not claimed. |
+| Documents | Seven formats use the native parser under ordinary reads. Fixed comparison/report tasks are prepared separately below; no real-model pass is claimed. |
 
 The adapter never selects a weaker permission profile or marks an unsupported task passed. No
 capability classifier is inferred from hidden task fields. Before a live comparison, record the
@@ -128,3 +129,24 @@ chosen capabilities and known unsupported cases; retain full per-task results an
 these limitations as model failures. No real-model corpus score or baseline comparison is available
 from this offline delivery. Private tasks require explicit `--include-private` and separate
 permission for their content; they were not read during implementation or checks.
+
+## Prepared document acceptance group
+
+The two fixed tasks in `evals/documents/tasks.ts` use the existing `EvalTask` contract and are kept
+separate from the unchanged 32-task public corpus. `document-comparison-seven-formats` requires
+`comparison.json` with all seven documents' facts, source hashes and exact one-sentence quotations.
+`document-report-seven-formats` requires `report.json` with the approved-only total, approved and
+blocked projects, earliest approved deadline and all seven source/hash/quote records. Sources must
+remain byte-identical. Fixed synthetic fixtures are generated locally; reference/checker data never
+enter a live model request. Checker tests reject missing output, wrong facts/calculation and source
+mutation. Nothing is declared passed merely because the runtime ends normally.
+
+Each task has a four-request ceiling. `npm run eval:documents` currently runs only scripted offline
+conformance with real document parsing, SQLite persistence, controlled create/readback, default write
+denial and final `none`. It makes zero paid requests. The prepared task objects can later be passed
+to the existing `runSuite` with an explicitly authorized host; no automatic live mode or key lookup
+was added. The separate original regression group remains original source4 + public4 with its
+unchanged rubric; the document group is comparison4 + report4. Each group needs a new authorization,
+Flash + Responses + low and zero retries. Document success cannot cancel an original-task failure.
+If evidence is present but facts remain wrong, diagnose interpretation/answer construction rather
+than automatically increasing retrieval or request counts.

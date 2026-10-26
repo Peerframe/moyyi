@@ -14,10 +14,12 @@ success. OpenBot contributes selected technology and failure experience through 
 contracts; it does not supply a bot-cluster architecture. Model training, including shasha/Qwen,
 is deferred. Accepted D1–D6 remain in force.
 
-**Current checkpoint: a reliable read-only project investigation.** The product already has
-write, process and web capabilities, but enabling more tools does not resolve the present failure:
-finding the needed implementation and making consistent claims from it. This checkpoint does not
-redefine the whole product as a coding-only agent or cancel later capabilities.
+**Current checkpoint: document-backed work with inspectable evidence.** The owner authorized seven
+format body-text reading and offline preparation of document comparison/report tasks. This slice
+reuses selected OpenBot parsing methods now, without waiting for GUI, training or a complete model
+eval program. Earlier source-investigation failures remain unresolved live outcomes; document
+plumbing does not overwrite them. Daily editing/undo, long-session and web live trials come next,
+followed separately by OCR and demand-driven MCP/GUI/memory.
 
 ## Version and evidence coordinates
 
@@ -26,15 +28,14 @@ and the referenced PR before changing code. No current authorization is inferred
 
 | Coordinate | Audited state | What it means |
 |---|---|---|
-| Merged product baseline | `b2d4790fda242d2ff8ba7bc3f8306bc2e06743a9`, through [PR #24](https://github.com/Peerframe/moyyi/pull/24) | Includes core/store/CLI, file writes, native process sandbox, web, Skills, runtime evals and bounded request closeout. |
-| Unmerged product candidate | [PR #25](https://github.com/Peerframe/moyyi/pull/25), reviewed product `69312969533659578cc1da21b510d8395a099ef3` | Range reads, evidence guidance, configurable reasoning, search context, exact-file/filter/files-mode navigation, safe schema errors and two additional source tasks. The eval host preserves explicit reasoning effort. Native numbered source evidence and explicit remaining tool opportunities now extend this candidate; API profile v2 prevents mixing old recordings. Opt-in path context and required-only compaction savings are also included. These are not merged-main capabilities. |
-| Current offline product correction | Product `69312969533659578cc1da21b510d8395a099ef3`; [ADR 0027](https://github.com/Peerframe/moyyi/blob/69312969533659578cc1da21b510d8395a099ef3/docs/decisions/0027-bounded-workspace-navigation.md) | Bounded path context is default-off, refreshed, permission checked and optional under capacity. Required-only compaction comparison prevents false savings. Default local check 2056/2056, instruction conformance 32/32 and [exact-head CI](https://github.com/Peerframe/moyyi/actions/runs/40305112704) passed. No new real-model quality result. |
-| Unmerged documentation candidate | [PR #26](https://github.com/Peerframe/moyyi/pull/26), plan baseline `b846e45842d7ac33fd85239454c411522cc8a05c`; this update preserves the installed correction’s failed live follow-up and records the installed offline navigation correction | The system entry and the current optimization plan are delivered here. Product optimization continues in existing PR #25; neither PR is merged or stacked on the other. |
-| Owner's installed candidate | Product `69312969533659578cc1da21b510d8395a099ef3`; package SHA256 `12b2aee9c116e432ab23780c32c793adc094708995dc7d7f393a1ac1fe3774a5` | Clean package, 244 installed-file identities, CLI10/client10/PTY5/type checks passed. Installed scripted four-request read/create/verify/final-none passes the original public checker; unrelated write denied. Actual CLI resume/help/exit passed. Host explicitly enables navigation and retains Flash + Responses + low, read-only access, three requests and zero retries. Zero real API requests/key reads for this upgrade. |
+| Merged product baseline | `3d3beff1d70c66d4da566fbc81353e253176d7e5`, through [PR #25](https://github.com/Peerframe/moyyi/pull/25) and [PR #26](https://github.com/Peerframe/moyyi/pull/26) | Owner authorized review and sequential merge; both fixed heads were reviewed without blockers and had passing CI. [Merged main CI](https://github.com/Peerframe/moyyi/actions/runs/40314574140) passed. Includes navigation and required-only compaction accounting. |
+| Document candidate | `codex/document-reading`, independent of merged main | Seven-format plugin/port, isolated parsers, generated package lock and offline document tasks. New feature PR is not auto-merged. [Decision and bounds](decisions/0028-bounded-document-reading.md). |
+| Prior installed baseline | Product `69312969533659578cc1da21b510d8395a099ef3`; tar SHA256 `12b2aee9c116e432ab23780c32c793adc094708995dc7d7f393a1ac1fe3774a5` | 244-file identity and CLI/client/PTY/offline navigation evidence remain valid for this prior package. The document upgrade has its own acceptance receipt and backup in the [optimization plan](tasks/2026-10-26-optimization-plan.md). Flash + Responses + low, daily read-only/max3/zero-retry settings are retained. |
 | Latest autonomous investigations | [Live follow-up on the installed correction](https://github.com/Peerframe/moyyi/blob/a04707c1ca37f35d7f1d1d916b4a44c84f128318/docs/tasks/2026-10-26-readable-evidence.md) | Eight newly authorized requests total, four per task, zero retries, Flash/Responses/low. Native tool-text continuation accepted. Original six criteria: three pass, three partial, overall failure, plus an incorrect default-policy inference. Public 11 facts correct, required report absent: official failure. Both source snapshots unchanged. The grant is exhausted; one run each is not stability evidence or the original historical eight-request task budget. |
 | Public release | None | Local candidate installation is not npm/GitHub publication or a release tag. |
 
-The corpus has 30 tasks on this main baseline; PR #25 adds two. Reference/checker tests and scripted
+The merged public corpus has 32 tasks. Two new fixed document tasks are prepared as a separate
+acceptance group; they do not change the original task selection or rubrics. Reference/checker tests and scripted
 conformance are not real-model corpus results. No same-model, same-budget comparison with a mature
 harness has been executed. Earlier full-source and model/effort diagnostics are recorded in
 [PR #25's fixed evidence record](https://github.com/Peerframe/moyyi/blob/650a00b06bcabc308d9cebeffc0e037658eb6457/docs/decisions/0022-evidence-guidance-and-focused-reads.md)
@@ -58,7 +59,7 @@ flowchart TD
   V0 --> P0[Before-prepare read permission]
   P0 --> T[Tool preparation]
   T --> P[Before-execute policy and approval, when required]
-  P --> E[Scoped file, process or web capability]
+  P --> E[Scoped file, document, process or web capability]
   E --> S
   E -->|bounded observations| K
   D -->|answer| A[User-visible result]
@@ -81,7 +82,8 @@ recovery and cancellation apply throughout the loop, not only after an answer.
 | Run commands and stop them | [Shell plugin](shell.md), explicit process grants, supported native sandbox/toolchain | Native-process conformance and documented platform tests | macOS detached descendants/host hard-kill limitations remain. Docker is a planned optional adapter, not an implemented fallback. |
 | Continue long work without losing state | [Store and long sessions](long-sessions.md), resume, explicit compaction | Crash/recovery tests and scripted compaction lifecycle; local resume startup verified | Real-model summary fidelity, long-task quality and cache savings are unmeasured. |
 | Apply project guidance and reusable Skills | [Instructions](instructions.md), [Skills](skills.md), trusted selection and read grants | Refresh, selection, bounds and authority conformance; [OpenBot reuse](openbot-provenance.md) already includes YAML-validation experience | Guidance quality is not guaranteed by correct loading; automatic nested instruction discovery is not implemented. |
-| Research online or use another provider | [Web](web.md), configured SearXNG/grants, [Anthropic](anthropic.md) | Offline protocol/authority and HTML extraction checks | Live Anthropic/SearXNG acceptance, browser and binary-document workflows are unverified or outside current support. |
+| Read supported documents and produce checkable results | [Documents](documents.md), workspace read grant and native parser sandbox | Seven-format real-file parsing and scripted next-context/report/readback checks; independently installed package isolation is required | No paid document-understanding result. OCR, legacy/macro formats, formula calculation and visual layout are unsupported. |
+| Research online or use another provider | [Web](web.md), configured SearXNG/grants, [Anthropic](anthropic.md) | Offline protocol/authority and HTML extraction checks | Live Anthropic/SearXNG acceptance and browser workflows remain unverified or outside current support; document support is tracked separately above. |
 
 ## Locate the right owner before choosing a fix
 
@@ -150,47 +152,29 @@ verifier, mandatory subagents, full-repository graph or larger request allowance
 
 ## Next bounded delivery and decision rules
 
-The owner has authorized planning first, then targeted optimization. The
-[current delivery plan](tasks/2026-10-26-optimization-plan.md) expands the following three levels;
-it is the scoped execution record for this checkpoint, not a new planning system. The plan updates
-PR #26, while product work continues in PR #25. No new stacked PR or automatic merge is required.
+The owner approved the [current delivery plan](tasks/2026-10-26-optimization-plan.md) and separately
+authorized merging PR #25/#26 after review. They are merged. The next independent feature PR
+implements seven-format document reading and prepares its fixed tasks; it is not automatically
+merged. The prior source-investigation work and failed live trials remain evidence, not a reason
+to delay the specifically authorized document capability until GUI or model training exists.
 
-| Level | User result and deliverable | Exit condition and evidence boundary |
+| Order | Deliverable | Acceptance boundary |
 |---|---|---|
-| 1 — delivered offline in PR #25 | Make source investigation tools select the requested material and explain repairable input errors: exact file/directory scope, bounded include/exclude globs, `files`/`content` search modes and safe field-level schema errors | Real disposable-file/runtime probes establish exact scope, filtering, deduplication, bounded results and actionable errors; denial/revocation/cancellation and existing task checks still pass. This proves tool behavior, not reliable model conclusions. [Implementation and installation evidence](https://github.com/Peerframe/moyyi/blob/8b74bed/docs/tasks/2026-10-26-investigation-navigation.md): default check 1929/1929, file eval 13/13, clean package and installed scenarios 5/5; implementation CI passed. |
-| 2 — fixed diagnostic delivered; targeted correction delivered offline | Two preselected autonomous tasks: original project question and public source-dataflow-report, four requests each; opt-in path orientation targets the observed late discovery | Original six criteria and public checker unchanged; both the earlier diagnostic and the new installed-correction follow-up fail. Latest original: three pass/three partial plus one unsupported default-policy claim. Latest public: eleven correct facts, no file. Eight new requests used and sealed, no remaining authorization; same four-per-task allocation as the preceding run, still not reliability evidence or a full historical eight-request original-task test. |
-| 3 — later user workflows | Establish controlled editing, long-session fidelity and online-research outcomes | Independently verify modification/checks/review/undo; retained facts and unfinished work across resume/compaction; and actual service/source quality for online research. Each outcome needs its own bounded task and evidence; the current offline tool work does not close these gaps. |
+| 0 — closed | Review and merge #25/#26, retain evidence | Fixed-head reviews and CI passed; merged main CI passed. |
+| 1 — current candidate | Read PDF, DOCX, XLSX, PPTX, ODT, ODS, ODP with source/hash/range/coverage | Real native parsing and denial, limits, cancellation/revocation; offline check and actual external installed-package gates on macOS/Linux. No OCR/layout/formula claim. |
+| 2 — prepared, paid runs pending | Original regression and new document comparison/report tasks | Two separately authorized groups, original4+public4 and comparison4+report4, zero retries, Flash/Responses/low. Existing failed results and original rubrics stay unchanged. Scripted checks prove delivery plumbing only. |
+| 3 — later | Daily editing/undo, long-session recovery, actual web reading | One bounded real task for each, with actual files/facts checked before expanding scope. No automatic parallel implementation in this slice. |
+| 4 — deferred | OCR; demand-driven MCP, GUI and long-term memory | Separate decisions and work. Qwen/shasha training is also deferred. |
 
-Level 1 and the bounded level-2 diagnostic are delivered. General task quality is still unproven.
-The installed follow-up addresses source presentation and action-opportunity reporting, with
-[implementation, CI and installation evidence](https://github.com/Peerframe/moyyi/pull/25).
-It preserves final-tool protection and does not introduce task-specific answer hints. The native wire format is now accepted in the live follow-up. Full-chain/default-policy verification
-and autonomous discovery/read/write ordering remain unsolved under the unchanged task criteria.
-The new eight-request grant is also exhausted. The [current path-navigation correction](https://github.com/Peerframe/moyyi/blob/69312969533659578cc1da21b510d8395a099ef3/docs/tasks/2026-10-26-readable-evidence.md)
-removes an initial discovery dependency in the scripted public workflow without changing the
-question, source snapshot, checker, request count or model. Final compaction validation, clean
-packaging, actual installation and exact-commit CI passed as recorded above. No new live calls
-were made for this correction; the previous task failures remain unchanged.
-Level 3 has not started.
+If the required evidence reaches the model but conclusions are wrong, isolate interpretation and
+answer construction rather than automatically expanding retrieval or requests. Normal completion,
+a written report or a passing document task cannot erase an original task failure. Once this
+slice's offline and installed gates pass, finish the PR and installation; do not expand unrelated
+mechanisms. Future paid calls, merges and publication require their applicable authorization.
 
-Level 1 preserves `contextLines` 0–20, every existing request/input/output/scan/time limit,
-Flash + Responses + low, and the original six criteria. It changes the existing guarded file
-capability, tool contract and argument validation, not prompts, the core loop or persisted format.
-It adds no LSP, repository graph or additional agents. File filters never grant access or silently
-hide tests; invalid-input feedback must not echo arbitrary values or private content.
-
-Stop an ineffective line of work when its claimed failure is no longer observed: if the required
-evidence reaches the model but conclusions still fail, stop expanding search and isolate
-interpretation/answer construction. If navigation improvements do not improve evidence selection
-under unchanged limits, do not keep widening context or adding tools without a demonstrated gap.
-Once the defined offline exit conditions pass, finish that delivery rather than adding unrelated
-mechanism tests; keep observed failures and remaining live-quality gaps explicit. A compatible
-mature-harness comparison or future index is useful only when it can resolve a concrete remaining
-question, under a new bounded run.
-
-GUI, MCP/memory, additional models and training remain roadmap work. Reuse from OpenBot follows a
-demonstrated need and [provenance rules](openbot-provenance.md), without migrating the old product
-roles or treating new capabilities as proof that existing tasks are correct.
+OpenBot reuse follows the [provenance record](openbot-provenance.md): selected parsing technology
+and failure experience are adapted to moyyi's own ports. No Server authority, attachment service,
+identity database or Bot-cluster model is imported. The core remains self-owned.
 
 ## Keep this useful
 

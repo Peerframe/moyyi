@@ -97,7 +97,11 @@ export async function createCliRuntime(options: CliHostOptions): Promise<Runtime
     ...host,
     ...(host.store ? {} : { dataDirectory: options.dataDirectory }),
     ...(options.approveReads
-      ? { policy: new ReadOnlyPolicy({ requireApproval: ["read", "list", "search"] }) }
+      ? {
+          policy: new ReadOnlyPolicy({
+            requireApproval: ["read", "list", "search", "read_document"],
+          }),
+        }
       : {}),
     ...(options.developmentPlugins ? { developmentPlugins: options.developmentPlugins } : {}),
   });

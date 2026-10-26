@@ -38,6 +38,8 @@ write tools were synthetic; phase 2 introduces an explicit runtime write grant. 
 
 | moyyi path | OpenBot source | Revision | Notes |
 |---|---|---|---|
+| `src/runtime/document-worker.ts` | `apps/server-python/src/openbot_server/parser_worker.ts` (`adaptPdf`, `adaptOffice`, input/output bounds and failure cases) | `010439bb9002fabb7e1facd8450ee85edbafa309` | Narrowly adapted parsing methods only; new runtime/plugin/sandbox/FD reader. MIT notice retained. |
+| `src/runtime/fixtures/{encrypted,image-only}.pdf` | `tests/oracles/legacy-server/src/__fixtures__/attachments/` | `010439bb9002fabb7e1facd8450ee85edbafa309` | Fixed synthetic binary inputs, newly exercised against moyyi; old test results are not evidence. |
 | `src/plugins/skills/parse.ts` | `packages/employee-publisher/src/agent-skills.ts` | `010439bb9002fabb7e1facd8450ee85edbafa309` | Adapted bounded YAML AST-validation approach (aliases, anchors/tags, scalar keys, node/depth caps); rewritten schema checks and moyyi plugin/port, no publisher or authority code. MIT notice in `THIRD_PARTY_NOTICES.md` |
 
 ## Skills boundary experience
@@ -66,3 +68,18 @@ from OpenBot revision `010439bb9002fabb7e1facd8450ee85edbafa309`:
 No OpenBot source is copied or substantially adapted. The Python process/BeautifulSoup pipeline,
 network implementation and Server authority are not ported. [ADR 0020](decisions/0020-bounded-html-text.md)
 records the independently chosen TypeScript parser, exact version and limits.
+
+## Document codec distribution
+
+[ADR 0028](decisions/0028-bounded-document-reading.md) records the selected releases and local npm
+installation finding. The compiled package includes the unchanged Node files of officeparser 7.8.0
+(commit `09b27018450ed4df88fe01494343b43556813b71`), licensed under MIT, with only package metadata's
+PDF edge corrected to 6.3.289. No browser bundle or OCR language data is included. SOURCE.json in
+the generated copy records every included file hash and the original npm integrity. The original
+package.json SHA-256 is `027203373c6f05784a6d87c72a47c412340201046dc6a84c1cc7259185bbdbde`.
+The generated metadata SHA-256 is `0e139b68c5354cb9f0d408fcc4ea09b0308874d7f643153f7587593cae2421db`.
+The install gate verifies original Node bytes, licenses and both actual PDF resolution paths.
+
+The new seven-format fixtures are independently generated in
+`src/runtime/fixtures/document-fixtures.ts`; only the two specifically listed PDF inputs come from
+OpenBot. Neither the OpenBot checkout's unrelated work nor its legacy runtime is imported.

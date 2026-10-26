@@ -7,17 +7,32 @@ Owner 已授权先做整体计划，再针对已证实的缺口优化。本计�
 
 ## 版本、交付与边界
 
-- 主线基线为 `b2d4790fda242d2ff8ba7bc3f8306bc2e06743a9`，已含 PR #24。
-- [PR #25](https://github.com/Peerframe/moyyi/pull/25) 与
-  [PR #26](https://github.com/Peerframe/moyyi/pull/26) 当前均未合并。计划在
-  `codex/system-overview` 的 PR #26 更新；产品优化继续现有 PR #25，不叠新 PR，不自动合并。
-- PR #25 本计划使用的已审阅产品记录固定在
-  [`650a00b`](https://github.com/Peerframe/moyyi/tree/650a00b06bcabc308d9cebeffc0e037658eb6457)。
-  该候选不能冒充主线；计划开始时本机安装版 `b019f30229a76a3dbe502ee5786ccf5bbb7f5a3e`
-  与文档提交是独立坐标，后续若更新安装必须另记实际产物和验证。
-- 第一层未使用付费请求。Owner 随后明确授权第二步固定多题总共最多 8 次；该独立授权现已
-  用完并封存（4+4、零重试、剩余0），不复用任何历史账本。本计划本身不是后续调用授权。
-- 不公开发布，不改变原题的六项标准、现有 checker、权限边界或已有的任何限额。
+- 2026-10-26 owner 已另行授权复核后合并 PR #25/#26；固定 head 均无阻断，原 CI 成功。
+  顺序 squash 后主线为 `3d3beff1d70c66d4da566fbc81353e253176d7e5`，
+  [合并后的 main CI](https://github.com/Peerframe/moyyi/actions/runs/40314574140)成功。
+- 当前独立功能分支 `codex/document-reading` 基于上述 main，范围是七格式文档正文读取和
+  两道真实任务的离线准备。新功能 PR 不自动合并，不公开发布。
+- 本轮不读取 Key、不发付费请求；历史两轮各8次额度保持封存。未来原题4+公共题4、文档对照4+
+  报告4，分两组分别取得新授权；Flash + Responses + low、零重试及原验收标准不变。
+- 安装前备份会话/配置，保留旧包；日常只读/max3/零重试及已有导航设置保留。旧安装
+  `6931296` / SHA `12b2aee9c116e432ab23780c32c793adc094708995dc7d7f393a1ac1fe3774a5`
+  的244文件验收是历史基线，不冒充文档候选证据。
+- 后续依次是受控修改/撤销、长会话恢复、联网真实任务；再按需安排OCR、MCP、GUI、记忆。
+  本轮不自动开工这些内容，也不开始Qwen/shasha训练。
+
+## 文档候选当前摘要
+
+工作目录 `/Users/yxflc/Project/moyyi`，分支 `codex/document-reading`。
+新增 `documents` / `read_document`、非持久化只读端口、受控完整字节快照及哈希、独立原生沙箱
+解析器；支持PDF、DOCX、XLSX、PPTX、ODT、ODS、ODP。提取行号、来源与截断明确分开。
+依赖/打包调整与OpenBot固定提交来源见[ADR 0028](../decisions/0028-bounded-document-reading.md)
+及[复用记录](../openbot-provenance.md)。不修改persisted、不引入OpenBot控制面。
+
+目前可复用证据：Mac七格式真实解析；实际Seatbelt进程正常执行同时拒绝相邻文件/合成凭据
+读取与改写、网络和继承环境；文档eval4/4通过实际SQLite和文件（脚本模型4请求读→写→核对→
+none，并验证默认写拒绝）。这不等于真实模型理解能力。最终本机 `npm run check`：类型、Biome、
+102个测试文件/2159项全通过；188个本地文档链接通过，未改变原任务判分与任何预算。
+精确PR CI和安装回执在完成后补入本节。下文原来的调查优化与失败记录保留为历史，不能把旧状态当作当前授权。
 
 ## 本次交付状态
 
@@ -102,7 +117,7 @@ Flash+Responses+low、日常只读/max3/零重试不变。以上均为离线接�
 本次导航没有证明它们已被模型自主解决。原题、固定源码、六项标准、公共 checker、
 Flash + Responses + low、请求硬限额和最终 none 全部保留。
 
-PR #25/#26 均未合并，没有公开发布。下文保留约定的范围与验收条件。
+上述为合并前的历史记录；PR #25/#26 已按顶部新授权合并，仍没有公开发布。下文保留当时约定的范围与验收条件。
 
 ## 整体路径与判断依据
 

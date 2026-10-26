@@ -8,6 +8,8 @@ describe("candidate package inventory", () => {
     expect(expected).toContain("dist/runtime/index.d.ts");
     expect(expected).toContain("dist/contracts/index.js");
     expect(expected).toContain("docs/installation.md");
+    expect(expected).toContain("docs/documents.md");
+    expect(expected).toContain("npm-shrinkwrap.json");
     expect(expected.some((path) => /test|fixture/.test(path))).toBe(false);
     expect(() => assertPackageFiles([...expected].reverse(), expected)).not.toThrow();
   });

@@ -2,6 +2,7 @@ import { execFileSync } from "node:child_process";
 import { chmodSync, lstatSync, rmSync } from "node:fs";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
+import { vendorOfficeParser } from "./vendor-documents.ts";
 
 const root = fileURLToPath(new URL("..", import.meta.url));
 const output = join(root, "dist");
@@ -23,3 +24,4 @@ execFileSync(
   },
 );
 chmodSync(join(output, "cli/main.js"), 0o755);
+vendorOfficeParser(root);

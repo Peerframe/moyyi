@@ -49,6 +49,7 @@ core through five fixed points and can be added or removed without touching anyt
 | `project-instructions` (workspace root AGENTS.md only) | context source | implemented; refreshed per request |
 | `workspace-navigation` (opt-in bounded file paths) | context source | implemented; refreshed per request; real-model quality unverified |
 | `fs` (read, list, search; create, edit, undo) | tools | read-only merged in batch 5; writes merged in phase 2 |
+| `documents` (seven-format body text) | read-only tool; dedicated runtime parser port | implemented candidate; live understanding acceptance pending |
 | `shell` | tools | merged in phase 3 |
 | `provider-anthropic` | model provider | merged in phase 5; live acceptance pending |
 | `web` (fetch, search) | tools; runtime capability and base policy | merged in phase 5 |
@@ -274,3 +275,13 @@ A complete package inventory, isolated tarball installation and actual CLI/PTY/c
 are required in CI. The installed process has no source checkout or compiler dependency. This is
 an unpublished development candidate with explicit platform and live-service gaps; see
 [installation](installation.md) and [client protocol](client-protocol.md).
+
+## Document reading
+
+[ADR 0028](decisions/0028-bounded-document-reading.md) adds an execute-only read capability
+for a fixed, native-sandboxed byte-to-text parser. The documents plugin validates arguments and
+presents evidence; runtime owns the guarded complete snapshot, hash, parser process and cleanup.
+The parser gets no workspace or network grant. Existing read policy and `--approve-reads` apply;
+`documents:false` removes the tool. Persisted contracts, generic shell permissions and daily write
+grants are unchanged. [Usage and coverage](documents.md) distinguish extracted positions, source
+hash, output truncation and incomplete extraction.

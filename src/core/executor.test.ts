@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import { createHash } from "node:crypto";
 import { describe, expect, it, vi } from "vitest";
+import type { DocumentReadResult, WorkspaceDocuments } from "../contracts/documents.ts";
 import type {
   ActionDigest,
   EffectClass,
@@ -116,6 +117,125 @@ function setup(selected = tool()) {
 }
 
 describe("tool execution pipeline", () => {
+  it("supplies document authority only after durable start and expires retained reads", async () => {
+    const test = setup(tool("read", "read_document"));
+    const document: DocumentReadResult = {
+      path: "report.pdf",
+      format: "pdf",
+      sha256: "a".repeat(64),
+      bytes: 100,
+      text: "evidence",
+      startLine: 1,
+      endLine: 1,
+      totalLines: 1,
+      truncated: false,
+      extractionTruncated: false,
+      coverage: "text only",
+    };
+    let retained: WorkspaceDocuments | undefined;
+    const create = vi.fn<NonNullable<ExecutionHost["documents"]>["create"]>(
+      (_context, guard, scope) => {
+        guard();
+        expect(scope.phase).toBe("execute");
+        expect(scope.effect?.state).toBe("started");
+        expect(test.records.at(-1)?.state).toBe("started");
+        expect(scope.action?.payload).toEqual({ path: "report.pdf", startLine: 1, maxLines: 200 });
+        return {
+          async read() {
+            guard();
+            return document;
+          },
+        };
+      },
+    );
+    test.selected.prepare = async (_args, context) => {
+      expect(context.documents).toBeUndefined();
+      return {
+        digest: "claimed" as ActionDigest,
+        summary: "Read report",
+        preconditions: [],
+        payload: { path: "report.pdf", startLine: 1, maxLines: 200 },
+      };
+    };
+    test.selected.execute = async (_action, context) => {
+      retained = context.documents;
+      assert(retained);
+      expect(await retained.read()).toEqual(document);
+      return { status: "succeeded", content: [] };
+    };
+    expect(
+      (await executeCalls([call("read_document")], { ...test.host, documents: { create } }))[0]
+        ?.status,
+    ).toBe("succeeded");
+    expect(create).toHaveBeenCalledTimes(1);
+    assert(retained);
+    await expect(retained.read()).rejects.toThrow("expired");
+    expect(test.host.ensureLease).not.toHaveBeenCalled();
+  });
+
+  it.each([
+    ["read", "read"],
+    ["workspace_write", "read_document"],
+    ["process", "read_document"],
+    ["external", "read_document"],
+  ] as const)("withholds document authority from %s tool %s", async (kind, name) => {
+    const test = setup(tool(kind, name));
+    const create = vi.fn(() => {
+      throw Error("Unexpected document capability");
+    });
+    test.selected.execute = async (_action, context) => {
+      expect(context.documents).toBeUndefined();
+      return { status: "succeeded", content: [] };
+    };
+    expect(
+      (await executeCalls([call(name)], { ...test.host, documents: { create } }))[0]?.status,
+    ).toBe("succeeded");
+    expect(create).not.toHaveBeenCalled();
+  });
+
+  it.each(["denied", "declined", "cancelled"] as const)(
+    "does not create a document port when execution is %s",
+    async (reason) => {
+      const test = setup(tool("read", "read_document"));
+      const create = vi.fn(() => {
+        throw Error("Unexpected document capability");
+      });
+      if (reason === "denied")
+        test.host.policy.beforeExecute = () => ({ kind: "deny", reason: "no read" });
+      if (reason === "declined") {
+        test.host.policy.beforeExecute = () => ({ kind: "ask" });
+        test.host.approve = vi.fn(async () => false);
+      }
+      if (reason === "cancelled") test.controller.abort();
+      expect(
+        (await executeCalls([call("read_document")], { ...test.host, documents: { create } }))[0]
+          ?.status,
+      ).toBe(reason === "cancelled" ? "cancelled" : "denied");
+      expect(create).not.toHaveBeenCalled();
+      expect(test.selected.execute).not.toHaveBeenCalled();
+    },
+  );
+
+  it("revokes a running document port when policy changes", async () => {
+    const test = setup(tool("read", "read_document"));
+    test.selected.execute = async (_action, context) => {
+      assert(context.documents);
+      test.host.policy.beforeExecute = () => ({ kind: "deny", reason: "revoked" });
+      await expect(context.documents.read()).rejects.toThrow("not authorized");
+      return { status: "failed", content: [] };
+    };
+    const create: NonNullable<ExecutionHost["documents"]>["create"] = (_context, guard) => ({
+      async read() {
+        guard();
+        throw Error("Unexpected extraction");
+      },
+    });
+    expect(
+      (await executeCalls([call("read_document")], { ...test.host, documents: { create } }))[0]
+        ?.status,
+    ).toBe("failed");
+  });
+
   it("isolates external web authority from local files and expires each invocation", async () => {
     const test = setup(tool("external"));
     const localFiles = vi.fn(() => {

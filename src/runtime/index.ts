@@ -25,6 +25,7 @@ import {
 } from "../contracts/index.ts";
 import { AgentCore } from "../core/index.ts";
 import { defaultInstructionsPlugin } from "../plugins/default-instructions/index.ts";
+import { documentsPlugin } from "../plugins/documents/index.ts";
 import { fsPlugin } from "../plugins/fs/index.ts";
 import { projectInstructionsPlugin } from "../plugins/project-instructions/index.ts";
 import {
@@ -53,6 +54,7 @@ import {
 import { SqliteSessionStore } from "../store/index.ts";
 import { type AnthropicHttpOptions, anthropicHttpTransport } from "./anthropic-http.ts";
 import { type DeepSeekHttpOptions, deepSeekHttpTransport } from "./deepseek-http.ts";
+import { NodeWorkspaceDocuments } from "./documents.ts";
 import { NodeWorkspaceFiles } from "./files.ts";
 import { collectContext } from "./instructions.ts";
 import { FileRecordingSink, RecordingModelClient, ReplayModelClient } from "./model-recording.ts";
@@ -102,6 +104,8 @@ export interface DevelopmentPlugin {
 }
 
 export interface RuntimeOptions {
+  /** Fixed offline document extraction uses the read grant; false disables the tool and port. */
+  readonly documents?: false;
   /** Explicit trusted library root and activated names; no automatic scanning or installation. */
   readonly skills?: SkillSelection;
   /** Disable automatic root AGENTS.md reads. Default working instructions remain enabled. */
@@ -167,6 +171,9 @@ export async function createRuntime(
   options: RuntimeOptions = {},
   services: RuntimeServices = {},
 ): Promise<Runtime> {
+  if (options.documents !== undefined && options.documents !== false)
+    throw Error("Document configuration must be false or omitted");
+  const documentsEnabled = options.documents !== false;
   if (options.workspaceNavigation !== undefined && typeof options.workspaceNavigation !== "boolean")
     throw Error("Workspace navigation must be a boolean");
   const workspaceNavigation = options.workspaceNavigation === true;
@@ -275,6 +282,7 @@ export async function createRuntime(
     ...(skills?.enabled.length ? [{ plugin: skillsPlugin }] : []),
     ...(workspaceNavigation ? [{ plugin: workspaceNavigationPlugin }] : []),
     { plugin: fsPlugin },
+    ...(documentsEnabled ? [{ plugin: documentsPlugin }] : []),
     { plugin: shellPlugin },
     { plugin: createWebPlugin(options.web?.search?.origin) },
     ...(anthropic ? [{ plugin: anthropic }] : []),
@@ -453,6 +461,7 @@ export async function createRuntime(
       ? new NodeWorkspaceProcesses({ ...options.workspaceProcesses, protectedPaths: excluded })
       : undefined;
     const files = new NodeWorkspaceFiles(excluded);
+    const documents = documentsEnabled ? new NodeWorkspaceDocuments(files) : undefined;
     core = new AgentCore({
       model: selectedClient,
       profile,
@@ -463,6 +472,7 @@ export async function createRuntime(
       validator: new AjvArgumentValidator(),
       preconditions: options.preconditions ?? new WorkspacePreconditions(),
       files,
+      ...(documents ? { documents } : {}),
       ...(web ? { web } : {}),
       ...(processes ? { processes } : {}),
       ...(writes

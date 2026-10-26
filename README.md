@@ -78,3 +78,7 @@ with explicit workspace grants. See [write usage](docs/writes.md) and
 [acceptance status](docs/tasks/2026-10-25-phase-2-writes.md). Run `npm run eval:writes` for
 eight offline scenarios with real filesystem and SQLite effects in disposable workspaces.
 Phase 3 follows accepted D6: native sandbox default, Docker optional. Phase 6 is limited to a local candidate; registry publication, release tags and official installers are not started.
+
+Document reading: the [seven-format document candidate](docs/documents.md) adds PDF, Word, Excel,
+PowerPoint and OpenDocument body text under the existing read permission. It includes native parser
+isolation and source/hash/coverage information. OCR and paid model task acceptance remain separate.

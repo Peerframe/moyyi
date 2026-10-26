@@ -12,6 +12,8 @@ import {
 } from "node:fs";
 import { tmpdir } from "node:os";
 import { basename, delimiter, dirname, join } from "node:path";
+import { writeDocumentFixtures } from "../src/runtime/fixtures/document-fixtures.ts";
+import { assertInstalledDependencyGraph } from "./package-dependencies.ts";
 import { buildCandidate, command, repository } from "./packaging.ts";
 
 // Only the contributor's compiler and npm cache are reused. Installed processes resolve the
@@ -95,13 +97,49 @@ try {
     );
   const pkg = JSON.parse(readFileSync(join(localPackage, "package.json"), "utf8"));
   assert.equal(pkg.private, true);
+  const officeRoot = join(localPackage, "dist/vendor/officeparser");
+  const officeSource = JSON.parse(readFileSync(join(officeRoot, "SOURCE.json"), "utf8"));
+  const upstreamOffice = JSON.parse(
+    readFileSync(join(officeRoot, "UPSTREAM_PACKAGE.json"), "utf8"),
+  );
+  assert.deepEqual(JSON.parse(readFileSync(join(officeRoot, "package.json"), "utf8")), {
+    ...upstreamOffice,
+    dependencies: { ...upstreamOffice.dependencies, "pdfjs-dist": "6.3.289" },
+  });
+  for (const [path, digest] of Object.entries(officeSource.copiedFiles))
+    assert.equal(
+      createHash("sha256")
+        .update(readFileSync(join(officeRoot, path)))
+        .digest("hex"),
+      digest,
+    );
+  checks.officeDistribution = officeSource;
   checks.installation = offline
     ? "local dependency and isolated global prefix; scripts disabled; offline cache"
     : "local dependency and isolated global prefix; scripts disabled; npm registry/cache for dependencies";
   checks.dependencies = JSON.parse(
     runNpm(["ls", "--all", "--omit=dev", "--json", "--prefix", consumer, ...npmOptions]),
   ).dependencies;
-  for (const name of ["cli.mjs", "client.mjs"])
+  checks.dependencyResolution = assertInstalledDependencyGraph(
+    localPackage,
+    JSON.parse(readFileSync(join(repository, "package-lock.json"), "utf8")),
+  );
+  checks.globalDependencyResolution = assertInstalledDependencyGraph(
+    join(prefix, "lib/node_modules/moyyi"),
+    JSON.parse(readFileSync(join(repository, "package-lock.json"), "utf8")),
+  );
+  assert.deepEqual(
+    readFileSync(join(localPackage, "npm-shrinkwrap.json")),
+    readFileSync(join(repository, "package-lock.json")),
+    "The installed candidate must retain the canonical dependency resolution",
+  );
+  for (const name of [
+    "cli.mjs",
+    "client.mjs",
+    "documents.mjs",
+    "document-confinement.mjs",
+    "document-confinement-runner.mjs",
+  ])
     copyFileSync(join(repository, "scripts/package-fixtures", name), join(consumer, name));
   const bin = join(prefix, "bin/moyyi");
   checks.cli = JSON.parse(
@@ -120,9 +158,28 @@ try {
       env,
     ),
   );
+  const documentWorkspace = join(temporary, "document-workspace");
+  writeDocumentFixtures(documentWorkspace);
+  checks.documents = JSON.parse(
+    command(
+      process.execPath,
+      ["--no-experimental-strip-types", join(consumer, "documents.mjs"), documentWorkspace],
+      consumer,
+      env,
+    ),
+  );
+  checks.documentConfinement = JSON.parse(
+    command(
+      process.execPath,
+      ["--no-experimental-strip-types", join(consumer, "document-confinement-runner.mjs")],
+      consumer,
+      env,
+    ),
+  );
   for (const [key, count] of [
     ["cli", 10],
     ["client", 10],
+    ["documents", 8],
   ] as const) {
     const result = checks[key] as {
       passed: boolean;
