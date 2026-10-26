@@ -4,6 +4,10 @@ These apply to human contributors and coding agents.
 
 ## Before changing code
 
+- For substantial work, start with [the system overview](docs/system-overview.md): identify the
+  user outcome, current product/candidate version, demonstrated failure layer and next bounded
+  result. Follow its relevant links rather than loading every historical task brief. Routine
+  changes do not require a new planning document or renewed approval of accepted decisions.
 - Read [docs/architecture.md](docs/architecture.md). Find the one layer or plugin your change
   belongs to; most changes should touch only that folder and its tests.
 - Common changes have recipes: [add a plugin](docs/recipes/add-a-plugin.md),
@@ -34,3 +38,6 @@ These apply to human contributors and coding agents.
   documents for the owner and may be written in Chinese.
 - When working from a brief in `docs/tasks/`, follow its rules and stop at decisions it reserves
   for the owner.
+- When delivery changes what users can do or what has actually been verified, update the affected
+  status/evidence row in [the system overview](docs/system-overview.md). Keep dated task records
+  as history; do not equate implemented, installed, offline-tested and live-task-verified.

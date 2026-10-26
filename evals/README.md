@@ -1,6 +1,9 @@
 # Evals
 
 The evals are how moyyi shows it is better, not just that it runs.
+For current measured capabilities and the next product checkpoint, see the
+[system overview](../docs/system-overview.md). Scripted conformance, checker validity and real-model
+task quality are different evidence; one does not establish the others.
 
 ```bash
 npm run eval -- --agent null --trials 1
@@ -55,8 +58,10 @@ claims success. Near-miss cases prove each probed failure is caught.
 
 ## Private tasks
 
-`evals/private/` is ignored by git. Put tasks with personal material and the held-out set there,
-exporting `tasks` from `evals/private/index.ts`; `npm run eval` includes them.
+`evals/private/` is ignored by git. Owner-supplied private tasks export `tasks` from
+`evals/private/index.ts`. `npm run eval` is public-only by default; `--include-private` is an
+explicit opt-in and requires authorization for that content. Do not read or populate the owner's
+private corpus as part of ordinary development.
 
 The public corpus includes three prompt-injection tasks with protected files and a sibling
 canary, and multi-turn constraint-retention tasks. These checks detect final-state changes;

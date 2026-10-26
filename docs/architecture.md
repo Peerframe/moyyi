@@ -1,8 +1,9 @@
 # Architecture
 
 moyyi is a personal, general-purpose agent with a small, self-owned core. Everything that is a
-capability rather than a guarantee is a plugin. What exists today is in [roadmap.md](roadmap.md);
-decisions and their status are in [decisions/](decisions/).
+capability rather than a guarantee is a plugin. Start at the [system overview](system-overview.md)
+for current capabilities, evidence and engineering priorities. This document owns layer boundaries;
+[roadmap](roadmap.md) owns future scope and [decisions](decisions/) own accepted choices.
 
 ## Core and plugins
 
@@ -43,7 +44,7 @@ core through five fixed points and can be added or removed without touching anyt
 | Plugin | Extension points | Phase |
 |---|---|---|
 | `provider-scripted` | model provider | exists (tests and evals) |
-| `provider-deepseek` (Responses subset; [ADR 0007](decisions/0007-first-model-provider.md)) | model provider | merged in batch 6; live acceptance pending |
+| `provider-deepseek` (Responses subset; [ADR 0007](decisions/0007-first-model-provider.md)) | model provider | implemented; connection/continuation evidence and task-quality gaps are separate in the system overview |
 | `default-instructions` (original working guidance) | context source | implemented; static |
 | `project-instructions` (workspace root AGENTS.md only) | context source | implemented; refreshed per request |
 | `workspace-navigation` (opt-in bounded file paths) | context source | implemented; refreshed per request; real-model quality unverified |
@@ -261,7 +262,7 @@ and bounds output/time. Search uses an explicitly configured SearXNG endpoint. P
 search links are untrusted data without authority. Unknown external effects are never replayed.
 See [web usage and limits](web.md) and [Anthropic usage](anthropic.md).
 
-## Local candidate packaging (phase 6 branch)
+## Local candidate packaging (merged phase 6)
 
 [ADR 0016](decisions/0016-local-installable-candidate.md) keeps the existing layers and compiles
 production ESM/declarations into a private npm tarball. `moyyi/runtime` exports the composition

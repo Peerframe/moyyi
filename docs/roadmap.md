@@ -1,123 +1,59 @@
 # Roadmap
 
-Each phase ends with a usable, measured result. Eval numbers come from `npm run eval`.
+The [system overview](system-overview.md) owns the dated current state, user-outcome matrix and
+next engineering checkpoint. This roadmap separates implementation history from remaining
+product acceptance and future scope. A merged phase does not prove that a real model completes
+all tasks using its capabilities.
 
-The remaining phase 0 work and phase 1 are split into batches in the
-[Codex handoff brief](tasks/2026-10-24-codex-handoff.md).
+## Implemented foundations
 
-## Phase 0: contracts and evals — in progress
+| Delivery | What exists | Contract and historical evidence |
+|---|---|---|
+| Contracts and eval foundation | Versioned persisted content, ports, plugin registry, task harness, public checkers and negative cases | [Architecture](architecture.md), [corpus](../evals/corpus.md), [historical handoff](tasks/2026-10-24-codex-handoff.md) |
+| Read-only loop and CLI | SQLite, core loop, context, policy, file tools, DeepSeek Responses, recording/replay, interactive CLI and development reload | [CLI](cli.md), [DeepSeek](deepseek.md), [batch 7 record](tasks/2026-10-25-batch-7-cli.md) |
+| Controlled writes | Confined create/edit, digest-bound approval, snapshots and undo | [Writes](writes.md), [phase 2 record](tasks/2026-10-25-phase-2-writes.md) |
+| Native command execution | Explicit process grants, OS confinement, bounded output, interruption and unknown-effect handling | [Shell limitations](shell.md), [D6 / ADR 0013](decisions/0013-native-process-sandbox.md), [phase 3 record](tasks/2026-10-25-phase-3-shell.md) |
+| Recovery and longer sessions | Crash recovery, immutable history and explicit bounded compaction | [Long sessions](long-sessions.md), [phase 4 record](tasks/2026-10-25-phase-4-long-sessions.md) |
+| Second provider and web | Anthropic adapter, separately granted fetch/search, bounded HTML text | [Anthropic](anthropic.md), [web](web.md), [phase 5 record](tasks/2026-10-25-phase-5-anthropic-web.md) |
+| Local installable candidate | Private tarball, installed CLI/PTY/client/type checks | [Installation](installation.md), [phase 6 record](tasks/2026-10-25-phase-6-candidate.md); merged, not officially published |
+| Working guidance, Skills and task measurement | Default/project instructions, explicitly selected Skills, runtime task adapter, bounded request closeout | [Instructions](instructions.md), [Skills](skills.md), [runtime evals](runtime-evaluation.md), [PR #24 record](tasks/2026-10-26-request-budget-closeout.md) |
 
-Done:
+Accepted D1–D6 are preserved in their ADRs. D2's one-time v1 amendment is complete; subsequent
+incompatible persisted changes require versioning and migration. OpenBot reuse already includes
+selected YAML-validation experience and independently rewritten HTML-extraction lessons; see
+[provenance](openbot-provenance.md). It does not import the old cluster/control-plane architecture.
 
-- Repository and toolchain on Node 26; layer boundary check
-- CI on pull requests and main pushes, including the tracked eval fixture baseline
-- Persisted format (content, transcript tree, effect journal and transitions) with version and
-  fixture lock
-- Model client contract with `checkModelStream`; tool contract; ports; client protocol
-- Plugin API and registry: atomic load, owned registrations, restrictive policy rules, isolated
-  observers; `provider-scripted` as the first plugin
-- Eval harness: fresh workspace per trial, hidden checker, outside-workspace canary, false-success
-  and pass^k metrics, stop-and-report tasks, private task folder
-- Task corpus: 30 public tasks with multi-turn and injection cases; every checker proven
-  against a reference solution and near misses ([evals/corpus.md](../evals/corpus.md)).
-  The B1 final-claim and B2 answer-hint corrections are integrated
-- Three-protocol content mapping with synthetic fixtures and integrity tests
-  ([content-model-mapping.md](research/content-model-mapping.md)); no live API acceptance
-- Accepted D1–D5 decisions; implementation gates remain in the handoff brief
-- D2 v1 amendment on [PR #6](https://github.com/Peerframe/moyyi/pull/6): refusal/reasoning,
-  usage and termination provenance, bounded hash/origin-bound replay; local checks and CI
-  passed before batch 3 started. It was reviewed and merged on 2026-10-25
+## Product acceptance still to establish
 
-Remaining:
+1. **Reliable project investigation.** Resolve demonstrated navigation/interface gaps and measure
+   the complete task with the fixed model and unchanged criteria. The original project task has
+   not passed. Candidate features and the finite next delivery are in the system overview.
+2. **Representative task quality.** Exercise existing public tasks through the real runtime with
+   explicit capabilities and authorized budgets. Separate unsupported tasks, execution failures,
+   evidence gaps and incorrect conclusions. Do not substitute null/scripted results or checker
+   tests for real-model performance. Use the existing [comparison protocol](research/harness-comparison.md)
+   when a controlled mature-harness baseline can resolve a concrete question.
+3. **Controlled editing as a user workflow.** Verify modification, actual checks, reviewable output
+   and undo together in bounded tasks; keep file/process grants explicit.
+4. **Long-session fidelity.** Measure real-model retained facts and unfinished work across resume
+   and compaction, beyond the existing deterministic lifecycle checks.
+5. **External-service acceptance.** Verify Anthropic and the configured search service before
+   claiming live support; browsing and binary-document workflows need separate implementation
+   and acceptance. Do not weaken isolation to make a task pass.
 
-- Add more tasks as needed and an owner-supplied held-out set in `evals/private/`; public
-  checker results do not yet measure real-agent performance
-- Validate the accepted security design ([threat-model.md](threat-model.md),
-  [ADR 0006](decisions/0006-security-boundaries.md)) in the relevant implementation phases
-- D6 accepted: native sandbox default, Docker optional; phases 3–5 merged; phase 6 local candidate authorized, no official publication
+These are outcomes, not automatic authorizations for paid calls, merges or publication. A single
+focused delivery should close one meaningful user outcome or one measured prerequisite, then
+update the system overview with the result. Avoid growing every future capability in parallel.
 
-## Phase 1: read-only loop
+## Deferred directions
 
-Core loop, `provider-deepseek` ([ADR 0007](decisions/0007-first-model-provider.md)),
-`project-instructions`, read and search tools in `fs`, SQLite store, record/replay,
-plugin hot reload in development mode. Batch 3 was reviewed and merged in
-[PR #7](https://github.com/Peerframe/moyyi/pull/7), after retargeting to main and passing fresh CI.
-The store uses `node:sqlite`: transactions, blobs, writer locks, workspace leases and backup/restore.
-The batch 4 core was reviewed, corrected and merged in [PR #8](https://github.com/Peerframe/moyyi/pull/8)
-after its 648-test check and corrected-head CI passed. It provides runtime wiring, context,
-policy, approvals, cancellation, budgets and startup reconciliation.
-The batch 5 file tools were reviewed and merged in [PR #9](https://github.com/Peerframe/moyyi/pull/9)
-after its CI passed; merged main CI passed too. They provide real `read`, `list` and `search`,
-a scoped runtime capability, revocation/lifetime guards and bounded ignore-aware search.
-The batch 6 provider was reviewed and merged in [PR #10](https://github.com/Peerframe/moyyi/pull/10).
-It adds the DeepSeek Responses text/function provider, fixed-origin host HTTP,
-and canonical model recording/replay. `npm run demo:deepseek-replay` drives real files and SQLite
-with synthetic SSE and verifies replay; `npm run eval:deepseek` now checks ten offline scenarios,
-including auxiliary reasoning and final-answer annotations with unchanged terminal authority.
-These do not measure real-model task competence or live service compatibility. See
-[deepseek.md](deepseek.md) and the [batch 6 record](tasks/2026-10-25-batch-6-deepseek.md).
-Batch 7 was reviewed and merged in [PR #11](https://github.com/Peerframe/moyyi/pull/11). It adds interactive sessions, streaming, digest approvals, Ctrl-C/EOF cleanup,
-steering/resume and explicit development-plugin reload through the protocol. `--demo` is a finite
-offline script; `--host FILE` connects an explicitly trusted runtime configuration. See
-[cli.md](cli.md) and the [current handoff](tasks/2026-10-25-batch-7-cli.md).
-PR #19 was merged and installed; a bounded synthetic-file live read/tool-result/answer task and
-offline replay passed on 2026-10-26. Broader model task quality remains unmeasured. The current
-project-instructions branch adds original working guidance and automatic root AGENTS.md loading
-under existing permissions; nested files still require explicit reads. Executable workspace config
-is never discovered. See [instructions](instructions.md). Phase 1 acceptance is not claimed. Phase 2 was separately authorized and merged; phase 3 is merged under accepted D6.
-Run the read-only subset of the corpus. Qwen and shasha training are deferred directions,
-not requirements for this phase or the first release.
+- A GUI client and UI slots over the existing client protocol.
+- MCP and memory/learning plugins, with separate authority, lifecycle and task-quality evidence.
+- Optional Docker execution backend; the accepted default remains native OS sandboxing.
+- Additional models, Qwen and shasha. Training is deferred until the agent itself is useful.
+- Further OpenBot reuse only when it solves a demonstrated need without importing old product roles.
+- Official package/release tags, signed installers and automatic updates, only with explicit release
+  authorization and their own acceptance. Current local installation is not public release.
 
-## Phase 2: controlled writes
-
-Confined workspace file access in `ToolContext`; edit and create with hash preconditions,
-approval bound to digests, workspace snapshots and undo, effect journal; fault-injection tests.
-Reviewed and merged in [PR #12](https://github.com/Peerframe/moyyi/pull/12), with explicit grants,
-schema 2 snapshot migration and read-only recovery. See [usage](writes.md),
-[ADR 0012](decisions/0012-controlled-workspace-writes.md) and the
-[historical handoff](tasks/2026-10-25-phase-2-writes.md).
-
-## Phase 3: shell and reliable stop
-
-Sandboxed processes in `ToolContext`, the `shell` plugin, process-group cancellation, bounded
-output, unknown-effect handling. Start same-model comparisons against other harnesses.
-D6 now accepts native OS sandboxing by default with Docker optional, following the
-[upstream comparison](research/phase-3-execution-backends.md). Merged [PR #13](https://github.com/Peerframe/moyyi/pull/13) adds the `shell`
-plugin, explicit process grants, Seatbelt/bubblewrap confinement and bounded group cleanup.
-Offline conformance is separate from real-model quality. The
-[comparison protocol](research/harness-comparison.md) records same-model requirements; no live
-comparison or paid call has run. See [usage](shell.md), [ADR 0013](decisions/0013-native-process-sandbox.md)
-and the [historical handoff](tasks/2026-10-25-phase-3-shell.md).
-
-## Phase 4: recovery and long sessions
-
-Crash tests at journal boundaries, explicit model-assisted `/compact`, cache-aware context and
-long-session offline evals are merged in [PR #14](https://github.com/Peerframe/moyyi/pull/14). Original history is retained;
-recent turns and unresolved actions remain visible. Summary requests are bounded, cancellable
-and auditable; recovery is itself restartable. Persisted v1 and previous checkers are unchanged.
-See [usage](long-sessions.md), [ADR 0014](decisions/0014-recovery-and-compaction.md) and
-[historical handoff](tasks/2026-10-25-phase-4-long-sessions.md). Fixed-head review, 64 focused tests,
-PR CI and merged-main CI passed. Live summary quality and provider cache savings remain unmeasured.
-
-## Phase 5: second provider and web
-
-`provider-anthropic` targets the direct Messages API with signed-reasoning replay, compaction
-fallback and fixed-origin host HTTP. The `web` plugin provides separately granted fetch/search
-with exact-origin approvals, public-address DNS pinning and bounded HTTPS. Reviewed and merged
-in [PR #15](https://github.com/Peerframe/moyyi/pull/15) after fixed-head review, 66 integration tests,
-138 risk-focused tests and passing PR/main CI. Offline provider and prompt-injection authority
-scenarios pass; live Anthropic and deployed SearXNG acceptance remain unverified. No paid call
-was made. See [Anthropic usage](anthropic.md), [web usage](web.md),
-[ADR 0015](decisions/0015-anthropic-and-web.md) and
-[historical handoff](tasks/2026-10-25-phase-5-anthropic-web.md).
-
-## Phase 6: release
-
-Packaging, installation and client protocol acceptance are implemented on the phase 6 branch,
-with a new PR awaiting review. This is a local private `0.0.0` candidate, not an official release.
-The same tarball is tested outside the checkout using its compiled CLI, real POSIX terminal,
-programmatic exports and strict TypeScript declarations. No paid model call, registry publication,
-tag, signed installer, GUI or automatic update is performed. See [installation](installation.md),
-[client protocol](client-protocol.md), [ADR 0016](decisions/0016-local-installable-candidate.md) and
-[current handoff](tasks/2026-10-25-phase-6-candidate.md). Live model/service and phase 1 acceptance
-gaps remain. UI slots arrive with the first GUI client, which is outside this delivery.
+The dated task archive is for reproducing earlier decisions and checks. It is not the current
+backlog; old phrases such as “next phase” or “awaiting review” retain their historical meaning.
