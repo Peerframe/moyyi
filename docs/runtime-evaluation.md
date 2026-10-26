@@ -48,7 +48,10 @@ the existing DeepSeek codec and fixed-origin, no-redirect HTTP transport. A host
 import { deepSeekEvalHost } from "/path/to/moyyi/evals/agents/deepseek.ts";
 import { readMyAuthorizedCredential } from "./my-private-credential-reader.ts";
 
-export default deepSeekEvalHost({ getApiKey: readMyAuthorizedCredential });
+export default deepSeekEvalHost({
+  getApiKey: readMyAuthorizedCredential,
+  reasoningEffort: "low",
+});
 ```
 
 The credential reader is host-owned, outside the eval workspace, and is called lazily only after
@@ -56,9 +59,16 @@ a model attempt has reserved its allowance. This example defines an integration 
 not install a credential reader. Do not put a key in source, command-line arguments or fixtures.
 No host/credential settings from the interactive CLI are loaded automatically.
 
+The eval helper accepts `none`, `low`, `high` or `max`, captured when the host is constructed.
+Omitting `reasoningEffort` retains the provider's existing `high` default; the example explicitly
+chooses `low`. Record the returned `reasoningEffort` and `apiProfile` with the trial manifest.
+The generic eval summary records the model identifier, not these provider-specific settings.
+This helper registers its own model client, so a separate interactive runtime setting cannot
+configure its effort. Invalid efforts fail before credentials or transport are used.
+
 A live command additionally requires `--allow-live`, an explicit `--max-model-requests N` and an
-authorized budget. Merely adding a live-capable helper does not authorize a paid run. No real-model
-calls were made to validate this change. Initial live use should select one public task before a
+authorized budget. Merely adding a live-capable helper does not authorize a paid run. The helper's
+wire-setting and runtime tests use synthetic responses. Initial live use should select one public task before a
 larger suite; apply the [same-model comparison protocol](research/harness-comparison.md).
 
 ## Budgets and authority
