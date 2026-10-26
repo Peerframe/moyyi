@@ -33,6 +33,7 @@ import {
   type Runtime,
   type RuntimeOptions,
 } from "../../src/runtime/index.ts";
+import { fileResultValue } from "../support/file-result.ts";
 
 export const instructionScenarios = [
   "root-source-and-persisted-request",
@@ -116,9 +117,7 @@ const resultsIn = (request: ModelRequest | undefined) => {
 const resultValue = (request: ModelRequest | undefined, callId: string) => {
   const result = resultsIn(request).find((part) => part.callId === callId);
   assert(result, `Missing tool result for ${callId}`);
-  const part = result.content[0];
-  assert(part?.type === "text");
-  return { status: result.status, value: JSON.parse(part.text) };
+  return { status: result.status, value: fileResultValue(result) };
 };
 const allAllowed: PermissionPolicy = {
   beforePrepare: () => ({ kind: "allow" }),

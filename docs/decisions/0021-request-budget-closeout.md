@@ -1,6 +1,8 @@
 # ADR 0021: Request-budget guidance and a reserved final answer
 
 Status: accepted for this implementation, 2026-10-26. D1–D6 are unchanged.
+[ADR 0026](0026-readable-evidence-and-action-budget.md) later makes the remaining tool-enabled
+requests and final action opportunity explicit; the final no-tool guarantee below is retained.
 
 ## Problem and evidence
 

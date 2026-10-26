@@ -1,4 +1,4 @@
-export const DEEPSEEK_API_PROFILE = "deepseek-responses-text-v1-2026-10-25";
+export const DEEPSEEK_API_PROFILE = "deepseek-responses-text-v2-2026-10-26";
 
 export type DeepSeekReasoningEffort = "none" | "low" | "high" | "max";
 
@@ -13,7 +13,7 @@ export function resolveDeepSeekReasoningEffort(value: unknown): DeepSeekReasonin
   throw Error("DeepSeek reasoning effort must be none, low, high or max");
 }
 
-/** Old records imply high; other efforts must never replay under that legacy profile. */
+/** Bind both tool-result rendering and reasoning effort; old wire profiles must not be relabeled. */
 export function deepSeekApiProfile(effort: DeepSeekReasoningEffort = "high"): string {
   const selected = resolveDeepSeekReasoningEffort(effort);
   return selected === "high"

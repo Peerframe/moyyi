@@ -114,8 +114,12 @@ modelReplay: {
 
 Do not supply `deepseek` or `modelRecording` during replay; configuration rejects the combination.
 A changed request, model, effort/profile or invalid record fails without network fallback.
-`DEEPSEEK_API_PROFILE` remains an alias for the historical high profile; old high recordings retain
-their identity. Low records cannot replay as high or vice versa. Runtime snapshots recording options
+`DEEPSEEK_API_PROFILE` names the current high profile,
+`deepseek-responses-text-v2-2026-10-26`; other efforts have distinct suffixes. This version sends
+tool results as native text parts with an explicit status, preserving readable newlines without
+a nested JSON envelope. Existing v1 recordings remain unchanged, but the built-in runtime rejects
+them under v2 rather than silently relabeling their wire configuration. Low records cannot replay
+as high or vice versa. See [ADR 0026](decisions/0026-readable-evidence-and-action-budget.md). Runtime snapshots recording options
 and validates replay records before asynchronous plugin setup, so caller mutations cannot relabel
 their configuration. Sequential recordings are bounded at 8 MiB/8,192 events per exchange and 64 MiB/1,024 files per directory.
 Concurrent model requests in one recording/replay wrapper fail explicitly; use separate runtimes

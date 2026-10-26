@@ -7,7 +7,7 @@ There is no direct-I/O fallback and no plugin configuration.
 
 | Tool | Arguments | Result |
 |---|---|---|
-| `read` | Required workspace-relative `path`; optional `maxBytes` (1–65,536), `startLine` (1–1,000,000), `maxLines` (1–1,000) | `path`, UTF-8 `text`, `bytesRead`, `truncated`; range reads also have `lineRange` |
+| `read` | Required workspace-relative `path`; optional `maxBytes` (1–65,536), `startLine` (1–1,000,000), `maxLines` (1–1,000) | `file-read-v1` metadata followed by numbered UTF-8 source, in separate text parts |
 | `list` | `path` defaults to `.`; optional `maxEntries` (1–200) | `path`, typed `entries`, `skippedEntries`, `truncated` |
 | `search` | Required single-line literal `query` (1–256 characters); existing file/directory `path` defaults to `.`; optional `maxMatches` (1–100), `caseSensitive` (default `true`), `contextLines` (0–20 per side, default 8), `include`/`exclude` globs, `mode` (`content` default or `files`) | `path`, `matches` with file/line/text, optional merged `context` windows, `skippedFiles`, `truncated`; files mode has `mode`, distinct `files`, empty `matches`, no context |
 
@@ -21,12 +21,38 @@ rechecks cancellation after awaiting it. The host's path refusals fail the opera
 they cannot become a request to approve a stale precondition.
 The three read tools declare a `read` effect with no reversal or reconciliation operation.
 
-Results are JSON inside the tool's text content. Limits are upper bounds: the host and the
-serialized output budget can reduce them further. Defaults request at most 16 KiB for reads,
-50 list entries or 20 search matches, reduced for the available output budget. Oversized
-responses keep valid JSON, shorten their text/results and set `truncated: true`. A very small
-budget can return only `{"truncated":true}`. A truncated or partially skipped search is not
-proof that the rest of the workspace contains no matches. Failures remain failed outcomes.
+Successful reads separate metadata from model-readable source as described below. List, search
+and failures retain JSON inside one text part. Limits are upper bounds: the host and the serialized
+output budget can reduce them further. Defaults request at most 16 KiB for reads, 50 list entries
+or 20 search matches, reduced for the available output budget. Oversized responses shorten their
+text/results and set `truncated: true`. A very small budget can return only `{"truncated":true}`.
+A truncated or partially skipped search is not proof that the rest of the workspace contains no
+matches. Failures remain failed outcomes.
+
+Successful read presentation has two text parts. The first is JSON with `format: "file-read-v1"`,
+`path`, the host's `bytesRead`, `truncated`, and its `lineRange` when presentation has not clipped
+the returned source. It contains no source text. Its `presentation` object reports `startLine`,
+`endLine` (null for empty output), `lastLineComplete` (null for empty output), `sourceBytes` and
+`outputTruncated`. The second part contains the source once, with each LF-delimited line prefixed
+by its number and `: `. Original CRLF, lone CR, Unicode and a missing final LF are preserved; a
+terminal LF does not create another empty line. An empty file has an empty second text part.
+Consumers can remove each expected, consecutively numbered prefix and concatenate the pieces to
+recover exactly the presented source; line splitting must use LF only.
+
+`bytesRead` remains the host's read count, while `presentation.sourceBytes` counts source actually
+shown, without numbering. They can differ after output clipping or a host byte limit that omits
+an incomplete UTF-8 character. Output accounting includes both serialized text parts, metadata
+and line prefixes, within the original budget. Clipping prefers whole lines; an overlong first
+line may retain a Unicode-code-point-safe prefix marked `lastLineComplete: false`. Clipped output
+sets `outputTruncated` and removes the original `lineRange` rather than preserving false endpoints.
+
+When a bounded continuation is available, `presentation.nextRead` gives `path`, `startLine` and
+`maxLines: 200`. It repeats an incomplete last line, or starts after the last complete line.
+Because a selected range can omit only earlier content, this is a continuation probe, not a claim
+that later content exists. A complete empty range does not repeat itself. If a next line would
+exceed the existing admitted start-line limit, `continuationBlocked: "startLine_limit"` replaces
+the hint. A very long partial line can still exceed the byte budget when reread; the hint neither
+raises limits nor promises completeness. A minimal truncation-only result has no source or range.
 
 Search filters narrow the existing guarded scan before candidate body reads. `include` and `exclude`
 each contain 1–8 strings of 1–128 characters, matched against workspace-relative paths even within
@@ -69,8 +95,7 @@ still counts toward `endLine`; inspect `complete` before treating it as a whole 
 `bytesRead` counts the UTF-8 bytes returned by the host for a range, not its full-file scan.
 `truncated` is true whenever any file content was omitted before or after the range, or by the
 byte limit. Thus `lineRange.complete: true` does not imply the entire file was read into the
-result. Further serialized-output clipping drops `lineRange` instead of retaining incorrect
-endpoints; a minimal result can still be only `{"truncated":true}`.
+result. Presentation preserves this distinction and separately reports its own clipping.
 
 The host rejects binary/non-UTF-8 reads, protected paths and escaping symlinks. Explicit reads
 and directory listings may resolve an internal symlink; recursive search skips symlinks and
@@ -86,5 +111,5 @@ single-use apply capability. Outcomes include a snapshot ID. Execution exception
 uncertain effects. See [controlled writes](../../../docs/writes.md) for opt-in, recovery and limits.
 
 Tests beside this file use mock capabilities to check delegation, missing/denied capabilities,
-cancellation, closed argument schemas and bounded JSON output. Actual filesystem confinement,
+cancellation, closed argument schemas, exact numbered source and bounded output. Actual filesystem confinement,
 ignore behavior, revocation and runtime integration are checked in the host's tests.

@@ -49,7 +49,7 @@ describe("DeepSeek eval host reasoning configuration", () => {
       expect(host.profile.origin).toEqual({ provider: "deepseek", model: "deepseek-flash" });
       expect(host.reasoningEffort).toBe(effort);
       expect(host.apiProfile).toBe(
-        `deepseek-responses-text-v1-2026-10-25${effort === "high" ? "" : `-reasoning-${effort}`}`,
+        `deepseek-responses-text-v2-2026-10-26${effort === "high" ? "" : `-reasoning-${effort}`}`,
       );
       expect(fetch).toHaveBeenCalledTimes(1);
       expect(fetch.mock.calls[0]?.[0]).toBe(DEEPSEEK_RESPONSES_URL);
@@ -67,7 +67,7 @@ describe("DeepSeek eval host reasoning configuration", () => {
     const fetch = sendFixture();
     const { host } = await invoke({ getApiKey: () => "synthetic-test-key", fetch });
     expect(host.reasoningEffort).toBe("high");
-    expect(host.apiProfile).toBe("deepseek-responses-text-v1-2026-10-25");
+    expect(host.apiProfile).toBe("deepseek-responses-text-v2-2026-10-26");
     expect(JSON.parse(String(fetch.mock.calls[0]?.[1]?.body)).reasoning).toEqual({
       effort: "high",
     });

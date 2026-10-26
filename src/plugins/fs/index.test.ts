@@ -65,7 +65,23 @@ function context(
 function body(outcome: ToolOutcome): Record<string, unknown> {
   const text = outcome.content[0];
   if (text?.type !== "text") throw new Error("Expected a JSON text result");
-  return JSON.parse(text.text) as Record<string, unknown>;
+  const metadata = JSON.parse(text.text) as Record<string, unknown>;
+  if (metadata.format !== "file-read-v1") return metadata;
+  const { format: _format, presentation, ...body } = metadata;
+  expect(body).not.toHaveProperty("text");
+  expect(outcome.content).toHaveLength(2);
+  const source = outcome.content[1];
+  if (source?.type !== "text") throw new Error("Expected numbered source text");
+  const range = presentation as { startLine: number; sourceBytes: number };
+  const raw = (source.text.match(/[^\n]*\n|[^\n]+$/g) ?? [])
+    .map((sourceLine, index) => {
+      const prefix = `${range.startLine + index}: `;
+      expect(sourceLine.startsWith(prefix)).toBe(true);
+      return sourceLine.slice(prefix.length);
+    })
+    .join("");
+  expect(new TextEncoder().encode(raw).byteLength).toBe(range.sourceBytes);
+  return { ...body, text: raw };
 }
 async function selected(name: string): Promise<ToolDefinition> {
   const tool = (await registered()).get(name);
@@ -462,7 +478,7 @@ describe("fs plugin", () => {
     await expect((await selected("search")).prepare(args, context(capability()))).rejects.toThrow();
   });
   it.each(["read", "list", "search"])(
-    "%s output remains valid bounded JSON with a truthful truncation marker",
+    "%s output retains bounded metadata and source with a truthful truncation marker",
     async (name) => {
       const files = capability(),
         ctx = context(files, undefined, 256),

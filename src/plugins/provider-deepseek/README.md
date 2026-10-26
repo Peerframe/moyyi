@@ -4,7 +4,7 @@ Registers `deepseek/deepseek-flash` through `createDeepSeekPlugin(transport, opt
 supplies the HTTP transport. Plugin config must be absent. No credentials, filesystem access,
 retries, tool execution or environment lookup live in this plugin.
 
-Supported profile: `deepseek-responses-text-v1-2026-10-25`. Requests use the official Responses
+Supported profile: `deepseek-responses-text-v2-2026-10-26`. Requests use the official Responses
 endpoint, full stateless text/reasoning history and client function tools. Completed assistant
 history with tools/calls must retain all actual visible reasoning and a known successful stop reason;
 a complete response need not generate reasoning. Unsupported
@@ -18,10 +18,16 @@ requests. No prompt, tool definition, output limit or model selection changes wi
 `none` disables thinking; it does not strip earlier visible reasoning from valid history.
 See the [official effort mapping](https://api-docs.deepseek.com/guides/thinking_mode/).
 
-`deepSeekApiProfile(effort)` binds recording/replay to the selected effort. High retains the legacy
+`deepSeekApiProfile(effort)` binds recording/replay to the selected effort. High uses the current
 constant; other efforts have distinct suffixes. Runtime exposes the helper through `moyyi/runtime`
 and uses the host's `deepseekReasoningEffort` setting for both live connections and offline replay.
 See [ADR 0023](../../../docs/decisions/0023-configurable-deepseek-reasoning.md).
+
+Tool results use native `input_text` parts: an explicit result-status part followed by each
+original text part, preserving actual newlines, Unicode and part boundaries. No nested JSON
+envelope is added and no tool JSON is parsed. The v2 recording profile identifies this wire
+change; v1 records must not be relabeled as v2. See
+[ADR 0026](../../../docs/decisions/0026-readable-evidence-and-action-budget.md).
 
 The optional common `toolChoice: "none"` control sends `tool_choice: "none"` while preserving
 tool definitions and complete tool-call/result history. Absence retains the previous wire shape;

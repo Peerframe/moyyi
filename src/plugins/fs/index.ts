@@ -2,7 +2,6 @@ import {
   type ActionDigest,
   canonicalizeJson,
   type FileList,
-  type FileRead,
   type FileSearch,
   type JsonSchema,
   type Plugin,
@@ -11,6 +10,7 @@ import {
   type ToolOutcome,
 } from "../../contracts/index.ts";
 
+import { presentRead } from "./read-presentation.ts";
 import { workspaceWriteTools } from "./writes.ts";
 
 type Operation = "read" | "list" | "search";
@@ -28,11 +28,7 @@ interface Arguments {
   readonly exclude?: readonly string[];
   readonly mode?: "content" | "files";
 }
-type Result =
-  | FileRead
-  | FileList
-  | FileSearch
-  | { readonly error: string; readonly truncated: boolean };
+type Result = FileList | FileSearch | { readonly error: string; readonly truncated: boolean };
 const encoder = new TextEncoder();
 const pathSchema = { type: "string", minLength: 1, maxLength: 4096 };
 const patternsSchema = {
@@ -75,7 +71,7 @@ const schemas: Record<Operation, JsonSchema> = {
   },
 };
 const descriptions: Record<Operation, string> = {
-  read: "Read UTF-8. startLine/maxLines selects a 1-based window (defaults 1/200, file<=1MiB); complete covers the window only.",
+  read: "Read numbered UTF-8 + metadata. startLine/maxLines: 1-based window (default 1/200,file<=1MiB); complete is window-only; nextRead may repeat partial lines.",
   list: "List a workspace directory (default .).",
   search:
     "Literal file/dir search (default .); honors .gitignore. include/exclude: workspace-relative *, **, ? globs; ** whole segments; dotfiles explicit; exclude wins. mode files: unique paths; content default: hits/context (8 lines/side). maxMatches counts lines/files. Read gaps; truncated/skipped cannot prove absence.",
@@ -115,13 +111,15 @@ function tool(operation: Operation): ToolDefinition {
         if (!context.files) throw new Error("Workspace file capability is unavailable");
         const args = argumentsFor(operation, action.payload);
         const budget = context.limits.maxOutputBytes;
-        let result: FileRead | FileList | FileSearch;
+        let result: FileList | FileSearch;
         if (operation === "read") {
-          result = await context.files.read(args.path, {
+          const read = await context.files.read(args.path, {
             maxBytes: Math.max(1, Math.min(args.maxBytes ?? 16384, Math.floor(budget / 8))),
             ...(args.startLine === undefined ? {} : { startLine: args.startLine }),
             ...(args.maxLines === undefined ? {} : { maxLines: args.maxLines }),
           });
+          assertActive(context);
+          return presentRead(read, budget);
         } else if (operation === "list") {
           result = await context.files.list(args.path, {
             maxEntries: Math.max(1, Math.min(args.maxEntries ?? 50, Math.floor(budget / 256))),
@@ -257,11 +255,7 @@ function outcome(status: ToolOutcome["status"], result: Result, budget: number):
   if (fits(result)) return { status, content: content(result) };
   let limited: unknown = { truncated: true };
   const base = { ...result, truncated: true };
-  if ("text" in result) {
-    // Generic serialized-output clipping cannot preserve the host's exact line endpoint.
-    const { lineRange: _lineRange, ...readBase } = { ...result, truncated: true };
-    limited = { ...readBase, text: prefix(result.text, (text) => fits({ ...readBase, text })) };
-  } else if ("entries" in result) {
+  if ("entries" in result) {
     limited = {
       ...base,
       entries: result.entries.slice(

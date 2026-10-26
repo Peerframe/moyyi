@@ -2,6 +2,7 @@ import { mkdirSync, mkdtempSync, readFileSync, rmSync, symlinkSync, writeFileSyn
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
+import { fileResultValue } from "../evals/support/file-result.ts";
 import {
   type ActionDigest,
   type FileList,
@@ -55,9 +56,7 @@ function calls(
 }
 function payload<T>(result: ToolResultPart | undefined): T {
   expect(result?.status).toBe("succeeded");
-  const text = result?.content.find((part) => part.type === "text");
-  if (text?.type !== "text") throw Error("Missing file result");
-  return JSON.parse(text.text) as T;
+  return fileResultValue<T>(result);
 }
 function captureTool(
   execute: ToolDefinition["execute"],

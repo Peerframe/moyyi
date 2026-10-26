@@ -20,7 +20,7 @@ model and storage as described in [core.md](core.md), then create a session with
 workspace. The model receives the `fs` schemas; read/list/search remain the default granted operations. Duplicate names fail plugin
 loading instead of replacing a built-in capability.
 
-The [plugin README](../src/plugins/fs/README.md) describes arguments and JSON results. Search
+The [plugin README](../src/plugins/fs/README.md) describes arguments and result presentation. Search
 uses literal text, includes line numbers and is case-sensitive by default. It traverses ordinary
 and hidden workspace files subject to protected paths and `.gitignore`; it does not load global
 Git excludes or `.git/info/exclude`. Direct reads/lists do not use ignore rules. Every result
@@ -79,9 +79,19 @@ Range results retain original text delimiters and report `lineRange` with the re
 LF-delimited and 1-based; CRLF is retained, and a trailing LF creates no extra empty line.
 `complete` means the selected range up to EOF was not byte-cut; it does not prove full-file
 coverage. `truncated` reports omitted file content, including lines before/after the requested
-range. An empty EOF/out-of-range result has `endLine: null`. If later JSON output clipping
+range. An empty EOF/out-of-range result has `endLine: null`. If later output clipping
 shortens the result, `lineRange` is removed to avoid incorrect endpoints. See the plugin README
 for exact field semantics; no additional filesystem or policy authority is introduced.
+
+Successful `read` tool results now contain two text parts: `file-read-v1` JSON metadata without
+the source body, followed by directly readable `N: source` lines. The runtime capability still
+returns the same structured `FileRead`; only the tool's model-facing presentation changes.
+The source appears once, preserving its original line endings. Presentation metadata reports
+the displayed range, byte count, partial last line and any output clipping. A suggested `nextRead`
+continues at the next line or re-reads a partial line; it is a bounded probe, not proof that more
+text exists or that a long line can fit the current byte limit. Extremely small output budgets
+may retain only the explicit truncated marker. See
+[ADR 0026](decisions/0026-readable-evidence-and-action-budget.md).
 
 The runtime applies independent ceilings: 1 MiB per scanned file, 16 MiB charged scan budget,
 10,000 visited entries, 32 recursive levels, 2,000 characters per matching line, 16 KiB per

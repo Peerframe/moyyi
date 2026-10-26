@@ -6,7 +6,13 @@ import {
   deepSeekFixture,
   type FixtureOptions,
 } from "../../src/plugins/provider-deepseek/fixtures.ts";
-import { assertEquivalent, finalAnswer, runRoundTrip, successfulFixtures } from "./scenario.ts";
+import {
+  assertEquivalent,
+  finalAnswer,
+  fixtureText,
+  runRoundTrip,
+  successfulFixtures,
+} from "./scenario.ts";
 
 interface Evidence {
   readonly requests: number;
@@ -66,6 +72,30 @@ const scenarios: readonly { id: string; run(): Promise<Evidence> }[] = [
         result.records.every((record) => record.meta.apiProfile.endsWith("-reasoning-low")),
       );
       assert.ok(JSON.stringify(result.wireRequests[2]).includes("Hello moyyi"));
+      const continuation = result.wireRequests[2]?.input as Record<string, unknown>[];
+      const readOutput = continuation.find(
+        (item) => item.type === "function_call_output" && item.call_id === "fixture_read_1",
+      );
+      assert.ok(Array.isArray(readOutput?.output), "Use the provider's native text parts");
+      const parts = readOutput.output as { type: string; text: string }[];
+      assert.deepEqual(
+        parts.map((part) => part.type),
+        ["input_text", "input_text", "input_text"],
+      );
+      assert.equal(parts[0]?.text, "Tool result status: succeeded");
+      const metadata = JSON.parse(parts[1]?.text ?? "null");
+      assert.equal(metadata.format, "file-read-v1");
+      assert.equal(metadata.path, "README.md");
+      assert.equal(metadata.truncated, false);
+      assert.equal(metadata.text, undefined, "Do not duplicate source inside JSON metadata");
+      assert.equal(
+        parts[2]?.text,
+        fixtureText
+          .match(/[^\n]*\n|[^\n]+$/gu)
+          ?.map((line, index) => `${index + 1}: ${line}`)
+          .join(""),
+        "Actual source and newlines must reach the decoded HTTP body exactly once",
+      );
       return evidence(result);
     },
   },

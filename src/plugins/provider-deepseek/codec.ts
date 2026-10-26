@@ -158,10 +158,12 @@ export function buildDeepSeekRequest(
         input.push({
           type: "function_call_output",
           call_id: callId,
-          output: canonicalizeJson({
-            status: part.status,
-            content: part.content.map((part) => textPart(part)),
-          }),
+          // Native text parts preserve source newlines and part boundaries for the model.
+          // Do not interpret tool JSON or wrap already-rendered evidence in another JSON string.
+          output: [
+            { type: "input_text", text: `Tool result status: ${part.status}` },
+            ...part.content.map((part) => ({ type: "input_text", text: textPart(part) })),
+          ],
         });
         pending.delete(part.callId);
       } else throw new CodecError("Unsupported history content or role");

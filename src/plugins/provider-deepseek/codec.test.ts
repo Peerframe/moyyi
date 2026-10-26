@@ -70,7 +70,7 @@ function expectError(events: ModelStreamEvent[], kind = "protocol", partial = tr
 
 describe("DeepSeek request codec", () => {
   it("selects only the supported documented request controls", () => {
-    expect(DEEPSEEK_API_PROFILE).toBe("deepseek-responses-text-v1-2026-10-25");
+    expect(DEEPSEEK_API_PROFILE).toBe("deepseek-responses-text-v2-2026-10-26");
     expect(deepSeekProfile).toMatchObject({
       contextWindowTokens: 1_000_000,
       maxOutputTokens: 8192,
@@ -180,10 +180,69 @@ describe("DeepSeek request codec", () => {
       {
         type: "function_call_output",
         call_id: "wire_1",
-        output: '{"content":["Verify before retrying."],"status":"unknown"}',
+        output: [
+          { type: "input_text", text: "Tool result status: unknown" },
+          { type: "input_text", text: "Verify before retrying." },
+        ],
       },
     ]);
   });
+  it.each(["succeeded", "failed", "denied", "cancelled", "unknown"] as const)(
+    "preserves readable text parts and explicit %s status through the actual JSON wire",
+    (status) => {
+      const callId = "source_read" as ToolCallId;
+      const text = '24: const title = "原文";\r\n25: return { markdown: text };\n';
+      const metadata = '{"path":"src/sample.ts","truncated":false}';
+      const built = buildDeepSeekRequest(
+        request({
+          messages: [
+            {
+              role: "assistant",
+              stopReason: "tool_use",
+              content: [
+                {
+                  type: "tool_call",
+                  callId,
+                  providerCallId: "wire_read",
+                  providerItemId: null,
+                  name: "read",
+                  rawArguments: "{}",
+                  argumentsSource: "verbatim",
+                },
+              ],
+            },
+            {
+              role: "user",
+              content: [
+                {
+                  type: "tool_result",
+                  callId,
+                  status,
+                  content: [
+                    { type: "text", text: metadata },
+                    { type: "text", text },
+                  ],
+                },
+              ],
+            },
+          ],
+        }),
+      );
+      const sent = JSON.parse(JSON.stringify(built));
+      expect(sent.input[1]).toEqual({
+        type: "function_call_output",
+        call_id: "wire_read",
+        output: [
+          { type: "input_text", text: `Tool result status: ${status}` },
+          { type: "input_text", text: metadata },
+          { type: "input_text", text },
+        ],
+      });
+      // JSON belongs to the tool, not this provider: preserve it as text, never infer a schema.
+      expect(sent.input[1].output[1].text).toBe(metadata);
+      expect(sent.input[1].output[2].text).toContain("\r\n25: return { markdown: text };\n");
+    },
+  );
   it("does not parse or depend on stale, malformed opaque replay payloads", () => {
     const history = request({
       messages: [
