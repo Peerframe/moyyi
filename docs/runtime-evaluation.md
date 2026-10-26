@@ -143,10 +143,11 @@ mutation. Nothing is declared passed merely because the runtime ends normally.
 
 Each task has a four-request ceiling. `npm run eval:documents` currently runs only scripted offline
 conformance with real document parsing, SQLite persistence, controlled create/readback, default write
-denial and final `none`. It makes zero paid requests. The prepared task objects can later be passed
-to the existing `runSuite` with an explicitly authorized host; no automatic live mode or key lookup
-was added. The separate original regression group remains original source4 + public4 with its
-unchanged rubric; the document group is comparison4 + report4. Each group needs a new authorization,
-Flash + Responses + low and zero retries. Document success cannot cancel an original-task failure.
+denial and final `none`. It makes zero paid requests. The task objects also work with `runSuite` and an explicitly authorized installed-runtime host;
+no automatic live mode or key lookup was added to this CLI. On 2026-10-26, both fixed document tasks
+passed once using Flash + Responses + low, four requests each and zero retries. The owner authorized
+that document work without a total request cap; the first recorded baseline still retained 4+4.
+The separate original regression group remains original source4 + public4 with its unchanged
+rubric and authorization boundary. [Evidence and limits](tasks/2026-10-26-optimization-plan.md#文档真实任务验收2026-10-26). Document success cannot cancel an original-task failure.
 If evidence is present but facts remain wrong, diagnose interpretation/answer construction rather
 than automatically increasing retrieval or request counts.

@@ -90,7 +90,14 @@ write-enabled temporary task can create and re-read a report. `npm run verify:pa
 seven-format reads and native isolation outside the source tree through an installed tarball.
 These checks prove plumbing and boundaries, not model understanding.
 
-Future paid acceptance is kept in two separately authorized groups, zero retries, Flash + Responses
-+ low: original source task (4 requests) plus original public task (4), and document comparison
-(4) plus document report (4). Original rubrics remain unchanged. No prior exhausted budget is reused.
-The fixed document tasks are described with the [existing runtime evaluation](runtime-evaluation.md).
+On 2026-10-26, the owner authorized real document acceptance and removed the total request cap
+for that document work. The first frozen baseline retained four requests per task: both fixed
+checkers passed on the installed candidate with actual comparison/report files, exact quotations
+and hashes, correct approved-only totals, readback and unchanged sources. Eight HTTP 200 requests
+were used, with no retries. Each task first attempted shell and was denied, then completed through
+the authorized file tools. This is one run of each small fixed task, not a general reliability claim.
+See the [acceptance record](tasks/2026-10-26-optimization-plan.md#文档真实任务验收2026-10-26).
+
+The separate original regression group remains original source4 + public4 with unchanged rubrics;
+those historical failures are not overwritten by document success. No old exhausted budget is
+reused. The fixed document tasks are described with the [existing runtime evaluation](runtime-evaluation.md).

@@ -49,7 +49,7 @@ core through five fixed points and can be added or removed without touching anyt
 | `project-instructions` (workspace root AGENTS.md only) | context source | implemented; refreshed per request |
 | `workspace-navigation` (opt-in bounded file paths) | context source | implemented; refreshed per request; real-model quality unverified |
 | `fs` (read, list, search; create, edit, undo) | tools | read-only merged in batch 5; writes merged in phase 2 |
-| `documents` (seven-format body text) | read-only tool; dedicated runtime parser port | implemented candidate; live understanding acceptance pending |
+| `documents` (seven-format body text) | read-only tool; dedicated runtime parser port | implemented candidate; two fixed live document tasks passed once; broader quality unmeasured |
 | `shell` | tools | merged in phase 3 |
 | `provider-anthropic` | model provider | merged in phase 5; live acceptance pending |
 | `web` (fetch, search) | tools; runtime capability and base policy | merged in phase 5 |
