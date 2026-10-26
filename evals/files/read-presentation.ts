@@ -20,6 +20,8 @@ export const fileReadPresentationScenarios = [
   "numbered-source-reaches-next-request",
   "partial-line-continuation-rereads-tail",
   "serialized-read-output-bound",
+  "default-budget-keeps-fitting-single-line",
+  "default-prefix-has-no-implicit-line-cap",
 ] as const;
 export type FileReadPresentationScenario = (typeof fileReadPresentationScenarios)[number];
 export interface FileReadPresentationEvidence {
@@ -70,14 +72,21 @@ export async function runFileReadPresentationScenario(
   let networks = 0;
   const partial = scenario === "partial-line-continuation-rereads-tail";
   const bounded = scenario === "serialized-read-output-bound";
+  const longLine = scenario === "default-budget-keeps-fitting-single-line";
+  const manyLines = scenario === "default-prefix-has-no-implicit-line-cap";
   const source = partial
     ? "first\nalpha🙂suffix\r\nlast\n"
     : bounded
       ? "x\n".repeat(200)
-      : 'export const raw = "字😀";\r\n1: original prefix\nlone\rcarriage\u2028separator\nno final LF';
+      : longLine
+        ? `${JSON.stringify({ note: "x".repeat(6000), status: "PENDING_REVIEW" })}\n`
+        : manyLines
+          ? `${"item\n".repeat(240)}TAIL_FACT\n`
+          : 'export const raw = "字😀";\r\n1: original prefix\nlone\rcarriage\u2028separator\nno final LF';
   const sourcePath = join(directory, "source.txt");
   const requestLimit = partial ? 3 : 2;
-  const outputLimit = bounded ? 512 : 8192;
+  const useDefaultBudget = longLine || manyLines;
+  const outputLimit = bounded ? 512 : useDefaultBudget ? 32768 : 8192;
   try {
     writeFileSync(sourcePath, source);
     globalThis.fetch = async () => {
@@ -145,6 +154,10 @@ export async function runFileReadPresentationScenario(
                 assert.equal(evidence.truncated, false);
                 assert.equal(metadata.presentation.lastLineComplete, true);
                 assert.equal(metadata.presentation.outputTruncated, false);
+                assert.equal(metadata.presentation.nextRead, undefined);
+                assert.equal(metadata.presentation.sourceBytes, Buffer.byteLength(source));
+                if (longLine) assert.equal(JSON.parse(evidence.text).status, "PENDING_REVIEW");
+                if (manyLines) assert.equal(metadata.presentation.endLine, 241);
               }
               assert.equal(request.toolChoice, "none");
               yield {
@@ -166,7 +179,7 @@ export async function runFileReadPresentationScenario(
         timeoutMs: 15_000,
         maxRetries: 0,
         maxModelRequests: requestLimit,
-        maxToolOutputBytes: outputLimit,
+        ...(useDefaultBudget ? {} : { maxToolOutputBytes: outputLimit }),
       },
       plugins: [{ plugin: provider }],
     });

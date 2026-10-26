@@ -159,7 +159,7 @@ describe("fs plugin", () => {
     expect(body(result).entries).toEqual([{ path: "a.txt", type: "file" }]);
     expect(body(result).truncated).toBe(false);
   });
-  it("forwards exact line selection with the reduced byte budget and retains range evidence", async () => {
+  it("forwards exact line selection within the output byte budget and retains range evidence", async () => {
     const files = capability(),
       ctx = context(files),
       tool = await selected("read");
@@ -178,7 +178,7 @@ describe("fs plugin", () => {
     expect(files.read).toHaveBeenCalledExactlyOnceWith("source.ts", {
       startLine: 2,
       maxLines: 2,
-      maxBytes: 1024,
+      maxBytes: 8192,
     });
     expect(body(result)).toEqual(evidence);
   });
@@ -190,11 +190,105 @@ describe("fs plugin", () => {
         tool = await selected("read");
       await tool.execute(await tool.prepare({ path: "source.ts", ...options }, ctx), ctx);
       expect(files.read).toHaveBeenCalledExactlyOnceWith("source.ts", {
-        maxBytes: 1024,
+        maxBytes: 8192,
         ...options,
       });
     },
   );
+  it.each([{}, { startLine: 1, maxLines: 1 }])(
+    "returns a complete 6 KiB single-line record when the unchanged output budget fits: %j",
+    async (options) => {
+      const files = capability(),
+        ctx = context(files, undefined, 32768),
+        tool = await selected("read");
+      const source = `${JSON.stringify({ note: "x".repeat(6000), status: "PENDING_REVIEW" })}\n`;
+      files.read.mockImplementation(async (path, limits) => {
+        const text = source.slice(0, limits?.maxBytes);
+        return { path, text, bytesRead: text.length, truncated: text !== source };
+      });
+      const result = await tool.execute(
+        await tool.prepare({ path: "record.json", ...options }, ctx),
+        ctx,
+      );
+      expect(files.read).toHaveBeenCalledExactlyOnceWith("record.json", {
+        maxBytes: 16384,
+        ...options,
+      });
+      expect(body(result)).toEqual({
+        path: "record.json",
+        text: source,
+        bytesRead: 6038,
+        truncated: false,
+      });
+      expect(result.content[0]?.type).toBe("text");
+      const metadata = JSON.parse((result.content[0] as { text: string }).text);
+      expect(metadata.presentation).toMatchObject({
+        sourceBytes: 6038,
+        lastLineComplete: true,
+        outputTruncated: false,
+      });
+      expect(metadata.presentation).not.toHaveProperty("nextRead");
+      expect(Buffer.byteLength(JSON.stringify(result.content))).toBeLessThanOrEqual(32768);
+    },
+  );
+  it.each([
+    { budget: 64, requested: undefined, expected: 64 },
+    { budget: 8192, requested: undefined, expected: 8192 },
+    { budget: 32768, requested: undefined, expected: 16384 },
+    { budget: 32768, requested: 65536, expected: 32768 },
+    { budget: 131072, requested: 65536, expected: 65536 },
+    { budget: 32768, requested: 1, expected: 1 },
+  ])("preserves the caller, default and hard read byte limits: %j", async (item) => {
+    const files = capability(),
+      ctx = context(files, undefined, item.budget),
+      tool = await selected("read");
+    await tool.execute(
+      await tool.prepare(
+        { path: "file.txt", ...(item.requested === undefined ? {} : { maxBytes: item.requested }) },
+        ctx,
+      ),
+      ctx,
+    );
+    expect(files.read).toHaveBeenCalledExactlyOnceWith("file.txt", { maxBytes: item.expected });
+  });
+  it.each([
+    { budget: 64, unit: '😀"字\\' },
+    { budget: 650, unit: '😀"字\\' },
+    { budget: 32768, unit: '"\\' },
+    { budget: 32768, unit: "\n" },
+  ])("fits serialized output after reading up to the byte budget: %j", async ({ budget, unit }) => {
+    const files = capability(),
+      ctx = context(files, undefined, budget),
+      tool = await selected("read");
+    const text = unit.repeat(Math.floor(budget / Buffer.byteLength(unit)));
+    files.read.mockResolvedValue({
+      path: "source.ts",
+      text,
+      bytesRead: Buffer.byteLength(text),
+      truncated: false,
+    });
+    const result = await tool.execute(
+      await tool.prepare({ path: "source.ts", maxBytes: 65536 }, ctx),
+      ctx,
+    );
+    expect(files.read).toHaveBeenCalledExactlyOnceWith("source.ts", { maxBytes: budget });
+    expect(result.status).toBe("succeeded");
+    expect(Buffer.byteLength(JSON.stringify(result.content))).toBeLessThanOrEqual(budget);
+    expect(body(result).truncated).toBe(true);
+    if (result.content.length === 2) {
+      const shown = body(result).text as string;
+      expect(text.startsWith(shown)).toBe(true);
+      expect(shown.length).toBeGreaterThan(0);
+      expect(shown.length).toBeLessThan(text.length);
+      expect(shown).toBe(shown.toWellFormed());
+      const metadata = JSON.parse((result.content[0] as { text: string }).text);
+      expect(metadata.presentation.outputTruncated).toBe(true);
+      expect(metadata.presentation.lastLineComplete).toBe(unit === "\n");
+      expect(metadata.presentation.nextRead.startLine).toBe(
+        metadata.presentation.endLine + (unit === "\n" ? 1 : 0),
+      );
+    }
+  });
   it.each([
     { startLine: 0 },
     { startLine: 1000001 },
@@ -203,6 +297,8 @@ describe("fs plugin", () => {
     { maxLines: 0 },
     { maxLines: 1001 },
     { maxLines: null },
+    { maxBytes: 0 },
+    { maxBytes: 65537 },
     { startLine: 1, maxLines: 2, bypassScan: true },
   ])("rejects invalid range arguments before capability use: %j", async (options) => {
     const files = capability(),
@@ -528,7 +624,7 @@ describe("fs plugin", () => {
     expect(new TextEncoder().encode(JSON.stringify(result.content)).byteLength).toBeLessThanOrEqual(
       64,
     );
-    expect(files.read).toHaveBeenCalledExactlyOnceWith("file", { maxBytes: 8 });
+    expect(files.read).toHaveBeenCalledExactlyOnceWith("file", { maxBytes: 64 });
   });
   it("sanitizes malformed diagnostic Unicode and never substitutes a success", async () => {
     const files = capability(),

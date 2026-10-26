@@ -71,7 +71,7 @@ const schemas: Record<Operation, JsonSchema> = {
   },
 };
 const descriptions: Record<Operation, string> = {
-  read: "Read numbered UTF-8 + metadata; 1-based startLine/maxLines default 1/200 (file<=1MiB). complete is window-only; nextRead may repeat partial lines.",
+  read: "Numbered UTF-8 + metadata. No line args: byte-bounded prefix; either: 1-based startLine/maxLines default 1/200, <=1MiB scan. complete is window-only; nextRead may repeat partial lines.",
   list: "List a workspace directory (default .).",
   search:
     "Literal file/dir search (default .), honoring .gitignore. include/exclude: relative *, **, ?; ** whole segments; dotfiles explicit; exclude wins. mode files: unique paths; content default: hits/context (8 lines/side). maxMatches counts lines/files. Read gaps; truncated/skipped cannot prove absence.",
@@ -114,7 +114,7 @@ function tool(operation: Operation): ToolDefinition {
         let result: FileList | FileSearch;
         if (operation === "read") {
           const read = await context.files.read(args.path, {
-            maxBytes: Math.max(1, Math.min(args.maxBytes ?? 16384, Math.floor(budget / 8))),
+            maxBytes: Math.max(1, Math.min(args.maxBytes ?? 16384, budget)),
             ...(args.startLine === undefined ? {} : { startLine: args.startLine }),
             ...(args.maxLines === undefined ? {} : { maxLines: args.maxLines }),
           });

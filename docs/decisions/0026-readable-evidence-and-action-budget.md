@@ -106,3 +106,25 @@ budget. A model-authored checklist, schema-valid JSON, final answer or completio
 certify arbitrary conclusions. Automatic completion contracts are deferred until a concrete
 user/host-owned condition needs them; hidden grader answers and unrestricted shell checks are
 not injected to make these tasks pass.
+
+## Read-budget correction, 2026-10-27
+
+An installed-runtime probe exposed a remaining allocation from the old presentation: before
+calling the exact serialized fitter, `read` divided the output budget by eight. With the default
+32 KiB output limit, a 6,038-byte one-line JSON file was cut at 4,096 bytes. Following its honest
+partial-line continuation returned the same prefix. The existing fitter can present the entire
+file in 6,318 bytes; the tail was hidden despite fitting all established limits.
+
+Keep the default 16 KiB source request, explicit 64 KiB maximum, guarded reader and final output
+limit. Bound source allocation by the whole output allowance rather than one eighth; retain the
+existing exact fitter for metadata, numbering and escaping. No automatic continuation, output
+increase or new capability is introduced. The tool description now distinguishes a byte-bounded
+prefix (no line arguments) from range mode (either line argument, missing defaults 1/200, complete
+scan at most 1 MiB). This documents existing reader semantics, not a new scan behavior.
+
+Regression evidence must include a real runtime/default-budget read whose complete source reaches
+the next request, a prefix exceeding 200 lines, the externally installed package, and unchanged
+small-budget/Unicode/escaping/partial-line/permission tests. Scripted responses prove delivery,
+not interpretation. The original Skills control used a larger output budget, and its incorrect
+answers also omitted already-delivered facts; this correction does not explain or erase those
+failures. Prior task scores and model configuration remain unchanged.

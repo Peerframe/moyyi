@@ -280,6 +280,33 @@ try {
   assert.equal(readFileSync(join(workspace, "protected.txt"), "utf8"), "UNCHANGED");
   cases.push("installed-missing-read-diagnostic-and-discovery-recovery");
 
+  const longRecord = `${JSON.stringify({ note: "x".repeat(6000), status: "PENDING_REVIEW" })}\n`;
+  writeFileSync(join(workspace, "record.json"), longRecord);
+  const recordCall = tool("read", { path: "record.json" });
+  const beforeRecord = requests.length;
+  steps.push(recordCall, answer("Observed the complete synthetic record."));
+  await turn("Read record.json, including the status after the long note.");
+  assert.equal(requests.length - beforeRecord, 2);
+  const recordResults = requests
+    .at(-1)
+    .messages.flatMap((message) => message.content)
+    .filter((part) => part.type === "tool_result" && part.callId === recordCall[0].part.callId);
+  assert.equal(recordResults.length, 1);
+  const record = recordResults[0];
+  assert.equal(record.status, "succeeded");
+  assert.equal(record.content.length, 2);
+  assert(Buffer.byteLength(JSON.stringify(record.content)) <= 32768);
+  const recordMetadata = JSON.parse(record.content[0].text);
+  assert.equal(recordMetadata.format, "file-read-v1");
+  assert.equal(recordMetadata.truncated, false);
+  assert.equal(recordMetadata.bytesRead, Buffer.byteLength(longRecord));
+  assert.equal(recordMetadata.presentation.sourceBytes, Buffer.byteLength(longRecord));
+  assert.equal(recordMetadata.presentation.outputTruncated, false);
+  assert.equal(recordMetadata.presentation.nextRead, undefined);
+  assert.equal(record.content[1].text, `1: ${longRecord}`);
+  assert.equal(readFileSync(join(workspace, "record.json"), "utf8"), longRecord);
+  cases.push("installed-default-budget-keeps-fitting-single-line");
+
   steps.push(
     tool("create", { path: "created.txt", text: "APPROVED_CONTENT" }),
     answer("Recorded creation."),
