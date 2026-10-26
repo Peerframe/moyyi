@@ -48,6 +48,7 @@ and the referenced PR before changing code. No current authorization is inferred
 | Corrected candidate live task | Installed `8eb8317`, original release-note task/checker/15-request/180s limit | Four HTTP200 requests, zero retries; first draft is the exact 271-byte expected file including the previously omitted record. Complete source and final-file readback reached subsequent requests, protected inputs unchanged. No shell call occurred: task correctness passed once, autonomous programmatic checking remains unestablished. The previous 3/4 sample and failed-check control are retained. |
 | New daily artifact sample | Installed `351126b`, three previously unexecuted public tasks, original 15-request/180s budgets | 17 HTTP200 requests, zero retries: quoted CSV 6, exact worksheet edit 7, conflicting ledger 4. CSV and worksheet pass their original checkers with actual file/readback evidence. The ledger fails the original checker while honestly reporting partial/blocked; its visible instruction did not explicitly forbid a partial ledger or specify JSON field hierarchy, so attribution includes a task-specification gap. Old scores remain unchanged. |
 | Clarified ledger diagnostic | Same installation, one separately labeled post-hoc trial; same fixture/checker/budget | Four HTTP200 requests, zero retries. General publication and top-level-field requirements were added without giving conflict facts. No ledger was produced and the final answer honestly reports blocked. The report still fails: it assigns source-a's INV-001 amount of 80.00 to INV-002 despite complete evidence that source-a.csv lists INV-002 as 120.00. Array-vs-string checker failures remain partly underspecified; the wrong amount independently establishes factual failure. Do not include this variant in original-corpus scores or repeat it until green. |
+| Frozen decision-point effort diagnostic | Same installation; two historical request bodies, each continued once with low/none | Four HTTP200 requests, zero retries; wire pairs differ only in effort. Neither Skills arm proposes the targeted missing reader/core reads. Ledger low lists both source amounts correctly; none proposes contradictory duplicate `total` keys. All eight returned tool calls remain data, with zero execution/follow-up. This is not a task rerun, original score or evidence of stable effort superiority; default low remains. |
 | Public release | None | Local candidate installation is not npm/GitHub publication or a release tag. |
 
 The merged public corpus has 32 tasks. Two new fixed document tasks are prepared as a separate
@@ -226,6 +227,16 @@ This is evidence to investigate factual interpretation and verification, not to 
 retrieval, rewrite task scores or put a question-specific instruction into the agent. Successful
 examples are available in the owner's local `moyyi-demo/daily-artifacts-2026-10-27` directory;
 failed originals and the separate diagnostic are retained in their private acceptance records.
+
+One further four-request diagnostic freezes the actual pre-decision wire bodies instead of
+rerunning tasks: the last Skills tool-enabled request and the ledger's pre-report request each
+receive low/none once, with no other request-field change. No returned tools execute. Neither
+Skills arm proposes the missing reader/core reads; the ledger low proposal has both correct
+source amounts, while none's proposed raw JSON contradicts itself with duplicate amount keys.
+Do not let ordinary JSON parsing overwrite that first wrong key during assessment. This shows
+no basis to switch effort or patch the runtime, and no stable accuracy conclusion follows from
+one observation per arm. End this diagnostic, retain default low and the original failures;
+there is no identified byte-delivery, write or budget repair left in this slice.
 
 The maintained OpenCode v1.19.4 baseline was actually exercised with a synthetic Responses
 service: normal read continuation worked, but plaintext reasoning was not replayed under either

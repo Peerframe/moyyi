@@ -66,6 +66,32 @@ create参数，实际落盘、完整读回与最后回答均保留该错误，�
 本轮没有修改生产代码、模型配置、原任务或checker；不将文档更新称为新产品二进制或重新安装。
 
 
+### 整体归因复核后的唯一配置诊断（2026-10-27）
+
+不修改产品和原题，固定原Skills轮最后可工具请求03、明确账目契约轮request02，在每份实际wire上
+各执行low/none一次；仅reasoning.effort不同，保持Flash/Responses/8192。四次总上限、零重试、
+不执行任何返回工具、不继续对话；150秒单响应、1MiB单响应上限。此为独立决策点诊断，不是原题重评。
+Skills原文件为pretty JSON，初次准备字节断言失败；保留失败记录后用JSON.stringify复原，
+76477字节/SHA精确匹配原ledger。原始wire含schema/封装，其512KiB门禁不能混同host的65536输入计数。
+
+离线13门控通过；4个正常合成响应与HTTP503/超限/incomplete各1个封存反例通过；8个工具提议
+只保存数据，canary不变，0Key/网络/执行。独立审查冻结manifest和runner无阻断后执行一次live。
+实际4次显式fetch、4个HTTP200、零重试，173088请求字节，414013响应字节，全部response.completed；
+未经独立抓包。realKeyReads=4指getter调用，不能称4次物理钥匙串读取。8个工具提议，0执行/后续请求。
+
+| 决策点 | 冻结判据下的观察 | 不能据此宣称 |
+|---|---|---|
+| Skills low | 提议读runtime/instructions、搜索runtime/index；目标reader/core读取未观察到 | 后续一定失败，或原题已完成 |
+| Skills none | 提议读runtime/instructions、搜索SkillSource/allowed-tools；目标读取未观察到 | none改善调查链 |
+| Ledger none | 拟写同一INV-002/source-a对象含重复total=80.00和120.00；说明文字正确写120/125，结构内容自相矛盾 | 用JSON.parse覆盖旧键后算正确 |
+| Ledger low | 拟写source-a120.00/source-b125.00，80.00正确归于INV-001；仅金额判断正确 | 实际文件写成/读回/原checker通过或稳定更优 |
+
+结果封存于`~/.moyyi/acceptance/decision-effort-ablation-2026-10-27/`。累计本轮三个独立记录25次请求
+（原三题17＋明确契约4＋effort对照4），不互相补分。本次4请求诊断的输入43521/output1528，含reasoning629、
+缓存输入21755（均为子集）；未查询实际账单。重复的相同low输入这次可给出正确金额，说明先前错误
+不是输入必然导致；单次结果不证明可靠性，也未证实新runtime/harness故障。诊断结束，保留默认low，
+不追加同题、提示规则或读取层修补。实际调查链和重要事实仍需独立核对，不称已解决全部准确性问题。
+
 另查Linux Codex入口：固定版本缺少请求输出上限字段，不能仅用不改写请求的门禁实现相同8192预算。
 本机Docker daemon的5秒探针也未响应；只终止本轮挂起的客户端，不重启服务或其他工作负载。
 按[比较记录](../research/harness-comparison.md#linux-codex-route-decision-2026-10-27)停止该未适配路线，
