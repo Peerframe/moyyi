@@ -31,8 +31,10 @@ and the referenced PR before changing code. No current authorization is inferred
 | Coordinate | Audited state | What it means |
 |---|---|---|
 | Prior merged baseline | `448fb2a246d327f45a1329dc920eb7c473e59ee0`, through [PR #29](https://github.com/Peerframe/moyyi/pull/29) | Independent review found no blocker; final-head CI and [merged main CI](https://github.com/Peerframe/moyyi/actions/runs/40359647505) passed. The first main macOS job acquired no runner and was cancelled before any steps; a job-only rerun passed without changing the head or workflow. |
-| Current product delivery | [PR #30](https://github.com/Peerframe/moyyi/pull/30), product `8eb8317362994a46704ee965559c0a89725b4b22` | Confined macOS heredocs/Node stdin, captured shell toolchain metadata and confirmed Linux parser namespace cleanup; [ADR 0031](decisions/0031-confined-command-verification.md). Original check passes 2,311 tests; [Linux/macOS CI](https://github.com/Peerframe/moyyi/actions/runs/40373993007), clean external package and actual owner installation passed. Product hash identifies packaged source; PR status and final CI identify integration. |
-| Current local installation | Product `8eb8317`; tar SHA256 `28417c7163feb6c61ccad693b567a9e11dbe0a637407e35a0cb68d83e846f1e0` | 363 files match. Actual installed Node heredoc computes from JSON, preserves files, denies workspace write/credentials/network and delivers the exact result to the next scripted request. CLI/client/documents/isolation/strict types and PTY 6/6 passed; prior-session resume/help/exit passed. Backup and previous package retained. Host remains Flash + Responses + low, default read-only/max3/zero-retry. |
+| Prior product delivery | [PR #30](https://github.com/Peerframe/moyyi/pull/30), product `8eb8317362994a46704ee965559c0a89725b4b22` | Confined macOS heredocs/Node stdin, captured shell toolchain metadata and confirmed Linux parser namespace cleanup; [ADR 0031](decisions/0031-confined-command-verification.md). Original check passes 2,311 tests; [Linux/macOS CI](https://github.com/Peerframe/moyyi/actions/runs/40373993007), clean external package and actual owner installation passed. Product hash identifies packaged source; PR status and final CI identify integration. |
+| Current product delivery | [PR #31](https://github.com/Peerframe/moyyi/pull/31), product `106d4130bd2d153c130c1810fa7694e470760848` | Find sessions across workspaces, inspect matching recorded effects/receipts, resume with current grants; [ADR 0032](decisions/0032-session-discovery-and-recorded-results.md). Original check passes 2,350 tests; [Linux/macOS CI](https://github.com/Peerframe/moyyi/actions/runs/40381859391), clean external package and owner installation passed. Independent review found no blocker; integration state is recorded on the PR. |
+| Current local installation | Product `106d413`; tar SHA256 `40ff38c844f4b99ce68e4266acf2be8a67c846550a711126b1cc6c909deee92a` | 372 files match. External CLI 10/10, client 11/11, documents 9/9, isolation, strict types and PTY 7/7 passed. Actual owner installation repeats PTY 7/7 and opens an existing DeepSeek session for help/catalog/results/exit, with zero model requests. Backup and prior PR #30 package retained. Host stays Flash + Responses + low, default read-only/max3/zero-retry. |
+| Prior command verification installation | Product `8eb8317`; tar SHA256 `28417c7163feb6c61ccad693b567a9e11dbe0a637407e35a0cb68d83e846f1e0` | Actual installed Node heredoc computed from JSON, preserved files, denied workspace write/credentials/network and delivered the exact result to the next scripted request. These unchanged command mechanisms retain their scoped evidence. |
 | Prior installed baseline | Product `69312969533659578cc1da21b510d8395a099ef3`; tar SHA256 `12b2aee9c116e432ab23780c32c793adc094708995dc7d7f393a1ac1fe3774a5` | 244-file identity and CLI/client/PTY/offline navigation evidence remain valid for this prior package. The document upgrade has its own acceptance receipt and backup in the [optimization plan](tasks/2026-10-26-optimization-plan.md). Flash + Responses + low, daily read-only/max3/zero-retry settings are retained. |
 | Document live acceptance | Installed `e64fa0e`; 2026-10-26, Flash + Responses + low | Both fixed tasks passed their unchanged checkers once: actual comparison/report files, seven facts/hashes/quotes, approved total CNY 5,500, readback and unchanged inputs. Eight HTTP 200 requests, zero retries; each attempted shell once and was denied before using controlled create/read. [Evidence and limits](tasks/2026-10-26-optimization-plan.md#文档真实任务验收2026-10-26). |
 | Latest autonomous investigations | Installed `e64fa0e`, 2026-10-26, fresh original4+public4 baseline | Eight HTTP200 requests, zero retries, unchanged snapshots/prompts/rubric/checker. Public source-dataflow report exists and its official checker passes. Original Skills explanation still makes a raw-text/parsed-field error and omits consumers/lifecycle. No corpus reliability claim. |
@@ -87,7 +89,7 @@ recovery and cancellation apply throughout the loop, not only after an answer.
 
 | User outcome | Entry and dependencies | Available evidence | Remaining limit |
 |---|---|---|---|
-| Start, resume and use a local agent | [CLI](cli.md), explicit host, Node/toolchain, credentials for live use | [Installed CLI/PTY/client acceptance](installation.md); a bounded DeepSeek file/tool continuation passed after #19 | Model/credential setup still requires trusted host configuration; explicit daily CLI grants are installed. A successful connection is not task competence. |
+| Start, find prior work, inspect results and resume | [CLI](cli.md), explicit host, Node/toolchain, credentials for live use | [Installed CLI/PTY/client acceptance](installation.md); PR #31 restart/catalog/results/current-grants workflow and existing-owner-session inspection pass without a model request | Model/credential setup still requires trusted host configuration; explicit daily CLI grants are installed. A successful connection is not task competence. |
 | Inspect a project and explain its behavior | File tools, instructions, context, provider and final answer | Real tool continuation and bounded final closeout; candidate source windows, exact scopes, filters and discovery outputs are verified against actual files; opt-in path context and scripted read/create/verify delivery now have offline evidence | The latest live follow-up passes public report delivery but still fails the original Skills explanation criteria. Native tool-text transport is accepted; one trial per task is not a reliability baseline. |
 | Change files, inspect changes and undo | [Write grant, approvals, snapshots](writes.md); shell grant if checks need a process | Filesystem/SQLite safety checks plus one real repair/check/undo task with exact content/mode restoration | One task is not an edit reliability rate; daily host remains read-only and grants are available through explicit CLI flags. |
 | Run commands and stop them | [Shell plugin](shell.md), explicit process grants, supported native sandbox/toolchain | Native-process conformance and documented platform tests | macOS detached descendants/host hard-kill limitations remain. Docker is a planned optional adapter, not an implemented fallback. |
@@ -172,12 +174,19 @@ Across the current evidence, interpretation/selection mistakes after full source
 separate from execution defects and from human-client usability. Another same-question prompt
 change or larger retrieval budget is not a supported general remedy.
 
-The next independent delivery closes a human-client gap: discover work after restarting, inspect
-recorded file/snapshot/process results, then resume under current permissions. It reuses SQLite,
-the local protocol and CLI; [ADR 0032](decisions/0032-session-discovery-and-recorded-results.md)
-defines bounded read-only views and the restart acceptance. The installed PR #30 remains the
-usable baseline until this delivery passes review, checks and installation. This workflow does
-not claim to repair model interpretation failures or reopen deferred GUI/model work.
+[PR #31](https://github.com/Peerframe/moyyi/pull/31) closes the human-client gap: discover work after
+restarting, inspect recorded file/snapshot/process results, then resume under current permissions.
+It reuses SQLite, the local protocol and CLI; [ADR 0032](decisions/0032-session-discovery-and-recorded-results.md)
+defines the bounded views and restart acceptance. The candidate is installed and verified; final
+integration is tracked on the PR. This does not repair or rescore model interpretation failures.
+
+The cross-layer review found no further demonstrated harness defect that justifies an accuracy
+patch now. Complete evidence delivery, actual file execution and model selection/interpretation
+are separate checks. Keep Flash + Responses + low; do not repeat the failed question, add another
+review loop or enlarge retrieval without new evidence. A second-provider comparison is conditional
+on an explicitly configured service and credentials, not a current delivery dependency. Remaining
+semantic mistakes require checking key claims and completeness in actual user work; history views
+make recorded actions inspectable but are not factual validators.
 
 The owner authorized ongoing work, necessary paid validation and sequential merging/installation
 only after review and passing CI. PRs #28 and #29 are merged, closing the measured DNS/native-loader
