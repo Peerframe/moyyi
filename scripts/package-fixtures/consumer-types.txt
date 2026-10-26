@@ -10,6 +10,7 @@ import {
   type ModelStreamEvent,
   type Plugin,
   type RuntimeEvent,
+  type SessionId,
   type WorkspaceFiles,
   type FileSearchContext,
   type FileSearchOptions,
@@ -80,6 +81,8 @@ function eventKind(event: RuntimeEvent): string {
   switch (event.type) {
     case "plugin.status":
     case "session.ready":
+    case "session.listed":
+    case "session.results":
     case "run.started":
     case "assistant.delta":
     case "entry.appended":
@@ -106,6 +109,12 @@ const invalidCommand: ClientCommand = { type: "shell.execute", command: "anythin
 const wideningPlugin: Plugin = { name: "invalid-policy", apiVersion: 1, setup(host) { host.registerPolicyRule({ id: "invalid", evaluate() { return { kind: "allow" }; } }); } };
 
 void [typedClient, eventKind, validApproval, missingDigest, invalidCommand, wideningPlugin];
+
+const listHistory: ClientCommand = { type: "session.list", offset: 0, limit: 20 };
+const viewResults: ClientCommand = { type: "session.results", sessionId: "session_synthetic" as SessionId };
+// @ts-expect-error Historical inspection cannot grant workspace writes.
+const historyGrant: ClientCommand = { type: "session.results", sessionId: "session_synthetic" as SessionId, allowWrite: true };
+void [listHistory, viewResults, historyGrant];
 
 const selectedSkills: RuntimeOptions = { skills: { root: "/synthetic-library", enabled: ["code-review"] } };
 // @ts-expect-error Skill configuration cannot omit the explicit enabled list.

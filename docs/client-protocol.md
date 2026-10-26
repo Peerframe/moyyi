@@ -35,6 +35,8 @@ recorded in diagnostics, not a reason to grant an action or stop the durable exe
 |---|---|
 | `session.create` | Select the workspace explicitly; wait for `session.ready` |
 | `session.load` | Use the matching private store; history is delivered through `entry.appended` |
+| `session.list` | Idle local inspection; bounded catalog through `session.listed`, no session selection or model request |
+| `session.results` | Idle local inspection of a session's recorded effects through `session.results`; no authority or action replay |
 | `run.start` | Supply content to the ready session; overlapping work is rejected |
 | `run.steer` | Address the active run ID; steering is recorded, not a silent replacement run |
 | `run.cancel` | Address the active run; cancellation preserves completed effects and partial output |
@@ -58,10 +60,12 @@ remain unresolved rather than being silently replayed on restart. See the
 ## Installed-candidate evidence
 
 The package gate copies `scripts/package-fixtures/client.mjs` to a temporary consumer outside the
-repository and runs it using only the installed package's bare exports. Its eight scenarios cover:
+repository and runs it using only the installed package's bare exports. Its eleven scenarios cover:
 
 - Session creation, streaming, frozen event snapshots and an observer that throws while trying to
   alter history. Other observers still receive the original events and the run completes.
+- Installed root instructions refreshed from actual workspace files.
+- Explicitly selected Skills refreshed from the configured library.
 - A real file creation that cannot occur with a stale digest, then succeeds after exact approval.
 - A denied edit with unchanged workspace and sibling canaries.
 - Busy admission, persistent steering, cancellation and rejection of an active development reload.
@@ -69,6 +73,8 @@ repository and runs it using only the installed package's bare exports. Its eigh
 - Explicit compaction, a tool-free summary request and continuation with the recorded summary.
 - Closing an active run, reopening actual SQLite, loading without a new model request and continuing
   from recorded context without re-executing the approved write.
+- Bounded session discovery and matched historical write/denial receipts after reopening, without
+  additional model requests, session switching or approval replay.
 - Listener unsubscribe and rejection of new work by a closed runtime.
 
 The separate `consumer-types.txt` fixture is copied to `.mts` and checked as an independent
@@ -81,3 +87,20 @@ web request, real credential or private task is involved. Passing establishes pa
 protocol compatibility for the exercised paths, not model task quality, provider service acceptance,
 remote protocol security or a formally released stable API. Source-level crash, sandbox, cancellation
 race and provider tests remain separate gates; this acceptance does not replace them.
+
+## Local history inspection
+
+Both inspection commands accept optional numeric `offset` (0–10,000) and `limit` (1–50, default
+20). Events contain a bounded `page` with `hasMore`; `session.results` also requires a session ID.
+These additive events must be handled by clients with exhaustive event switches. No persisted
+format changed. The catalog is an optional `SessionStore.listSessionSummaries` operation; a custom
+store without it rejects listing explicitly while preserving existing load/resume behavior.
+SQLite reads one catalog page using existing entry indexes. Result inspection reuses `loadSession`,
+so its returned page is bounded but its underlying full-session read has the existing cost.
+
+Views never enter model context or mutate transcripts. Idle admission is reserved while a view is
+being read; close waits for its read and suppresses a late result. Raw storage failures remain
+private. Receipt fields require a unique matching run/call tool result and an execution journal
+record. Historical output conveys observed states, not present filesystem state or correctness.
+The installed client acceptance includes catalog/result inspection after reopening SQLite with
+unchanged model request count and no approval or session-ready replay.

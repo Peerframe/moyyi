@@ -56,6 +56,7 @@ import { type AnthropicHttpOptions, anthropicHttpTransport } from "./anthropic-h
 import { type DeepSeekHttpOptions, deepSeekHttpTransport } from "./deepseek-http.ts";
 import { NodeWorkspaceDocuments } from "./documents.ts";
 import { NodeWorkspaceFiles } from "./files.ts";
+import { historyPage, sessionCatalog, sessionResults } from "./history.ts";
 import { collectContext } from "./instructions.ts";
 import { FileRecordingSink, RecordingModelClient, ReplayModelClient } from "./model-recording.ts";
 import { type PluginEntry, PluginRegistry, type PluginStatus } from "./plugins.ts";
@@ -328,6 +329,7 @@ export async function createRuntime(
   const commands = new Set<Promise<void>>();
   let closed = false;
   let reloading = false;
+  let inspecting = false;
   let closing: Promise<void> | undefined;
   const emit = (event: RuntimeEvent) => {
     if (event.type === "run.started") activeRuns.add(event.runId);
@@ -605,6 +607,51 @@ export async function createRuntime(
       reloading = false;
     }
   };
+  const inspect = async (
+    command: Extract<ClientCommand, { type: "session.list" | "session.results" }>,
+  ) => {
+    try {
+      const page = historyPage(command.offset, command.limit);
+      if (!page) {
+        reject(
+          command.type,
+          "History offset must be 0..10000 and limit must be 1..50, both integers",
+        );
+        return;
+      }
+      if (!store) {
+        reject(command.type, "Session storage is not configured");
+        return;
+      }
+      if (command.type === "session.list") {
+        if (!store.listSessionSummaries) {
+          reject(command.type, "Configured store does not support the session catalog");
+          return;
+        }
+        const result = await sessionCatalog(store, page);
+        if (!closed) emit({ type: "session.listed", page: result });
+      } else {
+        if (
+          typeof command.sessionId !== "string" ||
+          !command.sessionId ||
+          command.sessionId.length > 512
+        ) {
+          reject(command.type, "A valid session ID is required");
+          return;
+        }
+        const result = await sessionResults(store, command.sessionId, page);
+        if (!closed) {
+          if (result) emit({ type: "session.results", page: result });
+          else reject(command.type, "Session not found");
+        }
+      }
+    } catch {
+      // Storage failures may include private paths or payloads; expose only a fixed diagnosis.
+      if (!closed) reject(command.type, "Session history could not be read");
+    } finally {
+      inspecting = false;
+    }
+  };
   return {
     get plugins() {
       return plugins.map((entry) => ({ ...entry }));
@@ -615,6 +662,10 @@ export async function createRuntime(
     send(command) {
       if (closed) {
         reject(command.type, "Runtime is closed");
+        return Promise.resolve();
+      }
+      if (inspecting) {
+        reject(command.type, "Session inspection is in progress");
         return Promise.resolve();
       }
       if (command.type === "plugin.reload") {
@@ -635,6 +686,14 @@ export async function createRuntime(
       if (reloading) {
         reject(command.type, "Plugin reload is in progress");
         return Promise.resolve();
+      }
+      if (command.type === "session.list" || command.type === "session.results") {
+        if (commands.size || activeRuns.size) {
+          reject(command.type, "Session inspection requires an idle runtime");
+          return Promise.resolve();
+        }
+        inspecting = true;
+        return track(inspect(command));
       }
       if (!core) {
         reject(command.type, unavailable);

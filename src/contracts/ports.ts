@@ -1,3 +1,4 @@
+import type { HistoryPage, SessionListPage } from "./history.ts";
 import type { ModelProfile, ModelRequest, ToolSpec } from "./model.ts";
 import type {
   BlobRef,
@@ -21,6 +22,8 @@ import type { PreparedAction } from "./tools.ts";
 export interface SessionStore {
   /** Enumerates persisted sessions for startup recovery, including runs with no effects. */
   listSessions(): Promise<readonly SessionId[]>;
+  /** Optional bounded, read-only catalog for local clients. Recovery keeps listSessions. */
+  listSessionSummaries?(page: HistoryPage): Promise<SessionListPage>;
   /** Applies all changes in one transaction, or none of them. */
   commit(batch: StoreBatch): Promise<void>;
   loadSession(sessionId: SessionId): Promise<SessionSnapshot | null>;

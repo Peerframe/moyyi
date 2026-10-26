@@ -1,14 +1,17 @@
-import type {
-  ActionDigest,
-  ClientCommand,
-  EffectId,
-  EffectRecord,
-  RunId,
-  RuntimeEvent,
-  SessionId,
-  ToolCallId,
-  ToolResultPart,
-  TranscriptEntry,
+import {
+  type ActionDigest,
+  type ClientCommand,
+  type EffectId,
+  type EffectRecord,
+  type ExecutionReceipt,
+  executionReceipt,
+  isReceiptEffect,
+  type RunId,
+  type RuntimeEvent,
+  type SessionId,
+  type ToolCallId,
+  type ToolResultPart,
+  type TranscriptEntry,
 } from "../contracts/index.ts";
 import type { Runtime } from "../runtime/index.ts";
 
@@ -31,11 +34,20 @@ export interface CliSession {
 
 const help = [
   "Commands: /help, /new, /resume ID, /compact, /cancel, /exit",
+  "History: /sessions [PAGE], /results [SESSION_ID [PAGE]]; idle only, no model requests.",
   "Compaction: /compact uses one request to the selected model; originals remain in history.",
   "Approval: /approve EFFECT_ID or /deny EFFECT_ID (only the displayed digest)",
   "Development: /reload NAME (configured plugins only, between runs)",
   "While running, ordinary input steers the current run. Ctrl-C cancels; when idle it exits.",
 ];
+const HISTORY_PAGE_SIZE = 20;
+const MAX_HISTORY_PAGE = 501;
+
+function historyPage(input = "1"): number | undefined {
+  if (!/^[1-9]\d{0,2}$/u.test(input)) return;
+  const page = Number(input);
+  return page <= MAX_HISTORY_PAGE ? page : undefined;
+}
 
 /** Control characters are data, not terminal instructions. Newlines receive a source prefix. */
 export function terminalText(text: string): string {
@@ -57,61 +69,13 @@ export function terminalText(text: string): string {
     .join("");
 }
 
-function receiptTool(effect: EffectRecord): boolean {
-  return (
-    (["create", "edit", "undo"].includes(effect.tool) &&
-      effect.profile.class === "workspace_write" &&
-      effect.profile.reversibility === "snapshot") ||
-    (effect.tool === "shell" && effect.profile.class === "process")
-  );
-}
-
-function receiptText(effect: EffectRecord, result: ToolResultPart): string | undefined {
-  if (
-    result.status !== effect.state ||
-    !["succeeded", "failed"].includes(effect.state) ||
-    result.content.length !== 1
-  )
-    return;
-  const part = result.content[0];
-  if (part?.type !== "text" || part.text.length > 65_536) return;
-  let data: Record<string, unknown>;
-  try {
-    const value: unknown = JSON.parse(part.text);
-    if (!value || typeof value !== "object" || Array.isArray(value)) return;
-    data = value as Record<string, unknown>;
-  } catch {
-    return;
-  }
-  if (effect.profile.class === "workspace_write") {
-    const hash = (value: unknown) =>
-      value === null || (typeof value === "string" && /^[a-f0-9]{64}$/.test(value));
-    if (
-      effect.state !== "succeeded" ||
-      effect.profile.verification !== "postcheck" ||
-      typeof data.path !== "string" ||
-      !data.path ||
-      data.path.length > 4_096 ||
-      data.snapshotId !== effect.id ||
-      effect.id.length > 512 ||
-      !hash(data.beforeHash) ||
-      !hash(data.afterHash)
-    )
-      return;
+function receiptText(tool: string, data: ExecutionReceipt): string {
+  if (data.kind === "file") {
     const path = terminalText(data.path).replaceAll("\n", "\\n");
     const display = path.length > 512 ? `${path.slice(0, 512)}… (path truncated)` : path;
-    return `${effect.tool} path=${JSON.stringify(display)} snapshotId=${JSON.stringify(effect.id)}`;
+    return `${tool} path=${JSON.stringify(display)} snapshotId=${JSON.stringify(data.snapshotId)}`;
   }
-  if (
-    typeof data.termination !== "string" ||
-    !["exited", "cancelled", "timeout", "output_limit", "revoked", "unknown"].includes(
-      data.termination,
-    ) ||
-    (data.exitCode !== null && !Number.isSafeInteger(data.exitCode)) ||
-    typeof data.truncated !== "boolean"
-  )
-    return;
-  return `shell exitCode=${data.exitCode} termination=${data.termination} outputTruncated=${data.truncated}`;
+  return `shell exitCode=${data.exitCode} termination=${data.termination} outputTruncated=${data.outputTruncated}`;
 }
 
 /** A protocol client. It never executes assistant text or grants policy authority. */
@@ -147,11 +111,11 @@ export function createCliSession(runtime: Runtime, options: CliSessionOptions): 
     const effect = receiptEffects.get(callId);
     const result = receiptResults.get(callId);
     if (!effect || !result || shownReceipts.has(effect.id)) return;
-    const text = receiptText(effect, result);
-    if (text === undefined) return;
+    const receipt = executionReceipt(effect, result);
+    if (!receipt) return;
     shownReceipts.add(effect.id);
     receiptResults.delete(callId);
-    output("receipt", text);
+    output("receipt", receiptText(effect.tool, receipt));
   };
   const prompt = () => {
     if (options.interactive && !closing) {
@@ -238,6 +202,11 @@ export function createCliSession(runtime: Runtime, options: CliSessionOptions): 
           : { type: "session.load", sessionId: id },
       );
       if (!accepted) sessionId = previous;
+      else if (id !== undefined)
+        output(
+          "moyyi",
+          "History loaded. Use /results for recorded effects; past records grant no current permission.",
+        );
     } finally {
       loading = false;
     }
@@ -318,6 +287,66 @@ export function createCliSession(runtime: Runtime, options: CliSessionOptions): 
         sessionId = event.sessionId;
         output("session", event.sessionId);
         break;
+      case "session.listed": {
+        const page = Math.floor(event.page.offset / HISTORY_PAGE_SIZE) + 1;
+        output(
+          "sessions",
+          `Page ${page}; recorded sessions in this private store, across all workspaces.`,
+        );
+        for (const row of event.page.sessions) {
+          output(
+            "session history",
+            `id=${JSON.stringify(row.sessionId)} workspace=${JSON.stringify(row.workspaceRoot)} lastRecordedActivity=${row.lastActivityAt ?? "none"}`,
+          );
+          output(
+            "last user excerpt",
+            row.promptPreview === null
+              ? "No recorded user prompt."
+              : JSON.stringify(row.promptPreview),
+          );
+        }
+        if (!event.page.sessions.length) output("sessions", "No sessions on this page.");
+        output(
+          "moyyi",
+          "Use /resume SESSION_ID to continue or /results SESSION_ID to inspect recorded effects. Current session and permissions are unchanged.",
+        );
+        if (event.page.hasMore)
+          output(
+            "moyyi",
+            page < MAX_HISTORY_PAGE
+              ? `Next page: /sessions ${page + 1}`
+              : "More sessions exist beyond the CLI page limit (501).",
+          );
+        break;
+      }
+      case "session.results": {
+        const page = Math.floor(event.page.offset / HISTORY_PAGE_SIZE) + 1;
+        output(
+          "history",
+          `Session ${JSON.stringify(event.page.sessionId)} workspace=${JSON.stringify(event.page.workspaceRoot)} page=${page}`,
+        );
+        output(
+          "history",
+          "Recorded effects only: not current file contents or new authorization. Exit code 0 does not prove a correct check.",
+        );
+        for (const effect of event.page.effects) {
+          output(
+            "history effect",
+            `id=${JSON.stringify(effect.effectId)} run=${JSON.stringify(effect.runId)} tool=${JSON.stringify(effect.tool)} state=${effect.state} recordedAt=${effect.updatedAt}`,
+          );
+          if (effect.receipt) output("history receipt", receiptText(effect.tool, effect.receipt));
+          else output("history", "No matched execution receipt for this effect.");
+        }
+        if (!event.page.effects.length) output("history", "No recorded effects on this page.");
+        if (event.page.hasMore)
+          output(
+            "moyyi",
+            page < MAX_HISTORY_PAGE
+              ? `Next page: /results ${event.page.sessionId} ${page + 1}`
+              : "More effects exist beyond the CLI page limit (501).",
+          );
+        break;
+      }
       case "run.started":
         if (event.sessionId !== sessionId) return;
         runId = event.runId;
@@ -352,7 +381,7 @@ export function createCliSession(runtime: Runtime, options: CliSessionOptions): 
         if (event.effect.runId !== runId) return;
         // Only executor-journaled effects can qualify a matching result as a receipt.
         // Ordinary tool text, assistant claims and replayed transcript entries cannot.
-        if (receiptTool(event.effect)) {
+        if (isReceiptEffect(event.effect)) {
           receiptEffects.set(event.effect.callId, event.effect);
           showReceipt(event.effect.callId);
         }
@@ -449,7 +478,33 @@ export function createCliSession(runtime: Runtime, options: CliSessionOptions): 
         else if (command === "/new" && !args.length) await openSession();
         else if (command === "/resume" && args.length === 1)
           await openSession(args[0] as SessionId);
-        else if (command === "/compact" && !args.length) {
+        else if (command === "/sessions" || command === "/results") {
+          const page = historyPage(command === "/sessions" ? args[0] : args[1]);
+          if (runId) output("moyyi", "History inspection is only available between runs.");
+          else if (page === undefined || args.length > (command === "/sessions" ? 1 : 2))
+            output(
+              "moyyi",
+              `Use ${command === "/sessions" ? "/sessions [PAGE]" : "/results [SESSION_ID [PAGE]]"}; PAGE must be an integer from 1 to 501.`,
+            );
+          else if (command === "/sessions")
+            await send({
+              type: "session.list",
+              offset: (page - 1) * HISTORY_PAGE_SIZE,
+              limit: HISTORY_PAGE_SIZE,
+            });
+          else {
+            const id = (args[0] as SessionId | undefined) ?? sessionId;
+            if (!id)
+              output("moyyi", "No session is selected. Use /sessions, then /results SESSION_ID.");
+            else
+              await send({
+                type: "session.results",
+                sessionId: id,
+                offset: (page - 1) * HISTORY_PAGE_SIZE,
+                limit: HISTORY_PAGE_SIZE,
+              });
+          }
+        } else if (command === "/compact" && !args.length) {
           if (runId) output("moyyi", "Compaction is only available between runs.");
           else if (!sessionId) output("moyyi", "No session is available. Use /new or /resume ID.");
           else {

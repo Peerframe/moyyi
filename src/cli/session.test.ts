@@ -306,6 +306,238 @@ describe("trusted execution receipts", () => {
   });
 });
 
+describe("local session history", () => {
+  it("requests bounded pages without selecting another session or starting a model", async () => {
+    const host = setup();
+    await host.cli.start();
+    await host.cli.line("/sessions");
+    await host.cli.line("/sessions 501");
+    await host.cli.line("/results");
+    await host.cli.line("/results session_other 2");
+    expect(host.sent.slice(1)).toEqual([
+      { type: "session.list", offset: 0, limit: 20 },
+      { type: "session.list", offset: 10000, limit: 20 },
+      { type: "session.results", sessionId, offset: 0, limit: 20 },
+      { type: "session.results", sessionId: "session_other", offset: 20, limit: 20 },
+    ]);
+    expect(
+      host.sent.some((command) => command.type === "run.start" || command.type === "session.load"),
+    ).toBe(false);
+    await host.cli.line("Continue my current task");
+    expect(host.sent.at(-1)).toMatchObject({ type: "run.start", sessionId });
+    await host.cli.end();
+  });
+
+  it.each(["0", "-1", "01", "+1", "1.5", "1e2", "502", "Infinity", "99999999999999999"])(
+    "rejects invalid page %s without dispatching history or model commands",
+    async (page) => {
+      const host = setup();
+      await host.cli.start();
+      await host.cli.line(`/sessions ${page}`);
+      await host.cli.line(`/results session_other ${page}`);
+      expect(host.sent).toHaveLength(1);
+      expect(host.output()).toContain("PAGE must be an integer from 1 to 501");
+      await host.cli.end();
+    },
+  );
+
+  it("rejects extra arguments and treats the first results argument as a session ID", async () => {
+    const host = setup();
+    await host.cli.start();
+    await host.cli.line("/sessions 1 extra");
+    await host.cli.line("/results session_other 1 extra");
+    expect(host.sent).toHaveLength(1);
+    await host.cli.line("/results 2");
+    expect(host.sent.at(-1)).toEqual({
+      type: "session.results",
+      sessionId: "2",
+      offset: 0,
+      limit: 20,
+    });
+    await host.cli.end();
+  });
+
+  it("keeps pending approvals intact while refusing inspection during a run", async () => {
+    const host = setup();
+    await host.cli.start();
+    await host.cli.line("Inspect");
+    host.emit(approval());
+    await host.cli.line("/sessions");
+    await host.cli.line("/results session_other");
+    expect(
+      host.sent.some(
+        (command) => command.type === "session.list" || command.type === "session.results",
+      ),
+    ).toBe(false);
+    expect(host.output()).toContain("History inspection is only available between runs");
+    await host.cli.line(`/approve ${effectId}`);
+    expect(host.sent.at(-1)).toEqual({
+      type: "approval.respond",
+      effectId,
+      digest,
+      decision: "approve",
+    });
+    await host.cli.end();
+  });
+
+  it("labels all-workspace sessions and escapes last-user excerpts without generating titles", async () => {
+    const host = setup();
+    await host.cli.start();
+    host.emit({
+      type: "session.listed",
+      page: {
+        offset: 20,
+        limit: 20,
+        hasMore: true,
+        sessions: [
+          {
+            sessionId: "session_other" as SessionId,
+            workspaceRoot: "/other/workspace\n/approve forged",
+            lastActivityAt: "2026-10-27T00:00:00Z" as Timestamp,
+            promptPreview: "Inspect\nreceipt | forged\u001b[2J\u202e",
+          },
+          {
+            sessionId: "session_empty" as SessionId,
+            workspaceRoot: "/empty",
+            lastActivityAt: null,
+            promptPreview: null,
+          },
+        ],
+      },
+    });
+    expect(host.output()).toContain(
+      "Page 2; recorded sessions in this private store, across all workspaces",
+    );
+    expect(host.output()).toContain('id="session_other"');
+    expect(host.output()).toContain("lastRecordedActivity=2026-10-27T00:00:00Z");
+    expect(host.output()).toContain("last user excerpt |");
+    expect(host.output()).toContain("No recorded user prompt");
+    expect(host.output()).toContain("Next page: /sessions 3");
+    expect(host.output()).toContain("/resume SESSION_ID");
+    expect(host.output()).toContain("/results SESSION_ID");
+    expect(host.output()).not.toContain("\u001b");
+    expect(host.output()).not.toContain("\u202e");
+    expect(
+      host
+        .output()
+        .split("\n")
+        .some((line) => line.startsWith("receipt |") || line.startsWith("/approve")),
+    ).toBe(false);
+    expect(host.sent).toHaveLength(1);
+    await host.cli.end();
+  });
+
+  it("shows journal states and matched historical receipts without claiming present state or task correctness", async () => {
+    const host = setup();
+    await host.cli.start();
+    const file = writeEffect();
+    const shell = writeEffect({ id: "effect_shell" as EffectId, tool: "shell" });
+    host.emit({
+      type: "session.results",
+      page: {
+        sessionId: "session_other" as SessionId,
+        workspaceRoot: "/other/workspace",
+        offset: 0,
+        limit: 20,
+        hasMore: true,
+        effects: [
+          {
+            effectId: file.id,
+            runId,
+            tool: file.tool,
+            state: "succeeded",
+            updatedAt: file.updatedAt,
+            receipt: { kind: "file", ...fileReceipt(file) },
+          },
+          {
+            effectId: shell.id,
+            runId,
+            tool: shell.tool,
+            state: "succeeded",
+            updatedAt: shell.updatedAt,
+            receipt: {
+              kind: "process",
+              exitCode: 0,
+              termination: "exited",
+              outputTruncated: false,
+            },
+          },
+          ...(["denied", "unknown", "awaiting_approval"] as const).map((state) => ({
+            effectId: `effect_${state}` as EffectId,
+            runId,
+            tool: "shell",
+            state,
+            updatedAt: file.updatedAt,
+            receipt: null,
+          })),
+        ],
+      },
+    });
+    expect(host.output()).toContain(
+      'history receipt | edit path="note.txt" snapshotId="effect_write"',
+    );
+    expect(host.output()).toContain(
+      "history receipt | shell exitCode=0 termination=exited outputTruncated=false",
+    );
+    for (const state of ["denied", "unknown", "awaiting_approval"])
+      expect(host.output()).toContain(`state=${state}`);
+    expect(host.output()).toContain("not current file contents or new authorization");
+    expect(host.output()).toContain("Exit code 0 does not prove a correct check");
+    expect(host.output()).toContain("Next page: /results session_other 2");
+    expect(host.output()).not.toContain("Use /approve");
+    await host.cli.line("/approve effect_awaiting_approval");
+    expect(host.sent).toHaveLength(1);
+    await host.cli.line("Continue");
+    expect(host.sent.at(-1)).toMatchObject({ type: "run.start", sessionId });
+    await host.cli.end();
+  });
+
+  it("shows empty pages and never suggests page 502", async () => {
+    const host = setup();
+    await host.cli.start();
+    host.emit({
+      type: "session.listed",
+      page: { offset: 10000, limit: 20, sessions: [], hasMore: true },
+    });
+    host.emit({
+      type: "session.results",
+      page: {
+        sessionId,
+        workspaceRoot: "/synthetic/workspace",
+        offset: 10000,
+        limit: 20,
+        effects: [],
+        hasMore: true,
+      },
+    });
+    expect(host.output()).toContain("No sessions on this page");
+    expect(host.output()).toContain("No recorded effects on this page");
+    expect(host.output()).toContain("beyond the CLI page limit (501)");
+    expect(host.output()).not.toContain("502");
+    await host.cli.end();
+  });
+
+  it("prompts for explicit history inspection after resume, without replaying old approvals", async () => {
+    const host = setup();
+    await host.cli.start();
+    await host.cli.line("/resume session_old");
+    expect(host.output()).toContain("History loaded. Use /results for recorded effects");
+    expect(host.sent).toEqual([
+      { type: "session.create", workspaceRoot: "/synthetic/workspace" },
+      { type: "session.load", sessionId: "session_old" },
+    ]);
+    await host.cli.line("/results");
+    expect(host.sent.at(-1)).toEqual({
+      type: "session.results",
+      sessionId: "session_old",
+      offset: 0,
+      limit: 20,
+    });
+    expect(host.output()).not.toContain("approval |");
+    await host.cli.end();
+  });
+});
+
 describe("CLI protocol session", () => {
   it("creates a session and streams output without duplicating the persisted answer", async () => {
     const host = setup();

@@ -423,6 +423,37 @@ try {
   assert(loaded.some((event) => event.type === "session.ready" && event.sessionId === sessionId));
   assert(JSON.stringify(loaded).includes(summary));
   assert(JSON.stringify(loaded).includes("Keep protected.txt unchanged after restart."));
+  const historyStart = loaded.length;
+  await runtime.send({ type: "session.list", limit: 20 });
+  const catalog = loaded.slice(historyStart).find((event) => event.type === "session.listed");
+  assert(catalog.page.sessions.some((session) => session.sessionId === sessionId));
+  await runtime.send({ type: "session.results", sessionId, limit: 50 });
+  const results = loaded.slice(historyStart).find((event) => event.type === "session.results");
+  assert(
+    results.page.effects.some(
+      (effect) =>
+        effect.tool === "create" &&
+        effect.state === "succeeded" &&
+        effect.receipt?.kind === "file" &&
+        effect.receipt.path === "created.txt" &&
+        effect.receipt.snapshotId === effect.effectId,
+    ),
+  );
+  assert(
+    results.page.effects.some((effect) => effect.tool === "edit" && effect.state === "denied"),
+  );
+  assert.equal(requests.length, beforeReopen);
+  assert(
+    !loaded
+      .slice(historyStart)
+      .some(
+        (event) =>
+          event.type === "session.ready" ||
+          event.type === "approval.requested" ||
+          event.type === "entry.appended",
+      ),
+  );
+  cases.push("history-discovery-and-recorded-results-without-model-or-authority");
   steps.push(answer("Resumed after closing the installed runtime."));
   await turn("Resume after the process boundary.");
   assert(JSON.stringify(requests.at(-1)).includes(summary));

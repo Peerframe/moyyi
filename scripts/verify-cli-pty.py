@@ -2,6 +2,7 @@
 """Optional POSIX terminal smoke. Synthetic files/model only; not part of Node-only CI."""
 import argparse
 import errno
+import json
 import os
 import pathlib
 import pty
@@ -185,7 +186,7 @@ yield{type:'completed',stopReason:'tool_use',providerStopReason:null,usage};
     transcript, cursor = "", 0
     try:
         wait(r"grants \| Commands: approval, read-only workspace")
-        wait(r"session \| session_[\w-]+")
+        daily_session = wait(r"session \| (session_[\w-]+)").group(1)
         wait(r"moyyi> ")
         send("Run the fixed offline daily task\n")
         for tool in ["create", "shell", "undo"]:
@@ -217,4 +218,70 @@ yield{type:'completed',stopReason:'tool_use',providerStopReason:null,usage};
                 process.kill()
                 process.wait()
         os.close(master)
-print("6/6 POSIX PTY scenarios passed; temporary session files removed. No API or credentials.")
+
+    # A fresh process/host has no prior grants. Discover the first workspace's work through
+    # the catalog instead of supplying its ID at launch; inspection must not call a model.
+    second_workspace = root / "second-workspace"
+    second_workspace.mkdir()
+    marker = root / "unexpected-model-request"
+    history_host = root / "history-host.mjs"
+    history_host.write_text("""
+import {writeFileSync} from 'node:fs';
+const origin={provider:'daily-fixture',model:'fixture'};
+export default {model:origin,projectInstructions:false,plugins:[{plugin:{name:'daily-fixture',apiVersion:1,setup(host){
+host.registerModelProvider({id:origin.provider,models:[{origin,contextWindowTokens:32000,maxOutputTokens:1000,parallelToolCalls:false,reasoning:'none',promptCache:'none',editFormat:'search_replace'}],createClient(){return{async *stream(){
+writeFileSync(process.env.MOYYI_HISTORY_REQUEST_MARKER,'UNEXPECTED');throw Error('History must not request a model');
+}};}});}}}]};
+""")
+    master, slave = pty.openpty()
+    command = [node, entry, "--host", str(history_host), "-C", str(second_workspace),
+               "--data", str(root / "data")]
+    process = subprocess.Popen(command, stdin=slave, stdout=slave, stderr=slave, close_fds=True,
+                               env={**os.environ, "MOYYI_HISTORY_REQUEST_MARKER": str(marker)})
+    os.close(slave)
+    transcript, cursor = "", 0
+    try:
+        wait(r"session \| session_[\w-]+")
+        wait(r"moyyi> ")
+        send("/sessions\n")
+        selected = wait(r'session history \| id="(session_[\w-]+)" workspace=' +
+                        re.escape(json.dumps(str(workspace.resolve())))).group(1)
+        assert selected == daily_session, "Catalog selected another workspace's session"
+        wait(r"moyyi> ")
+        send("/results " + selected + "\n")
+        wait(r"history \| Recorded effects only")
+        wait(r"moyyi> ")
+        clean = ansi.sub("", transcript).replace("\r", "")
+        for text in ['history receipt | create path="report.txt" snapshotId=',
+                     'history receipt | undo path="report.txt" snapshotId=',
+                     'history receipt | shell exitCode=0 termination=exited']:
+            assert text in clean, clean[-6000:]
+        assert "approval |" not in clean, "Historical views replayed an approval"
+        send("/resume " + selected + "\n")
+        wait(r"History loaded\. Use /results")
+        wait(r"moyyi> ")
+        send("/results\n")
+        wait(r"history \| Recorded effects only")
+        wait(r"moyyi> ")
+        assert not marker.exists(), "Browsing or resuming called a model"
+        assert not (workspace / "report.txt").exists(), "Historical create was replayed"
+        assert outside.read_text() == "OUTSIDE_CANARY"
+        send("/exit\n")
+        until = time.monotonic() + 5
+        while process.poll() is None and time.monotonic() < until:
+            ready, _, _ = select.select([master], [], [], 0.05)
+            if ready:
+                try: transcript += os.read(master, 65536).decode("utf-8", errors="replace")
+                except OSError as error:
+                    if error.errno != errno.EIO: raise
+        assert process.poll() == 0, transcript[-5000:]
+        print("PASS PTY restart: discover cross-workspace session, inspect receipts, resume without model or replay")
+    finally:
+        if process.poll() is None:
+            process.terminate()
+            try: process.wait(timeout=5)
+            except subprocess.TimeoutExpired:
+                process.kill()
+                process.wait()
+        os.close(master)
+print("7/7 POSIX PTY scenarios passed; temporary session files removed. No API or credentials.")

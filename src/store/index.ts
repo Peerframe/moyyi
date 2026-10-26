@@ -11,6 +11,7 @@ import {
 import { basename, dirname, isAbsolute, join, relative, resolve, sep } from "node:path";
 import { DatabaseSync } from "node:sqlite";
 import type { WorkspaceSnapshot, WorkspaceSnapshotStore } from "../contracts/files.ts";
+import type { HistoryPage, SessionListPage } from "../contracts/history.ts";
 import {
   type BlobRef,
   canTransition,
@@ -21,6 +22,7 @@ import {
   PERSISTED_FORMAT_VERSION,
   type RunId,
   type SessionId,
+  type Timestamp,
   type TranscriptEntry,
 } from "../contracts/persisted/index.ts";
 import type {
@@ -567,6 +569,64 @@ export class SqliteSessionStore implements SessionStore, WorkspaceSnapshotStore 
       .prepare("SELECT id FROM sessions ORDER BY id")
       .all()
       .map((row) => row.id as SessionId);
+  }
+
+  /** Catalog reads use recorded order, not mutable heads or caller-supplied timestamps. */
+  async listSessionSummaries(page: HistoryPage): Promise<SessionListPage> {
+    this.#ready();
+    if (
+      !Number.isSafeInteger(page.offset) ||
+      page.offset < 0 ||
+      page.offset > 10_000 ||
+      !Number.isSafeInteger(page.limit) ||
+      page.limit < 1 ||
+      page.limit > 50
+    )
+      throw new Error("Invalid session catalog page");
+    // Select the small page before inspecting user text. No request blobs or whole
+    // transcripts cross the SQLite boundary; entries_session supports each reverse lookup.
+    const rows = this.#db
+      .prepare(`WITH recent AS (
+      SELECT s.id, s.workspace_root,
+        (SELECT ordinal FROM entries WHERE session_id = s.id
+         ORDER BY ordinal DESC LIMIT 1) AS latest
+      FROM sessions s ORDER BY latest DESC, s.id ASC LIMIT ? OFFSET ?
+    )
+    SELECT recent.id, recent.workspace_root,
+      json_extract(last.payload, '$.createdAt') AS last_activity,
+      (SELECT substr(json_extract(part.value, '$.text'), 1, 160)
+       FROM entries prompt, json_each(prompt.payload, '$.body.content') part
+       WHERE prompt.ordinal = (
+         SELECT ordinal FROM entries WHERE session_id = recent.id
+           AND json_extract(payload, '$.body.kind') = 'user_message'
+         ORDER BY ordinal DESC LIMIT 1
+       ) AND json_extract(part.value, '$.type') = 'text'
+       ORDER BY CAST(part.key AS INTEGER) LIMIT 1) AS preview
+    FROM recent LEFT JOIN entries last ON last.ordinal = recent.latest
+    ORDER BY recent.latest DESC, recent.id ASC`)
+      .all(page.limit + 1, page.offset);
+    const sessions = rows.slice(0, page.limit).map((row) => {
+      if (
+        typeof row.id !== "string" ||
+        row.id.length > 512 ||
+        typeof row.workspace_root !== "string" ||
+        row.workspace_root.length > 4096 ||
+        (row.last_activity !== null &&
+          (typeof row.last_activity !== "string" || row.last_activity.length > 128)) ||
+        (row.preview !== null && typeof row.preview !== "string")
+      )
+        throw new Error("Invalid session catalog record");
+      // SQLite substr counts code points; the public bound is UTF-16 code units.
+      let preview = row.preview === null ? null : row.preview.slice(0, 160);
+      if (preview && /[\uD800-\uDBFF]$/u.test(preview)) preview = preview.slice(0, -1);
+      return {
+        sessionId: row.id as SessionId,
+        workspaceRoot: row.workspace_root,
+        lastActivityAt: row.last_activity as Timestamp | null,
+        promptPreview: preview,
+      };
+    });
+    return { offset: page.offset, limit: page.limit, sessions, hasMore: rows.length > page.limit };
   }
 
   async unsettledEffects(): Promise<readonly EffectRecord[]> {
