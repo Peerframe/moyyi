@@ -1,4 +1,4 @@
-import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { describe, expect, it } from "vitest";
@@ -13,6 +13,7 @@ import {
 import { scriptedProvider } from "../src/plugins/provider-scripted/index.ts";
 import { ReadOnlyPolicy } from "../src/policy/index.ts";
 import { createRuntime } from "../src/runtime/index.ts";
+import { SqliteSessionStore } from "../src/store/index.ts";
 
 const completed: ModelStreamEvent = {
   type: "completed",
@@ -51,6 +52,94 @@ function workspace() {
 }
 
 describe("CLI session through real runtime and SQLite", () => {
+  it("displays actual file and undo snapshot receipts after approved durable writes", async () => {
+    const files = workspace();
+    const store = new SqliteSessionStore(files.data);
+    const calls = [
+      { name: "edit", args: { path: "note.txt", oldText: "Synthetic", newText: "Updated" } },
+      { name: "undo", args: { snapshotId: "effect_1" } },
+    ];
+    const scripted = scriptedProvider([
+      ...calls.map(({ name, args }, index): ModelStreamEvent[] => [
+        {
+          type: "part_completed",
+          index: 0,
+          part: {
+            type: "tool_call",
+            name,
+            callId: `write_${index}` as ToolCallId,
+            providerCallId: `write_${index}`,
+            providerItemId: null,
+            rawArguments: JSON.stringify(args),
+            argumentsSource: "verbatim",
+          },
+        },
+        { ...completed, stopReason: "tool_use" },
+      ]),
+      answer,
+    ]);
+    const counts: Record<string, number> = {};
+    const runtime = await createRuntime({
+      store,
+      plugins: [{ plugin: scripted.plugin }],
+      model: { provider: "scripted", model: "scripted" },
+      workspaceWrites: { roots: [files.root], approval: "ask" },
+      ids: {
+        next(prefix) {
+          counts[prefix] = (counts[prefix] ?? 0) + 1;
+          return `${prefix}_${counts[prefix]}`;
+        },
+      },
+    });
+    const approvals = [
+      Promise.withResolvers<Extract<RuntimeEvent, { type: "approval.requested" }>>(),
+      Promise.withResolvers<Extract<RuntimeEvent, { type: "approval.requested" }>>(),
+    ];
+    const finished = Promise.withResolvers<void>();
+    let approvalIndex = 0;
+    runtime.subscribe((event) => {
+      if (event.type === "approval.requested") approvals[approvalIndex++]?.resolve(event);
+      if (event.type === "run.finished") finished.resolve();
+    });
+    let output = "";
+    const cli = createCliSession(runtime, {
+      workspaceRoot: files.root,
+      interactive: true,
+      write: (text) => {
+        output += text;
+      },
+      prompt: () => {},
+    });
+    try {
+      await cli.start();
+      await cli.line("Edit the file, then undo the change");
+      const edit = await approvals[0]?.promise;
+      if (!edit) throw Error("Missing edit approval");
+      await cli.line(`/approve ${edit.effectId}`);
+      const undo = await approvals[1]?.promise;
+      if (!undo) throw Error("Missing undo approval");
+      expect(readFileSync(join(files.root, "note.txt"), "utf8")).toBe("Updated workspace note.\n");
+      expect(output).toContain('receipt | edit path="note.txt" snapshotId="effect_1"');
+      await cli.line(`/approve ${undo.effectId}`);
+      await finished.promise;
+      await runtime.idle();
+      expect(readFileSync(join(files.root, "note.txt"), "utf8")).toBe(
+        "Synthetic workspace note.\n",
+      );
+      expect(output).toContain('receipt | undo path="note.txt" snapshotId="effect_2"');
+      expect(output.match(/receipt \|/g)).toHaveLength(2);
+      expect(await store.getSnapshot("effect_1")).toMatchObject({ path: "note.txt" });
+      expect(await store.getSnapshot("effect_2")).toMatchObject({
+        path: "note.txt",
+        restoreOf: "effect_1",
+      });
+      expect(scripted.client.requests).toHaveLength(3);
+    } finally {
+      await cli.end();
+      store.close();
+      rmSync(files.directory, { recursive: true, force: true });
+    }
+  });
   it("one-shot denies a real read approval, finishes and never repeats streamed answer", async () => {
     const files = workspace();
     const scripted = scriptedProvider([read, answer]);
