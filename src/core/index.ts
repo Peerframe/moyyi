@@ -484,7 +484,11 @@ export class AgentCore {
         producedBy: { origin: this.#deps.profile.origin, promptVersion: plan.promptVersion },
       });
       try {
-        const projected = this.#deps.context.build({ ...input, path: [...input.path, candidate] });
+        const projected = this.#deps.context.build({
+          ...input,
+          path: [...input.path, candidate],
+          sections: input.sections.filter((section) => section.optional !== true),
+        });
         if (
           projected.report.estimatedTokens === undefined ||
           projected.report.estimatedTokens >= plan.originalTokens
@@ -548,14 +552,20 @@ export class AgentCore {
         text:
           `Model request budget: attempt ${run.requests + 1} of ${this.#limits.maxModelRequests}; ` +
           `${remaining} request(s) remaining including this one. ` +
+          `${remaining - 1} tool-enabled request(s) remain before the answer-only final request. ` +
           (finalRequest
             ? "This is the final request. New tool calls are disabled. Give the user your final answer " +
               "using only evidence already available. Distinguish verified findings, incomplete work " +
               "and uncertainty; do not invent results or claim unperformed actions. If evidence is " +
               "insufficient, explain the partial result and what remains unverified."
-            : "Reserve the final request for an answer. Gather only necessary evidence, group " +
-              "independent reads when useful, and answer early when you have enough. Retries consume " +
-              "this same budget. This notice does not grant permissions or override user constraints."),
+            : remaining === 2
+              ? "This is the last tool-enabled request. Complete any still-required artifact creation " +
+                "and verification in this tool batch; the next request cannot use tools. A proposed " +
+                "artifact in chat is not a created file. Retries consume this same budget. This notice " +
+                "does not grant permissions or override user constraints."
+              : "Reserve the final request for an answer. Gather necessary evidence; group independent " +
+                "reads; finish early when ready. Retries use this budget. Existing permissions and " +
+                "user constraints apply."),
       });
       const snapshot = await this.#session(run.sessionId);
       const consumedSteering = snapshot.entries.filter(

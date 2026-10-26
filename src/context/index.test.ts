@@ -158,6 +158,71 @@ describe("MinimalContextBuilder", () => {
     expect(textPath).toHaveLength(entries.length);
   });
 
+  it("admits optional navigation only when the complete request fits without dropping required evidence", () => {
+    const builder = new MinimalContextBuilder();
+    const required = input({
+      sections: [
+        { id: "project", stability: "turn", content: [{ type: "text", text: "Required rules" }] },
+      ],
+      tools: [{ name: "read", description: "Read", inputSchema: { type: "object" } }],
+      toolChoice: "none",
+    });
+    const baseline = builder.build(required);
+    const baselineTokens = baseline.report.estimatedTokens;
+    if (baselineTokens === undefined) throw Error("Expected context estimate");
+    const navigation = {
+      id: "navigation",
+      stability: "turn" as const,
+      optional: true,
+      content: [{ type: "text" as const, text: "src/example.ts\n".repeat(20) }],
+    };
+    const withNavigation = { ...required, sections: [...required.sections, navigation] };
+    const admitted = builder.build(withNavigation);
+    expect(admitted.request.system).toContainEqual(navigation.content[0]);
+    expect(admitted.report.estimatedTokens).toBeGreaterThan(baselineTokens);
+    const constrained = builder.build({
+      ...withNavigation,
+      profile: { ...profile, contextWindowTokens: baselineTokens },
+    });
+    expect(constrained.request).toEqual(baseline.request);
+    expect(constrained.report.includedEntryIds).toEqual(baseline.report.includedEntryIds);
+    expect(constrained.report.summarizedEntryIds).toEqual(baseline.report.summarizedEntryIds);
+    expect(constrained.report.notes).toContain(
+      "Optional context omitted for capacity: navigation.",
+    );
+    expect(constrained.request.toolChoice).toBe("none");
+    expect(() =>
+      builder.build({
+        ...withNavigation,
+        profile: { ...profile, contextWindowTokens: baselineTokens - 1 },
+      }),
+    ).toThrow(ContextCapacityError);
+    expect(withNavigation.sections).toContain(navigation);
+  });
+
+  it("does not make required instructions optional when supplemental sections are present", () => {
+    expect(() =>
+      new MinimalContextBuilder().build(
+        input({
+          profile: { ...profile, contextWindowTokens: 10_000 },
+          sections: [
+            {
+              id: "required",
+              stability: "static",
+              content: [{ type: "text", text: "x".repeat(20_000) }],
+            },
+            {
+              id: "navigation",
+              stability: "turn",
+              optional: true,
+              content: [{ type: "text", text: "a.ts" }],
+            },
+          ],
+        }),
+      ),
+    ).toThrow(ContextCapacityError);
+  });
+
   it.each(["system", "tools", "maxOutput"])("charges %s against the capacity", (kind) => {
     const base = input({
       path: [],
@@ -262,6 +327,43 @@ it("plans complete tool pairs while stripping replay only from the quoted summar
   expect(JSON.stringify(plan?.request)).not.toContain("User turn 3");
   expect(JSON.stringify(path)).toContain("signed_state");
 });
+
+it.each(["admitted", "omitted", "required-overflow"] as const)(
+  "uses required context as the compaction baseline when optional navigation is %s",
+  (capacity) => {
+    const builder = new MinimalContextBuilder();
+    const required = input({ path: plannerPath(), unsettledEffects: [] });
+    const originalTokens = builder.build(required).report.estimatedTokens;
+    if (originalTokens === undefined) throw Error("Expected context estimate");
+    const navigation = {
+      id: "navigation",
+      stability: "turn" as const,
+      optional: true,
+      content: [{ type: "text" as const, text: "src/example.ts\n".repeat(1000) }],
+    };
+    const withNavigation = {
+      ...required,
+      sections: [navigation],
+      profile: {
+        ...profile,
+        contextWindowTokens:
+          capacity === "admitted"
+            ? profile.contextWindowTokens
+            : originalTokens - (capacity === "required-overflow" ? 1000 : 0),
+      },
+    };
+    if (capacity === "required-overflow")
+      expect(() => builder.build(withNavigation)).toThrow(ContextCapacityError);
+    else {
+      const built = builder.build(withNavigation);
+      expect(built.request.system).toEqual(capacity === "admitted" ? navigation.content : []);
+    }
+    const plan = builder.planCompaction(withNavigation);
+    expect(plan).not.toBeNull();
+    expect(plan?.originalTokens).toBe(originalTokens);
+    expect(withNavigation.sections).toEqual([navigation]);
+  },
+);
 
 it.each(["unpaired", "unknown"] as const)("does not summarize a turn with %s calls", (status) => {
   const path = plannerPath(status);

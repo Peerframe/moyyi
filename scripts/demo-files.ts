@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
+import { fileResultValue } from "../evals/support/file-result.ts";
 import {
   type FileList,
   type FileRead,
@@ -114,9 +115,7 @@ try {
   const data = <T>(name: string): T => {
     const result = results.get(`demo_${name}`);
     assert.equal(result?.status, "succeeded");
-    const part = result?.content.find((part) => part.type === "text");
-    assert.ok(part?.type === "text");
-    return JSON.parse(part.text) as T;
+    return fileResultValue<T>(result);
   };
   assert.ok(data<FileList>("list").entries.some((entry) => entry.path === "src"));
   assert.deepEqual(

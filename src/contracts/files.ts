@@ -3,13 +3,28 @@ import type { ReconcileOutcome } from "./tools.ts";
 
 /** Read-only, runtime-confined capabilities. Paths are relative to the selected workspace. */
 export interface WorkspaceFiles {
-  read(path: string, options?: { readonly maxBytes?: number }): Promise<FileRead>;
+  read(path: string, options?: FileReadOptions): Promise<FileRead>;
   list(path: string, options?: { readonly maxEntries?: number }): Promise<FileList>;
-  search(
-    path: string,
-    query: string,
-    options?: { readonly maxMatches?: number; readonly caseSensitive?: boolean },
-  ): Promise<FileSearch>;
+  search(path: string, query: string, options?: FileSearchOptions): Promise<FileSearch>;
+}
+
+export interface FileSearchOptions {
+  /** Maximum matching lines in content mode, or distinct matching files in files mode. */
+  readonly maxMatches?: number;
+  readonly caseSensitive?: boolean;
+  /** Nearby LF-delimited lines per side, 0–20. Capability default 0; fs tool default 8. */
+  readonly contextLines?: number;
+  /** Bounded workspace-relative globs; includes are ORed and exclusions always win. */
+  readonly include?: readonly string[];
+  readonly exclude?: readonly string[];
+  readonly mode?: "content" | "files";
+}
+
+export interface FileReadOptions {
+  readonly maxBytes?: number;
+  /** Supplying either line option selects an LF-delimited range; defaults are 1 and 200. */
+  readonly startLine?: number;
+  readonly maxLines?: number;
 }
 
 export interface FileRead {
@@ -17,6 +32,12 @@ export interface FileRead {
   readonly text: string;
   readonly bytesRead: number;
   readonly truncated: boolean;
+  /** Present only for range reads. Completeness concerns the selected range, not the whole file. */
+  readonly lineRange?: {
+    readonly startLine: number;
+    readonly endLine: number | null;
+    readonly complete: boolean;
+  };
 }
 
 export interface FileList {
@@ -31,14 +52,28 @@ export interface FileList {
 
 export interface FileSearch {
   readonly path: string;
+  /** Only files mode adds these fields; matches stays empty and context is omitted. */
+  readonly mode?: "files";
+  readonly files?: readonly string[];
   readonly matches: readonly {
     readonly path: string;
     readonly line: number;
     readonly text: string;
   }[];
-  /** True when any scan, file-size, line-size or result bound prevented a complete search. */
+  /** Exact merged source windows, when requested; never a claim that a function is complete. */
+  readonly context?: readonly FileSearchContext[];
+  /** True when any scan, file-size, line-size, context or result bound omitted evidence. */
   readonly truncated: boolean;
   readonly skippedFiles: number;
+}
+
+export interface FileSearchContext {
+  readonly path: string;
+  readonly startLine: number;
+  readonly endLine: number;
+  readonly text: string;
+  /** All requested nearby lines available, or a verified file edge; not semantic completeness. */
+  readonly complete: boolean;
 }
 
 /** A complete, bounded UTF-8 file, or an absent target. Never a truncated read. */

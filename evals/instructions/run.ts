@@ -1,4 +1,5 @@
 import { mkdirSync, writeFileSync } from "node:fs";
+import { runWorkspaceNavigationScenario } from "./navigation.ts";
 import { instructionScenarios, runInstructionScenario } from "./scenario.ts";
 
 const originalFetch = globalThis.fetch;
@@ -13,6 +14,11 @@ try {
     await runInstructionScenario(id);
     results.push({ id, passed: true });
   }
+  results.push({
+    id: "workspace-navigation-to-artifact",
+    ...(await runWorkspaceNavigationScenario()),
+    passed: true,
+  });
   if (networkRequests !== 0) throw Error("Instruction conformance attempted network access");
 } finally {
   globalThis.fetch = originalFetch;

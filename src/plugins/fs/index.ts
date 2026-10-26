@@ -2,7 +2,6 @@ import {
   type ActionDigest,
   canonicalizeJson,
   type FileList,
-  type FileRead,
   type FileSearch,
   type JsonSchema,
   type Plugin,
@@ -11,28 +10,42 @@ import {
   type ToolOutcome,
 } from "../../contracts/index.ts";
 
+import { presentRead } from "./read-presentation.ts";
 import { workspaceWriteTools } from "./writes.ts";
 
 type Operation = "read" | "list" | "search";
 interface Arguments {
   readonly path: string;
   readonly maxBytes?: number;
+  readonly startLine?: number;
+  readonly maxLines?: number;
   readonly maxEntries?: number;
   readonly query?: string;
   readonly maxMatches?: number;
   readonly caseSensitive?: boolean;
+  readonly contextLines?: number;
+  readonly include?: readonly string[];
+  readonly exclude?: readonly string[];
+  readonly mode?: "content" | "files";
 }
-type Result =
-  | FileRead
-  | FileList
-  | FileSearch
-  | { readonly error: string; readonly truncated: boolean };
+type Result = FileList | FileSearch | { readonly error: string; readonly truncated: boolean };
 const encoder = new TextEncoder();
 const pathSchema = { type: "string", minLength: 1, maxLength: 4096 };
+const patternsSchema = {
+  type: "array",
+  minItems: 1,
+  maxItems: 8,
+  items: { type: "string", minLength: 1, maxLength: 128 },
+};
 const schemas: Record<Operation, JsonSchema> = {
   read: {
     type: "object",
-    properties: { path: pathSchema, maxBytes: { type: "integer", minimum: 1, maximum: 65536 } },
+    properties: {
+      path: pathSchema,
+      maxBytes: { type: "integer", minimum: 1, maximum: 65536 },
+      startLine: { type: "integer", minimum: 1, maximum: 1000000 },
+      maxLines: { type: "integer", minimum: 1, maximum: 1000 },
+    },
     required: ["path"],
     additionalProperties: false,
   },
@@ -48,16 +61,20 @@ const schemas: Record<Operation, JsonSchema> = {
       query: { type: "string", minLength: 1, maxLength: 256 },
       maxMatches: { type: "integer", minimum: 1, maximum: 100 },
       caseSensitive: { type: "boolean" },
+      contextLines: { type: "integer", minimum: 0, maximum: 20 },
+      include: patternsSchema,
+      exclude: patternsSchema,
+      mode: { type: "string", enum: ["content", "files"] },
     },
     required: ["query"],
     additionalProperties: false,
   },
 };
 const descriptions: Record<Operation, string> = {
-  read: "Read bounded UTF-8 text from a workspace-relative file. Binary or protected files fail; truncated means only a prefix was returned.",
-  list: "List bounded entries of a workspace-relative directory (default .). The host enforces protected paths; truncated means the listing is incomplete.",
+  read: "Read numbered UTF-8 + metadata. startLine/maxLines: 1-based window (default 1/200,file<=1MiB); complete is window-only; nextRead may repeat partial lines.",
+  list: "List a workspace directory (default .).",
   search:
-    "Search workspace text for a literal string, respecting scoped .gitignore rules. Default path is . and matching is case-sensitive. No regex; truncated means the search is incomplete.",
+    "Literal file/dir search (default .); honors .gitignore. include/exclude: workspace-relative *, **, ? globs; ** whole segments; dotfiles explicit; exclude wins. mode files: unique paths; content default: hits/context (8 lines/side). maxMatches counts lines/files. Read gaps; truncated/skipped cannot prove absence.",
 };
 
 export const fsPlugin: Plugin = {
@@ -94,11 +111,15 @@ function tool(operation: Operation): ToolDefinition {
         if (!context.files) throw new Error("Workspace file capability is unavailable");
         const args = argumentsFor(operation, action.payload);
         const budget = context.limits.maxOutputBytes;
-        let result: FileRead | FileList | FileSearch;
+        let result: FileList | FileSearch;
         if (operation === "read") {
-          result = await context.files.read(args.path, {
+          const read = await context.files.read(args.path, {
             maxBytes: Math.max(1, Math.min(args.maxBytes ?? 16384, Math.floor(budget / 8))),
+            ...(args.startLine === undefined ? {} : { startLine: args.startLine }),
+            ...(args.maxLines === undefined ? {} : { maxLines: args.maxLines }),
           });
+          assertActive(context);
+          return presentRead(read, budget);
         } else if (operation === "list") {
           result = await context.files.list(args.path, {
             maxEntries: Math.max(1, Math.min(args.maxEntries ?? 50, Math.floor(budget / 256))),
@@ -107,6 +128,10 @@ function tool(operation: Operation): ToolDefinition {
           result = await context.files.search(args.path, args.query as string, {
             maxMatches: Math.max(1, Math.min(args.maxMatches ?? 20, Math.floor(budget / 512))),
             caseSensitive: args.caseSensitive ?? true,
+            contextLines: args.contextLines ?? 8,
+            ...(args.include === undefined ? {} : { include: args.include }),
+            ...(args.exclude === undefined ? {} : { exclude: args.exclude }),
+            ...(args.mode === undefined ? {} : { mode: args.mode }),
           });
         }
         assertActive(context);
@@ -157,7 +182,14 @@ function argumentsFor(operation: Operation, value: unknown): Arguments {
   };
   if (operation === "read") {
     const maxBytes = optionalLimit("maxBytes", 65536);
-    return { path, ...(maxBytes === undefined ? {} : { maxBytes }) };
+    const startLine = optionalLimit("startLine", 1_000_000);
+    const maxLines = optionalLimit("maxLines", 1_000);
+    return {
+      path,
+      ...(maxBytes === undefined ? {} : { maxBytes }),
+      ...(startLine === undefined ? {} : { startLine }),
+      ...(maxLines === undefined ? {} : { maxLines }),
+    };
   }
   if (operation === "list") {
     const maxEntries = optionalLimit("maxEntries", 200);
@@ -173,11 +205,42 @@ function argumentsFor(operation: Operation, value: unknown): Arguments {
   if (args.caseSensitive !== undefined && typeof args.caseSensitive !== "boolean")
     throw new Error("Invalid caseSensitive");
   const maxMatches = optionalLimit("maxMatches", 100);
+  const contextLines = args.contextLines;
+  if (
+    contextLines !== undefined &&
+    (typeof contextLines !== "number" ||
+      !Number.isSafeInteger(contextLines) ||
+      contextLines < 0 ||
+      contextLines > 20)
+  )
+    throw new Error("Invalid contextLines");
+  const patterns = (name: "include" | "exclude"): readonly string[] | undefined => {
+    const value = args[name];
+    if (value === undefined) return undefined;
+    if (
+      !Array.isArray(value) ||
+      value.length < 1 ||
+      value.length > 8 ||
+      value.some(
+        (pattern) => typeof pattern !== "string" || !pattern.length || pattern.length > 128,
+      )
+    )
+      throw new Error(`Invalid ${name}: expected 1–8 glob strings of 1–128 characters`);
+    return value as string[];
+  };
+  const include = patterns("include"),
+    exclude = patterns("exclude");
+  if (args.mode !== undefined && args.mode !== "content" && args.mode !== "files")
+    throw new Error("Invalid mode: expected content or files");
   return {
     path,
     query: args.query,
     caseSensitive: args.caseSensitive ?? true,
     ...(maxMatches === undefined ? {} : { maxMatches }),
+    ...(contextLines === undefined ? {} : { contextLines }),
+    ...(include === undefined ? {} : { include }),
+    ...(exclude === undefined ? {} : { exclude }),
+    ...(args.mode === undefined ? {} : { mode: args.mode }),
   };
 }
 
@@ -192,9 +255,7 @@ function outcome(status: ToolOutcome["status"], result: Result, budget: number):
   if (fits(result)) return { status, content: content(result) };
   let limited: unknown = { truncated: true };
   const base = { ...result, truncated: true };
-  if ("text" in result) {
-    limited = { ...base, text: prefix(result.text, (text) => fits({ ...base, text })) };
-  } else if ("entries" in result) {
+  if ("entries" in result) {
     limited = {
       ...base,
       entries: result.entries.slice(
@@ -204,7 +265,37 @@ function outcome(status: ToolOutcome["status"], result: Result, budget: number):
         ),
       ),
     };
+  } else if ("matches" in result && result.mode === "files") {
+    const files = result.files ?? [];
+    limited = {
+      ...base,
+      files: files.slice(
+        0,
+        largest(files.length, (length) => fits({ ...base, files: files.slice(0, length) })),
+      ),
+    };
   } else if ("matches" in result) {
+    // Keep whole source windows only. Serialized clipping must not retain false endpoints.
+    if (result.context) {
+      const withEmptyContext = { ...base, context: [] };
+      if (fits(withEmptyContext)) {
+        const count = largest(result.context.length, (length) =>
+          fits({ ...base, context: result.context?.slice(0, length) }),
+        );
+        return { status, content: content({ ...base, context: result.context.slice(0, count) }) };
+      }
+      // Preserve hit navigation under a small budget; no windows survive clipped matches.
+      return outcome(
+        status,
+        {
+          path: result.path,
+          matches: result.matches,
+          truncated: true,
+          skippedFiles: result.skippedFiles,
+        },
+        budget,
+      );
+    }
     const count = largest(result.matches.length, (length) =>
       fits({ ...base, matches: result.matches.slice(0, length) }),
     );

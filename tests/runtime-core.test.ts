@@ -678,10 +678,20 @@ describe("runtime core with real SQLite persistence", () => {
       expect(JSON.stringify(request.messages.at(-1))).toContain(
         `attempt ${index + 1} of 3; ${3 - index} request(s) remaining including this one`,
       );
+      expect(JSON.stringify(request.messages.at(-1))).toContain(
+        `${2 - index} tool-enabled request(s) remain before the answer-only final request`,
+      );
       expect(request.toolChoice).toBe(index === 2 ? "none" : undefined);
       expect(request.tools.some((tool) => tool.name === "inspect")).toBe(true);
       expect(request.system).toEqual(test.client.requests[0]?.system);
     }
+    expect(JSON.stringify(test.client.requests[0]?.messages.at(-1))).not.toContain(
+      "This is the last tool-enabled request",
+    );
+    const lastToolRequest = JSON.stringify(test.client.requests[1]?.messages.at(-1));
+    expect(lastToolRequest).toContain("This is the last tool-enabled request");
+    expect(lastToolRequest).toContain("artifact creation and verification in this tool batch");
+    expect(lastToolRequest).toContain("A proposed artifact in chat is not a created file");
     expect(JSON.stringify(test.client.requests[2]?.messages)).toContain("Synthetic file contents");
     const final = snapshot.entries.findLast((entry) => entry.body.kind === "assistant_message");
     if (final?.body.kind !== "assistant_message") throw Error("Missing final answer");
@@ -708,6 +718,9 @@ describe("runtime core with real SQLite persistence", () => {
     expect(await test.finish()).toEqual({ kind: "completed" });
     expect(test.client.requests).toHaveLength(1);
     expect(test.client.requests[0]?.toolChoice).toBe("none");
+    expect(JSON.stringify(test.client.requests[0]?.messages.at(-1))).toContain(
+      "0 tool-enabled request(s) remain before the answer-only final request",
+    );
     expect(JSON.stringify(test.client.requests[0]?.messages)).toContain("what remains");
     expect((await test.snapshot()).effects).toHaveLength(0);
   });
@@ -769,9 +782,18 @@ describe("runtime core with real SQLite persistence", () => {
     await test.start();
     expect(await test.finish()).toEqual({ kind: "failed", reason: "Unavailable" });
     expect(test.client.requests).toHaveLength(2);
+    expect(JSON.stringify(test.client.requests[0]?.messages.at(-1))).toContain(
+      "1 tool-enabled request(s) remain before the answer-only final request",
+    );
+    expect(JSON.stringify(test.client.requests[0]?.messages.at(-1))).toContain(
+      "This is the last tool-enabled request",
+    );
     expect(test.client.requests[1]?.toolChoice).toBe("none");
     expect(JSON.stringify(test.client.requests[1]?.messages.at(-1))).toContain(
       "attempt 2 of 2; 1 request(s)",
+    );
+    expect(JSON.stringify(test.client.requests[1]?.messages.at(-1))).toContain(
+      "0 tool-enabled request(s) remain before the answer-only final request",
     );
     expect(test.scheduler.sleep).toHaveBeenCalledTimes(1);
     expect(test.client.remaining).toBe(1);

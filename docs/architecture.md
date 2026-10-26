@@ -46,6 +46,7 @@ core through five fixed points and can be added or removed without touching anyt
 | `provider-deepseek` (Responses subset; [ADR 0007](decisions/0007-first-model-provider.md)) | model provider | merged in batch 6; live acceptance pending |
 | `default-instructions` (original working guidance) | context source | implemented; static |
 | `project-instructions` (workspace root AGENTS.md only) | context source | implemented; refreshed per request |
+| `workspace-navigation` (opt-in bounded file paths) | context source | implemented; refreshed per request; real-model quality unverified |
 | `fs` (read, list, search; create, edit, undo) | tools | read-only merged in batch 5; writes merged in phase 2 |
 | `shell` | tools | merged in phase 3 |
 | `provider-anthropic` | model provider | merged in phase 5; live acceptance pending |
@@ -66,7 +67,7 @@ Defined in [plugin.ts](../src/contracts/plugin.ts):
 |---|---|---|
 | Tool | Add a tool with its schema, effect profile, prepare, execute, reconcile | Skip validation, policy, approval or the journal; the executor runs those |
 | Model provider | Add models and their profiles | Retry, loop or execute tools |
-| Context source | Contribute sections, marked by stability | Remove or reorder history, or hide unsettled effects |
+| Context source | Contribute sections, marked by stability and optional admission | Remove or reorder history, or hide unsettled effects |
 | Policy rule | Return `ask` or `deny` | Return `allow`; a throwing rule denies |
 | Event observer | Observe runtime events | Block or change a run; a throwing observer is recorded and ignored |
 
@@ -81,6 +82,13 @@ See [CLI usage](cli.md) and [ADR 0011](decisions/0011-interactive-cli-and-develo
 Development reload is incompatible with recording/replay and refreshes only explicit ESM entries.
 
 ### Trust
+
+[ADR 0027](decisions/0027-bounded-workspace-navigation.md) adds explicitly enabled, path-only
+workspace navigation through the context-source port. Runtime authorizes directory listing and
+ignore-file reads separately, including restrictive plugin rules in both phases. The bounded
+result is refreshed, revocable and untrusted. Context may omit optional sections when capacity
+is insufficient; required sections, history and tools retain the original budget and failure
+behavior. Neither paths nor the context plugin grant authority. See [setup](instructions.md).
 
 [ADR 0017](decisions/0017-working-and-project-instructions.md) adds original default working
 guidance and root AGENTS.md context. Runtime supplies a fixed-path, read-only capability under

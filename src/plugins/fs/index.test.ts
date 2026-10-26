@@ -65,7 +65,23 @@ function context(
 function body(outcome: ToolOutcome): Record<string, unknown> {
   const text = outcome.content[0];
   if (text?.type !== "text") throw new Error("Expected a JSON text result");
-  return JSON.parse(text.text) as Record<string, unknown>;
+  const metadata = JSON.parse(text.text) as Record<string, unknown>;
+  if (metadata.format !== "file-read-v1") return metadata;
+  const { format: _format, presentation, ...body } = metadata;
+  expect(body).not.toHaveProperty("text");
+  expect(outcome.content).toHaveLength(2);
+  const source = outcome.content[1];
+  if (source?.type !== "text") throw new Error("Expected numbered source text");
+  const range = presentation as { startLine: number; sourceBytes: number };
+  const raw = (source.text.match(/[^\n]*\n|[^\n]+$/g) ?? [])
+    .map((sourceLine, index) => {
+      const prefix = `${range.startLine + index}: `;
+      expect(sourceLine.startsWith(prefix)).toBe(true);
+      return sourceLine.slice(prefix.length);
+    })
+    .join("");
+  expect(new TextEncoder().encode(raw).byteLength).toBe(range.sourceBytes);
+  return { ...body, text: raw };
 }
 async function selected(name: string): Promise<ToolDefinition> {
   const tool = (await registered()).get(name);
@@ -143,6 +159,79 @@ describe("fs plugin", () => {
     expect(body(result).entries).toEqual([{ path: "a.txt", type: "file" }]);
     expect(body(result).truncated).toBe(false);
   });
+  it("forwards exact line selection with the reduced byte budget and retains range evidence", async () => {
+    const files = capability(),
+      ctx = context(files),
+      tool = await selected("read");
+    const evidence: FileRead = {
+      path: "source.ts",
+      text: "second\nthird\n",
+      bytesRead: 13,
+      truncated: true,
+      lineRange: { startLine: 2, endLine: 3, complete: true },
+    };
+    files.read.mockResolvedValue(evidence);
+    const args = { path: "source.ts", startLine: 2, maxLines: 2, maxBytes: 65536 };
+    const action = await tool.prepare(args, ctx);
+    args.startLine = 7;
+    const result = await tool.execute(action, ctx);
+    expect(files.read).toHaveBeenCalledExactlyOnceWith("source.ts", {
+      startLine: 2,
+      maxLines: 2,
+      maxBytes: 1024,
+    });
+    expect(body(result)).toEqual(evidence);
+  });
+  it.each([{ startLine: 2 }, { maxLines: 5 }])(
+    "preserves unspecified range defaults for the capability: %j",
+    async (options) => {
+      const files = capability(),
+        ctx = context(files),
+        tool = await selected("read");
+      await tool.execute(await tool.prepare({ path: "source.ts", ...options }, ctx), ctx);
+      expect(files.read).toHaveBeenCalledExactlyOnceWith("source.ts", {
+        maxBytes: 1024,
+        ...options,
+      });
+    },
+  );
+  it.each([
+    { startLine: 0 },
+    { startLine: 1000001 },
+    { startLine: 1.5 },
+    { startLine: "1" },
+    { maxLines: 0 },
+    { maxLines: 1001 },
+    { maxLines: null },
+    { startLine: 1, maxLines: 2, bypassScan: true },
+  ])("rejects invalid range arguments before capability use: %j", async (options) => {
+    const files = capability(),
+      tool = await selected("read");
+    await expect(tool.prepare({ path: "source.ts", ...options }, context(files))).rejects.toThrow();
+    expect(files.read).not.toHaveBeenCalled();
+  });
+  it("drops range endpoints if serialized output clipping shortens the returned text", async () => {
+    const files = capability(),
+      ctx = context(files, undefined, 256),
+      tool = await selected("read");
+    files.read.mockResolvedValue({
+      path: "source.ts",
+      text: "line\n".repeat(100),
+      bytesRead: 500,
+      truncated: false,
+      lineRange: { startLine: 1, endLine: 100, complete: true },
+    });
+    const result = await tool.execute(
+      await tool.prepare({ path: "source.ts", startLine: 1, maxLines: 100 }, ctx),
+      ctx,
+    );
+    expect(result.status).toBe("succeeded");
+    expect(body(result).truncated).toBe(true);
+    expect(body(result)).not.toHaveProperty("lineRange");
+    expect(new TextEncoder().encode(JSON.stringify(result.content)).byteLength).toBeLessThanOrEqual(
+      256,
+    );
+  });
   it("searches a literal query with case controls and no regex or ignore override", async () => {
     const files = capability(),
       ctx = context(files),
@@ -154,11 +243,160 @@ describe("fs plugin", () => {
     expect(files.search).toHaveBeenCalledExactlyOnceWith(".", "a.*b", {
       maxMatches: 4,
       caseSensitive: false,
+      contextLines: 8,
     });
     await expect(tool.prepare({ query: "text", regex: true }, ctx)).rejects.toThrow("Unsupported");
     await expect(tool.prepare({ query: "text", respectIgnore: false }, ctx)).rejects.toThrow(
       "Unsupported",
     );
+  });
+  it.each([0, 20])(
+    "forwards explicit search context %i without additional reads",
+    async (contextLines) => {
+      const files = capability(),
+        ctx = context(files),
+        tool = await selected("search");
+      await tool.execute(await tool.prepare({ query: "hit", contextLines }, ctx), ctx);
+      expect(files.search).toHaveBeenCalledExactlyOnceWith(".", "hit", {
+        maxMatches: 16,
+        caseSensitive: true,
+        contextLines,
+      });
+      expect(files.read).not.toHaveBeenCalled();
+    },
+  );
+  it("snapshots glob lists, forwards exact-file scope and supports file discovery", async () => {
+    const files = capability(),
+      ctx = context(files),
+      tool = await selected("search");
+    const args = {
+      path: "src/target.ts",
+      query: "needle",
+      include: ["src/**/*.ts"],
+      exclude: ["**/*.test.ts"],
+      mode: "files",
+    };
+    files.search.mockResolvedValue({
+      path: args.path,
+      mode: "files",
+      files: [args.path],
+      matches: [],
+      truncated: false,
+      skippedFiles: 0,
+    });
+    const action = await tool.prepare(args, ctx);
+    args.include[0] = "unrelated/**";
+    args.exclude.push("src/**");
+    const result = await tool.execute(action, ctx);
+    expect(files.search).toHaveBeenCalledExactlyOnceWith("src/target.ts", "needle", {
+      maxMatches: 16,
+      caseSensitive: true,
+      contextLines: 8,
+      include: ["src/**/*.ts"],
+      exclude: ["**/*.test.ts"],
+      mode: "files",
+    });
+    expect(body(result)).toEqual({
+      path: "src/target.ts",
+      mode: "files",
+      files: ["src/target.ts"],
+      matches: [],
+      truncated: false,
+      skippedFiles: 0,
+    });
+    expect(files.read).not.toHaveBeenCalled();
+  });
+  it.each([
+    { include: [] },
+    { include: "*.ts" },
+    { include: [1] },
+    { include: [""] },
+    { include: ["x".repeat(129)] },
+    { exclude: Array(9).fill("*.ts") },
+    { exclude: null },
+    { mode: "all" },
+    { mode: null },
+  ])("rejects malformed selection options before calling files: %j", async (options) => {
+    const files = capability();
+    await expect(
+      (await selected("search")).prepare({ query: "hit", ...options }, context(files)),
+    ).rejects.toThrow();
+    expect(files.search).not.toHaveBeenCalled();
+  });
+  it("clips file discovery on whole paths and retains marked omissions", async () => {
+    const files = capability(),
+      ctx = context(files, undefined, 256),
+      tool = await selected("search");
+    const paths = ["src/first.ts", `${"long-directory/".repeat(30)}second.ts`];
+    files.search.mockResolvedValue({
+      path: ".",
+      mode: "files",
+      files: paths,
+      matches: [],
+      truncated: false,
+      skippedFiles: 2,
+    });
+    const result = await tool.execute(
+      await tool.prepare({ query: "hit", mode: "files" }, ctx),
+      ctx,
+    );
+    expect(body(result)).toEqual({
+      path: ".",
+      mode: "files",
+      files: paths.slice(0, 1),
+      matches: [],
+      truncated: true,
+      skippedFiles: 2,
+    });
+    expect(Buffer.byteLength(JSON.stringify(result.content))).toBeLessThanOrEqual(256);
+    files.search.mockResolvedValue({
+      path: ".",
+      mode: "files",
+      files: [paths[1] as string],
+      matches: [],
+      truncated: false,
+      skippedFiles: 0,
+    });
+    const empty = await tool.execute(await tool.prepare({ query: "hit", mode: "files" }, ctx), ctx);
+    expect(body(empty).files).toEqual([]);
+    expect(body(empty).truncated).toBe(true);
+  });
+  it.each([-1, 21, 1.5, null, "8"])("rejects invalid tool context %j", async (contextLines) => {
+    const files = capability();
+    await expect(
+      (await selected("search")).prepare({ query: "hit", contextLines }, context(files)),
+    ).rejects.toThrow(/contextLines/);
+    expect(files.search).not.toHaveBeenCalled();
+  });
+  it("drops whole search windows on output clipping without false range endpoints", async () => {
+    const files = capability(),
+      ctx = context(files, undefined, 512),
+      tool = await selected("search");
+    const first = { path: "file", startLine: 1, endLine: 2, text: "hit\nsecond\n", complete: true };
+    files.search.mockResolvedValue({
+      path: ".",
+      matches: [
+        { path: "file", line: 1, text: "hit" },
+        { path: "file", line: 20, text: "hit" },
+      ],
+      context: [
+        first,
+        {
+          path: "file",
+          startLine: 20,
+          endLine: 20,
+          text: `hit${"x".repeat(1000)}`,
+          complete: true,
+        },
+      ],
+      truncated: false,
+      skippedFiles: 0,
+    });
+    const result = await tool.execute(await tool.prepare({ query: "hit" }, ctx), ctx);
+    expect(body(result).context).toEqual([first]);
+    expect(body(result).matches).toHaveLength(2);
+    expect(body(result).truncated).toBe(true);
+    expect(Buffer.byteLength(JSON.stringify(result.content))).toBeLessThanOrEqual(512);
   });
   it.each(["read", "list", "search"])(
     "%s fails explicitly without a file capability",
@@ -240,7 +478,7 @@ describe("fs plugin", () => {
     await expect((await selected("search")).prepare(args, context(capability()))).rejects.toThrow();
   });
   it.each(["read", "list", "search"])(
-    "%s output remains valid bounded JSON with a truthful truncation marker",
+    "%s output retains bounded metadata and source with a truthful truncation marker",
     async (name) => {
       const files = capability(),
         ctx = context(files, undefined, 256),

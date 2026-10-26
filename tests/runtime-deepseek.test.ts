@@ -10,7 +10,8 @@ import {
   runRoundTrip,
   successfulFixtures,
 } from "../evals/deepseek/scenario.ts";
-import type { RunOutcome, SessionId } from "../src/contracts/index.ts";
+import { fileResultValue } from "../evals/support/file-result.ts";
+import type { FileRead, RunOutcome, SessionId } from "../src/contracts/index.ts";
 import { deepSeekFixture } from "../src/plugins/provider-deepseek/fixtures.ts";
 import { DEEPSEEK_API_PROFILE, deepSeekProfile } from "../src/plugins/provider-deepseek/index.ts";
 import { createRuntime } from "../src/runtime/index.ts";
@@ -101,19 +102,21 @@ describe("DeepSeek fixture transport through runtime, files, recording and repla
     expect(result.records).toHaveLength(3);
     expect(result.wireRequests).toHaveLength(3);
     expect(network).not.toHaveBeenCalled();
-    const fileResult = result.first.results[1]?.content[0];
-    expect(fileResult?.type).toBe("text");
-    if (fileResult?.type === "text") expect(JSON.parse(fileResult.text).text).toBe(fixtureText);
+    expect(fileResultValue<FileRead>(result.first.results[1]).text).toBe(fixtureText);
     expect(JSON.stringify(result.first.assistantContent)).toContain(finalAnswer);
     for (const index of [1, 2]) {
       const input = result.wireRequests[index]?.input as {
         type: string;
         call_id?: string;
         content?: unknown;
-        output?: string;
+        output?: readonly { type: "input_text"; text: string }[];
       }[];
       expect(input.some((part) => part.type === "reasoning")).toBe(true);
       expect(input.some((part) => part.type === "function_call_output")).toBe(true);
+      for (const part of input.filter((part) => part.type === "function_call_output")) {
+        expect(Array.isArray(part.output)).toBe(true);
+        expect(part.output?.every((item) => item.type === "input_text")).toBe(true);
+      }
     }
     expect(JSON.stringify(result.wireRequests[2])).toContain("Hello moyyi");
     expect(result.records.every((record) => record.meta.source === "synthetic")).toBe(true);
@@ -207,6 +210,13 @@ describe("DeepSeek fixture transport through runtime, files, recording and repla
           dataDirectory: join(directory, "wrong-profile"),
           model: deepSeekProfile.origin,
           modelReplay: { records, apiProfile: "different-profile" },
+        }),
+      ).rejects.toThrow(/profile/);
+      await expect(
+        createRuntime({
+          dataDirectory: join(directory, "obsolete-wire-profile"),
+          model: deepSeekProfile.origin,
+          modelReplay: { records, apiProfile: "deepseek-responses-text-v1-2026-10-25" },
         }),
       ).rejects.toThrow(/profile/);
       const forbidden = vi.fn(async () => {

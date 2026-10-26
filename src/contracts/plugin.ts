@@ -52,6 +52,10 @@ export interface ContextSourceInput {
   readonly workspaceRoot: string;
   readonly profile: ModelProfile;
   readonly signal: AbortSignal;
+  /** Opt-in, bounded path discovery only; expires with collection and grants no file access. */
+  readonly workspaceNavigation?: {
+    read(): Promise<WorkspaceNavigationResult>;
+  };
   /** Host-selected SKILL.md files only; expires with collection; no discovery or executable access. */
   readonly skills?: {
     readEnabled(): Promise<readonly SkillSource[]>;
@@ -61,6 +65,15 @@ export interface ContextSourceInput {
     readRoot(): Promise<ProjectInstructionsResult>;
   };
 }
+
+export type WorkspaceNavigationResult =
+  | { readonly kind: "blocked" }
+  | {
+      readonly kind: "loaded";
+      readonly paths: readonly string[];
+      readonly truncated: boolean;
+      readonly skippedEntries: number;
+    };
 
 export type SkillSource =
   | { readonly kind: "blocked"; readonly name: string }
@@ -88,6 +101,8 @@ export interface ContextSection {
    * stable prefix of the request, and therefore the provider's prompt cache, survives.
    */
   readonly stability: "static" | "session" | "turn";
+  /** Supplemental navigation may be omitted as a whole to fit; instructions are required by default. */
+  readonly optional?: boolean;
   readonly content: readonly TextPart[];
 }
 

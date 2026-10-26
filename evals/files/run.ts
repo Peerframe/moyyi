@@ -18,6 +18,17 @@ import {
 } from "../../src/contracts/index.ts";
 import { scriptedProfile, scriptedProvider } from "../../src/plugins/provider-scripted/index.ts";
 import { createRuntime, type Runtime } from "../../src/runtime/index.ts";
+import { fileResultValue } from "../support/file-result.ts";
+import {
+  type FileReadPresentationEvidence,
+  fileReadPresentationScenarios,
+  runFileReadPresentationScenario,
+} from "./read-presentation.ts";
+import {
+  type FileNavigationEvidence,
+  fileNavigationScenarios,
+  runFileNavigationScenario,
+} from "./scenario.ts";
 
 interface Request {
   readonly name: string;
@@ -66,9 +77,7 @@ function response(request: Request, index: number): readonly ModelStreamEvent[] 
 }
 function payload<T>(result: ToolResultPart | undefined): T {
   assert.equal(result?.status, "succeeded");
-  const part = result?.content.find((part) => part.type === "text");
-  assert.ok(part?.type === "text");
-  return JSON.parse(part.text) as T;
+  return fileResultValue<T>(result);
 }
 function denied(observation: Observation): void {
   assert.notEqual(observation.results.at(-1)?.status, "succeeded");
@@ -264,7 +273,12 @@ console.log(
 console.log(
   "This checks execution boundaries and file-result propagation, not model task capability or an OS sandbox.",
 );
-const results: { id: string; passed: boolean; evidence?: Evidence; error?: string }[] = [];
+const results: {
+  id: string;
+  passed: boolean;
+  evidence?: Evidence | FileNavigationEvidence | FileReadPresentationEvidence;
+  error?: string;
+}[] = [];
 for (const scenario of scenarios) {
   let observation: Observation | undefined;
   try {
@@ -283,6 +297,28 @@ for (const scenario of scenarios) {
     console.error(`FAIL ${scenario.id}: ${message}`);
   }
 }
+for (const id of fileNavigationScenarios) {
+  try {
+    const evidence = await runFileNavigationScenario(id);
+    results.push({ id, passed: true, evidence });
+    console.log(`PASS ${id} (scripted navigation mechanism)`);
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    results.push({ id, passed: false, error: message });
+    console.error(`FAIL ${id}: ${message}`);
+  }
+}
+for (const id of fileReadPresentationScenarios) {
+  try {
+    const evidence = await runFileReadPresentationScenario(id);
+    results.push({ id, passed: true, evidence });
+    console.log(`PASS ${id} (scripted source presentation mechanism)`);
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    results.push({ id, passed: false, error: message });
+    console.error(`FAIL ${id}: ${message}`);
+  }
+}
 const passed = results.filter((result) => result.passed).length;
 const destination = fileURLToPath(new URL("../results/files.json", import.meta.url));
 mkdirSync(dirname(destination), { recursive: true });
@@ -294,6 +330,13 @@ writeFileSync(
       modelCapabilityScore: false,
       evidenceScope:
         "Public runtime protocol, session.load transcript, scripted next-request records and synthetic canary contents; no direct database inspection.",
+      groups: {
+        existingFileConformance: scenarios.map((scenario) => scenario.id),
+        scriptedNavigationMechanisms: fileNavigationScenarios,
+        scriptedReadPresentationMechanisms: fileReadPresentationScenarios,
+      },
+      navigationEvidenceScope:
+        "Exact source/results and request propagation through the real file plugin, runtime and core; pass-through capability/policy observers check rejection before workspace I/O. Scripted repairs are not model understanding or autonomous task-quality evidence.",
       generatedAt: new Date().toISOString(),
       passed,
       total: results.length,

@@ -1,15 +1,33 @@
 # DeepSeek provider
 
-Registers `deepseek/deepseek-flash` through `createDeepSeekPlugin(transport)`; the trusted runtime
+Registers `deepseek/deepseek-flash` through `createDeepSeekPlugin(transport, options?)`; the trusted runtime
 supplies the HTTP transport. Plugin config must be absent. No credentials, filesystem access,
 retries, tool execution or environment lookup live in this plugin.
 
-Supported profile: `deepseek-responses-text-v1-2026-10-25`. Requests use the official Responses
+Supported profile: `deepseek-responses-text-v2-2026-10-26`. Requests use the official Responses
 endpoint, full stateless text/reasoning history and client function tools. Completed assistant
 history with tools/calls must retain all actual visible reasoning and a known successful stop reason;
 a complete response need not generate reasoning. Unsupported
 content/options fail before HTTP. Opaque replay data is unused; valid common content is sufficient.
 The local output cap is 8,192 tokens. Model alias resolution remains controlled by the service.
+
+`options.reasoningEffort` accepts `none`, `low`, `high` or `max`, using the official Responses
+`reasoning.effort` control. Omission keeps `high`; aliases and invalid values are rejected before
+transport. Plugin/client construction captures the value, so later caller mutation cannot change
+requests. No prompt, tool definition, output limit or model selection changes with this setting.
+`none` disables thinking; it does not strip earlier visible reasoning from valid history.
+See the [official effort mapping](https://api-docs.deepseek.com/guides/thinking_mode/).
+
+`deepSeekApiProfile(effort)` binds recording/replay to the selected effort. High uses the current
+constant; other efforts have distinct suffixes. Runtime exposes the helper through `moyyi/runtime`
+and uses the host's `deepseekReasoningEffort` setting for both live connections and offline replay.
+See [ADR 0023](../../../docs/decisions/0023-configurable-deepseek-reasoning.md).
+
+Tool results use native `input_text` parts: an explicit result-status part followed by each
+original text part, preserving actual newlines, Unicode and part boundaries. No nested JSON
+envelope is added and no tool JSON is parsed. The v2 recording profile identifies this wire
+change; v1 records must not be relabeled as v2. See
+[ADR 0026](../../../docs/decisions/0026-readable-evidence-and-action-budget.md).
 
 The optional common `toolChoice: "none"` control sends `tool_choice: "none"` while preserving
 tool definitions and complete tool-call/result history. Absence retains the previous wire shape;

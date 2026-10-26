@@ -17,6 +17,24 @@ const action: PreparedAction = {
 const effect = "eff_test" as EffectId;
 
 describe("automatic instruction read policy", () => {
+  it("keeps list approval distinct and forwards it through every policy wrapper", () => {
+    const reads = new ReadOnlyPolicy({ requireApproval: ["list"] });
+    const writes = new WorkspaceWritePolicy({ requireApproval: ["list"] });
+    const process = new WorkspaceProcessPolicy({ files: writes });
+    const web = new WebPolicy({ previous: process, fetch: true });
+    for (const policy of [reads, writes, process, web]) {
+      expect(policy.beforeContextRead(".", "list")).toEqual({ kind: "ask" });
+      expect(policy.beforeContextRead(".gitignore", "read")).toEqual({ kind: "allow" });
+      expect(policy.beforeContextRead("AGENTS.md")).toEqual({ kind: "allow" });
+    }
+    reads.revoke();
+    expect(reads.beforeContextRead(".", "list").kind).toBe("deny");
+    const denied = new WorkspaceWritePolicy({ readAllowed: false });
+    expect(new WorkspaceProcessPolicy({ files: denied }).beforeContextRead(".", "list").kind).toBe(
+      "deny",
+    );
+    expect(new WebPolicy({ previous: denied }).beforeContextRead(".", "list").kind).toBe("deny");
+  });
   it("keeps read approval and revocation applicable without manufacturing a tool action", () => {
     const policy = new ReadOnlyPolicy({ requireApproval: ["read"] });
     expect(policy.beforeContextRead("AGENTS.md")).toEqual({ kind: "ask" });

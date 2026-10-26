@@ -125,6 +125,14 @@ function checkBudgetPrompts(observation: Observation, maximum: number): void {
     const remaining = maximum - index;
     const prefix = `Model request budget: attempt ${index + 1} of ${maximum}; ${remaining} request(s) remaining including this one.`;
     assert.ok(notices[index]?.startsWith(prefix), "Persist the actual attempt allowance");
+    assert.ok(
+      notices[index]?.includes(`${remaining - 1} tool-enabled request(s) remain`),
+      "Report actual tool opportunities separately from the reserved answer",
+    );
+    if (remaining === 2) {
+      assert.ok(notices[index]?.includes("last tool-enabled request"));
+      assert.ok(notices[index]?.includes("artifact"));
+    }
     const latest = request.messages.at(-1);
     assert.equal(latest?.role, "user");
     assert.ok(

@@ -35,11 +35,15 @@ import {
 import {
   createDeepSeekPlugin,
   DEEPSEEK_API_PROFILE,
+  type DeepSeekReasoningEffort,
   type DeepSeekTransport,
+  deepSeekApiProfile,
+  resolveDeepSeekReasoningEffort,
 } from "../plugins/provider-deepseek/index.ts";
 import { shellPlugin } from "../plugins/shell/index.ts";
 import { skillsPlugin } from "../plugins/skills/index.ts";
 import { createWebPlugin } from "../plugins/web/index.ts";
+import { workspaceNavigationPlugin } from "../plugins/workspace-navigation/index.ts";
 import {
   ReadOnlyPolicy,
   WebPolicy,
@@ -68,6 +72,8 @@ export type { PluginEntry, PluginStatus } from "./plugins.ts";
 export {
   ANTHROPIC_API_PROFILE,
   DEEPSEEK_API_PROFILE,
+  type DeepSeekReasoningEffort,
+  deepSeekApiProfile,
   ReadOnlyPolicy,
   WebPolicy,
   WorkspaceProcessPolicy,
@@ -100,6 +106,8 @@ export interface RuntimeOptions {
   readonly skills?: SkillSelection;
   /** Disable automatic root AGENTS.md reads. Default working instructions remain enabled. */
   readonly projectInstructions?: false;
+  /** Explicit opt-in for bounded path-only navigation; omitted or false performs no scan. */
+  readonly workspaceNavigation?: boolean;
   readonly developmentPlugins?: readonly DevelopmentPlugin[];
   readonly plugins?: readonly PluginEntry[];
   readonly model?: ModelOrigin;
@@ -130,6 +138,8 @@ export interface RuntimeOptions {
   };
   /** Explicit host connection only; no environment lookup or network before a model request. */
   readonly deepseek?: DeepSeekHttpOptions | { readonly transport: DeepSeekTransport };
+  /** Host-selected for this runtime, including replay. Omission preserves the high default. */
+  readonly deepseekReasoningEffort?: DeepSeekReasoningEffort;
   readonly anthropic?:
     | AnthropicHttpOptions
     | { readonly transport: AnthropicTransport; readonly accountScope: string };
@@ -157,45 +167,55 @@ export async function createRuntime(
   options: RuntimeOptions = {},
   services: RuntimeServices = {},
 ): Promise<Runtime> {
+  if (options.workspaceNavigation !== undefined && typeof options.workspaceNavigation !== "boolean")
+    throw Error("Workspace navigation must be a boolean");
+  const workspaceNavigation = options.workspaceNavigation === true;
+  const model = options.model ? { ...options.model } : undefined;
+  const deepseekReasoningEffort = resolveDeepSeekReasoningEffort(options.deepseekReasoningEffort);
+  if (options.deepseekReasoningEffort !== undefined && model?.provider !== "deepseek")
+    throw Error("DeepSeek reasoning effort requires a selected DeepSeek model");
+  if (options.deepseekReasoningEffort !== undefined && !options.deepseek && !options.modelReplay)
+    throw Error("DeepSeek reasoning effort requires a built-in connection or replay");
+  // Freeze recording identity before plugin setup can yield to caller mutations.
+  const modelRecording = options.modelRecording ? { ...options.modelRecording } : undefined;
+  const modelReplay = options.modelReplay ? { ...options.modelReplay } : undefined;
   const skills = selectSkills(options.skills);
-  if (options.developmentPlugins?.length && (options.modelRecording || options.modelReplay))
+  if (options.developmentPlugins?.length && (modelRecording || modelReplay))
     throw Error("Development reload cannot be combined with recording or replay");
-  if (
-    (options.modelRecording && options.modelReplay) ||
-    (options.modelReplay && (options.deepseek || options.anthropic))
-  )
+  if ((modelRecording && modelReplay) || (modelReplay && (options.deepseek || options.anthropic)))
     throw Error("Replay cannot be combined with live connection or recording options");
-  if (
-    (options.modelRecording || options.modelReplay || options.deepseek || options.anthropic) &&
-    !options.model
-  )
+  if ((modelRecording || modelReplay || options.deepseek || options.anthropic) && !model)
     throw Error("Model transport/recording requires an explicitly selected model");
-  for (const recording of [options.modelRecording, options.modelReplay]) {
+  for (const recording of [modelRecording, modelReplay]) {
     if (
       recording &&
-      options.model?.provider === "anthropic" &&
+      model?.provider === "anthropic" &&
       recording.apiProfile !== ANTHROPIC_API_PROFILE
     )
       throw Error("Anthropic recording profile does not match the configured adapter");
     if (
       recording &&
-      options.model?.provider === "deepseek" &&
-      recording.apiProfile !== DEEPSEEK_API_PROFILE
+      model?.provider === "deepseek" &&
+      recording.apiProfile !== deepSeekApiProfile(deepseekReasoningEffort)
     )
       throw Error("DeepSeek recording profile does not match the configured adapter");
   }
+  const replayClient = modelReplay
+    ? new ReplayModelClient(modelReplay.records, { apiProfile: modelReplay.apiProfile })
+    : undefined;
   const transport = options.deepseek
     ? "transport" in options.deepseek
       ? options.deepseek.transport
       : deepSeekHttpTransport(options.deepseek)
     : undefined;
   const deepseek =
-    transport || (options.modelReplay && options.model?.provider === "deepseek")
+    transport || (modelReplay && model?.provider === "deepseek")
       ? createDeepSeekPlugin(
           transport ??
             (async () => {
               throw Error("Replay cannot access the network");
             }),
+          { reasoningEffort: deepseekReasoningEffort },
         )
       : undefined;
   const anthropicTransport = options.anthropic
@@ -204,7 +224,7 @@ export async function createRuntime(
       : anthropicHttpTransport(options.anthropic)
     : undefined;
   const anthropic =
-    anthropicTransport || (options.modelReplay && options.model?.provider === "anthropic")
+    anthropicTransport || (modelReplay && model?.provider === "anthropic")
       ? createAnthropicPlugin(
           anthropicTransport ??
             (async () => {
@@ -253,6 +273,7 @@ export async function createRuntime(
     { plugin: defaultInstructionsPlugin },
     ...(options.projectInstructions === false ? [] : [{ plugin: projectInstructionsPlugin }]),
     ...(skills?.enabled.length ? [{ plugin: skillsPlugin }] : []),
+    ...(workspaceNavigation ? [{ plugin: workspaceNavigationPlugin }] : []),
     { plugin: fsPlugin },
     { plugin: shellPlugin },
     { plugin: createWebPlugin(options.web?.search?.origin) },
@@ -342,9 +363,9 @@ export async function createRuntime(
 
   const policy: PermissionPolicy = {
     revision: () => base.revision?.() ?? 0,
-    beforeContextRead: (path) => {
+    beforeContextRead: (path, operation = "read") => {
       try {
-        const initial = base.beforeContextRead?.(path);
+        const initial = base.beforeContextRead?.(path, operation);
         if (!initial || !["allow", "ask", "deny"].includes(initial.kind))
           return { kind: "deny", reason: "Automatic context reads are not granted" };
         const profile = {
@@ -356,9 +377,9 @@ export async function createRuntime(
         return stricter(
           stricter(
             initial,
-            registry.evaluatePolicy({ tool: "read", profile, args, phase: "prepare" }),
+            registry.evaluatePolicy({ tool: operation, profile, args, phase: "prepare" }),
           ),
-          registry.evaluatePolicy({ tool: "read", profile, args, phase: "execute" }),
+          registry.evaluatePolicy({ tool: operation, profile, args, phase: "execute" }),
         );
       } catch {
         return { kind: "deny", reason: "Automatic context reads are not granted" };
@@ -380,12 +401,10 @@ export async function createRuntime(
   };
   const wireCore = async (allowMissing: boolean) => {
     core = undefined;
-    if (!options.model || !store) return;
-    const provider = registry.providers.find((item) => item.id === options.model?.provider);
+    if (!model || !store) return;
+    const provider = registry.providers.find((item) => item.id === model?.provider);
     const profile = provider?.models.find(
-      (item) =>
-        item.origin.provider === options.model?.provider &&
-        item.origin.model === options.model.model,
+      (item) => item.origin.provider === model?.provider && item.origin.model === model.model,
     );
     if (!provider || !profile) {
       selectedProvider = undefined;
@@ -398,11 +417,7 @@ export async function createRuntime(
     if (provider !== selectedProvider || !selectedClient) {
       selectedProvider = provider;
       try {
-        selectedClient = options.modelReplay
-          ? new ReplayModelClient(options.modelReplay.records, {
-              apiProfile: options.modelReplay.apiProfile,
-            })
-          : provider.createClient(profile.origin.model);
+        selectedClient = replayClient ?? provider.createClient(profile.origin.model);
       } catch (error) {
         const owner = registry.providerOwner(provider.id);
         if (!owner || !development.has(owner)) throw error;
@@ -418,20 +433,14 @@ export async function createRuntime(
         status(failed, false);
         return failed;
       }
-      if (options.modelRecording) {
-        recorder = new RecordingModelClient(
-          selectedClient,
-          options.modelRecording.sink,
-          options.modelRecording,
-        );
+      if (modelRecording) {
+        recorder = new RecordingModelClient(selectedClient, modelRecording.sink, modelRecording);
         selectedClient = recorder;
       }
     }
     const excluded = [
       ...(store instanceof SqliteSessionStore ? [store.directory] : []),
-      ...(options.modelRecording?.sink instanceof FileRecordingSink
-        ? [options.modelRecording.sink.directory]
-        : []),
+      ...(modelRecording?.sink instanceof FileRecordingSink ? [modelRecording.sink.directory] : []),
       ...(options.protectedPaths ?? []),
     ];
     // Only the durable, snapshot-aware host store can enable the built-in mutation capability.
@@ -489,6 +498,7 @@ export async function createRuntime(
           signal,
           options.projectInstructions !== false,
           skills,
+          workspaceNavigation,
         ),
       ...(options.limits === undefined ? {} : { limits: options.limits }),
     });
@@ -500,7 +510,7 @@ export async function createRuntime(
   try {
     if (options.store && options.dataDirectory)
       throw Error("Choose a store or dataDirectory, not both");
-    if (options.model) {
+    if (model) {
       if (options.dataDirectory) ownedStore = new SqliteSessionStore(options.dataDirectory);
       store = options.store ?? ownedStore;
       if (!store) throw Error("A configured model requires persistent storage");

@@ -1,6 +1,7 @@
 import {
   createRuntime, type Runtime, type RuntimeOptions, FileRecordingSink, loadModelRecordings,
   DEEPSEEK_API_PROFILE, ANTHROPIC_API_PROFILE, WebPolicy,
+  deepSeekApiProfile, type DeepSeekReasoningEffort,
 } from "moyyi/runtime";
 import {
   type ActionDigest,
@@ -9,6 +10,9 @@ import {
   type ModelStreamEvent,
   type Plugin,
   type RuntimeEvent,
+  type WorkspaceFiles,
+  type FileSearchContext,
+  type FileSearchOptions,
   UNKNOWN_USAGE,
 } from "moyyi/contracts";
 
@@ -107,3 +111,32 @@ const selectedSkills: RuntimeOptions = { skills: { root: "/synthetic-library", e
 // @ts-expect-error Skill configuration cannot omit the explicit enabled list.
 const implicitSkills: RuntimeOptions = { skills: { root: "/synthetic-library" } };
 void [selectedSkills, implicitSkills];
+
+const effort: DeepSeekReasoningEffort = "low";
+const lowReplay: RuntimeOptions = {
+  model: { provider: "deepseek", model: "deepseek-flash" },
+  deepseekReasoningEffort: effort,
+  modelReplay: { records: [], apiProfile: deepSeekApiProfile(effort) },
+};
+// @ts-expect-error Unspecified provider aliases are not accepted reasoning efforts.
+const invalidEffort: RuntimeOptions = { deepseekReasoningEffort: "medium" };
+void [lowReplay, invalidEffort];
+
+async function sourceWindows(files: WorkspaceFiles): Promise<readonly FileSearchContext[] | undefined> {
+  const result = await files.search("src", "function", { contextLines: 8 });
+  // @ts-expect-error Context radius is numeric, never a textual query or authority flag.
+  await files.search("src", "function", { contextLines: "all" });
+  return result.context;
+}
+void sourceWindows;
+
+async function discoverSource(files: WorkspaceFiles): Promise<readonly string[] | undefined> {
+  const selection: FileSearchOptions = { include: ["src/**/*.ts"], exclude: ["**/*.test.ts"], mode: "files" };
+  const result = await files.search("src", "function", selection);
+  // @ts-expect-error Discovery mode is explicit; arbitrary output modes are not accepted.
+  await files.search("src", "function", { mode: "raw" });
+  // @ts-expect-error Selection patterns are strings, never permission objects.
+  await files.search("src", "function", { include: [{ grant: true }] });
+  return result.mode === "files" ? result.files : undefined;
+}
+void discoverSource;

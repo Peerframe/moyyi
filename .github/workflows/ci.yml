@@ -40,6 +40,9 @@ jobs:
       - name: Core budget and execution conformance
         run: npm run eval:core
 
+      - name: Read-only file conformance
+        run: npm run eval:files
+
       - name: DeepSeek offline conformance
         run: npm run eval:deepseek
 
