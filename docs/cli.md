@@ -62,6 +62,41 @@ keep them outside a repository. The runtime protects its store from ordinary fil
 for supported profiles and acceptance gaps. Tool networking is separate: [web grants](web.md)
 describe explicit origins, optional search and interactive approval.
 
+## Enable capabilities for this workspace
+
+Startup flags are explicit, temporary owner grants. With no flags, the host's settings remain
+unchanged. They never load project configuration, change a stored session's authority, or remove
+per-effect approval. For a normally read-only host:
+
+```sh
+moyyi --host /absolute/private/moyyi-host.mjs -C /absolute/workspace \
+  --allow-write --allow-shell --shell-toolchain node --max-requests 8
+```
+
+- `--allow-write` enables snapshot-backed create/edit/undo in the selected canonical workspace.
+- `--allow-shell` independently enables approved commands with a **read-only workspace** and no
+  network. A private scratch directory remains writable. `--allow-write` does not make commands
+  writable; cache/coverage/build outputs in the project can fail. Existing explicit host process
+  grants retain their documented default behavior; see [shell](shell.md).
+- `--shell-toolchain node` requires `--allow-shell`. It selects the current Node executable and
+  its exact startup libraries/aliases through a bounded clean probe. It does not grant an entire
+  installation tree, npm/global packages, external dependency caches or arbitrary native addons.
+- `--max-requests N` explicitly changes only the per-turn model request ceiling (1–128), including
+  the final no-tool answer. Other host limits and retry settings remain unchanged. It is not a
+  monetary cap or a change to evaluation budgets.
+
+To read a specific website, add `--web-origin https://www.rfc-editor.org`; repeat the flag for
+other origins. Paths, credentials, query strings and fragments are rejected. Each fetch asks for
+approval; DNS/public-address/TLS checks still apply and linked sites receive no implicit grant.
+`--web-dns cloudflare-doh` explicitly sends authorized hostnames to the fixed Cloudflare resolver;
+`system` remains the default. DNS selection requires an origin grant. See [web](web.md).
+
+CLI capability flags refuse conflicts with the corresponding existing host capability or any
+custom host policy. Configure one authority source; no silent policy replacement. `--approve-reads`
+can accompany CLI grants and still covers document reads. Noninteractive approvals remain denied.
+Capabilities are limited to the selected workspace/origins even if another session is resumed.
+The offline `--demo` rejects these daily capability and budget options.
+
 ## Session controls
 
 | Input | Behavior |
@@ -81,13 +116,16 @@ The session ID is displayed when created or loaded. There is no session browser 
 history alone makes no model request. Failed/partial DeepSeek history may be rejected by its
 strict continuation profile; use `/new` for a fresh conversation rather than inventing reasoning.
 
-Add `--approve-reads` to require execution approval for read/list/search. It cannot replace a
+Add `--approve-reads` to require execution approval for read/list/search/document tools. It cannot replace a
 custom host policy or authorize a forbidden effect. Multiple approvals have separate IDs/digests;
 a stale response is rejected and never retried automatically. In one-shot mode approvals are
 explicitly denied, so unattended input cannot authorize them or leave the process waiting forever.
 
 Assistant text streams as it arrives and is not printed twice when its persisted message arrives.
-Reasoning is retained by the runtime but not printed by this client. Output is marked by source;
+Matching current effect/tool results also display bounded file paths/snapshot IDs and command exit
+status. Arbitrary assistant prose, read content and historical replay are not promoted to verified
+receipts. Ask the agent to undo a displayed snapshot; normal approval and conflict checks still
+apply. Reasoning is retained by the runtime but not printed by this client. Output is marked by source;
 control characters and bidirectional formatting are escaped. This is a readline terminal client,
 not a full-screen TUI. No command is executed from model/file content.
 

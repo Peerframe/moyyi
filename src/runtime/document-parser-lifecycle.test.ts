@@ -18,9 +18,9 @@ vi.mock("node:child_process", async (original) => {
 vi.mock("./document-sandbox.ts", async (original) => {
   const actual = await original<typeof import("./document-sandbox.ts")>();
   return {
-    documentSandbox: (worker: string, scratch: string) => {
+    documentSandbox: async (worker: string, scratch: string) => {
       observation.scratch = scratch;
-      const plan = actual.documentSandbox(worker, scratch);
+      const plan = await actual.documentSandbox(worker, scratch);
       const args = [...plan.args];
       args.pop();
       // Fixed test worker proves a live process is stopped, including TERM resistance.

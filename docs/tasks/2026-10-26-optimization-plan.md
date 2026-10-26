@@ -63,9 +63,52 @@ PR #28 产品 `487ccfb4f434952a63a890582dec3651e0751e0d` 的
   此诊断不改变原题分数，也不支持往生产加入强制review框架。相关维护中公开方案已经查阅；
   当前先交付已证实有效的工具/入口，再用代表性任务推进准确性，避免同题循环。
 
-下一检查点是正常CLI的显式工作区写入、沙箱命令、网页origin和请求上限选项，以及可见snapshot/check回执。
-当前真实闭环通过可信私有验收host实现，普通用户仍需手写host才能开启，不能把这个可用性缺口掩盖成已完成。
-默认只读、逐次审批、Flash+Responses+low、零重试保持；不扩大现有题目的预算/判分，不公开发布。
+PR #28 的最后证据头 `947dc6e` 独立复核无阻断，
+[该头CI](https://github.com/Peerframe/moyyi/actions/runs/40349596700)成功后按授权合并；
+main为 `86dc4337ea117656595af3d999da42e462051af6`，
+[合并main CI](https://github.com/Peerframe/moyyi/actions/runs/40350509270)成功。
+
+### 日常CLI入口（当前候选）
+
+独立分支 `codex/daily-cli` 从最新main创建。正常CLI新增显式工作区写入、只读沙箱命令、
+当前Node工具链、精确网页origin/DNS和请求上限选项；默认host不变，自定义policy/既有capability冲突拒绝。
+`--allow-write`只开放有快照的文件工具，不把命令变为可写；命令模式进审批digest和执行重查。
+Node探针复用现有文档解析逻辑，只授权当前可执行文件、实际启动库及精确别名，不开放整个Homebrew。
+真实effect与tool_result匹配后才显示路径/snapshotId或命令退出回执，不把模型文字提升为验证证据。
+见[ADR0030](../decisions/0030-explicit-daily-cli-grants.md)及[CLI说明](../cli.md)。
+
+- 原 `npm run check`：类型、Biome、105文件/2287项全部通过；未改原阈值/并发/判分。
+- shell相关71项、文档47项、CLI回执36项、CLI参数31项、host授权4项通过（有重叠，不累加成独立总数）；
+  `eval:shell`7/7、`eval:documents`4/4通过真实原生沙箱/7格式。新增模式Linux行为仍待原CI。
+- `python3 scripts/verify-cli-pty.py` 6/6：原5项+真实主CLI使用startup grants，经TTY审批create、
+  只读Node检查（工作区写入/外部修改/继承canary拒绝）和按真实snapshot undo；目前是源码入口与合成模型。
+- 代码范围分工后相互复核无阻断；默认authority和零重试不变。当前产品修改无新增付费调用。
+  本机manager候选66项离线参数/execve/非交互/Key隔离检查通过，现已备份后应用。
+- [PR #29](https://github.com/Peerframe/moyyi/pull/29) 产品 `0a539c71c4898ede49b4a4c2959807adb6788563`
+  的[原Linux/macOS CI](https://github.com/Peerframe/moyyi/actions/runs/40353835298)成功。
+  `npm run verify:package -- --offline` 干净包及实际独立安装PTY6/6、CLI/client、文档/隔离/依赖图全部通过。
+  首次打包前漏暂存一份已测试的CLI集成测试，回执正确标dirty；该回执保留，补提交后重新干净验证，
+  不把dirty包冒充干净证据。两次产物相同，最终tar SHA为
+  `b57fd5e96730a0e53c1d5df67a1a2a63cc65fcf2789a219a03e7686881490554`。
+- 本机363文件匹配；备份为 `~/.moyyi/backups/pre-pr29-2026-10-26T15-58-35.624Z`，旧包保留。
+  生效manager已更新为经过66项测试的候选，host/模型/档位/默认权限不变；实际安装PTY6/6、
+  老DeepSeek会话resume/help/exit、metadata-only配置检查通过，这些步骤零付费/零Key值读取。
+- 2026-10-27正常 `moyyi-deepseek start` 真实任务：Flash+Responses+low，CLI明确8次上限，
+  实际记录5次预算attempt和5份assistant请求，无retry notice；只批准city.js编辑及
+  `node check.cjs`（只读Seatbelt、无网络）。打开时3/3监听器且能响应，dispose后0/0且静默；
+  同一引用注册/移除的修复代码独立检查正确。最后edit之后实际checker和完整1060字节/35行readback
+  均进入后续模型上下文；实际文件/快照/SQLite哈希一致，checker、其它输入、权限和外部canary未变。
+  此入口没有HTTP拦截，不声称抓到了HTTP200或实际wire。
+- 原私有runner在最终核对时错误假设默认全文read也有可选`lineRange`，保留其failed-no-replay账本和错误。
+  没有重跑live或增加请求；独立离线补验按两种既有read契约检查，严格逐字节（不trim换行）、元数据、
+  顺序、快照和context送达；显式range历史见证与6个篡改/截断反例也通过。补验结论是本次真实入口单例通过，
+  不改原冻结账本，不把运行结束当作成功。实际结果、完整报告及代码在
+  `~/.moyyi/acceptance/daily-cli-2026-10-26/live/supplemental-verification.json` 与 `review.md`。
+- live前还修复了私有PTY driver的无界TERM等待，实际忽略TERM进程组在7.1秒内被KILL并回收；
+  最终安装版离线预检5次scripted、拒绝checker修改/任意curl、正常edit/check/readback通过，之后才发唯一live。
+
+当前余下是本PR证据提交的CI和顺序合并。安装运行代码不随纯证据文档更新重复替换。
+复杂源码题的原失败继续保留；本次入口单例通过不建立广泛编码可靠率，也没有公开发布。
 
 私有证据仍放在 `~/.moyyi/acceptance/`：`regression-2026-10-26-daily`、
 `daily-work-2026-10-26`。保存真实请求/输出和失败记录，不提交凭据、会话或私人录制。

@@ -1,10 +1,11 @@
 import { spawn } from "node:child_process";
-import { existsSync } from "node:fs";
+import { existsSync, statSync } from "node:fs";
 import { link, mkdir, mkdtemp, readFile, realpath, rm, symlink, writeFile } from "node:fs/promises";
 import { createServer } from "node:net";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
+import { discoverNodeToolchain } from "./node-toolchain.ts";
 import { type NativeSandboxOptions, prepareNativeSandbox } from "./sandbox.ts";
 
 let base: string;
@@ -43,6 +44,41 @@ describe("native sandbox confinement", () => {
     expect(result).toEqual({ code: 0, signal: null, stdout: "hello", stderr: "" });
     expect(await readFile(join(workspace, "result"), "utf8")).toBe("hello");
     expect(await readFile(join(scratch, "cache"), "utf8")).toBe("scratch");
+  });
+
+  it("keeps read-only checks confined even beneath protected-file directory pins", async () => {
+    options = { ...options, workspaceAccess: "read-only" };
+    await mkdir(join(workspace, "nested"));
+    await writeFile(join(workspace, "nested/.env"), "PROTECTED_CANARY");
+    const file = join(workspace, "nested/source");
+    await writeFile(file, "ORIGINAL", { mode: 0o640 });
+    expect((await run('cat nested/source; printf CACHE > "$HOME/cache"')).stdout).toBe("ORIGINAL");
+    for (const command of [
+      "printf changed > nested/source",
+      "printf new > nested/new",
+      "rm nested/source",
+      "mv nested/source nested/moved",
+      "chmod 777 nested/source",
+      "mkdir nested/new-directory",
+      "/bin/sh -c 'printf child > nested/source'",
+      'ln nested/source "$HOME/alias" && printf changed > "$HOME/alias"',
+    ])
+      expect((await run(command)).code).not.toBe(0);
+    expect(await readFile(file, "utf8")).toBe("ORIGINAL");
+    expect(statSync(file).mode & 0o777).toBe(0o640);
+    expect(await readFile(join(scratch, "cache"), "utf8")).toBe("CACHE");
+    expect((await run("cat nested/.env")).stdout).not.toContain("PROTECTED_CANARY");
+    expect((await run(`cat ${quote(outside)}`)).stdout).not.toContain("OUTSIDE_CANARY");
+  });
+
+  it("runs the discovered Node toolchain with clean configuration and no workspace writes", async () => {
+    options = { ...options, workspaceAccess: "read-only", ...(await discoverNodeToolchain()) };
+    await writeFile(join(workspace, "source"), "SOURCE");
+    const script = `const fs=require('node:fs'); process.stdout.write(fs.readFileSync('source')); if(process.env.OPENSSL_CONF!=='/dev/null') throw Error('config'); fs.writeFileSync('source','changed')`;
+    const result = await run(`node -e ${quote(script)}`);
+    expect(result.stdout).toBe("SOURCE");
+    expect(result.code).not.toBe(0);
+    expect(await readFile(join(workspace, "source"), "utf8")).toBe("SOURCE");
   });
 
   it("denies reads and writes outside the workspace including symlink aliases", async () => {
@@ -128,6 +164,7 @@ describe("native sandbox confinement", () => {
       "HOME",
       "LANG",
       "LC_ALL",
+      "OPENSSL_CONF",
       "PATH",
       "PWD",
       "TMPDIR",
