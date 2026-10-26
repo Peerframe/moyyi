@@ -38,6 +38,8 @@ notice; its original record is not rewritten. This can limit the prefix eligible
 Run `npm run eval:long-sessions` for deterministic long-history compaction/resume/recompaction,
 real read-tool execution, and rejected summary cases. Tests additionally exercise cancellation,
 budget and real process-kill boundaries. These runs need no credential and make no network model
-call. They do not prove a real model preserves every fact; semantic quality and actual cache
-savings remain unmeasured. See [ADR 0014](decisions/0014-recovery-and-compaction.md) and
+call. They do not prove a real model preserves every fact. A separate live eight-turn/reopen/compact/
+reopen case preserved ten corrected facts, constraints and pending states; original history was
+retained and resume made no model request. This single case does not establish general fidelity
+or cache savings. See the [current evidence](tasks/2026-10-26-optimization-plan.md). See [ADR 0014](decisions/0014-recovery-and-compaction.md) and
 the [current handoff](tasks/2026-10-25-phase-4-long-sessions.md).

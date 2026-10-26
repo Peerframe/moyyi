@@ -152,27 +152,37 @@ export async function prepareNativeSandbox(
 
   const extraReads: string[] = [];
   const extraBins: string[] = [];
+  const loaderMetadata = new Set<string>();
   for (const [paths, executable] of [
     [options.executablePaths ?? [], true],
     [options.readOnlyPaths ?? [], false],
   ] as const) {
     for (const input of paths) {
       if (!isAbsolute(input)) throw Error("Sandbox toolchain grants must be absolute");
-      const path = await realpath(input);
+      const alias = resolve(input);
+      const path = await realpath(alias);
       const stat = await lstat(path);
       if ((!stat.isFile() && !stat.isDirectory()) || (executable && !stat.isFile()))
         throw Error("Sandbox toolchain grant is not a regular file or directory");
-      assertUnprotected(path);
-      if (protectedName(path)) throw Error("Sandbox toolchain path is protected");
-      if (
-        path === "/" ||
-        within(path, homedir()) ||
-        within(path, workspace) ||
-        within(path, scratch) ||
-        exclusions.some((excluded) => within(path, excluded) || within(excluded, path))
-      )
-        throw Error("Sandbox toolchain grant overlaps a private scope");
+      for (const candidate of new Set([alias, path])) {
+        assertUnprotected(candidate);
+        if (protectedName(candidate)) throw Error("Sandbox toolchain path is protected");
+        if (
+          candidate === "/" ||
+          within(candidate, homedir()) ||
+          within(candidate, workspace) ||
+          within(candidate, scratch) ||
+          exclusions.some((excluded) => within(candidate, excluded) || within(excluded, candidate))
+        )
+          throw Error("Sandbox toolchain grant overlaps a private scope");
+      }
       extraReads.push(path);
+      // dyld may inspect a host-selected compatibility symlink before opening its real target.
+      // Preserve only that path's metadata; data grants remain pinned to the validated target.
+      if (alias !== path) {
+        for (let current = alias; current !== "/"; current = dirname(current))
+          loaderMetadata.add(current);
+      }
       if (stat.isDirectory()) await inspect(path, 0);
       else if (stat.nlink !== 1) throw Error("Sandbox toolchain contains a hard-link alias");
       if (executable) {
@@ -212,6 +222,9 @@ export async function prepareNativeSandbox(
       `(allow sysctl-read ${["hw.activecpu", "hw.memsize", "hw.pagesize", "hw.pagesize_compat", "hw.ncpu", "hw.cputype", "kern.osrelease", "kern.ostype", "kern.osversion", "kern.hostname", "kern.maxfilesperproc", "sysctl.proc_cputype"].map((name) => `(sysctl-name ${quote(name)})`).join(" ")})`,
       // Directory inodes are required by the loader/getcwd, without granting descendant data.
       `(allow file-read* ${literal([...ancestors])})`,
+      ...(loaderMetadata.size
+        ? [`(allow file-read-metadata ${literal([...loaderMetadata])})`]
+        : []),
       `(allow file-read* ${filters(reads)})`,
       `(allow file-read* file-write* ${filters([workspace, scratch])})`,
       '(allow file-read* (literal "/dev/null") (literal "/dev/random") (literal "/dev/urandom"))',

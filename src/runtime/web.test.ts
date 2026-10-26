@@ -15,6 +15,8 @@ import type {
   WebRequest,
   WorkspaceWriteScope,
 } from "../contracts/index.ts";
+import { createCliRuntime } from "./cli-host.ts";
+import { createRuntime, type RuntimeOptions } from "./index.ts";
 import { NodeWebAccess, type WebAccessOptions } from "./web.ts";
 import type { WebHttpDependencies } from "./web-http.ts";
 
@@ -97,6 +99,69 @@ function setup(
 }
 
 describe("web capability", () => {
+  it.each([null, false, "cloudflare", "https://resolver.example.com", {}, () => []])(
+    "rejects unsupported DNS configuration before runtime or CLI startup %#",
+    async (dns) => {
+      const web = { allowedOrigins: [], dns } as unknown as WebAccessOptions;
+      expect(() => new NodeWebAccess(web)).toThrow("Web DNS must be");
+      await expect(createRuntime({ web })).rejects.toThrow("Web DNS must be");
+      await expect(
+        createCliRuntime({
+          demo: false,
+          host: { web } as RuntimeOptions,
+          dataDirectory: "/unused",
+          approveReads: false,
+        }),
+      ).rejects.toThrow("Web DNS must be");
+    },
+  );
+
+  it("uses DoH only for the approved immutable hostname after durable start; configuration grants no origins", async () => {
+    const dnsWire = transport(
+      JSON.stringify({
+        Status: 0,
+        TC: false,
+        Question: [{ name: "site.example.com", type: 1 }],
+        Answer: [{ name: "site.example.com", type: 1, TTL: 60, data: "93.184.216.34" }],
+      }),
+      { "content-type": "application/dns-json" },
+    );
+    const targetWire = transport();
+    const send = vi.fn<NonNullable<WebHttpDependencies["request"]>>((options, receive) =>
+      (options.hostname === "cloudflare-dns.com" ? dnsWire : targetWire).dependencies.request(
+        options,
+        receive,
+      ),
+    );
+    const options: Partial<WebAccessOptions> = { dns: "cloudflare-doh" };
+    const t = setup(options, { request: send });
+    const prepared = await t.prepare({
+      kind: "fetch",
+      url: "https://site.example.com/approved?private=value",
+    });
+    await expect(t.prepare({ kind: "fetch", url: "https://cloudflare-dns.com/" })).rejects.toThrow(
+      "outside",
+    );
+    await expect(t.prepare({ kind: "fetch", url: "https://other.example.com/" })).rejects.toThrow(
+      "outside",
+    );
+    const scope = t.scope(prepared);
+    await expect(
+      t.factory.create(t.context, t.guard, { ...scope, phase: "prepare" }).execute(),
+    ).rejects.toThrow("durable started");
+    expect(send).not.toHaveBeenCalled();
+    const cap = t.factory.create(t.context, t.guard, scope);
+    if (prepared.kind !== "fetch") throw Error("fixture");
+    // Mutation of the caller's host configuration or payload cannot change the selected route.
+    Object.assign(options, { dns: "system" });
+    expect((await cap.execute()).url).toBe("https://site.example.com/approved?private=value");
+    expect(dnsWire.requests[0]?.path).toBe("/dns-query?name=site.example.com&type=A");
+    expect(targetWire.requests[0]?.hostname).toBe("site.example.com");
+    expect(send).toHaveBeenCalledTimes(2);
+    await expect(cap.execute()).rejects.toThrow("single approved");
+    expect(send).toHaveBeenCalledTimes(2);
+  });
+
   it("prepares without DNS or I/O and executes exactly the approved canonical URL once", async () => {
     const wire = transport();
     const t = setup({}, wire.dependencies);
