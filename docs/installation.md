@@ -29,8 +29,8 @@ npm run verify:package
 
 `verify:package` creates a clean compiled npm tarball, validates its complete file list, installs
 that exact file into disposable local and global-prefix consumers outside the repository, and
-runs CLI, terminal, public-client and TypeScript checks, seven-format document reads, native
-parser isolation probes and exact parser dependency checks. Install scripts are disabled; npm may fetch
+runs CLI, terminal, public-client and TypeScript checks, seven-format document reads, a scripted
+document-to-report write/readback workflow, native parser isolation probes and exact parser dependency checks. Install scripts are disabled; npm may fetch
 the pinned production dependencies and their transitive dependencies from the public registry.
 The acceptance programs make no model or web requests. Existing user/global installations and data
 are untouched. Python 3 is needed for the existing POSIX terminal acceptance script; it is not a
