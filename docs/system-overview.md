@@ -25,13 +25,13 @@ constraints. OCR, demand-driven MCP/GUI/memory and model training stay deferred.
 
 ## Version and evidence coordinates
 
-Audited on **2026-10-26**. These are evidence snapshots, not moving branch guarantees; check Git
+Audited on **2026-10-27**. These are evidence snapshots, not moving branch guarantees; check Git
 and the referenced PR before changing code. No current authorization is inferred from old records.
 
 | Coordinate | Audited state | What it means |
 |---|---|---|
-| Merged product baseline | `86dc4337ea117656595af3d999da42e462051af6`, through [PR #28](https://github.com/Peerframe/moyyi/pull/28) | Independent review found no blocker; fixed-head CI and [merged main CI](https://github.com/Peerframe/moyyi/actions/runs/40350509270) passed. Includes seven-format document reading and prior navigation. |
-| Current candidate | [PR #29](https://github.com/Peerframe/moyyi/pull/29), product `0a539c71c4898ede49b4a4c2959807adb6788563` | Explicit per-workspace CLI grants, readonly command mode, exact Node toolchain and visible effect receipts; [ADR 0030](decisions/0030-explicit-daily-cli-grants.md). Original check passes 2,287 tests; [Linux/macOS CI](https://github.com/Peerframe/moyyi/actions/runs/40353835298), clean package and actual installed PTY passed. |
+| Merged product baseline | `448fb2a246d327f45a1329dc920eb7c473e59ee0`, through [PR #29](https://github.com/Peerframe/moyyi/pull/29) | Independent review found no blocker; final-head CI and [merged main CI](https://github.com/Peerframe/moyyi/actions/runs/40359647505) passed. The first main macOS job acquired no runner and was cancelled before any steps; a job-only rerun passed without changing the head or workflow. |
+| Installed product source | [PR #29](https://github.com/Peerframe/moyyi/pull/29), product `0a539c71c4898ede49b4a4c2959807adb6788563` | Explicit per-workspace CLI grants, readonly command mode, exact Node toolchain and visible effect receipts; [ADR 0030](decisions/0030-explicit-daily-cli-grants.md). Original check passes 2,287 tests; [Linux/macOS CI](https://github.com/Peerframe/moyyi/actions/runs/40353835298), clean package and actual installed PTY passed. Packaged inputs match merged main; later evidence-only documents require no reinstall. |
 | Current local installation | Product `0a539c7`; tar SHA256 `b57fd5e96730a0e53c1d5df67a1a2a63cc65fcf2789a219a03e7686881490554` | 363 files match. CLI/client/PTY, documents/isolation and dependency graph passed. Reviewed local launcher supports explicit daily flags; existing-session resume/help/exit passed without model calls. Backup and previous package retained. Host remains Flash + Responses + low, default read-only/max3/zero-retry. |
 | Prior installed baseline | Product `69312969533659578cc1da21b510d8395a099ef3`; tar SHA256 `12b2aee9c116e432ab23780c32c793adc094708995dc7d7f393a1ac1fe3774a5` | 244-file identity and CLI/client/PTY/offline navigation evidence remain valid for this prior package. The document upgrade has its own acceptance receipt and backup in the [optimization plan](tasks/2026-10-26-optimization-plan.md). Flash + Responses + low, daily read-only/max3/zero-retry settings are retained. |
 | Document live acceptance | Installed `e64fa0e`; 2026-10-26, Flash + Responses + low | Both fixed tasks passed their unchanged checkers once: actual comparison/report files, seven facts/hashes/quotes, approved total CNY 5,500, readback and unchanged inputs. Eight HTTP 200 requests, zero retries; each attempted shell once and was denied before using controlled create/read. [Evidence and limits](tasks/2026-10-26-optimization-plan.md#文档真实任务验收2026-10-26). |
@@ -40,12 +40,14 @@ and the referenced PR before changing code. No current authorization is inferred
 | Real edit/check/undo acceptance | Installed `487ccfb`, native sandbox | Public listener-leak fixture repaired and checked, then both snapshots undone in reverse order. Original bytes/mode and original failure restored; checker and outside canary unchanged. Eight HTTP200 requests, zero retries. |
 | Real web report acceptance | Installed `487ccfb`, explicit DoH | Actual full RFC8259 fetched, report created and read back in four requests; required five facts correct. Two incidental unsupported claims needed human review and a separate four-request revision. Revised bytes independently checked; the model omitted revision readback, so that later workflow is not marked fully passed. |
 | Real everyday launcher acceptance | Installed `0a539c7`, actual `moyyi-deepseek start` | Five recorded model attempts, no retry notice; approved edit, readonly native Node checker and exact 1,060-byte readback passed. Whole-file read legitimately omits optional range metadata; an offline supplemental verifier retained the runner failure and checked the original file/results/next context without new calls. No HTTP wire/status capture or general reliability claim. |
+| Additional public task sample | Installed `0a539c7`, 2026-10-27, unchanged four tasks and original per-task limits | 16 HTTP200 requests, zero retries. Lifecycle analysis, release evidence audit and website copy/injection tasks passed. Exact release-note transformation omitted one public record and failed despite complete source and output readback. Protected inputs remained unchanged and all separate evidence audits passed. A five-request command-capability control produced a correct first draft but both attempted checks failed; it does not establish a verification fix. |
 | Public release | None | Local candidate installation is not npm/GitHub publication or a release tag. |
 
 The merged public corpus has 32 tasks. Two new fixed document tasks are prepared as a separate
 acceptance group; they do not change the original task selection or rubrics. Reference/checker tests and scripted
 conformance are not real-model corpus results. No same-model, same-budget comparison with a mature
-harness has been executed. Earlier full-source and model/effort diagnostics are recorded in
+harness has been executed; a [bounded offline feasibility probe](research/harness-comparison.md#bounded-feasibility-check-2026-10-27)
+stopped before any model request. Earlier full-source and model/effort diagnostics are recorded in
 [PR #25's fixed evidence record](https://github.com/Peerframe/moyyi/blob/650a00b06bcabc308d9cebeffc0e037658eb6457/docs/decisions/0022-evidence-guidance-and-focused-reads.md)
 and [reasoning record](https://github.com/Peerframe/moyyi/blob/650a00b06bcabc308d9cebeffc0e037658eb6457/docs/tasks/2026-10-26-configurable-reasoning.md).
 Do not repeat those experiments merely because a new contributor has not read them.
@@ -165,27 +167,33 @@ verifier, mandatory subagents, full-repository graph or larger request allowance
 ## Next bounded delivery and decision rules
 
 The owner authorized ongoing work, necessary paid validation and sequential merging/installation
-only after review and passing CI. PR #28 is merged and closes the measured DNS/native-loader
-obstacles with installed live evidence. The current independent candidate makes grants usable from
-the normal CLI and has installed/live evidence, preserving default read-only operation and
-per-effect approval. Complete its final evidence review/CI integration before the next branch. The original source rubric and
-historical failures remain evidence; they do not justify reopening every accepted architecture choice.
+only after review and passing CI. PRs #28 and #29 are merged, closing the measured DNS/native-loader
+obstacles and making grants usable from the normal CLI. Installed/live evidence preserves default
+read-only operation and per-effect approval. The current independent candidate fixes the concrete
+command-entry gaps exposed by a bounded verification comparison: private heredoc scratch, Node
+stdin OS identification and model-visible host toolchain/mode information; see
+[ADR 0031](decisions/0031-confined-command-verification.md). The original source rubric
+and historical failures remain evidence; they do not justify reopening every accepted architecture choice.
 
 | Order | Deliverable | Acceptance boundary |
 |---|---|---|
-| 0 — closed | Review and merge #25–#28, retain evidence | Fixed-head reviews and CI passed; merged main CI passed. |
+| 0 — closed | Review and merge #25–#29, retain evidence | Fixed-head reviews and CI passed; merged main CI passed, including the recorded infrastructure-only macOS rerun. |
 | 1 — merged and installed | Read PDF, DOCX, XLSX, PPTX, ODT, ODS, ODP with source/hash/range/coverage | Real native parsing and denial, limits, cancellation/revocation; offline check and actual external installed-package gates on macOS/Linux. No OCR/layout/formula claim. |
-| 2 — partially verified | Original regression and new document comparison/report tasks | Document comparison/report and public source report pass once; original Skills explanation remains failed. Original rubrics and 4+4 comparison envelopes unchanged; zero retries, Flash/Responses/low. |
-| 3 — current | Daily editing/undo, long-session recovery, actual web reading | Installed bounded trials completed; edit/undo and ten long-session facts passed. Web core facts passed with incidental claims repaired after review. Explicit CLI grants and receipts are installed; one actual launcher repair/check/full-readback task passed after correcting a private verifier assumption offline. |
+| 2 — partially verified | Original regression, document tasks and representative public tasks | Document comparison/report and public source report pass once; original Skills explanation remains failed. A separate unchanged four-task sample passed three; exact release-note transformation missed a public record despite complete evidence. Original rubrics and 4+4 comparison envelopes remain unchanged. |
+| 3 — delivered | Daily editing/undo, long-session recovery, actual web reading | Installed bounded trials completed; edit/undo and ten long-session facts passed. Web core facts passed with incidental claims repaired after review. Explicit CLI grants and receipts are installed; one actual launcher repair/check/full-readback task passed after correcting a private verifier assumption offline. |
 | 4 — deferred | OCR; demand-driven MCP, GUI and long-term memory | Separate decisions and work. Qwen/shasha training is also deferred. |
 
 If the required evidence reaches the model but conclusions are wrong, isolate interpretation and
 answer construction rather than automatically expanding retrieval or requests. Normal completion,
 a written report or a passing document task cannot erase an original task failure. An independent one-review diagnostic consumed its entire 8,192-output-token ceiling in reasoning
 and produced no answer; it stopped after one request. It provides no evidence for adding a
-mandatory review loop. Keep the failed original score and prioritize the usable entry point. Once
-this slice's offline and installed gates pass, finish the PR and installation; do not expand unrelated
-mechanisms. Future paid calls, merges and publication require their applicable authorization.
+mandatory review loop. The public release-note failure also retained ten unused requests: complete
+readback did not reveal an omitted source record to the model. The single readonly-command control
+created the correct first draft but did not execute a successful comparison. Fix the observed
+environment/description defects, then verify actual command results on the installed candidate
+under the original task limits. Preserve both configurations and the failed baseline; do not call
+a capability comparison a fix to all interpretation errors. Further work must follow new evidence,
+not repeated same-task prompt changes. Public release still requires separate authorization.
 
 OpenBot reuse follows the [provenance record](openbot-provenance.md): selected parsing technology
 and failure experience are adapted to moyyi's own ports. No Server authority, attachment service,

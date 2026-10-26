@@ -90,5 +90,7 @@ jobs:
         run: npm ci --ignore-scripts
       - name: Native document conformance
         run: npm run eval:documents
+      - name: Native shell conformance
+        run: npm run eval:shell
       - name: Installable candidate and native document containment
         run: npm run verify:package

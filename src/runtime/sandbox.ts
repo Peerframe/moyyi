@@ -204,6 +204,7 @@ export async function prepareNativeSandbox(
     LC_ALL: "C",
     PWD: cwd,
     OPENSSL_CONF: "/dev/null",
+    ...(process.platform === "darwin" ? { TMPPREFIX: resolve(scratch, "sh") } : {}),
   });
   if (process.platform === "darwin") {
     await access("/usr/bin/sandbox-exec", constants.X_OK);
@@ -223,8 +224,9 @@ export async function prepareNativeSandbox(
       "(allow process-fork process-exec)",
       "(allow signal (target same-sandbox))",
       "(allow process-info* (target same-sandbox))",
-      // No kern.proc/argv/environment sysctls: hardware and OS identity are sufficient here.
-      `(allow sysctl-read ${["hw.activecpu", "hw.memsize", "hw.pagesize", "hw.pagesize_compat", "hw.ncpu", "hw.cputype", "kern.osrelease", "kern.ostype", "kern.osversion", "kern.hostname", "kern.maxfilesperproc", "sysctl.proc_cputype"].map((name) => `(sysctl-name ${quote(name)})`).join(" ")})`,
+      // uname also reads hw.machine/kern.version; Node stdin initialization depends on it.
+      // No kern.proc/argv/environment sysctls: only exact hardware and OS identity keys.
+      `(allow sysctl-read ${["hw.activecpu", "hw.machine", "hw.memsize", "hw.pagesize", "hw.pagesize_compat", "hw.ncpu", "hw.cputype", "kern.osrelease", "kern.ostype", "kern.osversion", "kern.version", "kern.hostname", "kern.maxfilesperproc", "sysctl.proc_cputype"].map((name) => `(sysctl-name ${quote(name)})`).join(" ")})`,
       // Directory inodes are required by the loader/getcwd, without granting descendant data.
       `(allow file-read* ${literal([...ancestors])})`,
       ...(loaderMetadata.size
@@ -245,7 +247,9 @@ export async function prepareNativeSandbox(
     ].join("\n");
     return {
       command: "/usr/bin/sandbox-exec",
-      args: ["-p", profile, "/bin/sh", "-c", options.commandText],
+      // Apple's Bash 3.2 heredocs ignore TMPDIR. Zsh's sh emulation uses the existing
+      // scratch grant via TMPPREFIX; -f and the clean environment exclude startup hooks.
+      args: ["-p", profile, "/bin/zsh", "--emulate", "sh", "-f", "-c", options.commandText],
       env,
       backend: "seatbelt",
     };

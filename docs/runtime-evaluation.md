@@ -1,6 +1,6 @@
 # Runtime task evaluation
 
-`npm run eval` defaults to the null baseline and the public 30-task corpus. It does not discover
+`npm run eval` defaults to the null baseline and the public 32-task corpus. It does not discover
 a model, environment key, saved CLI host, or private corpus. The `moyyi` adapter runs the real
 runtime, default/project instructions, SQLite sessions, policies and tools. It supplies only each
 user instruction, previous conversation and the disposable workspace; it never receives the task
@@ -121,7 +121,7 @@ the exact checkout, host configuration, OS/toolchain and provider settings requi
 | `shell` | Requires the existing supported OS sandbox and an explicitly available read-only Node/toolchain for coding checks. No network installation of missing tools or packages. |
 | Git history | `.git` remains protected even with shell. `git-history-ci-repair` cannot inspect the required history with this adapter. Report this restriction separately from model performance. |
 | Web/browser | No web or browser grant in this adapter. Existing research inputs are offline fixtures; live browsing is not claimed. |
-| Documents | Seven formats use the native parser under ordinary reads. Fixed comparison/report tasks are prepared separately below; no real-model pass is claimed. |
+| Documents | Seven formats use the native parser under ordinary reads. Two separate fixed document tasks passed once on the installed runtime, as recorded below; this is not a corpus reliability result. |
 
 The adapter never selects a weaker permission profile or marks an unsupported task passed. No
 capability classifier is inferred from hidden task fields. Before a live comparison, record the
@@ -129,6 +129,14 @@ chosen capabilities and known unsupported cases; retain full per-task results an
 these limitations as model failures. No real-model corpus score or baseline comparison is available
 from this offline delivery. Private tasks require explicit `--include-private` and separate
 permission for their content; they were not read during implementation or checks.
+
+The 2026-10-27 four-task installed-runtime sample is recorded in the
+[current delivery record](tasks/2026-10-26-optimization-plan.md#跨题准确性与确定性核对2026-10-27).
+It used the public `createRuntime` entry with the daily host's enabled workspace navigation;
+it did **not** run this source adapter, which currently has no workspace-navigation option.
+Lifecycle, release-audit and website-copy tasks passed; exact release-note transformation failed.
+Their 16 HTTP requests, static checker verdicts and independent file/SQLite/wire audits remain
+separate from the original Skills regression and the unexecuted full-corpus comparison.
 
 ## Prepared document acceptance group
 

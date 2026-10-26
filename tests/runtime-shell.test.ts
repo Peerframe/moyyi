@@ -12,6 +12,7 @@ import {
 import { scriptedProfile, scriptedProvider } from "../src/plugins/provider-scripted/index.ts";
 import { WorkspaceProcessPolicy } from "../src/policy/index.ts";
 import { createRuntime, type RuntimeOptions } from "../src/runtime/index.ts";
+import { discoverNodeToolchain } from "../src/runtime/node-toolchain.ts";
 import { SqliteSessionStore } from "../src/store/index.ts";
 
 const cleanups: (() => Promise<void>)[] = [];
@@ -30,6 +31,7 @@ async function harness(
     workspaceProcesses: { roots: [root] },
   }),
   timeoutMs = 3000,
+  afterCreate?: (root: string) => void,
 ) {
   const directory = mkdtempSync(join(tmpdir(), "moyyi-shell-integration-"));
   const root = join(directory, "workspace");
@@ -63,6 +65,7 @@ async function harness(
     ...configure(root),
   };
   let runtime = await createRuntime(options);
+  afterCreate?.(root);
   const events: RuntimeEvent[] = [];
   runtime.subscribe((e) => events.push(e));
   await runtime.send({ type: "session.create", workspaceRoot: root });
@@ -124,6 +127,104 @@ async function harness(
 }
 
 describe("sandboxed shell through the real runtime", () => {
+  it.each([false, true])(
+    "describes the actual configured command access (grant: %s)",
+    async (grant) => {
+      const h = await harness("printf fixture", (root) =>
+        grant ? { workspaceProcesses: { roots: [root] } } : {},
+      );
+      h.approve();
+      await h.start();
+      const s = await h.finish();
+      const description = h.provider.client.requests[0]?.tools.find(
+        (tool) => tool.name === "shell",
+      )?.description;
+      expect(description).toContain(grant ? "read-write" : "unconfigured");
+      expect(description).toContain(process.platform === "darwin" ? "/bin/zsh" : "/bin/sh");
+      if (process.platform === "darwin") expect(description).toMatch(/sh emulation/iu);
+      expect(description).not.toContain(h.root);
+      expect(s.results[0]?.status).toBe(grant ? "succeeded" : "denied");
+    },
+  );
+  it("keeps the described Node grant and read-only execution bound to the creation snapshot", async () => {
+    const toolchain = await discoverNodeToolchain();
+    let grant:
+      | {
+          roots: string[];
+          executablePaths: string[];
+          readOnlyPaths: string[];
+          workspaceAccess: "read-only" | "read-write";
+        }
+      | undefined;
+    const h = await harness(
+      `node -e 'const fs = require("node:fs");
+const blocked = operation => { try { operation(); return false; } catch { return true; } };
+console.log(JSON.stringify({
+  workspaceWriteDenied: blocked(() => fs.writeFileSync("result", "bad")),
+  outsideReadDenied: blocked(() => fs.readFileSync("../outside"))
+}));'`,
+      (root) => {
+        grant = {
+          roots: [root],
+          executablePaths: [...toolchain.executablePaths],
+          readOnlyPaths: [...toolchain.readOnlyPaths],
+          workspaceAccess: "read-only",
+        };
+        return { workspaceProcesses: grant };
+      },
+      5000,
+      (root) => {
+        if (!grant) throw Error("Missing caller-owned grant");
+        grant.workspaceAccess = "read-write";
+        grant.roots.splice(0, grant.roots.length, join(root, ".."));
+        grant.executablePaths.splice(0, grant.executablePaths.length, "/usr/bin/false");
+        grant.readOnlyPaths.splice(0, grant.readOnlyPaths.length, join(root, "..", "outside"));
+      },
+    );
+    h.approve();
+    await h.start();
+    const s = await h.finish();
+    const description = h.provider.client.requests[0]?.tools.find(
+      (tool) => tool.name === "shell",
+    )?.description;
+    expect(description).toContain("read-only");
+    expect(description).toMatch(/\bnode\b/u);
+    expect(description).not.toContain("read-write");
+    expect(description).not.toContain("false");
+    for (const path of [h.root, ...toolchain.executablePaths, ...toolchain.readOnlyPaths])
+      expect(description).not.toContain(path);
+    expect(s.results[0]?.status).toBe("succeeded");
+    const content = s.results[0]?.content[0];
+    if (content?.type !== "text") throw Error("Missing command result");
+    const receipt = JSON.parse(content.text);
+    expect(receipt.exitCode).toBe(0);
+    expect(JSON.parse(receipt.output)).toEqual({
+      workspaceWriteDenied: true,
+      outsideReadDenied: true,
+    });
+    expect(existsSync(join(h.root, "result"))).toBe(false);
+    expect(readFileSync(join(h.directory, "outside"), "utf8")).toBe("OUTSIDE_CANARY");
+  });
+  it("still applies a denying policy when the description advertises a Node command grant", async () => {
+    const toolchain = await discoverNodeToolchain();
+    const h = await harness("node -e 'process.stdout.write(\"must not run\")'", (root) => ({
+      workspaceProcesses: { roots: [root], workspaceAccess: "read-only", ...toolchain },
+      policy: {
+        beforePrepare: () => ({ kind: "deny" as const, reason: "Synthetic policy denial" }),
+        beforeExecute: () => ({ kind: "deny" as const, reason: "Synthetic policy denial" }),
+      },
+    }));
+    await h.start();
+    const s = await h.finish();
+    const description = h.provider.client.requests[0]?.tools.find(
+      (tool) => tool.name === "shell",
+    )?.description;
+    expect(description).toContain("read-only");
+    expect(description).toMatch(/\bnode\b/u);
+    expect(s.results[0]?.status).toBe("denied");
+    expect(s.effects).toEqual([]);
+    expect(h.events.some((event) => event.type === "approval.requested")).toBe(false);
+  });
   it("binds exact command approval and durably records start before command effects", async () => {
     const h = await harness("printf completed > result; printf output");
     h.approve((e) => {

@@ -1,6 +1,6 @@
 import { createHash, randomUUID } from "node:crypto";
 import { lstatSync, realpathSync } from "node:fs";
-import { isAbsolute } from "node:path";
+import { basename, isAbsolute } from "node:path";
 import { setTimeout as delay } from "node:timers/promises";
 import { MinimalContextBuilder } from "../context/index.ts";
 import {
@@ -41,7 +41,7 @@ import {
   deepSeekApiProfile,
   resolveDeepSeekReasoningEffort,
 } from "../plugins/provider-deepseek/index.ts";
-import { shellPlugin } from "../plugins/shell/index.ts";
+import { createShellPlugin } from "../plugins/shell/index.ts";
 import { skillsPlugin } from "../plugins/skills/index.ts";
 import { createWebPlugin } from "../plugins/web/index.ts";
 import { workspaceNavigationPlugin } from "../plugins/workspace-navigation/index.ts";
@@ -179,6 +179,15 @@ export async function createRuntime(
   if (options.workspaceNavigation !== undefined && typeof options.workspaceNavigation !== "boolean")
     throw Error("Workspace navigation must be a boolean");
   const workspaceNavigation = options.workspaceNavigation === true;
+  // Capture guidance and execution grants together before asynchronous plugin setup/reloads.
+  const workspaceProcesses = options.workspaceProcesses
+    ? {
+        ...options.workspaceProcesses,
+        roots: [...options.workspaceProcesses.roots],
+        executablePaths: [...(options.workspaceProcesses.executablePaths ?? [])],
+        readOnlyPaths: [...(options.workspaceProcesses.readOnlyPaths ?? [])],
+      }
+    : undefined;
   const model = options.model ? { ...options.model } : undefined;
   const deepseekReasoningEffort = resolveDeepSeekReasoningEffort(options.deepseekReasoningEffort);
   if (options.deepseekReasoningEffort !== undefined && model?.provider !== "deepseek")
@@ -252,10 +261,10 @@ export async function createRuntime(
   const filePolicy = options.workspaceWrites
     ? new WorkspaceWritePolicy({ approval: options.workspaceWrites.approval ?? "ask" })
     : new ReadOnlyPolicy();
-  const localPolicy = options.workspaceProcesses
+  const localPolicy = workspaceProcesses
     ? new WorkspaceProcessPolicy({
         files: filePolicy,
-        approval: options.workspaceProcesses.approval ?? "ask",
+        approval: workspaceProcesses.approval ?? "ask",
       })
     : filePolicy;
   const base =
@@ -285,7 +294,18 @@ export async function createRuntime(
     ...(workspaceNavigation ? [{ plugin: workspaceNavigationPlugin }] : []),
     { plugin: fsPlugin },
     ...(documentsEnabled ? [{ plugin: documentsPlugin }] : []),
-    { plugin: shellPlugin },
+    {
+      plugin: createShellPlugin({
+        workspaceAccess: workspaceProcesses
+          ? (workspaceProcesses.workspaceAccess ?? "read-write")
+          : "unconfigured",
+        interpreter: process.platform === "darwin" ? "zsh-sh" : "sh",
+        executableNames: (workspaceProcesses?.executablePaths ?? []).map((path) => {
+          if (!isAbsolute(path)) throw Error("Shell executable grants must be absolute");
+          return basename(realpathSync(path));
+        }),
+      }),
+    },
     { plugin: createWebPlugin(options.web?.search?.origin) },
     ...(anthropic ? [{ plugin: anthropic }] : []),
     ...(deepseek ? [{ plugin: deepseek }] : []),
@@ -459,8 +479,8 @@ export async function createRuntime(
     const writes = writeRoots
       ? new NodeWorkspaceWrites(store as SqliteSessionStore, excluded)
       : undefined;
-    const processes = options.workspaceProcesses
-      ? new NodeWorkspaceProcesses({ ...options.workspaceProcesses, protectedPaths: excluded })
+    const processes = workspaceProcesses
+      ? new NodeWorkspaceProcesses({ ...workspaceProcesses, protectedPaths: excluded })
       : undefined;
     const files = new NodeWorkspaceFiles(excluded);
     const documents = documentsEnabled ? new NodeWorkspaceDocuments(files) : undefined;

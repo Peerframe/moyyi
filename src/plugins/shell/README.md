@@ -5,6 +5,15 @@ optional workspace-relative `cwd` (default `.`), and `timeoutMs` (default 30 sec
 120 seconds). The runtime supplies the OS sandbox, explicit root grant and clean environment.
 It never accepts a model-selected shell executable, environment, network grant or backend.
 
+Runtime uses `createShellPlugin` to describe its captured process configuration in the tool
+definition: configured/unconfigured command access, workspace mode, platform interpreter and a
+bounded list of host-selected executable names. Only safe basenames are presented, never host
+paths or inherited environment. The description does not discover other tools, grant permission
+or promise that a command will launch. Runtime checks the actual capability, approval and current
+preconditions on every invocation. The same captured grants supply guidance and execution.
+An unconfigured host is described as unavailable; additional toolchain selection does not imply
+Python, packages or a general developer installation.
+
 The host must opt in using `workspaceProcesses`; file-write grants do not enable commands.
 The executor owns validation, exact approval, lease, durable journal and capability lifetime.
 No command runs during preparation. Execution receives no replacement command arguments.

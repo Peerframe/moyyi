@@ -19,7 +19,9 @@ reading files, then received the reserved fourth no-tool request before writing 
 
 ## Primary sources reviewed
 
-- OpenCode `v1.19.4`, commit `c0c7bae726798d02592f8d3305891ba2f0cd880a`, MIT:
+- OpenCode source snapshot `c0c7bae726798d02592f8d3305891ba2f0cd880a`, MIT
+  (the original inspected source, not the `v1.19.4` release commit; see the
+  [2026-10-27 coordinate correction](../research/2026-10-26-agent-navigation.md#reviewed-sources)):
   [read presentation and continuation](https://github.com/anomalyco/opencode/blob/c0c7bae726798d02592f8d3305891ba2f0cd880a/packages/opencode/src/tool/read.ts#L338-L372)
   separate numbered source from metadata;
   [tests](https://github.com/anomalyco/opencode/blob/c0c7bae726798d02592f8d3305891ba2f0cd880a/packages/opencode/test/tool/read.test.ts#L315-L435)

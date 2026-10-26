@@ -11,13 +11,20 @@ deterministic probes and real-model behavior are separate evidence classes.
 | Project | Pinned source | License and scope |
 |---|---|---|
 | Codex | [`970111f6cb62cc02fe36a82ea7d71b37a2889c97`](https://github.com/openai/codex/tree/970111f6cb62cc02fe36a82ea7d71b37a2889c97) | Apache-2.0; reviewed main commit, not asserted to be a release |
-| OpenCode | [`v1.19.4`, `c0c7bae726798d02592f8d3305891ba2f0cd880a`](https://github.com/anomalyco/opencode/releases/tag/v1.19.4) | MIT; released 2026-10-22; inspect both core and legacy tool paths rather than assume they are equivalent |
+| OpenCode | [Source snapshot `c0c7bae726798d02592f8d3305891ba2f0cd880a`](https://github.com/anomalyco/opencode/tree/c0c7bae726798d02592f8d3305891ba2f0cd880a) | MIT; inspect both core and legacy tool paths rather than assume they are equivalent |
 | Aider | [`5dc9490bb35f9729ef2c95d00a19ccd30c26339c`](https://github.com/Aider-AI/aider/tree/5dc9490bb35f9729ef2c95d00a19ccd30c26339c) | Apache-2.0; tree-sitter query sources have their own notices |
 | SWE-agent | [`3ea751c087f32b16e039a2233dd6eefecef325d5`](https://github.com/SWE-agent/SWE-agent/tree/3ea751c087f32b16e039a2233dd6eefecef325d5) | MIT; ACI source and representative tests |
 | mini-SWE-agent | [`04d809ceab9df28f9adaed044884180159172930`](https://github.com/SWE-agent/mini-swe-agent/tree/04d809ceab9df28f9adaed044884180159172930) | MIT; loop, limits and completion mechanism |
 
 These are reviewed versions, not new moyyi dependencies. No upstream source or prompt was copied
 or substantially adapted into the product. Private review copies retain their licenses.
+
+Version-coordinate correction (2026-10-27): this record originally associated snapshot
+`c0c7bae726798d02592f8d3305891ba2f0cd880a` with `v1.19.4`. The
+[official tag](https://api.github.com/repos/anomalyco/opencode/git/ref/tags/v1.19.4) resolves to
+`148842ef7cb1bc34192b3fff57d0f9721ab9c801`. Original source links remain unchanged to preserve
+the inspected snapshot. This corrects release attribution only; it does not establish identical
+behavior across the two commits or add execution evidence.
 
 ## Concrete mechanisms and their limits
 
@@ -40,7 +47,7 @@ with glob selection and concise file/line output. The
 includes validation details; [truncated output](https://github.com/anomalyco/opencode/blob/c0c7bae726798d02592f8d3305891ba2f0cd880a/packages/opencode/src/tool/truncate.ts#L124-L140)
 provides a way to continue reading. Its [LSP tool](https://github.com/anomalyco/opencode/blob/c0c7bae726798d02592f8d3305891ba2f0cd880a/packages/opencode/src/tool/lsp.ts)
 can request definitions/references/call hierarchy, but needs a language server and does not prove
-behavior. Caution: this release's [legacy grep](https://github.com/anomalyco/opencode/blob/c0c7bae726798d02592f8d3305891ba2f0cd880a/packages/opencode/src/tool/grep.ts#L60-L68)
+behavior. Caution: this inspected snapshot's [legacy grep](https://github.com/anomalyco/opencode/blob/c0c7bae726798d02592f8d3305891ba2f0cd880a/packages/opencode/src/tool/grep.ts#L60-L68)
 uses the parent directory without the exact-file argument. Its
 [single-file test](https://github.com/anomalyco/opencode/blob/c0c7bae726798d02592f8d3305891ba2f0cd880a/packages/opencode/test/tool/grep.test.ts#L171)
 does not include a matching sibling. This inspection is a reason to test scope semantics ourselves,

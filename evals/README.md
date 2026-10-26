@@ -110,7 +110,7 @@ pass^k or a model capability score. `npm run demo:deepseek-replay` demonstrates 
 
 ## Shell offline conformance
 
-`npm run eval:shell` runs seven deterministic scenarios through real native sandboxes, SQLite
+`npm run eval:shell` runs eight deterministic scenarios through real native sandboxes, SQLite
 and the runtime protocol. It verifies actual file results, denial, protected/outside files,
 timeout unknown handling and bounded output. It does not load private tasks or change existing
 corpus checkers. [Same-model comparison protocol](../docs/research/harness-comparison.md) defines
