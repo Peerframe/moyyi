@@ -45,7 +45,20 @@ none，并验证默认写拒绝）。这不等于真实模型理解能力。最�
 安装验收与固定文档题改用完整应用生成文件：ReportLab/python-docx/openpyxl/python-pptx/LibreOffice，
 14/14成熟reader复读和实际解析成功，独立再生14/14字节hash一致，文档eval4/4再次通过。
 原最小容器保留为定向边界测试；生成器不进入产品或CI依赖。
-精确PR CI和安装回执在完成后补入本节。下文原来的调查优化与失败记录保留为历史，不能把旧状态当作当前授权。
+最终产品提交 `e64fa0e26839cb913a7f7b90b900c65f10fe0597` 的
+[Linux/macOS CI](https://github.com/Peerframe/moyyi/actions/runs/40329152425)全通过；
+[PR #27](https://github.com/Peerframe/moyyi/pull/27)尚未合并。`npm run verify:package -- --offline`
+干净提交通过9个安装文档场景（19次合成请求，含七文档→报告→读回）、CLI10/client10/PTY5、
+类型、卸载及实际原生隔离，local/global依赖图均41包80边与源码锁一致。
+
+已从该包更新本机：SHA256 `469c6012258c2090523ad6cfedac7093e4d538fd10d2d06a7b0cd20f1e158ae7`，
+357文件逐字节匹配。会话/配置先备份到 `~/.moyyi/backups/pre-pr27-2026-10-26T13-20-32.003Z`，
+旧包保留；启动器和host/manage字节未变，日常仍只读/max3/零重试。实际全局安装再次通过9个
+文档场景、Seatbelt隔离、依赖图、元数据配置检查及已有DeepSeek会话resume/help/exit。
+本机回执为 `~/.moyyi/reviews/installed-documents.result.json` 和
+`~/.moyyi/reviews/document-startup.result.json`，安装记录及用户说明已更新。
+这些检查全为离线脚本，真实请求/Key读取0；真实理解验收仍需下一组授权。
+最后的交接补证提交只更新状态文档，不代表另一个产品安装。下文原来的调查优化与失败记录保留为历史，不能把旧状态当作当前授权。
 
 ## 本次交付状态
 
