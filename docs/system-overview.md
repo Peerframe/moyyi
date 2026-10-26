@@ -203,6 +203,18 @@ old raw-text-loss error. No missing read occurred, so this experiment does not m
 error's effect on autonomous behavior. Keep the failure and end this local diagnostic slice;
 repeating it or adding another file-read change would not address the remaining two layers.
 
+A whole-task review also separates the Skills rubric from its visible question. Tracing the
+host-to-model path is explicitly requested, so the untraced actual reader and core per-request call sites are a real
+investigation gap; the answer acknowledges it. The renderer was read and explained. Rebuilding runtime after changing the enabled
+selection and not automatically reading references are rubric requirements,
+but the visible question asks about editing skill files and does not explicitly ask those two
+extensions. Keep items 4/6 partial and the original overall failure; their omission proves rubric
+coverage is incomplete, not by itself that an explicit user requirement was ignored or a false
+fact was asserted. The current 4+4 envelope also differs from the historical original's eight
+requests for one task; do not call those an equal-budget comparison. None of these qualifications
+removes the untraced central chain or the separately demonstrated ledger amount error. The
+answer already explains that scripts are not automatically executed; that is not a fresh omission.
+
 A separate daily-artifact sample extends actual use beyond source explanation: exact CSV
 transformation and a formatting-preserving worksheet edit passed with real outputs and readback.
 The ledger task exposed a third owner to inspect before changing product code: its checker
