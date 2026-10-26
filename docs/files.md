@@ -86,6 +86,12 @@ and 1,000 for `maxLines`. Range mode scans at most 1 MiB through the same guarde
 and refuses an incomplete scan. It cannot retrieve ranges from larger files. The existing
 byte and output limits still apply; requesting later lines does not raise them.
 
+Reads request at most 16 KiB by default (explicit `maxBytes` can request up to 64 KiB), further
+bounded by the tool-output allowance. The numbered presentation then fits its actual serialized
+size, including metadata and JSON escaping, into that same allowance. It does not first divide
+the allowance by eight. A record that fits may therefore be returned completely; genuinely
+oversized lines can still be partial, with truthful truncation and continuation metadata.
+
 Range results retain original text delimiters and report `lineRange` with the requested
 `startLine`, last represented `endLine` (or `null` for empty text), and `complete`. Lines are
 LF-delimited and 1-based; CRLF is retained, and a trailing LF creates no extra empty line.

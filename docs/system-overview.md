@@ -181,7 +181,23 @@ Across the current evidence, interpretation/selection mistakes after full source
 separate from execution defects and from human-client usability. Another same-question prompt
 change or larger retrieval budget is not a supported general remedy.
 
-**Current delivery: honest response-completion status.** The new independent autonomous model
+**Current delivery: remove premature read truncation, independently compare task behavior.**
+The default installed host allowed 32 KiB tool output, but `read` allocated only 4 KiB before its
+exact presentation fitter. A 6,038-byte single-line record consequently hid its tail and repeated
+the same prefix on continuation, though its full serialized result needs only 6,318 bytes.
+The [ADR 0026 correction](decisions/0026-readable-evidence-and-action-budget.md#read-budget-correction-2026-10-27)
+retains all final limits and uses the existing fitter. Real-runtime conformance now verifies the
+complete record reaches the next request and that a default prefix has no implicit 200-line cap.
+Source, installed-package and CI evidence must remain distinct. This defect was reproduced under
+the daily default budget, not the larger budget of the original Skills control, and does not
+explain its already-delivered facts being omitted or interpreted incorrectly.
+
+Separately, a pinned Pi release is being checked as a private same-model baseline under a
+readonly snapshot, explicit containment and an external four-request gate. It is not a product
+dependency or a proposal to replace moyyi's core. Native prompt/tools and lack of moyyi's
+countdown/final-no-tool rule must be disclosed; one result cannot establish general superiority.
+
+**Previous delivery: honest response-completion status.** The independent autonomous model
 control closes the model-switch hypothesis for this sample without a quality gain: keep Flash,
 Responses and low, preserve both failures and do not repeat the question until green. Auditing
 the complete lifecycle then found an engineering defect outside retrieval: early truncated or

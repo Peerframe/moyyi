@@ -24,7 +24,9 @@ The three read tools declare a `read` effect with no reversal or reconciliation 
 Successful reads separate metadata from model-readable source as described below. List, search
 and failures retain JSON inside one text part. Limits are upper bounds: the host and the serialized
 output budget can reduce them further. Defaults request at most 16 KiB for reads, 50 list entries
-or 20 search matches, reduced for the available output budget. Oversized responses shorten their
+or 20 search matches, reduced for the available output budget. Reads bound source bytes by the
+requested/default limit and the whole output budget, then fit the serialized presentation exactly;
+they do not reserve seven eighths of the budget before reading. Oversized responses shorten their
 text/results and set `truncated: true`. A very small budget can return only `{"truncated":true}`.
 A truncated or partially skipped search is not proof that the rest of the workspace contains no
 matches. Failures remain failed outcomes.
