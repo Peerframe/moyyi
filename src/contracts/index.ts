@@ -1,6 +1,7 @@
 export type * from "./documents.ts";
 export type * from "./execution.ts";
 export type * from "./files.ts";
+export type * from "./history.ts";
 export type * from "./model.ts";
 export * from "./model-conformance.ts";
 export * from "./persisted/index.ts";
@@ -8,6 +9,7 @@ export type * from "./plugin.ts";
 export type * from "./ports.ts";
 export type * from "./processes.ts";
 export type * from "./protocol.ts";
+export * from "./receipts.ts";
 export type * from "./recording.ts";
 export * from "./replay.ts";
 export { parseStrictJson } from "./strict-json.ts";

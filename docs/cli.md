@@ -106,15 +106,29 @@ The offline `--demo` rejects these daily capability and budget options.
 | Ctrl-C / `/cancel` | Cancel the active run and preserve partial content/results; Ctrl-C when idle exits |
 | `/new` | Create a new session in the configured workspace, only while idle |
 | `/resume SESSION_ID` / `--session SESSION_ID` | Load persisted history; requires the matching data directory |
+| `/sessions [PAGE]` | List recorded sessions in this private store across workspaces; idle only, 20 per page |
+| `/results [SESSION_ID [PAGE]]` | Inspect recorded effects and matching receipts; defaults to the selected session, idle only |
 | `/approve EFFECT_ID` / `/deny EFFECT_ID` | Respond only to a currently displayed approval using its exact digest |
 | `/reload NAME` | Reload an explicitly configured development plugin while idle |
 | `/compact` | Summarize older turns with one request to the selected model; idle only; cancellable |
 | `/help` | Show controls |
 | `/exit` / terminal EOF | Cancel any active run, wait for cleanup and close storage |
 
-The session ID is displayed when created or loaded. There is no session browser yet. Restoring
-history alone makes no model request. Failed/partial DeepSeek history may be rejected by its
+The session ID is displayed when created or loaded. Use `/sessions` to find it after restarting;
+the list shows the workspace, last recorded activity and an excerpt of the last user prompt.
+Empty sessions have no invented activity time. `/sessions 2` shows the next page. These are local
+views of the selected private data directory; viewing or restoring history makes no model request.
+Failed/partial DeepSeek history may be rejected by its
 strict continuation profile; use `/new` for a fresh conversation rather than inventing reasoning.
+
+Use `/results SESSION_ID` before resuming, or `/results` for the current session, to inspect
+recorded effects. Matching file receipts show the path and snapshot ID; process receipts show
+exit/termination status. These are historical observations: a file may have changed or been
+undone since then, and exit code zero does not prove a correct check. Missing/ambiguous results
+remain without a matched receipt. `/results SESSION_ID 2` shows the next page; CLI pages are
+1–501. Inspection does not change your selected session, replay actions or restore old approvals.
+To continue, use `/resume SESSION_ID`. Writes and commands still require the current host's
+explicit grants; restart with the appropriate workspace and startup flags when necessary.
 
 Add `--approve-reads` to require execution approval for read/list/search/document tools. It cannot replace a
 custom host policy or authorize a forbidden effect. Multiple approvals have separate IDs/digests;
@@ -123,8 +137,9 @@ explicitly denied, so unattended input cannot authorize them or leave the proces
 
 Assistant text streams as it arrives and is not printed twice when its persisted message arrives.
 Matching current effect/tool results also display bounded file paths/snapshot IDs and command exit
-status. Arbitrary assistant prose, read content and historical replay are not promoted to verified
-receipts. Ask the agent to undo a displayed snapshot; normal approval and conflict checks still
+status. Arbitrary assistant prose, read content and ordinary history replay are not promoted to
+receipts. The explicit `/results` view independently matches persisted journal and tool records.
+Ask the agent to undo a displayed snapshot; normal approval and conflict checks still
 apply. Reasoning is retained by the runtime but not printed by this client. Output is marked by source;
 control characters and bidirectional formatting are escaped. This is a readline terminal client,
 not a full-screen TUI. No command is executed from model/file content.

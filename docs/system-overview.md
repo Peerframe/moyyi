@@ -167,6 +167,18 @@ verifier, mandatory subagents, full-repository graph or larger request allowance
 
 ## Next bounded delivery and decision rules
 
+The owner's latest direction is to diagnose the complete task path before choosing a local fix.
+Across the current evidence, interpretation/selection mistakes after full source delivery are
+separate from execution defects and from human-client usability. Another same-question prompt
+change or larger retrieval budget is not a supported general remedy.
+
+The next independent delivery closes a human-client gap: discover work after restarting, inspect
+recorded file/snapshot/process results, then resume under current permissions. It reuses SQLite,
+the local protocol and CLI; [ADR 0032](decisions/0032-session-discovery-and-recorded-results.md)
+defines bounded read-only views and the restart acceptance. The installed PR #30 remains the
+usable baseline until this delivery passes review, checks and installation. This workflow does
+not claim to repair model interpretation failures or reopen deferred GUI/model work.
+
 The owner authorized ongoing work, necessary paid validation and sequential merging/installation
 only after review and passing CI. PRs #28 and #29 are merged, closing the measured DNS/native-loader
 obstacles and making grants usable from the normal CLI. Installed/live evidence preserves default

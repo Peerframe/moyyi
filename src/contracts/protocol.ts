@@ -1,3 +1,4 @@
+import type { SessionListPage, SessionResultsPage } from "./history.ts";
 import type {
   ActionDigest,
   ContentPart,
@@ -17,6 +18,13 @@ export type ClientCommand =
   | { readonly type: "plugin.reload"; readonly name: string }
   | { readonly type: "session.create"; readonly workspaceRoot: string }
   | { readonly type: "session.load"; readonly sessionId: SessionId }
+  | { readonly type: "session.list"; readonly offset?: number; readonly limit?: number }
+  | {
+      readonly type: "session.results";
+      readonly sessionId: SessionId;
+      readonly offset?: number;
+      readonly limit?: number;
+    }
   | { readonly type: "session.compact"; readonly sessionId: SessionId }
   | {
       readonly type: "run.start";
@@ -42,6 +50,8 @@ export type RuntimeEvent =
       readonly error: string;
     }
   | { readonly type: "session.ready"; readonly sessionId: SessionId }
+  | { readonly type: "session.listed"; readonly page: SessionListPage }
+  | { readonly type: "session.results"; readonly page: SessionResultsPage }
   | { readonly type: "run.started"; readonly runId: RunId; readonly sessionId: SessionId }
   | { readonly type: "assistant.delta"; readonly runId: RunId; readonly text: string }
   | { readonly type: "entry.appended"; readonly entry: TranscriptEntry }
