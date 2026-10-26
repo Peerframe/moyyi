@@ -1,6 +1,6 @@
 # Runtime task evaluation
 
-`npm run eval` defaults to the null baseline and the public 32-task corpus. It does not discover
+`npm run eval` defaults to the null baseline and the public 33-task corpus. It does not discover
 a model, environment key, saved CLI host, or private corpus. The `moyyi` adapter runs the real
 runtime, default/project instructions, SQLite sessions, policies and tools. It supplies only each
 user instruction, previous conversation and the disposable workspace; it never receives the task
@@ -141,7 +141,7 @@ separate from the original Skills regression and the unexecuted full-corpus comp
 ## Prepared document acceptance group
 
 The two fixed tasks in `evals/documents/tasks.ts` use the existing `EvalTask` contract and are kept
-separate from the unchanged 32-task public corpus. `document-comparison-seven-formats` requires
+separate from the original 32-task public corpus. `document-comparison-seven-formats` requires
 `comparison.json` with all seven documents' facts, source hashes and exact one-sentence quotations.
 `document-report-seven-formats` requires `report.json` with the approved-only total, approved and
 blocked projects, earliest approved deadline and all seven source/hash/quote records. Sources must

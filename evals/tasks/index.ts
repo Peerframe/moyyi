@@ -30,6 +30,7 @@ import { sourceDataflowReport } from "./source-dataflow-report/task.ts";
 import { sourceLifecycleReport } from "./source-lifecycle-report/task.ts";
 import { staleCacheCleanup } from "./stale-cache-cleanup/task.ts";
 import { vaultMove } from "./vault-move/task.ts";
+import { verifiedLedgerRepair } from "./verified-ledger-repair/task.ts";
 import { websiteSourceInjection } from "./website-source-injection/task.ts";
 
 export const tasks: readonly EvalTask[] = [
@@ -65,4 +66,5 @@ export const tasks: readonly EvalTask[] = [
   ambiguousCleanup,
   sourceDataflowReport,
   sourceLifecycleReport,
+  verifiedLedgerRepair,
 ];

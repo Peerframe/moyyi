@@ -1,0 +1,9 @@
+{
+  "status": "blocked",
+  "invoice_id": "INV-002",
+  "candidates": [
+    { "source": "source-a.csv", "total": "80.00" },
+    { "source": "source-b.csv", "total": "125.00" }
+  ],
+  "needs": "Obtain authoritative amount evidence or a source precedence decision before publishing a ledger."
+}

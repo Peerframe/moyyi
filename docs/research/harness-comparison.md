@@ -13,7 +13,8 @@ budget, sandbox policy and toolchain image/OS. DeepSeek is the first selected pr
 baseline cannot use the same API/model, report it as unsupported rather than compare different
 models under the same label. Never weaken a sandbox just to increase its pass rate.
 
-Use the existing public 32-task corpus, preserve checkers and fixtures, and separate tasks that
+Use a fixed manifest of the public corpus (original 32 tasks; the later report-verification
+workflow is recorded separately), preserve checkers and fixtures, and separate tasks that
 need capabilities not yet delivered. Run each task from an independent clean fixture and session;
 pass only instruction/history/allowed workspace contents, never hidden checks, reference solutions
 or task IDs in visible paths. Keep identical trial counts, ordering/seed policy and budgets. Run
