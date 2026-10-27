@@ -1,11 +1,15 @@
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import { describe, expect, it } from "vitest";
-import { repo, sourceFiles, violations } from "./boundaries.ts";
+import { importsOf, layerOf, repo, sourceFiles, violations } from "./boundaries.ts";
 
 describe("layer boundaries", () => {
   it("holds for the repository", () => {
-    const files = [...sourceFiles(join(repo, "src")), ...sourceFiles(join(repo, "evals"))];
+    const files = [
+      ...sourceFiles(join(repo, "src")),
+      ...sourceFiles(join(repo, "evals")),
+      ...sourceFiles(join(repo, "apps")),
+    ];
     expect(files.length).toBeGreaterThan(0);
     expect(files.flatMap((f) => violations(f, readFileSync(f, "utf8")))).toEqual([]);
   });
@@ -59,5 +63,133 @@ describe("layer boundaries", () => {
     expect(violations(join(repo, "src", "plugins", "loose.ts"), "")).toEqual([
       'src/plugins/loose.ts: unknown layer "plugins"',
     ]);
+  });
+
+  it("recognizes re-exports, require and literal dynamic imports without reading comment/string fixtures", () => {
+    expect(
+      importsOf(`
+      import "react";
+      export type { DesktopState } from "../shared.ts";
+      const a = require(/* a comment */ "node:fs");
+      const b = import /* another comment */ (\`node:child_process\`);
+      const fixture = "require('ignored')";
+      // import "ignored-comment";
+      /* export { x } from "ignored-block"; */
+    `),
+    ).toEqual(["react", "../shared.ts", "node:fs", "node:child_process"]);
+    expect(violations(join(repo, "src/core/example.ts"), 'require("node:fs")')).toHaveLength(1);
+  });
+
+  it("limits renderer imports to React, local views and the data-only shared contract", () => {
+    const file = join(repo, "apps/desktop/renderer/App.tsx");
+    expect(
+      violations(
+        file,
+        `
+      import { useState } from "react";
+      import { createRoot } from "react-dom/client";
+      import type { DesktopState } from "../shared.ts";
+      import { ApprovalCard } from "./ApprovalCard.tsx";
+      import "./styles.css";
+    `,
+      ),
+    ).toEqual([]);
+    for (const source of [
+      'import "node:fs";',
+      'require("fs");',
+      'await import("electron");',
+      'export { createRuntime } from "moyyi/runtime";',
+      'import "../connection.ts";',
+      'import "../wire.ts";',
+      'import "../../../src/contracts/index.ts";',
+      'import "../../../../scripts/build.ts";',
+      'import "./../../unexpected/worker.ts";',
+      "const x = import(variable);",
+      'require("react" + suffix);',
+      // biome-ignore lint/suspicious/noTemplateCurlyInString: source text for a rejected dynamic import
+      "await import(`./${name}.ts`);",
+      String.raw`import "node:\u0066s";`,
+    ])
+      expect(violations(file, source), source).toHaveLength(1);
+  });
+
+  it("keeps shared/wire/security pure and limits the preload bridge", () => {
+    const shared = join(repo, "apps/desktop/shared.ts");
+    for (const source of [
+      'import "node:buffer";',
+      'import "react";',
+      'import "moyyi/contracts";',
+      'import "./wire.ts";',
+    ]) {
+      expect(violations(shared, source), source).toHaveLength(1);
+    }
+    const preload = join(repo, "apps/desktop/preload.ts");
+    expect(
+      violations(
+        preload,
+        `import "electron"; import "./shared.ts"; import "./wire.ts"; import "./security.ts";`,
+      ),
+    ).toEqual([]);
+    for (const source of [
+      'require("node:fs");',
+      'import "./bridge.ts";',
+      'await import("moyyi/runtime");',
+      'import "./renderer/App.tsx";',
+    ]) {
+      expect(violations(preload, source), source).toHaveLength(1);
+    }
+    expect(
+      violations(
+        join(repo, "apps/desktop/wire.ts"),
+        'import "./security.ts"; import "./shared.ts";',
+      ),
+    ).toEqual([]);
+    expect(
+      violations(join(repo, "apps/desktop/security.ts"), 'import "./host/service.ts";'),
+    ).toHaveLength(1);
+    expect(violations(join(repo, "apps/desktop/wire.ts"), 'import "node:fs";')).toHaveLength(1);
+  });
+
+  it("keeps trusted host code on public moyyi exports and rejects unknown desktop paths", () => {
+    const file = join(repo, "apps/desktop/host/service.ts");
+    expect(
+      violations(
+        file,
+        `
+      import "node:fs/promises";
+      import "moyyi/runtime";
+      import type { RuntimeEvent } from "moyyi/contracts";
+      import "../shared.ts";
+      import "./validation.ts";
+    `,
+      ),
+    ).toEqual([]);
+    expect(
+      violations(join(repo, "apps/desktop/main.ts"), 'import "electron"; import "./bridge.ts";'),
+    ).toEqual([]);
+    for (const source of [
+      'import "../../../src/runtime/index.ts";',
+      'import "moyyi/src/core/index.ts";',
+      'require("zod");',
+      'import "../renderer/App.tsx";',
+      'import "../unreviewed.ts";',
+    ]) {
+      expect(violations(file, source), source).toHaveLength(1);
+    }
+    expect(violations(join(repo, "apps/desktop/unreviewed.ts"), "")).toHaveLength(1);
+    expect(violations(join(repo, "apps/desktop/unreviewed/index.tsx"), "")).toHaveLength(1);
+    expect(violations(join(repo, "apps/other/index.ts"), "")).toHaveLength(1);
+  });
+
+  it("scans TSX and does not use test support to widen production imports", () => {
+    const renderer = join(repo, "apps/desktop/renderer");
+    expect(sourceFiles(renderer)).toContain(join(renderer, "App.tsx"));
+    expect(layerOf(join(renderer, "App.tsx"))).toBe("desktop:renderer");
+    expect(
+      violations(join(renderer, "render.test.ts"), 'import "vitest"; import "react-dom/server";'),
+    ).toEqual([]);
+    expect(violations(join(renderer, "render.test.ts"), 'import "node:fs";')).toHaveLength(1);
+    expect(violations(join(renderer, "App.tsx"), 'import "react-dom/server";')).toHaveLength(1);
+    expect(violations(join(renderer, "App.tsx"), 'import "vitest";')).toHaveLength(1);
   });
 });

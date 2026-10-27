@@ -1,0 +1,460 @@
+import { mkdirSync, mkdtempSync, readFileSync, realpathSync, rmSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
+import {
+  type ModelRequest,
+  type ModelStreamEvent,
+  type Plugin,
+  type ToolCallId,
+  UNKNOWN_USAGE,
+} from "moyyi/contracts";
+import type { RuntimeOptions } from "moyyi/runtime";
+import { afterEach, describe, expect, it } from "vitest";
+import type { DesktopState } from "../shared.ts";
+import { createDesktopHost, type DesktopHost } from "./service.ts";
+import { parseDesktopCommand } from "./validation.ts";
+
+type Step =
+  | readonly ModelStreamEvent[]
+  | ((signal: AbortSignal) => AsyncIterable<ModelStreamEvent>);
+const complete = (stopReason: "end_turn" | "tool_use" = "end_turn"): ModelStreamEvent => ({
+  type: "completed",
+  stopReason,
+  providerStopReason: null,
+  usage: UNKNOWN_USAGE,
+});
+const answer = (text: string): ModelStreamEvent[] => [
+  { type: "text_delta", index: 0, text },
+  { type: "part_completed", index: 0, part: { type: "text", text } },
+  complete(),
+];
+let nextCall = 0;
+function call(name: string, args: unknown): ModelStreamEvent[] {
+  const id = `desktop_call_${++nextCall}`;
+  return [
+    {
+      type: "part_completed",
+      index: 0,
+      part: {
+        type: "tool_call",
+        callId: id as ToolCallId,
+        providerCallId: id,
+        providerItemId: null,
+        name,
+        rawArguments: JSON.stringify(args),
+        argumentsSource: "verbatim",
+      },
+    },
+    complete("tool_use"),
+  ];
+}
+
+const resources: { directory: string; hosts: DesktopHost[] }[] = [];
+afterEach(async () => {
+  for (const resource of resources.splice(0)) {
+    for (const host of resource.hosts) await host.close();
+    rmSync(resource.directory, { recursive: true, force: true });
+  }
+});
+
+async function fixture(
+  steps: Step[],
+  options: Partial<RuntimeOptions> = {},
+  connection = { ready: true },
+) {
+  const directory = realpathSync(mkdtempSync(join(tmpdir(), "moyyi-desktop-host-")));
+  const workspace = join(directory, "workspace"),
+    other = join(directory, "other");
+  mkdirSync(workspace);
+  mkdirSync(other);
+  writeFileSync(join(workspace, "note.txt"), "ORIGINAL");
+  writeFileSync(join(other, "note.txt"), "OTHER_WORKSPACE");
+  const dataDirectory = join(directory, "private");
+  const requests: ModelRequest[] = [];
+  const origin = { provider: "desktop-fixture", model: "scripted" };
+  const plugin: Plugin = {
+    name: "desktop-fixture",
+    apiVersion: 1,
+    setup(host) {
+      host.registerModelProvider({
+        id: origin.provider,
+        models: [
+          {
+            origin,
+            contextWindowTokens: 200_000,
+            maxOutputTokens: 8192,
+            parallelToolCalls: false,
+            reasoning: "visible",
+            promptCache: "none",
+            editFormat: "search_replace",
+          },
+        ],
+        createClient: () => ({
+          async *stream(request, signal) {
+            requests.push(structuredClone(request));
+            const step = steps.shift();
+            if (!step) throw Error("Unexpected fixture request");
+            if (typeof step === "function") yield* step(signal);
+            else yield* step;
+          },
+        }),
+      });
+    },
+  };
+  const runtimeOptions: RuntimeOptions = {
+    model: origin,
+    dataDirectory,
+    limits: {
+      maxModelRequests: 3,
+      maxRetries: 0,
+      timeoutMs: 120_000,
+      maxInputBytes: 65_536,
+      maxParallelReads: 1,
+    },
+    ...options,
+    plugins: [{ plugin }, ...(options.plugins ?? [])],
+  };
+  const resource = { directory, hosts: [] as DesktopHost[] };
+  resources.push(resource);
+  const reopen = async () => {
+    const host = await createDesktopHost({
+      runtimeOptions: () => runtimeOptions,
+      maxOutputTokens: 8192,
+      connection,
+    });
+    resource.hosts.push(host);
+    return host;
+  };
+  const host = await reopen();
+  return { host, reopen, workspace, other, requests, runtimeOptions };
+}
+
+function waitFor(
+  host: DesktopHost,
+  predicate: (state: DesktopState) => boolean,
+): Promise<DesktopState> {
+  if (predicate(host.getState())) return Promise.resolve(host.getState());
+  return new Promise((resolve, reject) => {
+    const timer = setTimeout(() => {
+      off();
+      reject(Error("Desktop state did not settle"));
+    }, 3000);
+    const off = host.subscribe((state) => {
+      if (predicate(state)) {
+        clearTimeout(timer);
+        off();
+        resolve(state);
+      }
+    });
+  });
+}
+
+function required<T>(value: T | null | undefined): T {
+  if (value == null) throw Error("Expected fixture state");
+  return value;
+}
+
+describe("desktop host boundary over the public runtime", () => {
+  it("creates, streams and reopens real SQLite history without a new model call", async () => {
+    const f = await fixture([answer("Read-only answer")]);
+    expect(f.requests).toHaveLength(0);
+    await f.host.dispatch({ type: "create", workspaceRoot: f.workspace, askEachRead: false });
+    const sessionId = f.host.getState().activeSessionId;
+    expect(f.host.getState().sessions.items).toEqual([
+      { sessionId, workspaceRoot: f.workspace, lastActivityAt: null, promptPreview: null },
+    ]);
+    expect(f.requests).toHaveLength(0);
+    await f.host.dispatch({ type: "start", sessionId, text: "Inspect this workspace" });
+    const done = await waitFor(f.host, (s) => s.outcome?.kind === "completed");
+    expect(done.messages.filter((m) => m.text === "Read-only answer")).toHaveLength(1);
+    expect(done.streamText).toBe("");
+    const summary = required(done.sessions.items.find((item) => item.sessionId === sessionId));
+    expect(summary.promptPreview).toBe("Inspect this workspace");
+    expect(summary.lastActivityAt).toMatch(/^\d{4}-\d{2}-\d{2}T/);
+    await Promise.all([f.host.close(), f.host.close()]);
+    const reopened = await f.reopen();
+    expect(reopened.getState().sessions.items.some((s) => s.sessionId === sessionId)).toBe(true);
+    await reopened.dispatch({ type: "load", sessionId, askEachRead: false });
+    expect(reopened.getState().messages.some((m) => m.text === "Read-only answer")).toBe(true);
+    expect(reopened.getState().workspaceRoot).toBe(f.workspace);
+    expect(f.requests).toHaveLength(1);
+    expect(reopened.getState().pendingApproval).toBeNull();
+    expect(reopened.getState().sessions.items.find((item) => item.sessionId === sessionId)).toEqual(
+      summary,
+    );
+  });
+
+  it("bounds immediate new-session rows to the first page and never mixes them into later pages", async () => {
+    const f = await fixture([answer("Done")]);
+    for (let i = 0; i < 21; i++)
+      await f.host.dispatch({ type: "create", workspaceRoot: f.workspace, askEachRead: false });
+    expect(f.host.getState().sessions.items).toHaveLength(20);
+    expect(f.host.getState().sessions.items[0]?.sessionId).toBe(f.host.getState().activeSessionId);
+    expect(f.host.getState().sessions.hasMore).toBe(true);
+    await f.host.dispatch({ type: "list", offset: 20 });
+    const later = f.host.getState().sessions;
+    expect(later.items).toHaveLength(1);
+    await f.host.dispatch({ type: "create", workspaceRoot: f.workspace, askEachRead: false });
+    expect(f.host.getState().sessions).toEqual(later);
+    expect(f.requests).toHaveLength(0);
+    const sessionId = f.host.getState().activeSessionId;
+    await f.host.dispatch({ type: "start", sessionId, text: `${"x".repeat(159)}😀tail` });
+    await waitFor(f.host, (state) => state.outcome?.kind === "completed");
+    expect(f.host.getState().sessions).toEqual(later);
+    await f.host.dispatch({ type: "list", offset: 0 });
+    expect(f.host.getState().sessions.items).toHaveLength(20);
+    expect(f.host.getState().sessions.items[0]?.sessionId).toBe(sessionId);
+    expect(f.host.getState().sessions.items[0]?.promptPreview).toBe("x".repeat(159));
+  });
+
+  it("binds approval to the displayed digest and actual read, without accepting stale clicks", async () => {
+    const f = await fixture([call("read", { path: "note.txt" }), answer("Read completed")]);
+    await f.host.dispatch({ type: "create", workspaceRoot: f.workspace, askEachRead: true });
+    await f.host.dispatch({
+      type: "start",
+      sessionId: f.host.getState().activeSessionId,
+      text: "Read note.txt",
+    });
+    const waiting = await waitFor(f.host, (s) => s.pendingApproval !== null);
+    const pending = required(waiting.pendingApproval);
+    await expect(
+      f.host.dispatch({
+        type: "approve",
+        effectId: pending.effectId,
+        digest: "stale",
+        decision: "approve",
+      }),
+    ).rejects.toThrow("stale");
+    expect(f.requests).toHaveLength(1);
+    expect(f.host.getState().pendingApproval?.digest).toBe(pending.digest);
+    await f.host.dispatch({
+      type: "approve",
+      effectId: pending.effectId,
+      digest: pending.digest,
+      decision: "approve",
+    });
+    const done = await waitFor(f.host, (s) => s.outcome?.kind === "completed");
+    expect(
+      done.messages.some(
+        (m) => m.role === "tool" && m.state === "succeeded" && m.text.includes("ORIGINAL"),
+      ),
+    ).toBe(true);
+    await expect(
+      f.host.dispatch({
+        type: "approve",
+        effectId: pending.effectId,
+        digest: pending.digest,
+        decision: "approve",
+      }),
+    ).rejects.toThrow("Approval");
+    expect(f.requests).toHaveLength(2);
+  });
+
+  it("denies a read without returning its contents and never inherits factory write authority", async () => {
+    const f = await fixture([
+      call("read", { path: "note.txt" }),
+      answer("Read denied"),
+      call("edit", { path: "note.txt", oldText: "ORIGINAL", newText: "CHANGED" }),
+      answer("Write denied"),
+    ]);
+    // The factory is trusted test composition, but its broader grants must not become M1 grants.
+    const withWrites = {
+      ...f.runtimeOptions,
+      workspaceWrites: { roots: [f.workspace], approval: "allow" as const },
+    };
+    await f.host.close();
+    const host = await createDesktopHost({ runtimeOptions: () => withWrites });
+    required(resources.at(-1)).hosts.push(host);
+    await host.dispatch({ type: "create", workspaceRoot: f.workspace, askEachRead: true });
+    await host.dispatch({
+      type: "start",
+      sessionId: host.getState().activeSessionId,
+      text: "Read note.txt",
+    });
+    const pending = required((await waitFor(host, (s) => !!s.pendingApproval)).pendingApproval);
+    await host.dispatch({
+      type: "approve",
+      effectId: pending.effectId,
+      digest: pending.digest,
+      decision: "deny",
+    });
+    const denied = await waitFor(host, (s) => s.outcome?.kind === "completed");
+    expect(denied.messages.some((m) => m.role === "tool" && m.state === "denied")).toBe(true);
+    expect(denied.messages.some((m) => m.role === "tool" && m.text.includes("ORIGINAL"))).toBe(
+      false,
+    );
+    await host.dispatch({
+      type: "start",
+      sessionId: host.getState().activeSessionId,
+      text: "Try edit",
+    });
+    await waitFor(host, (s) => s.outcome?.kind === "completed");
+    expect(readFileSync(join(f.workspace, "note.txt"), "utf8")).toBe("ORIGINAL");
+    expect(host.getState().messages.some((m) => m.tool === "edit" && m.state === "denied")).toBe(
+      true,
+    );
+  });
+
+  it("cancels a pending approval and closes/reopens without approving or replaying it", async () => {
+    const f = await fixture([call("read", { path: "note.txt" })]);
+    await f.host.dispatch({ type: "create", workspaceRoot: f.workspace, askEachRead: true });
+    const sessionId = f.host.getState().activeSessionId;
+    await f.host.dispatch({ type: "start", sessionId, text: "Read" });
+    const waiting = await waitFor(f.host, (s) => !!s.pendingApproval);
+    await expect(f.host.dispatch({ type: "load", sessionId, askEachRead: false })).rejects.toThrow(
+      "active run",
+    );
+    await f.host.dispatch({ type: "cancel", runId: required(waiting.run).id });
+    await waitFor(f.host, (s) => s.outcome?.kind === "cancelled");
+    await f.host.close();
+    const next = await f.reopen();
+    await next.dispatch({ type: "load", sessionId, askEachRead: false });
+    expect(next.getState().pendingApproval).toBeNull();
+    expect(next.getState().askEachRead).toBe(false);
+    expect(f.requests).toHaveLength(1);
+    expect(next.getState().messages.some((m) => m.state === "cancelled")).toBe(true);
+  });
+
+  it.each(["Partial output", ""])(
+    "close/reopen labels an interrupted response with text %j and releases the writer lock",
+    async (partial) => {
+      const started = Promise.withResolvers<void>();
+      const f = await fixture([
+        async function* (signal) {
+          yield {
+            type: "part_completed",
+            index: 0,
+            part: { type: "reasoning", kind: "visible", text: "PRIVATE_REASONING" },
+          };
+          if (partial) yield { type: "text_delta", index: 1, text: partial };
+          started.resolve();
+          if (!signal.aborted)
+            await new Promise<void>((resolve) =>
+              signal.addEventListener("abort", () => resolve(), { once: true }),
+            );
+          yield {
+            type: "error",
+            error: {
+              kind: "cancelled",
+              message: "Cancelled",
+              partialOutput: true,
+              usage: UNKNOWN_USAGE,
+            },
+          };
+        },
+      ]);
+      await f.host.dispatch({ type: "create", workspaceRoot: f.workspace, askEachRead: false });
+      const sessionId = f.host.getState().activeSessionId;
+      await f.host.dispatch({ type: "start", sessionId, text: "Wait" });
+      await started.promise;
+      await expect(f.reopen()).rejects.toThrow("store is locked");
+      await f.host.close();
+      const next = await f.reopen();
+      await next.dispatch({ type: "load", sessionId, askEachRead: false });
+      const messages = next.getState().messages;
+      expect(messages.some((m) => m.role === "assistant" && m.text === partial)).toBe(!!partial);
+      expect(messages.find((m) => m.state === "interrupted")?.text).toBe(
+        partial
+          ? "This response was interrupted. The text above is partial, not a completed answer."
+          : "This response was interrupted before an answer was received.",
+      );
+      expect(JSON.stringify(messages)).not.toContain("PRIVATE_REASONING");
+      expect(f.requests).toHaveLength(1);
+    },
+  );
+
+  it("rejects foreign IDs and unavailable connections, while listed sessions restore their own workspace", async () => {
+    const f = await fixture([], {}, { ready: false });
+    await f.host.dispatch({ type: "create", workspaceRoot: f.workspace, askEachRead: false });
+    const first = f.host.getState().activeSessionId;
+    await f.host.dispatch({ type: "create", workspaceRoot: f.other, askEachRead: false });
+    await expect(
+      f.host.dispatch({ type: "start", sessionId: first, text: "Wrong session" }),
+    ).rejects.toThrow("not selected");
+    await expect(
+      f.host.dispatch({ type: "load", sessionId: "not-listed", askEachRead: false }),
+    ).rejects.toThrow("listed");
+    await expect(f.host.dispatch({ type: "cancel", runId: "foreign" })).rejects.toThrow(
+      "not active",
+    );
+    await f.host.dispatch({ type: "load", sessionId: first, askEachRead: false });
+    expect(f.host.getState().workspaceRoot).toBe(f.workspace);
+    await expect(
+      f.host.dispatch({ type: "start", sessionId: first, text: "No connection" }),
+    ).rejects.toThrow("unavailable");
+    expect(f.requests).toHaveLength(0);
+  });
+
+  it("projects bounded text without reasoning, replay payloads or mutable internal state", async () => {
+    const events: ModelStreamEvent[] = [
+      {
+        type: "part_completed",
+        index: 0,
+        part: { type: "reasoning", kind: "visible", text: "PRIVATE_REASONING" },
+      },
+      { type: "part_completed", index: 1, part: { type: "text", text: "x".repeat(40_000) } },
+      complete(),
+    ];
+    const f = await fixture([events]);
+    await f.host.dispatch({ type: "create", workspaceRoot: f.workspace, askEachRead: false });
+    await f.host.dispatch({
+      type: "start",
+      sessionId: f.host.getState().activeSessionId,
+      text: "Explain",
+    });
+    const done = await waitFor(f.host, (s) => s.outcome?.kind === "completed");
+    expect(JSON.stringify(done)).not.toContain("PRIVATE_REASONING");
+    expect(JSON.stringify(done)).not.toContain("rendererVersion");
+    expect(done.historyTruncated).toBe(true);
+    expect(done.messages.some((m) => m.text.includes("Display truncated"))).toBe(true);
+    expect(JSON.stringify(done).length).toBeLessThan(300_000);
+    (done.messages as unknown[]).splice(0);
+    expect(f.host.getState().messages.length).toBeGreaterThan(0);
+  });
+
+  it("shows startup plugin failures after subscribing and retains the warning across commands", async () => {
+    const f = await fixture([], {
+      plugins: [
+        {
+          plugin: {
+            name: "failed-fixture",
+            apiVersion: 1,
+            setup() {
+              throw Error("PRIVATE_PLUGIN_FAILURE");
+            },
+          },
+        },
+      ],
+    });
+    expect(f.host.getState().error).toContain("runtime plugin is unavailable");
+    expect(JSON.stringify(f.host.getState())).not.toContain("PRIVATE_PLUGIN_FAILURE");
+    await f.host.dispatch({ type: "create", workspaceRoot: f.workspace, askEachRead: false });
+    expect(f.host.getState().error).toContain("runtime plugin is unavailable");
+    expect(f.requests).toHaveLength(0);
+  });
+});
+
+describe("desktop command validation", () => {
+  it("rejects extra keys, prototype/accessor payloads, invalid IDs and oversized messages", () => {
+    const getter = {
+      get type() {
+        throw Error("Getter must not execute");
+      },
+    };
+    for (const value of [
+      null,
+      [],
+      { type: "close", extra: true },
+      { type: "start", sessionId: "x", text: "x".repeat(65_536) },
+      { type: "list", offset: Number.NaN },
+      { type: "list", offset: -1 },
+      { type: "load", sessionId: "x" },
+      { type: "cancel", runId: "\n" },
+      { type: "create", workspaceRoot: "relative", askEachRead: false },
+      Object.create({ type: "close" }),
+      getter,
+    ])
+      expect(() => parseDesktopCommand(value)).toThrow("Invalid desktop command");
+    expect(parseDesktopCommand({ type: "close" })).toEqual({ type: "close" });
+  });
+});

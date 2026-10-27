@@ -1,4 +1,5 @@
 import { readdirSync } from "node:fs";
+import { isBuiltin } from "node:module";
 import { dirname, join, relative, resolve, sep } from "node:path";
 
 /**
@@ -21,6 +22,12 @@ const allowedLayers: Record<string, readonly string[]> = {
   runtime: ["contracts", "persisted", "core", "store", "context", "policy", "plugin:*"],
   cli: ["contracts", "persisted", "runtime"],
   evals: ["contracts", "persisted", "runtime", "plugin:*"],
+  "desktop:shared": [],
+  "desktop:security": [],
+  "desktop:wire": ["desktop:shared", "desktop:security"],
+  "desktop:preload": ["desktop:shared", "desktop:wire", "desktop:security"],
+  "desktop:renderer": ["desktop:shared"],
+  "desktop:host": ["desktop:shared", "desktop:wire", "desktop:security"],
 };
 
 /** Layers that must stay free of I/O and third-party code outside tests. */
@@ -37,6 +44,20 @@ export const repo = resolve(import.meta.dirname, "..");
 export function layerOf(file: string): string | null {
   const parts = relative(repo, file).split(sep);
   if (parts[0] === "evals" || parts[0] === "tests") return parts[0];
+  if (parts[0] === "apps") {
+    if (parts[1] !== "desktop") return `app:${parts[1] ?? "unknown"}`;
+    if (parts[2] === "renderer" && parts.length > 3) return "desktop:renderer";
+    if (parts[2] === "host" && parts.length > 3) return "desktop:host";
+    const name = parts.length === 3 ? parts[2]?.replace(/\.test(?=\.tsx?$)/, "") : "";
+    if (name === "shared.ts") return "desktop:shared";
+    if (name === "security.ts") return "desktop:security";
+    if (name === "wire.ts") return "desktop:wire";
+    if (name === "preload.ts") return "desktop:preload";
+    if (["main.ts", "bridge.ts", "connection.ts", "worker.ts"].includes(name ?? "")) {
+      return "desktop:host";
+    }
+    return `desktop:unknown:${parts.slice(2).join("/")}`;
+  }
   if (parts[0] !== "src" || parts.length < 3) return null;
   if (parts[1] === "contracts" && parts[2] === "persisted") return "persisted";
   if (parts[1] === "plugins") return parts.length > 3 ? `plugin:${parts[2]}` : "plugins";
@@ -44,8 +65,59 @@ export function layerOf(file: string): string | null {
 }
 
 export function importsOf(source: string): string[] {
-  const pattern = /(?:\bfrom\s*|\bimport\s*\(\s*|\bimport\s+)["']([^"']+)["']/g;
-  return [...source.matchAll(pattern)].map((match) => match[1] as string);
+  return scanImports(source).flatMap((specifier) => (specifier === null ? [] : [specifier]));
+}
+
+/** Skip comments and unrelated string values so test fixtures are not treated as imports. */
+function scanImports(source: string): (string | null)[] {
+  const tokens =
+    /\/\*[\s\S]*?\*\/|\/\/[^\n]*|"(?:\\.|[^"\\])*"|'(?:\\.|[^'\\])*'|`(?:\\.|[^`\\])*`|\b(from|import|require)\b/g;
+  const literal = /^(?:"([^"\\]*)"|'([^'\\]*)'|`([^`\\]*)`)/;
+  const found: (string | null)[] = [];
+  for (const token of source.matchAll(tokens)) {
+    const word = token[1];
+    if (!word) continue;
+    let at = skipTrivia(source, token.index + token[0].length);
+    const call = word !== "from" && source[at] === "(";
+    if (call) at = skipTrivia(source, at + 1);
+    const match = literal.exec(source.slice(at));
+    if (!match) {
+      if (call || ((word === "from" || word === "import") && /["'`]/.test(source[at] ?? ""))) {
+        found.push(null);
+      }
+      continue;
+    }
+    const value = match[1] ?? match[2] ?? match[3] ?? "";
+    const after = source[skipTrivia(source, at + match[0].length)];
+    // Escapes, expressions and interpolated template paths are not an auditable module list.
+    const computed =
+      (match[3] !== undefined && value.includes("${")) ||
+      (call && after !== ")" && !(word === "import" && after === ","));
+    found.push(computed ? null : value);
+  }
+  return found;
+}
+
+function skipTrivia(source: string, start: number): number {
+  let at = start;
+  while (at < source.length) {
+    if (/\s/.test(source[at] ?? "")) {
+      at += 1;
+      continue;
+    }
+    if (source.startsWith("/*", at)) {
+      const end = source.indexOf("*/", at + 2);
+      at = end === -1 ? source.length : end + 2;
+      continue;
+    }
+    if (source.startsWith("//", at)) {
+      const end = source.indexOf("\n", at + 2);
+      at = end === -1 ? source.length : end + 1;
+      continue;
+    }
+    break;
+  }
+  return at;
 }
 
 function rulesFor(layer: string): readonly string[] | undefined {
@@ -61,14 +133,24 @@ export function violations(file: string, source: string): string[] {
   if (layer === null || layer === "tests") return [];
   const allowed = rulesFor(layer);
   if (allowed === undefined) return [`${relative(repo, file)}: unknown layer "${layer}"`];
-  const isTest = file.endsWith(".test.ts");
+  const isTest = /\.test\.tsx?$/.test(file);
+  const desktop = layer.startsWith("desktop:");
   const out: string[] = [];
-  for (const specifier of importsOf(source)) {
+  for (const specifier of scanImports(source)) {
+    if (specifier === null) {
+      if ((desktop || pureLayers.has(layer)) && !isTest)
+        out.push(`${relative(repo, file)}: ${layer} module paths must be static literals`);
+      continue;
+    }
     if (specifier.startsWith(".")) {
       const target = layerOf(resolve(dirname(file), specifier));
-      if (target !== null && target !== layer && !allows(allowed, target)) {
+      if (desktop && (target === null || !target.startsWith("desktop:"))) {
+        out.push(`${relative(repo, file)}: desktop must use public package exports (${specifier})`);
+      } else if (target !== null && target !== layer && !allows(allowed, target)) {
         out.push(`${relative(repo, file)}: ${layer} may not import ${target} (${specifier})`);
       }
+    } else if (desktop && !desktopPackageAllowed(layer, file, specifier, isTest)) {
+      out.push(`${relative(repo, file)}: ${layer} must not import "${specifier}"`);
     } else if (pureLayers.has(layer) && !isTest) {
       out.push(`${relative(repo, file)}: ${layer} must not import "${specifier}"`);
     } else if (layer.startsWith("plugin:") && !isTest && pluginForbidden.has(specifier)) {
@@ -78,8 +160,34 @@ export function violations(file: string, source: string): string[] {
   return out;
 }
 
+function desktopPackageAllowed(
+  layer: string,
+  file: string,
+  specifier: string,
+  isTest: boolean,
+): boolean {
+  if (isTest && specifier === "vitest") return true;
+  if (layer === "desktop:renderer") {
+    return (
+      ["react", "react/jsx-runtime", "react/jsx-dev-runtime", "react-dom/client"].includes(
+        specifier,
+      ) ||
+      (isTest && specifier === "react-dom/server")
+    );
+  }
+  if (layer === "desktop:preload") return specifier === "electron";
+  if (layer === "desktop:host") {
+    return (
+      isBuiltin(specifier) ||
+      ["moyyi/runtime", "moyyi/contracts"].includes(specifier) ||
+      (specifier === "electron" && /[/\\]main(?:\.test)?\.ts$/.test(file))
+    );
+  }
+  return false;
+}
+
 export function sourceFiles(dir: string): string[] {
   return readdirSync(dir, { recursive: true, withFileTypes: true })
-    .filter((e) => e.isFile() && e.name.endsWith(".ts"))
+    .filter((e) => e.isFile() && /\.tsx?$/.test(e.name))
     .map((e) => join(e.parentPath, e.name));
 }

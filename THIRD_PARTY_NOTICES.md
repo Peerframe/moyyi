@@ -1,6 +1,6 @@
 # Third-party notices
 
-## OpenBot: bounded YAML validation and document parsing
+## OpenBot: bounded YAML validation, document parsing and approval presentation
 
 `src/plugins/skills/parse.ts` adapts the bounded YAML AST-validation approach from
 `packages/employee-publisher/src/agent-skills.ts`, OpenBot revision
@@ -8,6 +8,10 @@
 `src/runtime/document-worker.ts` also adapts the PDF/Office extraction methods from
 `apps/server-python/src/openbot_server/parser_worker.ts` at the same fixed commit. Two synthetic
 PDF test fixtures (encrypted and image-only) are copied from that commit.
+`apps/desktop/renderer/ApprovalCard.tsx` adapts its approval view's pending/error handling,
+and `styles.css` adapts a small presentation/token subset, at the same fixed commit.
+Bot/channel DTOs, Server authority and the old runtime are not imported. The desktop distribution
+also carries `apps/desktop/renderer/OPENBOT-LICENSE.txt` under its Resources/licenses directory.
 The source and fixtures are licensed under MIT:
 
 Copyright (c) 2026 OpenBot contributors
@@ -35,6 +39,11 @@ SOFTWARE.
 The npm-installed dependencies retain their own licenses in their package directories. The Skills
 parser adds `yaml` 2.9.1 (ISC), used through its public API rather than vendored source. Its exact
 version and integrity are recorded in `package-lock.json`.
+
+The desktop bundles Electron45.0.0, React/ReactDOM19.3.1 (MIT), and Node26.12.1 with their original
+licenses, including Chromium's third-party notices. esbuild0.28.2 and React type declarations19.3.0
+are build-time dependencies only. Exact integrity and reviewed choices are in the lockfile and
+[ADR 0037](docs/decisions/0037-installed-desktop-client.md).
 
 
 ## officeparser Node distribution
