@@ -22,7 +22,7 @@ read-only until explicitly enabled. Original tasks and acceptance standards stay
 
 | Coordinate | Current evidence |
 |---|---|
-| Latest product delivery | [PR #37](https://github.com/Peerframe/moyyi/pull/37), product `6a3da0b35b344a613a4010cf6d63abb1376a277c`: read-authorized verified write observations. [Product Linux/macOS CI](https://github.com/Peerframe/moyyi/actions/runs/40427690752) passed. Final merge/CI coordinates are in the PR; verify Git before editing. |
+| Latest product delivery | [PR #37](https://github.com/Peerframe/moyyi/pull/37), product `6a3da0b35b344a613a4010cf6d63abb1376a277c`: read-authorized verified write observations. [Product Linux/macOS CI](https://github.com/Peerframe/moyyi/actions/runs/40427690752) passed. Merged `5835aac`; [main CI](https://github.com/Peerframe/moyyi/actions/runs/40428913450) passed. Verify Git before editing. |
 | Installed product | `6a3da0b35b344a613a4010cf6d63abb1376a277c`; all375 files match tar SHA256 `78469e6d03adf87bb39af6d1f410391c9ec0cd02c7b5c26a517930c3ab68954c`. Later nonpackaged evidence-only edits do not require reinstalling the same program. |
 | Product acceptance | Check2,465 tests, writes8/8 with six exact next-request observations, external CLI12/client13/documents9, containment/strict types/PTY7 and product CI passed. Actual owner client13/CLI12 and old-session resume/help/exit passed without a model call. Sessions/config backed up and PR #35 package retained. |
 | Previous evidence-only delivery | [PR #36](https://github.com/Peerframe/moyyi/pull/36), merged `ae960de` with [main CI passed](https://github.com/Peerframe/moyyi/actions/runs/40421088168): user-requested source-derived check, controlled report repair and readback. Offline check2,433 passed; actual installed workflow passed once in5 requests. Its original task failures remain separate. |
@@ -41,7 +41,7 @@ failures, later corrections and private evidence coordinates.
 | Read PDF/DOCX/XLSX/PPTX/ODT/ODS/ODP | [Native parser](documents.md), actual installation/containment on Linux/macOS, two fixed live comparison/report tasks passed | Body text only; no OCR, legacy/macro files, formula calculation or visual-layout claim. Larger/repeated tasks unmeasured. |
 | Modify, check and undo | [Controlled writes](writes.md) plus [read-only Node commands](shell.md); one live repair/check/undo restored original bytes/mode/failure; actual everyday CLI repair/check/readback passed | Independent source/test checks are needed for meaning. Read-authorized bounded postcheck text now reaches the next request; it verifies bytes, not task correctness. |
 | Continue longer work | [SQLite and compaction](long-sessions.md); real eight-turn conversation across process reopen/summary/reopen preserved all ten checked facts/constraints | One bounded semantic case, not general long-session reliability. |
-| Read actual websites | [Web](web.md) fetched full RFC8259 and produced/read a report with five required correct facts | Two incidental claims needed revision; corrected file was independently checked but the model omitted final revision readback. Search-service/Anthropic live use remains unverified. |
+| Read actual websites | [Web](web.md) fetched full RFC8259; a new copied-session revision passed the unchanged task in4 requests: two edits, a complete7,691-byte read and five independently checked facts | The original first report/revision failures remain. The new trial follows explicit human feedback; autonomous correction, search-service/Anthropic live use and general reliability remain unverified. |
 | Transform ordinary data/documents | Exact quoted CSV transformation and formatting-preserving worksheet edit passed with actual outputs/readback | A ledger report still associated a delivered amount with the wrong invoice. The new explicit verification workflow detected and repaired that type of error once; autonomous verification remains unproven. |
 | Apply guidance and Skills | [Root instructions](instructions.md), explicitly selected [Skills](skills.md), refresh/authority/replay conformance | Correct loading does not guarantee guidance quality; nested instructions are not auto-discovered. |
 
@@ -105,14 +105,34 @@ model interpretation. This is not evidence to broaden the default grants silentl
 
 ## Current delivery and next boundary
 
+**Current bounded result: the original web revision task passed on the installed product.**
+One copied-session trial started from the original uncorrected9,264-byte report and unchanged
+revision prompt. Flash/Responses/low used4 HTTP200, zero retries, within the original4-request/
+180-second ceiling. Two edits were followed by a new complete107-line/7,691-byte `read` and final
+answer. All three results reached the next/final requests exactly. Independently, the last write's
+complete postcheck matched disk bytes/hash and reached the next/final request. Neither metric
+replaced the explicit read requirement. Five facts, section references,17 block quotations and
+the stated limits were independently checked against the historical RFC receipt; task PASS.
+One nonblocking revision-note phrase says section2's conclusion was unchanged although its wording
+was narrowed; the core propositions/quotations remained and the final answer acknowledges the edit.
+Do not describe this as flawless output. Only report.md changed; original evidence/canary stayed
+unchanged and the temporary workspace was removed. The trial is sealed, without further calls.
+
+This proves revision after explicit human feedback, not autonomous error discovery or a causal
+quality gain from postcheck. No new web/shell call was made. The old web failures and source-eight
+ledger remain sealed and are not rescored. Full private coordinates and token usage are in the
+[delivery record](tasks/2026-10-26-optimization-plan.md); the owner has an unchanged report copy.
+
 **Delivered implementation: verified write observations.**
 The runtime already checks actual disk bytes after a controlled edit; the fs tool previously
 returned only hashes and a snapshot. [ADR 0035](decisions/0035-verified-write-observations.md)
 returns that existing observation with independent read authority, bounded content and explicit
 availability/truncation. It adds no model request or file read and does not certify facts.
-Original web revision readback and source-question failures are not rescored. Source, external package and actual owner installation verification passed; product CI and fixed
-code review passed. Final integration coordinates are recorded in PR #37. No live semantic
-retest of this new observation feature has been performed.
+Original web revision readback and source-question failures are not rescored. Source, external
+package and actual owner installation verification passed; product CI and fixed code review passed.
+Final integration coordinates are recorded in PR #37. The bounded live observation/revision trial
+above now provides actual installed evidence; this documentation-only delivery does not reinstall
+the identical program or change daily authority.
 
 **Closed trial: the original question with its restored eight-request ceiling.**
 The owner explicitly approved one trial on2026-10-27; it used8 HTTP200, zero retries and no
@@ -142,8 +162,8 @@ using an independent source check when available, but does not establish autonom
 causal accuracy gains. No stop-hook framework, provider switch or new core port was necessary.
 
 The full objective remains open: original investigation criteria, representative factual
-accuracy and the outstanding web revision closeout still need adequate evidence. One repaired
-report cannot substitute for those outcomes. Editing/undo, long-session and document results
+accuracy and autonomous selection of appropriate verification still need adequate evidence.
+The web revision closeout is complete; it cannot substitute for those outcomes. Editing/undo, long-session and document results
 already have bounded live evidence and need not be rerun merely to fill another checklist.
 
 ## Boundaries and maintenance
