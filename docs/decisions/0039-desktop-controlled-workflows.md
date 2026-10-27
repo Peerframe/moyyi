@@ -1,7 +1,9 @@
 # ADR 0039: Desktop controlled changes, checks and recovery
 
-Status: accepted for M3 implementation, 2026-10-27. Source integration is in progress; installed
-interaction and the fixed live change/check/undo workflow have not yet been accepted.
+Status: accepted; M3 feature acceptance evidence complete2026-10-28. Functional repair/recovery
+passed in a separately authorized live retest. Its extra DOM explanation contains an error, and
+the first live repair failure remains sealed. Final integration/installation coordinates are
+owned by the [PR #46 delivery receipt](https://github.com/Peerframe/moyyi/pull/46).
 
 ## Problem and decision
 
@@ -73,16 +75,32 @@ The upstream tests were read, not executed. Adaptation and MIT notices are recor
 
 ## Evidence and exit gate
 
-At this source checkpoint, four renderer test files passed32 tests; desktop typecheck and scoped
-Biome passed. This covers folded list boundaries/identity, unknown states, escaped text, expected
-absence, separate grants and draft-only actions. It does not establish native confirmation,
-process isolation, installed recovery or live task correctness. Host/bridge integration and
-installed checks are separately recorded when actually executed.
+The external bundle source `4274de2` passed the installed-copy M3 gate (10 cases/33 synthetic
+requests) and the instrumented native gate (9 cases/7 synthetic requests). The QA app keeps the
+candidate main/preload/renderer/host and explicitly substitutes only a synthetic worker with
+isolated data; this native gate does not establish live semantics. Writes/shell evals passed8/8
+each. Final source check passed131 files/2644 tests; checkpoint `33ed114` CI passed all three jobs.
+
+The first live repair failed before its functional check; its5-request repair/recovery group
+remains sealed. One separately authorized pair used the same original task/source/prompt/standards
+and its own shared12-request ceiling: repair5 requests/51.047s, then reopen with reset grants and
+reverse undo of both actual snapshots3 requests/30.123s. The unchanged functional checker passed;
+original bytes/mode were restored, other inputs/checker/canary stayed unchanged, and no retry ran.
+Daily Flash3/120 defaults were restored.
+
+Functional/recovery PASS does not mean the whole answer is correct: the repair answer wrongly
+claimed that a null `removeEventListener` callback throws in real DOM. The callback is nullable
+and no matching listener means no removal under the [DOM standard](https://dom.spec.whatwg.org/#dom-eventtarget-removeeventlistener).
+The [delivery record](../tasks/2026-10-26-optimization-plan.md) retains that error, both live groups,
+fixture corrections and actual check history. No new request was made to repair the explanation;
+original source-analysis FAILs remain unchanged. Final integration and owner installation are
+recorded separately in [PR #46](https://github.com/Peerframe/moyyi/pull/46); M4 is not claimed.
 
 Keep the [roadmap's fixed PR28 workflow](../roadmap.md#quality-lane-independent-progress-explicit-final-gate):
 two runs, each8 requests/180 seconds/8192 output, shared12 HTTP and zero retries, original
 listener-leak source/checker, functional repair and two byte/mode-exact undos. Native denial,
 stale approval, cancellation/reopen and no-replay checks are additional interaction evidence.
 Do not replace the functional checker with a successful command or file existence, and do not
-rescore the original source-analysis failures. Final package, native/live results, CI and owner
-installation belong in the delivery receipt before claiming M3 accepted. M4 remains separate.
+rescore the original source-analysis failures. Feature acceptance evidence is complete within these limits. Final package, CI and owner
+installation coordinates belong in the delivery receipt; they are not implied by source checks.
+M4 remains separate.

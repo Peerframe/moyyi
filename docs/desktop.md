@@ -4,10 +4,12 @@ The macOS arm64 desktop opens the existing moyyi runtime. M1's workspace selecti
 conversation, approval, cancellation and history loop is accepted. M2's settings, document
 selection and delivered-report controls passed the external bundle checks and two fixed live
 tasks through the native UI. M2 was merged and installed; the [PR #45 delivery receipt](https://github.com/Peerframe/moyyi/pull/45)
-records its final coordinates. M3 adds controlled changes/checks and operation history in the
-source candidate; its installed/native/live acceptance is still pending. New controls require
-the corresponding bundle and do not appear in an earlier app because source changed. This is
-not a public release.
+records its final coordinates. M3 adds controlled changes/checks and operation history. Its
+feature acceptance evidence is complete: external-copy/native gates and an independently
+authorized live repair/check/reopen/undo passed. The first live failure and an incorrect extra
+explanation remain recorded below. Final integration and installation coordinates belong in
+[PR #46](https://github.com/Peerframe/moyyi/pull/46). New controls require the corresponding bundle;
+source changes do not update an earlier app. This is not a public release.
 See [ADR 0037](decisions/0037-installed-desktop-client.md),
 [ADR 0038](decisions/0038-desktop-materials-and-reports.md),
 [ADR 0039](decisions/0039-desktop-controlled-workflows.md) and the
@@ -77,7 +79,8 @@ check its claims, citations and coverage against the materials.
 
 ## M3 candidate: changes, checks and recovery
 
-These controls are in the source candidate and still require installed/native workflow acceptance.
+These controls have bounded functional/recovery acceptance evidence. Final integration and daily
+installation coordinates belong in the [PR #46 receipt](https://github.com/Peerframe/moyyi/pull/46).
 Open **会话权限** in an idle session. **允许提议文件修改** and **允许提议 Node 命令检查** are independent
 and initially off. Confirm the selected workspace in the native dialog; cancelling keeps the
 current permissions. File changes use snapshot-backed create/edit/undo and each operation still
@@ -112,6 +115,18 @@ retry or automatic unlock control. Cancelling a pending approval is different: s
 edits can still be requested for undo after reopening and explicitly re-enabling writes.
 History alone does not prove a file is unchanged or a check passed. Original task standards and
 budgets remain unchanged; component tests are separate from installed workflow acceptance.
+
+M3 passed external-copy and instrumented native interaction gates with synthetic providers.
+A separately authorized live pair then repaired the unchanged listener-leak task, ran its fixed
+Node check, reopened with grants reset and undid both actual snapshots in reverse order, restoring
+original bytes/mode. It used5 repair and3 undo requests within its own shared12-request ceiling,
+with zero retries. Final source check passed131 files/2644 tests.
+
+This establishes the bounded functional/recovery workflow, not an error-free explanation: the
+repair answer incorrectly claimed that a null `removeEventListener` callback throws in real DOM.
+The first live repair failure also remains sealed. The [delivery record](tasks/2026-10-26-optimization-plan.md)
+preserves both groups and the correction; final integration/installation coordinates belong in
+[PR #46](https://github.com/Peerframe/moyyi/pull/46).
 
 ## Demonstrated M1 acceptance
 
@@ -207,9 +222,9 @@ parser containment canary with synthetic model responses. It never uses an API k
 does not replace visible GUI testing, paid task-quality checks or the original fixed tasks.
 
 M2's external-copy, native-control, live-task and final installation evidence is recorded above
-and in its PR receipt. M3 still requires its own final build, native permission/change/check/undo
-and interruption workflow, CI and installation. Earlier acceptance is not evidence that a later
-package was installed or that the new workflow passed.
+and in its PR receipt. M3's functional/recovery evidence is recorded above; its final package,
+CI, merge and daily installation coordinates belong in [PR #46](https://github.com/Peerframe/moyyi/pull/46).
+Source evidence alone does not establish installation of a later package.
 
 Before installing, close both clients, back up the session/configuration directories, preserve
 the prior CLI tarball and any previous app, then copy the verified app to `~/Applications`.
