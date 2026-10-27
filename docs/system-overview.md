@@ -22,9 +22,9 @@ read-only until explicitly enabled. Original tasks and acceptance standards stay
 
 | Coordinate | Current evidence |
 |---|---|
-| Latest product delivery | [PR #40](https://github.com/Peerframe/moyyi/pull/40), product `c2f894f31915c40332eb43063b23b675433b237b`: optional Kimi Chat and missed development-notification recovery. [Product Linux/macOS CI](https://github.com/Peerframe/moyyi/actions/runs/40456494675) passed; fixed-head independent review found no blockers. Final integration coordinates are in the PR; verify Git before editing. |
-| Installed product | `c2f894f31915c40332eb43063b23b675433b237b`; all394 files match tar SHA256 `b437ed5deb4e9468566714776665d307b0933b20456dce8d2164f9ac05d673bd`. Later nonpackaged evidence-only edits do not require reinstalling the same program. |
-| Product acceptance | Check2,548 tests, Kimi4/4 offline scenarios; external CLI12/client13/Kimi3/documents9, containment/strict types/PTY7 and product CI passed. Actual owner installation matches the accepted tar; Kimi3 installed-consumer cases, real host startup/help/exit and old Flash session load passed without model calls. Sessions/config backed up, old package retained, Flash host/launchers unchanged. |
+| Latest product candidate | [PR #41](https://github.com/Peerframe/moyyi/pull/41): accurate final-request output exhaustion and CLI partial/no-answer diagnostics; no automatic review stage. Its delivery receipt tracks fixed-head review, final CI, merge and local installation separately. |
+| Installation coordinate | The [PR #41 delivery receipt](https://github.com/Peerframe/moyyi/pull/41) is the current installation record: accepted tar SHA256 `76efa10a1b6f07cf575a3cbcfcb68c1d777255125b1460b6474206960b21731e`,394 files. Candidate acceptance does not imply the owner installation has happened; consult its explicit installation result. The prior PR #40 installation remains recorded in the dated delivery history. |
+| Product acceptance | Output-diagnostic candidate: check2,553 tests; external CLI13/client13/Kimi3/documents9, containment/strict types/PTY7 passed. Previous unchanged Kimi4/4 offline and live connection evidence remain valid. Initial CI failures and final corrected results are retained in the delivery record and PR receipt. |
 | Previous evidence-only delivery | [PR #36](https://github.com/Peerframe/moyyi/pull/36), merged `ae960de` with [main CI passed](https://github.com/Peerframe/moyyi/actions/runs/40421088168): user-requested source-derived check, controlled report repair and readback. Offline check2,433 passed; actual installed workflow passed once in5 requests. Its original task failures remain separate. |
 | Optional Kimi | Installed opt-in `kimi-k3.1-pro` Chat provider, low/high/max, preserving visible reasoning and final-request tool prohibition. Two-request Chat connection probe passed; Responses rejected final `none`. Original-task independent comparison: six HTTP200, zero retries; strict FAIL, items1/2/3/5 met and4/6 partial. Installation is verified; the six-item task FAIL remains separate. |
 | Public version | None; local candidate installation and public source PRs are not a version release. |
@@ -106,7 +106,24 @@ model interpretation. This is not evidence to broaden the default grants silentl
 
 ## Current delivery and next boundary
 
-**Current bounded result: Kimi connects correctly, but does not pass the unchanged source rubric.**
+
+**Current bounded work: accurate output-limit diagnostics; source-answer omissions remain open.**
+One sealed Flash revision diagnostic exhausted all8,192 output tokens in reasoning without an
+answer. One separate fresh Kimi compact defect audit received429 engine overload and supplied no
+semantic evidence. Both stopped after one request with no retries or tools; old task scores remain
+unchanged. The [research record](research/2026-10-26-agent-navigation.md#answer-coverage-after-evidence-delivery-2026-10-27)
+records the mechanism changes, official budget controls and why no automatic review stage is adopted.
+
+The concrete residual defect is final-request classification: explicit output exhaustion was
+reported as request exhaustion. [ADR0034](decisions/0034-incomplete-response-outcomes.md#correct-the-final-request-cause-2026-10-27)
+corrects that cause and adds clear CLI partial/no-answer diagnostics with known final usage.
+This does not alter limits, authority, default Flash/Responses/low or the original answer rubric.
+Current branch acceptance is in the delivery record, and the [PR #41 receipt](https://github.com/Peerframe/moyyi/pull/41)
+tracks the actual installation/backup/startup result separately from the accepted tar. A future source-answer
+quality change needs a distinct, justified mechanism and evidence within its accepted task budget;
+no further same-question prompt variant or automatic review framework is pending from these trials.
+
+**Previous bounded result: Kimi connects correctly, but does not pass the unchanged source rubric.**
 The owner selected official Kimi Open Platform and saved the regional key. A separate synthetic
 Responses probe returned HTTP200 then HTTP400 for final `tool_choice:none`; Chat completed the
 tool/result/final-none flow in two HTTP200 requests. [ADR 0036](decisions/0036-kimi-chat-provider.md)

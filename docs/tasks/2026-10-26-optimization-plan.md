@@ -7,7 +7,52 @@ Owner 已授权先做整体计划，再针对已证实的缺口优化。本计�
 
 ## 持续交付：日常任务闭环（当前）
 
-### 当前交付：Kimi 官方接口与同题独立对照（2026-10-27）
+### 当前交付：输出耗尽的准确诊断与答案复核边界（2026-10-27）
+
+Owner要求修复剩余问题。本轮先复核原题、原评分和已送达的证据，保留两项遗漏及旧FAIL。
+重新查阅Codex/OpenCode任务状态工具和OpenHands独立judge，未发现能自动保证事实完整性的
+现成组件；已有泛化提示词曾失败撤回，不能再加同类句子当修复。
+
+两次不同机制的单请求诊断均单独冻结、先离线22/22再真实请求，零重试/零工具，不提供rubric或
+正确答案、不修改旧账本：
+
+- Flash/Responses/low续接原完整证据+原完整草稿/可见推理，要求通用复核并给出修订全文。
+  1次HTTP200，52.347秒，input35,278/cacheRead31,232/output8,192/reasoning8,192；没有正文，
+  raw SSE独立证实`incomplete/max_output_tokens`，不是保存或codec漏字。结果INCOMPLETE。
+  私有`~/.moyyi/reviews/answer-coverage-revision-2026-10-27/`，manifest
+  `e48ee743303e0bfd3dc0894dca744d25a127f4ddcd50c99f1a99962e1d87a330`。
+- Kimi/Chat/low fresh紧凑缺陷审查：原问题、原草稿和全部32个完整工具观察作为新JSON数据，
+  无旧assistant推理/倒计时/检索叙述，只要求有证据的简短缺陷与纠正。1次HTTP429，36.129秒，
+  原始类型`engine_overloaded_error`，无答复，用量unknown。独审逐项确认32结果及5个历史文件hash。
+  私有`~/.moyyi/reviews/answer-coverage-kimi-audit-2026-10-27/`，manifest
+  `05eccc8980a09baa6fcbdf7f3898c7dbeea61d5abd308d6ccece337ac93325ab`。不是语义FAIL或PASS。
+
+本轮共2次真实请求，均封存，未核对账户账单。两家公开接口都没有独立推理硬预算或正文预留参数，
+现有codec未漏传；保持low、8192与既有上限，不自动扩大。关闭本轮复核路线，不追加同题提示版本，
+也不加入未经证实的自动review阶段。原题4/6仍partial，其余1/2/3/5满足；旧标准和分数不动。
+
+**已确定的产品修复**：同样的`max_tokens`在早期请求会报输出额度耗尽，最后一请求却被报成请求数
+耗尽。先用2个真实runtime/SQLite回归复现错误，再修正cause优先级，包括最后一轮违规工具提议仍
+拒绝且不执行。CLI明确正文缺失/仅有部分文字；仅在最终用量已知时显示output及其中的reasoning数，
+不泄露推理正文、不把未知用量写成0。不会追加请求或重试。见[ADR0034](../decisions/0034-incomplete-response-outcomes.md#correct-the-final-request-cause-2026-10-27)。
+这修复运行诊断，**不声称修复原题事实遗漏**。分支`codex/answer-coverage-review`，独立PR交付。
+修复前定向复现2失败/9通过；首次修复后runtime/CLI定向97/97通过，随后加入最后一轮截断工具提议
+保留拒绝的用例。最终`npm run check`118文件/2553测试、typecheck/lint全部通过（85.37秒）；
+原core eval25/25通过。原六项标准、权限、超时、请求数、8192输出及零重试均未放宽。
+独立审查未发现产品阻断，额外历史加载4项通过；同步architecture中旧的final-request分类说明。
+首次独立安装验收发现总计数断言仍写12而CLI已实际通过13项；将精确清单更新为13，原12项保留，
+新增最后一请求reasoning-only截断用例，未减少断言或跳过测试。首次失败日志保留。
+修正后的外部`verify:package -- --offline`通过：clean `6f63518`、394文件，CLI13/client13/Kimi3/
+documents9、原生containment、strict types、PTY7；包SHA256
+`76efa10a1b6f07cf575a3cbcfcb68c1d777255125b1460b6474206960b21731e`。
+[PR #41](https://github.com/Peerframe/moyyi/pull/41)按固定head独审无阻断。
+首轮[CI](https://github.com/Peerframe/moyyi/actions/runs/40462489084)macOS通过，Linux在既有
+Office vendor测试中对1.2MB Buffer做框架深比较耗时6.283秒，超过原5秒门槛。保留全部84文件、
+逐字节相等、SHA256、metadata/license断言与超时，只将字节断言改为Node原生`Buffer.equals`；
+未增加重试、减少用例或更改worker数。本地原focused耗时2.38秒（总进程），修改后302ms；最终再次`npm run check`118文件/2553测试、typecheck/lint通过（76.90秒）。
+最终CI及本机安装/备份/启动结果统一维护在PR #41交付回执；不会把“准备好安装”写成已安装。
+
+### 上次交付：Kimi 官方接口与同题独立对照（2026-10-27）
 
 Owner保存区域密钥后授权接口验证、原题/原标准对照；Flash + Responses + low日常默认保留，不公开发布。
 先验证路线：Responses合成工具探针2请求中首个HTTP200、第二个HTTP400明确拒绝`tool_choice:none`；

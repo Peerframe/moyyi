@@ -236,3 +236,11 @@ stops it. Originals remain available; the CLI labels summary-request audit recor
 from normal answers. See [long-session behavior and limits](long-sessions.md). The finite offline
 `--demo` script does not generate summaries; `npm run eval:long-sessions` checks the feature with
 purpose-built synthetic responses.
+
+
+When a model reaches its output limit, the CLI marks any text as partial or reports that no
+answer was produced. If final usage is available, it shows output tokens and the reasoning tokens
+included in that total, without displaying reasoning content. This is a per-response output
+limit, even on the final allowed request; allowing more requests does not enlarge it. The run
+still exits nonzero in one-shot mode and does not continue automatically. Original partial
+content and usage remain in session history.

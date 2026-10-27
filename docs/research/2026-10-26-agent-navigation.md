@@ -178,3 +178,77 @@ file body. Denied/approval-required reads should leave a successful write receip
 post-publication verification failure remains unknown. This is a design candidate, not an
 implemented capability or a substitute for fact checking, ordinary reads after later changes,
 or the old web task's missing readback evidence.
+
+## Answer coverage after evidence delivery, 2026-10-27
+
+PR #40's independent Kimi comparison retained the original source/question/rubric and confirmed
+exact delivery of all32 tool observations (98 historical appearances). The remaining lifecycle
+and indirect-content boundaries were already present in the evidence. Four requirements met and
+two remained partial, as in the earlier Flash trial. Those two requirements extend the visible
+question's explicit enumeration; preserve the original strict FAIL without assuming every rubric
+omission is a new runtime defect. The observed failure is answer coverage, not a lost reader result.
+
+The owner requested a fix. Rechecking [ADR 0022](../decisions/0022-evidence-guidance-and-focused-reads.md)
+rejects simply adding another generic completeness sentence: a candidate with question coverage,
+conditions and lifecycle scope already failed and was withdrawn. Current guidance also contains
+claim/evidence mapping and final checks. The following primary sources were inspected afresh:
+
+| Maintained source | What it actually provides | Relevant limitation |
+|---|---|---|
+| [Codex `2cab11ca40aad193382348a7bda46da2fc47596a`](https://github.com/openai/codex/blob/2cab11ca40aad193382348a7bda46da2fc47596a/codex-rs/core/src/tools/handlers/plan.rs), Apache-2.0 | Model-authored plan states and visible progress | The handler publishes state; it does not independently check conclusions or omitted requirements. |
+| [OpenCode `5f8ee0f5074f99a8b5d5cafb94126f879a274b50`](https://github.com/anomalyco/opencode/blob/5f8ee0f5074f99a8b5d5cafb94126f879a274b50/packages/core/src/tool/plugin/todo.ts), MIT | Todo state/counts and model-specific working guidance | [Tests](https://github.com/anomalyco/opencode/blob/5f8ee0f5074f99a8b5d5cafb94126f879a274b50/packages/core/test/tool-todo.test.ts) exercise the tool contract, not factual answer completeness. |
+| [OpenHands SDK `d0d9d81324210414462fb676b377e0563a08a0cb`](https://github.com/OpenHands/software-agent-sdk/blob/d0d9d81324210414462fb676b377e0563a08a0cb/openhands-sdk/openhands/sdk/conversation/goal/judge.py), MIT | A separate model call assesses goal completion against the conversation | This consumes a request and remains a model judgment. Its parser tests are not reliability evidence for moyyi. |
+
+No upstream prompt/source was copied, no dependency was added, and no upstream test suite was
+executed. These sources support distinguishing task tracking, same-pass guidance and an actual
+second-stage review; none certifies that an answer is correct.
+
+Before changing the product, freeze one separate draft-revision diagnostic: the original Flash
+final request's complete evidence/history plus its exact old completed answer, followed by an
+original general review request. Do not send the rubric, expected facts or specific omissions.
+Use Flash/Responses/low, one request, no tools, zero retry and the original output ceiling. Preserve
+old scores and ledgers. This diagnoses whether a second stage can improve a fixed draft; it is
+not an autonomous original-task pass or a ninth request added to the old trial. If it fails, do
+not ship a review mechanism or repeat the same probe until green. If it improves, independently
+check regressions and test the cost of reserving that stage inside the original task's eight
+requests before claiming product improvement. No core/provider change is justified in advance.
+
+
+The single continuation diagnostic is sealed: one HTTP200, zero retries/tools,52.347 seconds.
+The raw Responses terminal is `incomplete/max_output_tokens`; all8,192 output tokens are reported
+as reasoning and no answer text was emitted. Input was35,278 tokens (31,232 cached). Independent
+raw-SSE review confirmed this was not a decoder or saving loss. No product review stage is adopted
+from this result, and the original Flash/Kimi scores remain unchanged.
+
+The [DeepSeek Responses schema](https://api-docs.deepseek.com/api/create-response/) makes the
+output cap shared by reasoning and visible text; its reasoning control is effort, not a reserved
+answer allowance. The [Anthropic compatibility table](https://api-docs.deepseek.com/guides/anthropic_api/)
+explicitly ignores `thinking.budget_tokens`. The [Kimi Chat schema](https://platform.kimi.com/docs/api/chat)
+and [effort guide](https://platform.kimi.com/docs/guide/use-reasoning-effort) likewise expose the
+total completion limit and effort, not an independent thinking cap or guaranteed answer reserve.
+Existing adapters send the documented fields. Do not infer that low was ignored, invent an
+unsupported parameter, silently disable thinking, or increase the accepted output cap.
+
+The earlier nine-observation Flash review in the delivery record also exhausted output without
+an answer. A final bounded diagnostic therefore changes the tested mechanism explicitly: Kimi's
+own completed draft and all32 observations are data in a fresh system/user pair, with no old
+assistant reasoning or budget notices. It asks only for compact, evidence-backed defects and
+corrections, not another full answer or a self-certified PASS. The reviewed OpenHands judge uses
+[a fresh request](https://github.com/OpenHands/software-agent-sdk/blob/d0d9d81324210414462fb676b377e0563a08a0cb/openhands-sdk/openhands/sdk/conversation/goal/judge.py#L54-L87),
+which is different from continuing an old assistant reasoning stream. No rubric, expected facts,
+prior assessment or manual correction enters the diagnostic. Preserve every observation's call,
+arguments, status, complete result, order, duplication and truncation markers. Freeze the exact
+transformation before one Kimi/Chat/low request,8192 output,180 seconds, no tools/retries. If it
+has no usable final result or identifies neither remaining material omission, close this route;
+do not vary the same question until it passes. A successful defect audit would still require
+separate correction and in-budget autonomous validation before any product-quality claim.
+
+
+The fresh compact Kimi diagnostic is also sealed: one request, HTTP429 with
+`engine_overloaded_error`,36.129 seconds, zero retries/tools, no answer or findings. Usage is
+unknown, not zero. Independent comparison verified the original question/draft and all32 paired
+observations against the frozen source records. This is unavailable semantic evidence, not a
+finding that Kimi missed the defects or that the review mechanism works. No further request,
+prompt variant, review framework or default-model change is made. Separately, the concrete
+final-attempt output-limit classification defect is corrected under [ADR0034](../decisions/0034-incomplete-response-outcomes.md#correct-the-final-request-cause-2026-10-27);
+that product change does not resolve or regrade the source-answer omissions.

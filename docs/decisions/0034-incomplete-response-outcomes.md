@@ -75,3 +75,28 @@ All 372 installed files match the accepted package. The actual installed CLI pas
 scenarios, including both new early-terminal cases; opening an existing owner session for
 help/exit succeeds without model calls. Backups and the old package remain available. Final
 integration is recorded on the PR and in the [current delivery record](../tasks/2026-10-26-optimization-plan.md).
+
+
+## Correct the final-request cause (2026-10-27)
+
+A new, separately sealed Flash revision diagnostic returned HTTP200 with all8,192 generated
+tokens classified as reasoning and no final text. A fresh Kimi compact audit subsequently
+returned429 engine overload without a model answer. Neither result justifies automatic review,
+more requests or a quality-PASS claim. The [research record](../research/2026-10-26-agent-navigation.md#answer-coverage-after-evidence-delivery-2026-10-27)
+keeps the mechanisms and original failed scores separate.
+
+Tracing the actual outcome boundary found a concrete residual classification error: a
+`max_tokens` response on the last allowed attempt returned `model_requests`, while the same
+response earlier correctly returned `model_output_tokens`. Two focused regressions reproduced
+the wrong final cause before the fix, for partial text and reasoning-only output. Correct this
+exception to the original decision above: the provider's explicit output-limit terminal takes
+precedence over the coincident request ceiling, including forbidden tool proposals. Those calls
+still receive denied results without preparation, approval or execution. Errors/cancellation,
+empty/unknown terminals, recorded usage and interrupted run status retain their existing rules.
+
+The CLI now explains capped output beside its saved answer, distinguishing partial text from
+no answer. When both final usage counts are known, show output and its included reasoning count;
+never present missing usage as zero, expose reasoning content, or certify a partial answer.
+This explanation also applies when viewing saved history. No new request, retry, model setting,
+permission, persistent format or review phase is introduced. This repairs diagnostics, not the
+original source-question omissions.

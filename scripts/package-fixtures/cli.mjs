@@ -230,28 +230,39 @@ export default {
     assert(!existsSync(data));
   });
 
-  for (const [stopReason, part, diagnosis] of [
+  for (const [label, maxRequests, stopReason, part, diagnosis] of [
     [
+      "early-max_tokens",
+      3,
       "max_tokens",
       { type: "text", text: "Retain this unfinished answer." },
       "budget exhausted: model_output_tokens",
     ],
     [
+      "early-end_turn",
+      3,
       "end_turn",
       { type: "reasoning", kind: "visible", text: "Synthetic reasoning without an answer." },
       "failed: Model response contained no answer text",
     ],
+    [
+      "final-max_tokens",
+      1,
+      "max_tokens",
+      { type: "reasoning", kind: "visible", text: "Synthetic reasoning without an answer." },
+      "budget exhausted: model_output_tokens",
+    ],
   ]) {
-    scenario(`early-${stopReason}-without-answer-exits-nonzero`, () => {
-      const host = join(root, `terminal-${stopReason}-host.mjs`);
-      const counter = join(root, `terminal-${stopReason}-requests`);
+    scenario(`${label}-without-answer-exits-nonzero`, () => {
+      const host = join(root, `terminal-${label}-host.mjs`);
+      const counter = join(root, `terminal-${label}-requests`);
       writeFileSync(
         host,
         `import { appendFileSync } from 'node:fs';
 const usage = { status: 'unknown', inputTokens: null, outputTokens: null, cacheReadTokens: null, cacheWriteTokens: null, reasoningTokens: null };
 const origin = { provider: 'terminal-fixture', model: 'fixture' };
 export default {
-  model: origin, limits: { maxModelRequests: 3, maxRetries: 2 },
+  model: origin, limits: { maxModelRequests: ${maxRequests}, maxRetries: 2 },
   plugins: [{ plugin: { name: 'terminal-fixture', apiVersion: 1, setup(host) {
     host.registerModelProvider({ id: origin.provider,
       models: [{ origin, contextWindowTokens: 100000, maxOutputTokens: 100, parallelToolCalls: false, reasoning: 'none', promptCache: 'none', editFormat: 'search_replace' }],
@@ -270,7 +281,7 @@ export default {
         "-C",
         workspace,
         "--data",
-        join(root, `terminal-${stopReason}-data`),
+        join(root, `terminal-${label}-data`),
         "Inspect the synthetic task",
       ]);
       status(result, 1);
@@ -278,10 +289,19 @@ export default {
       assert(!result.stdout.includes("run | completed"));
       assert.equal(readFileSync(counter, "utf8"), "request\n", "No replacement or retry request");
       if (part.type === "text") assert(result.stdout.includes(part.text));
+      else assert(!result.stdout.includes(part.text), "Reasoning is not a final answer");
+      if (stopReason === "max_tokens") {
+        assert(
+          result.stdout.includes(
+            part.type === "text" ? "text above is partial" : "without producing an answer",
+          ),
+        );
+        assert(!result.stdout.includes("run | budget exhausted: model_requests"));
+      }
     });
   }
 
-  assert.equal(cases.length, 12);
+  assert.equal(cases.length, 13);
   console.log(
     JSON.stringify({
       passed: true,

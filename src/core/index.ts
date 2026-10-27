@@ -672,7 +672,10 @@ export class AgentCore {
         });
         if (run.controller.signal.aborted) break;
         run.finishing = true;
-        return { kind: "budget_exhausted", budget: "model_requests" };
+        return {
+          kind: "budget_exhausted",
+          budget: response.stopReason === "max_tokens" ? "model_output_tokens" : "model_requests",
+        };
       }
       if (interrupted || run.controller.signal.aborted || response.stopReason !== "tool_use") {
         if (calls.length)
@@ -706,11 +709,12 @@ export class AgentCore {
           }
         }
         run.finishing = true;
-        if (finalRequest && !response.error && (!completeStop || !hasAnswer))
-          return { kind: "budget_exhausted", budget: "model_requests" };
         if (response.error) return { kind: "failed", reason: response.error.message };
+        // The provider's output ceiling remains the cause even on the last allowed request.
         if (response.stopReason === "max_tokens")
           return { kind: "budget_exhausted", budget: "model_output_tokens" };
+        if (finalRequest && (!completeStop || !hasAnswer))
+          return { kind: "budget_exhausted", budget: "model_requests" };
         if (!completeStop)
           return {
             kind: "failed",

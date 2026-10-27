@@ -186,7 +186,7 @@ try {
     ),
   );
   for (const [key, count] of [
-    ["cli", 12],
+    ["cli", 13],
     ["client", 13],
     ["documents", 9],
     ["kimi", 3],
