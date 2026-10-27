@@ -33,6 +33,27 @@ The rolling pages identified Node v26.12.1 when reviewed; fixed v26.0.0 pages we
 through the research tool. Execution evidence uses the repository's actual Node 26.0.0 on macOS
 and the existing Node 26 CI lane. We do not infer Windows or network-filesystem watch support.
 
+### Notification recovery (2026-10-27)
+
+Full-suite macOS runs exposed missed development notifications under the original three-second
+test deadline. A separate focused run and twelve immediate same-length native writes passed;
+their changed stat fingerprints rule out the proposed same-length timestamp collision in that
+sample, but do not establish the exact cause of the intermittent failure.
+[libuv 1.52.1](https://github.com/libuv/libuv/blob/v1.52.1/src/unix/fsevents.c) (the version in the
+local Node binary) starts FSEvents on its CF thread after signaling it; the stream starts at
+`SinceNow`. Native notification delivery is not a synchronous registration guarantee.
+
+Keep the parent watch and add a 250ms, unreferenced stat recheck for the already selected entry
+paths only. Reuse fingerprints and debounce, do not postpone an already pending notification,
+and cancel both mechanisms on close. This adds no discovery, content loading or authority; it
+does not promise detection of changes that leave the fingerprint identical. Deterministic
+missing-native-event tests cover notification and closure without extending timeouts.
+
+The full suite also exposed contention in large-file/recording checks. Its
+[Vitest worker ceiling](https://vitest.dev/config/maxworkers) is now four; the complete test set,
+assertions, isolation and existing timeouts remain unchanged. Bound resource competition rather
+than increasing timeouts or retrying tests until they pass.
+
 ## Host configuration and authority
 
 `--demo` uses the existing scripted provider with a bounded offline read-only demonstration.
