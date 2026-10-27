@@ -107,21 +107,30 @@ model interpretation. This is not evidence to broaden the default grants silentl
 ## Current delivery and next boundary
 
 
-**Current bounded work: accurate output-limit diagnostics; source-answer omissions remain open.**
-One sealed Flash revision diagnostic exhausted all8,192 output tokens in reasoning without an
-answer. One separate fresh Kimi compact defect audit received429 engine overload and supplied no
-semantic evidence. Both stopped after one request with no retries or tools; old task scores remain
-unchanged. The [research record](research/2026-10-26-agent-navigation.md#answer-coverage-after-evidence-delivery-2026-10-27)
-records the mechanism changes, official budget controls and why no automatic review stage is adopted.
+**Current bounded work: source interpretation remains unresolved; Kimi high is service-blocked.**
+The structured-findings candidate was withdrawn after one unchanged original-task trial. Eight
+Flash/Responses/low requests completed, all16 tool results, including the notes, reached the final request,
+and source bytes stayed unchanged. The notes never formed the two missing propositions and
+introduced an incorrect raw-metadata conclusion. Independent old-rubric result: items1/5 met,
+2/4/6 partial,3 wrong. Offline24 focused checks/full2,577 tests establish only the rejected
+candidate's transport/limits. No notes plugin, new prompt or automatic review stage is installed.
 
-The concrete residual defect is final-request classification: explicit output exhaustion was
-reported as request exhaustion. [ADR0034](decisions/0034-incomplete-response-outcomes.md#correct-the-final-request-cause-2026-10-27)
-corrects that cause and adds clear CLI partial/no-answer diagnostics with known final usage.
-This does not alter limits, authority, default Flash/Responses/low or the original answer rubric.
-Current branch acceptance is in the delivery record, and the [PR #41 receipt](https://github.com/Peerframe/moyyi/pull/41)
-tracks the actual installation/backup/startup result separately from the accepted tar. A future source-answer
-quality change needs a distinct, justified mechanism and evidence within its accepted task budget;
-no further same-question prompt variant or automatic review framework is pending from these trials.
+The owner then authorized one Kimi high control using the original isolated runtime, question,
+source, system/tools and8-request/300-second/8,192-output ceiling. Offline14 gates and nine synthetic
+requests passed. Its first actual request returned429 `engine_overloaded_error`, with no answer,
+no tool calls, unknown usage and zero retries. This is unavailable semantic evidence: high has
+neither passed nor failed the six-item answer rubric. The [official troubleshooting guide](https://platform.kimi.com/docs/guide/troubleshooting)
+identifies this subtype as server capacity, distinct from quota or organization rate limits;
+changing moyyi's prompts or adding credits is not an established remedy. The sealed trial is not
+reopened. A later availability-backed validation must be separately recorded within unchanged
+limits, not used to reroll a completed bad answer. No alternative model/region was substituted.
+
+The optional complex-task entry and conditional public lifecycle/dataflow trials have **not**
+started because their quality gate is unmet. The installed PR41 baseline and daily Flash low,
+read grants, max3 and zero retries remain unchanged. The [research record](research/2026-10-26-agent-navigation.md#form-findings-during-investigation-2026-10-27)
+and [dated delivery record](tasks/2026-10-26-optimization-plan.md) retain rejected code, exact trial
+identities and known limits. Do not repeat generic completeness prompts, expand retrieval, or
+report service failure as evidence that high cannot solve the task.
 
 **Previous bounded result: Kimi connects correctly, but does not pass the unchanged source rubric.**
 The owner selected official Kimi Open Platform and saved the regional key. A separate synthetic
