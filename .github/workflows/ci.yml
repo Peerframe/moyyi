@@ -58,6 +58,9 @@ jobs:
       - name: Anthropic offline conformance
         run: npm run eval:anthropic
 
+      - name: Kimi offline conformance
+        run: npm run eval:kimi
+
       - name: Web authority conformance
         run: npm run eval:web
 

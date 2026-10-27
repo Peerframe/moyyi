@@ -1,15 +1,31 @@
 import { execFileSync } from "node:child_process";
-import { mkdtempSync, renameSync, rmSync, writeFileSync } from "node:fs";
+import { EventEmitter } from "node:events";
+import {
+  type FSWatcher,
+  mkdtempSync,
+  renameSync,
+  rmSync,
+  statSync,
+  watch,
+  writeFileSync,
+} from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { fileDevelopmentPlugin, watchDevelopmentPlugins } from "./development.ts";
+
+vi.mock("node:fs", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("node:fs")>();
+  return { ...actual, watch: vi.fn(actual.watch), statSync: vi.fn(actual.statSync) };
+});
 
 const roots: string[] = [];
 const watchers: { close(): void }[] = [];
 afterEach(() => {
   for (const watcher of watchers.splice(0)) watcher.close();
   for (const root of roots.splice(0)) rmSync(root, { recursive: true, force: true });
+  vi.useRealTimers();
+  vi.clearAllMocks();
 });
 function root() {
   const path = mkdtempSync(join(tmpdir(), "moyyi-dev-loader-"));
@@ -146,5 +162,94 @@ describe("development ESM loader and entry watcher", () => {
     watchers.push(watcher);
     writeFileSync(path, source("two"));
     expect(await timeout(reported.promise)).toContain("/reload");
+  });
+  it("reconciles missed native notifications without scanning new entries or resetting debounce", async () => {
+    vi.useFakeTimers();
+    const directory = root();
+    const path = join(directory, "plugin.mjs");
+    const unrelated = join(directory, "unrelated.mjs");
+    writeFileSync(path, source("one"));
+    writeFileSync(unrelated, source("unrelated"));
+    const native = Object.assign(new EventEmitter(), { close: vi.fn() });
+    vi.mocked(watch).mockReturnValueOnce(native as unknown as FSWatcher);
+    const entries = [fileDevelopmentPlugin("example", path)];
+    const changed = vi.fn(),
+      errors = vi.fn();
+    const watcher = watchDevelopmentPlugins(entries, changed, errors, 600);
+    watchers.push(watcher);
+    // Mutating the caller's list must not enlarge the watched paths. The native emitter stays
+    // silent, so only reconciliation can observe this edit and report it within the old limit.
+    entries.push(fileDevelopmentPlugin("another", unrelated));
+    writeFileSync(path, source("a new version"));
+    vi.mocked(statSync).mockClear();
+    await vi.advanceTimersByTimeAsync(250);
+    expect(changed).not.toHaveBeenCalled();
+    await vi.advanceTimersByTimeAsync(600);
+    expect(changed).toHaveBeenCalledExactlyOnceWith("example");
+    expect(vi.mocked(statSync).mock.calls.every(([file]) => file === path)).toBe(true);
+    await vi.advanceTimersByTimeAsync(1000);
+    expect(changed).toHaveBeenCalledTimes(1);
+    expect(errors).not.toHaveBeenCalled();
+    watcher.close();
+    expect(native.close).toHaveBeenCalledTimes(1);
+    expect(vi.getTimerCount()).toBe(0);
+  });
+  it("reports asynchronous callback failures after a missed native notification", async () => {
+    vi.useFakeTimers();
+    const path = join(root(), "plugin.mjs");
+    writeFileSync(path, source("one"));
+    const native = Object.assign(new EventEmitter(), { close: vi.fn() });
+    vi.mocked(watch).mockReturnValueOnce(native as unknown as FSWatcher);
+    const errors = vi.fn();
+    watchers.push(
+      watchDevelopmentPlugins(
+        [fileDevelopmentPlugin("example", path)],
+        async () => {
+          throw Error("synthetic callback failed");
+        },
+        errors,
+        5,
+      ),
+    );
+    writeFileSync(path, source("new version"));
+    await vi.advanceTimersByTimeAsync(255);
+    expect(errors).toHaveBeenCalledExactlyOnceWith(
+      "example",
+      "Development watcher failed; use /reload manually",
+    );
+  });
+  it("unrefs reconciliation and close cancels both rechecks and pending notifications", async () => {
+    vi.useFakeTimers();
+    const path = join(root(), "plugin.mjs");
+    writeFileSync(path, source("one"));
+    const native = Object.assign(new EventEmitter(), { close: vi.fn() });
+    vi.mocked(watch).mockReturnValueOnce(native as unknown as FSWatcher);
+    const interval = vi.spyOn(globalThis, "setInterval");
+    try {
+      const changed = vi.fn(),
+        errors = vi.fn();
+      const watcher = watchDevelopmentPlugins(
+        [fileDevelopmentPlugin("example", path)],
+        changed,
+        errors,
+        100,
+      );
+      watchers.push(watcher);
+      expect(interval.mock.results[0]?.value.hasRef()).toBe(false);
+      writeFileSync(path, source("new version"));
+      await vi.advanceTimersByTimeAsync(250);
+      expect(vi.getTimerCount()).toBe(2);
+      watcher.close();
+      watcher.close();
+      vi.mocked(statSync).mockClear();
+      await vi.advanceTimersByTimeAsync(1000);
+      expect(statSync).not.toHaveBeenCalled();
+      expect(changed).not.toHaveBeenCalled();
+      expect(errors).not.toHaveBeenCalled();
+      expect(native.close).toHaveBeenCalledTimes(1);
+      expect(vi.getTimerCount()).toBe(0);
+    } finally {
+      interval.mockRestore();
+    }
   });
 });

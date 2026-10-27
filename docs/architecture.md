@@ -52,6 +52,7 @@ core through five fixed points and can be added or removed without touching anyt
 | `documents` (seven-format body text) | read-only tool; dedicated runtime parser port | implemented candidate; two fixed live document tasks passed once; broader quality unmeasured |
 | `shell` | tools | merged in phase 3 |
 | `provider-anthropic` | model provider | merged in phase 5; live acceptance pending |
+| `provider-kimi` (Chat Completions; [ADR 0036](decisions/0036-kimi-chat-provider.md)) | model provider | opt-in K3.1 Pro; connection and task-quality evidence tracked separately |
 | `web` (fetch, search) | tools; runtime capability and base policy | merged in phase 5 |
 | `skills` (explicitly activated Agent Skills documents) | context source | implemented; refreshed per request |
 | `mcp` (bridge to MCP servers) | tools, policy rule | later |

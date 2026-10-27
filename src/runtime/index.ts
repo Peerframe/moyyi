@@ -41,6 +41,13 @@ import {
   deepSeekApiProfile,
   resolveDeepSeekReasoningEffort,
 } from "../plugins/provider-deepseek/index.ts";
+import {
+  createKimiPlugin,
+  type KimiReasoningEffort,
+  type KimiTransport,
+  kimiApiProfile,
+  resolveKimiReasoningEffort,
+} from "../plugins/provider-kimi/index.ts";
 import { createShellPlugin } from "../plugins/shell/index.ts";
 import { skillsPlugin } from "../plugins/skills/index.ts";
 import { createWebPlugin } from "../plugins/web/index.ts";
@@ -58,6 +65,7 @@ import { NodeWorkspaceDocuments } from "./documents.ts";
 import { NodeWorkspaceFiles } from "./files.ts";
 import { historyPage, sessionCatalog, sessionResults } from "./history.ts";
 import { collectContext } from "./instructions.ts";
+import { type KimiHttpOptions, kimiHttpTransport } from "./kimi-http.ts";
 import { FileRecordingSink, RecordingModelClient, ReplayModelClient } from "./model-recording.ts";
 import { type PluginEntry, PluginRegistry, type PluginStatus } from "./plugins.ts";
 import { WorkspacePreconditions } from "./preconditions.ts";
@@ -77,6 +85,8 @@ export {
   DEEPSEEK_API_PROFILE,
   type DeepSeekReasoningEffort,
   deepSeekApiProfile,
+  type KimiReasoningEffort,
+  kimiApiProfile,
   ReadOnlyPolicy,
   WebPolicy,
   WorkspaceProcessPolicy,
@@ -150,6 +160,9 @@ export interface RuntimeOptions {
   readonly anthropic?:
     | AnthropicHttpOptions
     | { readonly transport: AnthropicTransport; readonly accountScope: string };
+  /** Explicit Kimi Open Platform connection; the owner selects its region and credential. */
+  readonly kimi?: KimiHttpOptions | { readonly transport: KimiTransport };
+  readonly kimiReasoningEffort?: KimiReasoningEffort;
   /** Separate tool-network grant; never inferred from a selected model or workspace. */
   readonly web?: WebAccessOptions & { readonly approval?: "ask" | "allow" };
   /** Opt-in diagnostic recording, limited to one sequential request stream per runtime. */
@@ -195,15 +208,28 @@ export async function createRuntime(
     throw Error("DeepSeek reasoning effort requires a selected DeepSeek model");
   if (options.deepseekReasoningEffort !== undefined && !options.deepseek && !options.modelReplay)
     throw Error("DeepSeek reasoning effort requires a built-in connection or replay");
+  const kimiReasoningEffort = resolveKimiReasoningEffort(options.kimiReasoningEffort);
+  if (options.kimiReasoningEffort !== undefined && model?.provider !== "kimi")
+    throw Error("Kimi reasoning effort requires a selected Kimi model");
+  if (options.kimiReasoningEffort !== undefined && !options.kimi && !options.modelReplay)
+    throw Error("Kimi reasoning effort requires a built-in connection or replay");
+  if (options.kimi && (model?.provider !== "kimi" || model.model !== "kimi-k3.1-pro"))
+    throw Error("Kimi connection requires the selected Kimi K3.1 Pro model");
   // Freeze recording identity before plugin setup can yield to caller mutations.
   const modelRecording = options.modelRecording ? { ...options.modelRecording } : undefined;
   const modelReplay = options.modelReplay ? { ...options.modelReplay } : undefined;
   const skills = selectSkills(options.skills);
   if (options.developmentPlugins?.length && (modelRecording || modelReplay))
     throw Error("Development reload cannot be combined with recording or replay");
-  if ((modelRecording && modelReplay) || (modelReplay && (options.deepseek || options.anthropic)))
+  if (
+    (modelRecording && modelReplay) ||
+    (modelReplay && (options.deepseek || options.anthropic || options.kimi))
+  )
     throw Error("Replay cannot be combined with live connection or recording options");
-  if ((modelRecording || modelReplay || options.deepseek || options.anthropic) && !model)
+  if (
+    (modelRecording || modelReplay || options.deepseek || options.anthropic || options.kimi) &&
+    !model
+  )
     throw Error("Model transport/recording requires an explicitly selected model");
   for (const recording of [modelRecording, modelReplay]) {
     if (
@@ -218,6 +244,12 @@ export async function createRuntime(
       recording.apiProfile !== deepSeekApiProfile(deepseekReasoningEffort)
     )
       throw Error("DeepSeek recording profile does not match the configured adapter");
+    if (
+      recording &&
+      model?.provider === "kimi" &&
+      recording.apiProfile !== kimiApiProfile(kimiReasoningEffort)
+    )
+      throw Error("Kimi recording profile does not match the configured adapter");
   }
   const replayClient = modelReplay
     ? new ReplayModelClient(modelReplay.records, { apiProfile: modelReplay.apiProfile })
@@ -250,6 +282,21 @@ export async function createRuntime(
               throw Error("Replay cannot access the network");
             }),
           { accountScope: options.anthropic?.accountScope ?? "offline-replay" },
+        )
+      : undefined;
+  const kimiTransport = options.kimi
+    ? "transport" in options.kimi
+      ? options.kimi.transport
+      : kimiHttpTransport(options.kimi)
+    : undefined;
+  const kimi =
+    kimiTransport || (modelReplay && model?.provider === "kimi")
+      ? createKimiPlugin(
+          kimiTransport ??
+            (async () => {
+              throw Error("Replay cannot access the network");
+            }),
+          { reasoningEffort: kimiReasoningEffort },
         )
       : undefined;
   const web = options.web ? new NodeWebAccess(options.web, services.webHttp) : undefined;
@@ -310,6 +357,7 @@ export async function createRuntime(
     { plugin: createWebPlugin(options.web?.search?.origin) },
     ...(anthropic ? [{ plugin: anthropic }] : []),
     ...(deepseek ? [{ plugin: deepseek }] : []),
+    ...(kimi ? [{ plugin: kimi }] : []),
     ...(options.plugins ?? []),
   ];
   const development = new Map<string, DevelopmentPlugin>();

@@ -25,6 +25,7 @@ export const installedGuides = [
   "docs/cli.md",
   "docs/deepseek.md",
   "docs/anthropic.md",
+  "docs/kimi.md",
   "docs/files.md",
   "docs/documents.md",
   "docs/writes.md",

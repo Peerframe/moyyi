@@ -53,7 +53,8 @@ export function watchDevelopmentPlugins(
   const fingerprints = new Map<string, string>();
   const watchers: FSWatcher[] = [];
   let closed = false;
-  for (const entry of entries) {
+  for (const configured of entries) {
+    const entry = { ...configured };
     fingerprints.set(entry.name, fingerprint(entry.filePath));
     const directory = dirname(entry.filePath);
     const group = groups.get(directory) ?? [];
@@ -98,10 +99,28 @@ export function watchDevelopmentPlugins(
       for (const entry of group) report(entry);
     }
   }
+  // fs.watch can miss events during native registration or coalesce them to a directory.
+  // Reconcile only the captured entries; notifications still pass through the same debounce.
+  const reconciliation = groups.size
+    ? setInterval(() => {
+        if (closed) return;
+        for (const group of groups.values()) {
+          for (const entry of group) {
+            if (
+              !timers.has(entry.name) &&
+              fingerprints.get(entry.name) !== fingerprint(entry.filePath)
+            )
+              changed(entry);
+          }
+        }
+      }, 250)
+    : undefined;
+  reconciliation?.unref();
   return {
     close() {
       if (closed) return;
       closed = true;
+      clearInterval(reconciliation);
       for (const timer of timers.values()) clearTimeout(timer);
       timers.clear();
       for (const watcher of watchers) watcher.close();
