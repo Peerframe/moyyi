@@ -1,5 +1,37 @@
 import { boundedMessage } from "./security.ts";
-import type { DesktopState } from "./shared.ts";
+import type { DesktopMaintenanceResult, DesktopState } from "./shared.ts";
+
+export function isMaintenanceResult(value: unknown): value is DesktopMaintenanceResult {
+  return (
+    boundedMessage(value) &&
+    object(value, [
+      "kind",
+      "path",
+      "rescuePath",
+      "sessionCount",
+      "schemaVersion",
+      "persistedFormat",
+      "targetRevision",
+      "settingsPreserved",
+      "workspacesUntouched",
+      "credentialsExported",
+    ]) &&
+    Object.keys(value).length === 10 &&
+    choice(value.kind, ["backup", "restore", "rollback"]) &&
+    string(value.path, 4096) &&
+    value.path.startsWith("/") &&
+    !value.path.includes("\0") &&
+    nullableString(value.rescuePath, 4096) &&
+    nullableInteger(value.sessionCount) &&
+    nullableInteger(value.schemaVersion) &&
+    nullableInteger(value.persistedFormat) &&
+    (value.targetRevision === null ||
+      (typeof value.targetRevision === "string" && /^[a-f0-9]{40}$/.test(value.targetRevision))) &&
+    value.settingsPreserved === true &&
+    value.workspacesUntouched === true &&
+    value.credentialsExported === false
+  );
+}
 
 function object(value: unknown, keys: string[]): value is Record<string, unknown> {
   return (
@@ -65,14 +97,17 @@ export function isDesktopState(s: unknown): s is DesktopState {
   )
     return false;
   if (
-    !object(s.settings, ["preset", "maxRequests", "timeoutMs"]) ||
+    !object(s.settings, ["preset", "maxRequests", "timeoutMs", "kimiReasoningEffort"]) ||
     !choice(s.settings.preset, ["flash", "kimi-cn", "kimi-global"]) ||
     !integer(s.settings.maxRequests) ||
     Number(s.settings.maxRequests) < 1 ||
     Number(s.settings.maxRequests) > 8 ||
     !integer(s.settings.timeoutMs) ||
     Number(s.settings.timeoutMs) < 30_000 ||
-    Number(s.settings.timeoutMs) > 300_000
+    Number(s.settings.timeoutMs) > 300_000 ||
+    (s.settings.kimiReasoningEffort !== undefined &&
+      !choice(s.settings.kimiReasoningEffort, ["low", "high"])) ||
+    (s.settings.preset === "flash" && s.settings.kimiReasoningEffort === "high")
   )
     return false;
   const hash = (value: unknown) => typeof value === "string" && /^[a-f0-9]{64}$/.test(value);

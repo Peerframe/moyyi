@@ -54,6 +54,18 @@ lease and unknown-effect state; restoring it must not automatically resume actio
 unreferenced blobs and the writer lock. There is no automatic garbage collection or retention
 policy implementation yet.
 
+The M4 candidate adds trusted local `backupLocalStore({ dataDirectory, destination })` and
+`restoreLocalStore({ dataDirectory, backupDirectory, rescueDestination })` exports through
+`moyyi/runtime`. Close the runtime first. These functions take the store writer lock and check
+all sessions. Restore validates a private copy, refuses unsettled work/leases, publishes a rescue
+backup, then replaces the database in place while retaining the live directory and writer-lock
+inode. It preserves previous blobs and never replays actions. The desktop separately wraps this
+with native confirmation and data-only settings backup; restore leaves current settings, Keychain
+and workspace files unchanged. These are host maintenance APIs, not model tools or session commands.
+See [ADR 0040](decisions/0040-desktop-local-maintenance.md) and the
+[candidate maintenance guide](desktop.md#backup-restore-and-software-rollback-m4-candidate);
+installed/native acceptance remains pending.
+
 Failure before directory publication leaves no destination. Failure of the final parent-directory
 sync occurs after a complete snapshot becomes visible: `BackupDurabilityError.destination`
 identifies it, but durability is unconfirmed and the method rejects. Do not mistake existence

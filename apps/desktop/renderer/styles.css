@@ -753,6 +753,45 @@ svg {
 .settings-dialog h2 {
   font-size: 18px;
 }
+.dialog-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+}
+.guide-workflows {
+  display: grid;
+  gap: 18px;
+  margin: 24px 0;
+}
+.guide-workflows section {
+  border-top: 1px solid var(--line);
+  padding-top: 16px;
+}
+.guide-workflows h3 {
+  font-size: 14px;
+  margin: 0 0 8px;
+}
+.guide-workflows p,
+.maintenance-receipt p {
+  font-size: 13px;
+  line-height: 1.8;
+  overflow-wrap: anywhere;
+}
+.guide-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin-top: 20px;
+}
+.maintenance-receipt {
+  border-top: 1px solid var(--line);
+  padding-top: 16px;
+}
+.header-actions {
+  flex-wrap: wrap;
+  justify-content: flex-end;
+}
 .settings-fields {
   margin: 22px 0 0;
   padding: 0;

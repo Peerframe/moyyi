@@ -76,6 +76,11 @@ import { NodeWebAccess, type WebAccessOptions } from "./web.ts";
 import type { WebHttpDependencies } from "./web-http.ts";
 import { NodeWorkspaceWrites } from "./writes.ts";
 
+export {
+  backupLocalStore,
+  type LocalStoreReceipt,
+  restoreLocalStore,
+} from "./local-maintenance.ts";
 export { FileRecordingSink, loadModelRecordings } from "./model-recording.ts";
 export { discoverNodeToolchain, type NodeToolchain } from "./node-toolchain.ts";
 export type { PluginEntry, PluginStatus } from "./plugins.ts";

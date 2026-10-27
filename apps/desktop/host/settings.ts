@@ -134,7 +134,7 @@ export function createModelConfiguration(home: string, vault: CredentialVault) {
           }
         : {
             model: { provider: "kimi", model: "kimi-k3.1-pro" },
-            kimiReasoningEffort: "low" as const,
+            kimiReasoningEffort: value.settings.kimiReasoningEffort ?? ("low" as const),
             kimi: {
               region: preset === "kimi-cn" ? ("cn" as const) : ("global" as const),
               getApiKey,

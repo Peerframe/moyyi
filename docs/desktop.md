@@ -4,15 +4,18 @@ The macOS arm64 desktop opens the existing moyyi runtime. M1's workspace selecti
 conversation, approval, cancellation and history loop is accepted. M2's settings, document
 selection and delivered-report controls passed the external bundle checks and two fixed live
 tasks through the native UI. M2 was merged and installed; the [PR #45 delivery receipt](https://github.com/Peerframe/moyyi/pull/45)
-records its final coordinates. M3 adds controlled changes/checks and operation history. Its
-feature acceptance evidence is complete: external-copy/native gates and an independently
+records its final coordinates. M3 adds controlled changes/checks and operation history. It is
+installed at source `6eb2993`, merged main `85873c7`: external-copy/native gates and an independently
 authorized live repair/check/reopen/undo passed. The first live failure and an incorrect extra
-explanation remain recorded below. Final integration and installation coordinates belong in
-[PR #46](https://github.com/Peerframe/moyyi/pull/46). New controls require the corresponding bundle;
-source changes do not update an earlier app. This is not a public release.
+explanation remain recorded below. [PR #46](https://github.com/Peerframe/moyyi/pull/46) and the local
+installation receipt record native launch and history reopen verification. M4's optional high
+setting, local help and maintenance controls are source candidates awaiting installed acceptance;
+they do not yet update this M3 installation. The complex source-analysis task still fails its
+original standard. This is not a public release or M4 completion claim.
 See [ADR 0037](decisions/0037-installed-desktop-client.md),
 [ADR 0038](decisions/0038-desktop-materials-and-reports.md),
-[ADR 0039](decisions/0039-desktop-controlled-workflows.md) and the
+[ADR 0039](decisions/0039-desktop-controlled-workflows.md),
+[ADR 0040](decisions/0040-desktop-local-maintenance.md) and the
 [system overview](system-overview.md) for exact scope and separate evidence.
 
 ## Use
@@ -40,10 +43,13 @@ The conversation displays at most100 recent messages and a bounded text projecti
 transcript browsing, rich Markdown, image preview and external document import remain outside
 this client. Selecting files does not upload them or read their body into the model.
 
-## M2 candidate: settings, materials and reports
+## Settings, materials and reports
 
-Open **模型设置** to choose Flash, Kimi China or Kimi Global. All three use low reasoning; Flash
-remains the default, and the Kimi choices are not a verified complex-task recommendation.
+Open **模型设置** to choose Flash, Kimi China or Kimi Global. Installed M3 uses low reasoning for
+all three. M4's settings candidate adds an explicit low/high choice for Kimi only. High is labelled
+**待任务验证**; it has not passed the fixed complex-source task and is not a reliability recommendation.
+Flash always uses low. Switching back to Flash removes high from the configuration. Legacy
+three-field settings retain low behavior; saving low or Flash retains that older representation.
 Endpoints are fixed presets. The form accepts1–8 requests and30–300 seconds per turn;8192 output
 tokens and zero retries stay fixed. An empty API Key preserves that preset's existing key.
 Changing preset, saving or closing clears the input. Save stores local configuration only: it
@@ -77,10 +83,10 @@ Receipt pages follow the underlying20-effect history, so an empty report page ca
 next page. File existence, matching bytes and a completed turn do not prove report accuracy;
 check its claims, citations and coverage against the materials.
 
-## M3 candidate: changes, checks and recovery
+## Changes, checks and recovery
 
-These controls have bounded functional/recovery acceptance evidence. Final integration and daily
-installation coordinates belong in the [PR #46 receipt](https://github.com/Peerframe/moyyi/pull/46).
+These installed controls have bounded functional/recovery acceptance evidence in the
+[PR #46 receipt](https://github.com/Peerframe/moyyi/pull/46).
 Open **会话权限** in an idle session. **允许提议文件修改** and **允许提议 Node 命令检查** are independent
 and initially off. Confirm the selected workspace in the native dialog; cancelling keeps the
 current permissions. File changes use snapshot-backed create/edit/undo and each operation still
@@ -125,8 +131,50 @@ with zero retries. Final source check passed131 files/2644 tests.
 This establishes the bounded functional/recovery workflow, not an error-free explanation: the
 repair answer incorrectly claimed that a null `removeEventListener` callback throws in real DOM.
 The first live repair failure also remains sealed. The [delivery record](tasks/2026-10-26-optimization-plan.md)
-preserves both groups and the correction; final integration/installation coordinates belong in
-[PR #46](https://github.com/Peerframe/moyyi/pull/46).
+preserves both groups and the correction. None of these results rescores the complex source task.
+
+## Daily use and limits
+
+For project reading, select the workspace, describe the question and inspect the cited files.
+No write/check grant is needed. For a document report, select the materials and one new report
+path, review its create approval, then open the recorded output and check it against the sources.
+For an edit, enable only the needed grants, inspect each preview, check the result and use the
+actual snapshots in reverse order if undo is needed. **停止** keeps completed changes; reopening
+restores records with grants off. A new send is a new model run, including after a budget stop.
+
+M4 adds an in-app **使用帮助** containing these local instructions; it is not model context.
+The displayed limits and effect receipts describe execution, not factual reliability. Flash
+remains the daily default. Original source-analysis omissions remain unresolved; larger budgets,
+Kimi high or a normal completion message do not establish correctness.
+
+## Backup, restore and software rollback (M4 candidate)
+
+These controls are implemented in the M4 source candidate; installed/native acceptance is still
+pending in the [M4 receipt](tasks/2026-10-28-desktop-m4.md). The current installed M3 app does not
+gain them from source edits. Open **备份与回退** only after work finishes. The app closes its session
+worker before maintenance and reopens it afterwards, with grants reset. Close any CLI using the
+same store first. Maintenance makes no model call and does not read or export Keychain secrets.
+
+| Action | What to do and what changes |
+|---|---|
+| **创建备份** | Choose a new folder in the native save dialog. The backup includes a consistent session database, referenced transcript/undo blobs, data-only settings and a hash manifest. It never overwrites an existing backup. Project files and Keychain secrets are excluded; credential references in settings are not portable keys. Keep this private backup protected. |
+| **选择备份并恢复** | Select a moyyi backup and confirm the native warning. The app verifies its files and formats, saves the current records/settings under `~/.moyyi/backups/before-restore-<id>`, then replaces only the session database in its original location. Current settings, Keychain and workspace files are unchanged. The selected backup's settings are not applied. |
+| **检查可回退版本** | The app checks the previously retained installation, archive hash, app identity/signature and compatibility with current data/settings. If available, it shows the target revision and rescue location. **退出并回退** arms replacement only after the current app exits; the helper retains the current app and attempts to reopen the old one. This confirmation is not proof that the old app launched successfully. |
+
+Restoring history makes conversations created after that backup absent from the active catalog;
+the rescue backup retains the replaced state. It does not undo project edits, replay operations,
+restore approvals or restore write/check permissions. Existing unknown effects, active runs or
+protective workspace leases prevent session restoration from bypassing their safety records.
+Corrupt/modified, unsupported or unsafe backup files are refused. Cancellation before confirmation
+leaves the selection's data unapplied. On an unconfirmed result, inspect the existing backup/rescue
+and current state; do not assume that repeating the action is necessary.
+
+Software rollback preserves current conversations/settings/workspaces; it does not restore a
+database backup. It requires a verified previous installation retained in managed local storage,
+not an arbitrary downloaded app. Explicit Kimi high adds a settings field older M2/M3 apps cannot
+read: rollback refuses it and asks you to switch to Flash and save first. It never silently edits
+settings or Keychain to make the older app start. A later software launch/history verification
+must be recorded separately. There is no automatic updater or public installer in this candidate.
 
 ## Demonstrated M1 acceptance
 
@@ -182,8 +230,8 @@ temporarily in its password field and travels through the dedicated write-only c
 and helper stdin; it is excluded from state snapshots, transcripts, argv, environment and logs.
 Non-executable settings and credential references live in `~/.moyyi/desktop/settings.json`
 (mode0600). Configuration closes the old runtime and reopens the same store, clearing its old
-credential cache and report grant. A post-commit reopen failure can leave settings saved but
-not yet usable; the UI reports that applying them could not be confirmed.
+credential cache, report grant and write/check permissions. A post-commit reopen failure can
+leave settings saved but not yet usable; the UI reports that applying them could not be confirmed.
 
 The desktop host uses `~/.moyyi/deepseek-data`; it does not execute `host.mjs` or inherit
 other grants from it. The unchanged Flash/Responses/low defaults match the accepted daily host.
@@ -222,13 +270,16 @@ parser containment canary with synthetic model responses. It never uses an API k
 does not replace visible GUI testing, paid task-quality checks or the original fixed tasks.
 
 M2's external-copy, native-control, live-task and final installation evidence is recorded above
-and in its PR receipt. M3's functional/recovery evidence is recorded above; its final package,
-CI, merge and daily installation coordinates belong in [PR #46](https://github.com/Peerframe/moyyi/pull/46).
-Source evidence alone does not establish installation of a later package.
+and in its PR receipt. M3 is the verified installed baseline recorded in [PR #46](https://github.com/Peerframe/moyyi/pull/46).
+M4's new maintenance paths additionally require real temporary-store failure/recovery checks and
+actual bundle/native confirmation/exit/reopen evidence. Its high selector requires separate task
+quality evidence. Source evidence alone does not establish installation of a later package.
 
 Before installing, close both clients, back up the session/configuration directories, preserve
 the prior CLI tarball and any previous app, then copy the verified app to `~/Applications`.
 Check its signature/manifest, launch it from outside the checkout, and reopen an existing session.
-To roll back, quit, restore the previous app; the existing CLI package remains usable. Restore
-database backups only deliberately because doing so discards conversations created since backup.
+For a manual software rollback from an older app without the M4 controls, quit and restore the
+verified previous app only after checking current settings/store compatibility. Keep current data;
+the existing CLI package remains separate. Restore database backups only deliberately because
+doing so replaces the active history; first preserve the current store as a rescue backup.
 No automatic updater or additional desktop platform is claimed.

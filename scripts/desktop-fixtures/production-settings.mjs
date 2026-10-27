@@ -27,19 +27,19 @@ function installGuard() {
   const originalExecFile = childProcess.execFile;
   const originalExecute = promisify(originalExecFile);
   const isolatedKeychain = join(process.env.HOME, "Library/Keychains/login.keychain-db");
-  const expected = [
+  const expected = ["moyyi.deepseek.api-key", "moyyi.kimi.cn.api-key"].map((service) => [
     "find-generic-password",
     "-a",
     "moyyi",
     "-s",
-    "moyyi.deepseek.api-key",
+    service,
     isolatedKeychain,
-  ];
+  ]);
   function checkNative(file, args) {
     // Only a metadata lookup against a nonexistent, explicit isolated-HOME keychain is allowed.
     if (
       file === "/usr/bin/security" &&
-      JSON.stringify(args) === JSON.stringify(expected) &&
+      expected.some((command) => JSON.stringify(args) === JSON.stringify(command)) &&
       !existsSync(isolatedKeychain)
     ) {
       counts.metadataChecks++;
@@ -220,6 +220,12 @@ async function verify() {
   let worker = await launch();
   let sessionId;
   const settings = { preset: "flash", maxRequests: 4, timeoutMs: 120_000 };
+  const high = {
+    preset: "kimi-cn",
+    kimiReasoningEffort: "high",
+    maxRequests: 8,
+    timeoutMs: 300_000,
+  };
   const savedPath = join(home, ".moyyi/desktop/settings.json");
   try {
     assert.equal(worker.state().connection.ready, false);
@@ -276,6 +282,62 @@ async function verify() {
     assert.equal(worker.state().messages.length, 0);
     cases.push(
       "missing credentials reject start before secret reads or network calls; both processes exit cleanly",
+    );
+    await worker.request({ type: "permissions", sessionId, writes: true, checks: false });
+    assert.equal(worker.state().permissions.writes, true);
+    const selected = await worker.request({ type: "configure", settings: high });
+    assert.deepEqual(selected.settings, high);
+    assert.equal(selected.budgets.maxRequests, 8);
+    assert.equal(selected.budgets.timeoutMs, 300_000);
+    assert.deepEqual(selected.permissions, { writes: false, checks: false });
+    assert.equal(selected.activeSessionId, sessionId);
+    assert.equal(selected.messages.length, 0);
+    assert.deepEqual(JSON.parse(readFileSync(savedPath, "utf8")).settings, high);
+  } finally {
+    await worker.close();
+  }
+  worker = await launch();
+  try {
+    assert.deepEqual(worker.state().settings, high);
+    assert.equal(worker.state().budgets.maxRequests, 8);
+    assert.equal(worker.state().budgets.timeoutMs, 300_000);
+    assert.equal(worker.state().connection.ready, false);
+    assert.deepEqual(worker.state().permissions, { writes: false, checks: false });
+    await worker.request({ type: "load", sessionId, askEachRead: false });
+    await assert.rejects(
+      worker.request({ type: "start", sessionId, text: "Must remain offline with high selected" }),
+      /unavailable/,
+    );
+    assert.equal(worker.state().messages.length, 0);
+    cases.push(
+      "explicit Kimi high persists/restarts at 8 requests/300 seconds without credentials, replay or restored grants",
+    );
+    await worker.request({
+      type: "configure",
+      settings: { ...high, kimiReasoningEffort: "low" },
+    });
+    assert.deepEqual(JSON.parse(readFileSync(savedPath, "utf8")).settings, {
+      preset: "kimi-cn",
+      maxRequests: 8,
+      timeoutMs: 300_000,
+    });
+    await worker.request({ type: "configure", settings });
+    assert.deepEqual(JSON.parse(readFileSync(savedPath, "utf8")).settings, settings);
+  } finally {
+    await worker.close();
+  }
+  worker = await launch();
+  try {
+    assert.deepEqual(worker.state().settings, settings);
+    assert.equal(worker.state().budgets.maxRequests, 4);
+    assert.equal(worker.state().connection.ready, false);
+    assert.deepEqual(Object.keys(JSON.parse(readFileSync(savedPath, "utf8")).settings).sort(), [
+      "maxRequests",
+      "preset",
+      "timeoutMs",
+    ]);
+    cases.push(
+      "returning to low/Flash writes the legacy three-field settings and restarts with Flash/4",
     );
   } finally {
     await worker.close();

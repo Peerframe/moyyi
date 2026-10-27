@@ -32,9 +32,10 @@ checked outcomes from the installed application. This is a local product candida
 release or a claim of general model reliability.
 
 The owner requested this whole-product plan on2026-10-27. This supersedes GUI's former deferred
-priority. The accepted self-owned core, single-agent scope and D1–D6 remain. The planning delivery
-does not implement a desktop shell, change the daily model or trigger model calls. Current
-implementation/live evidence remains in the [system overview](system-overview.md); the Chinese
+priority. The accepted self-owned core, single-agent scope and D1–D6 remain. M1–M3 are now the
+installed baseline; M4 is in progress and not accepted. The original planning delivery itself
+did not implement a shell or trigger model calls. Current implementation/live evidence remains
+in the [system overview](system-overview.md); the Chinese
 owner-facing brief is in the existing [delivery record](tasks/2026-10-26-optimization-plan.md).
 This roadmap is the implementation sequence, not another task queue alongside those records.
 
@@ -137,8 +138,8 @@ installation checks. These are acceptance checkpoints, not estimates or completi
 |---|---|---|
 | **M1: installed desktop read-only loop** | Open app → select workspace → use an existing secure Flash connection → send a request → observe real tool/output/error state → cancel or finish → reopen its history. First functional PR starts this path and adapts the OpenBot approval-card presentation where read approvals are needed. | Native startup/bridge/Node26/store ownership proven from an installed bundle; real runtime and temporary files, no product mock backend. Scripted interaction evidence and a separately labelled bounded live read case; denied/stale approval and close/reopen behavior checked. Missing connection has an actionable state. |
 | **M2: materials, settings and delivered reports — accepted baseline** | Configure a connection without a terminal; select documents; generate an explicitly approved report; open it from a receipt-backed result card. Accepted and installed through [PR #45](https://github.com/Peerframe/moyyi/pull/45). | Seven existing parsers reused; workspace-local materials only. External import remains separate. Report content was checked against actual source, not only file existence. |
-| **M3: edit, inspect, resume and undo — feature acceptance evidence complete** | Preview a change → deny once → approve → check → interrupt/reopen → inspect → undo. External-copy/native gates and one independently authorized live repair/check/two-snapshot reverse undo passed. Final source check131/2644 passed. See [ADR 0039](decisions/0039-desktop-controlled-workflows.md). | First live repair failure remains sealed; the passing repair added a false DOM explanation. Final integration/installation coordinates belong in [PR #46 receipt](https://github.com/Peerframe/moyyi/pull/46). Checks retain independent approval, read-only workspace/no network; unknown leases are not automatically released. No M4 acceptance claim. |
-| **M4: integrated personal candidate** | Use all three fixed workflows below from the installed app, with normal settings and no developer-assisted file/config repair. Backup/update/rollback and a short user guide accompany the candidate. | M1–M3 interaction/authority gates plus all applicable semantic gates. No unresolved blocker for the advertised workflow, no hidden failed criterion. General reliability and additional platforms remain unclaimed. |
+| **M3: edit, inspect, resume and undo — accepted installed baseline** | Preview a change → deny once → approve → check → interrupt/reopen → inspect → undo. External-copy/native gates and one independently authorized live repair/check/two-snapshot reverse undo passed. Final source check131/2644 passed. Installed source6eb2993/main85873c7, [PR #46 receipt](https://github.com/Peerframe/moyyi/pull/46). | First live repair failure remains sealed; the passing repair added a false DOM explanation. Checks retain independent approval, read-only workspace/no network; unknown leases are not automatically released. No M4 acceptance claim. |
+| **M4: integrated personal candidate — in progress** | Use all three fixed workflows below from the installed app, with normal settings and no developer-assisted file/config repair. Backup/update/rollback and a short user guide accompany the candidate. The [single M4 receipt](tasks/2026-10-28-desktop-m4.md) separates implemented, checked and pending evidence. | M1–M3 interaction/authority gates plus all applicable semantic gates. Reuse unchanged M2/M3 live-task evidence; retain affected package/native checks. No unresolved blocker for the advertised workflow, no hidden failed criterion. General reliability and additional platforms remain unclaimed. |
 
 M1 begins with one real installed transport/runtime feasibility probe, then completes the same
 user flow. It is not a separate framework project or a sequence of mock-only prerequisite PRs.
@@ -169,10 +170,23 @@ Report per-task attempts, outcome, missing facts, wrong claims, time and availab
 usage stays unknown. Do not invent a universal pass percentage from a few cases.
 
 Current quality facts: original Flash and Kimi low explanations failed; the notes candidate was
-withdrawn; Kimi high returned first-request429 engine overload and produced no answer to score.
-No optional high entry is implemented or recommended as verified. Keep these records sealed.
-A later service-available high comparison needs its own bounded record; do not retry it silently.
-Existing continuous paid-validation authorization does not waive zero-retry or fixed-budget rules.
+withdrawn; the earlier Kimi high control returned first-request429 engine overload and produced
+no answer to score. Keep these records sealed. M4 wires an explicit Kimi high selector labelled
+unverified; this is not a verified complex-task recommendation and Flash remains low. Freeze one
+new original-task attempt through the actual desktop entry with the limits above. Count its first
+request inside the ceiling and stop on a service error without retry. Only a strict six-item pass
+without new factual errors opens the two unchanged public tasks. The current runtime differs
+from the old isolated control; do not claim effort-only causality. Continuous paid-validation
+authorization does not waive zero-retry or fixed-budget rules.
+
+The other M4 checkpoint is local maintenance and daily usability. [ADR 0040](decisions/0040-desktop-local-maintenance.md)
+keeps backup/restore/rollback in the trusted local host, outside model tools. Restore only the
+session store in place after publishing a rescue backup; preserve settings, Keychain and workspace
+files. Roll back only to a verified retained app compatible with current data/settings. Neither
+action replays effects or restores old grants. Current explicit high settings are incompatible
+with older three-field desktop settings; refuse rollback instead of silently rewriting them.
+These paths require offline and actual bundle/native evidence, not another task framework or
+repeat of unaffected paid document/edit trials. Their completion does not remove the source-task gate.
 
 ### OpenBot reuse within this sequence
 

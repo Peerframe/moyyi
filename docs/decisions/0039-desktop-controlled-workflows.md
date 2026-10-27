@@ -5,6 +5,11 @@ passed in a separately authorized live retest. Its extra DOM explanation contain
 the first live repair failure remains sealed. Final integration/installation coordinates are
 owned by the [PR #46 delivery receipt](https://github.com/Peerframe/moyyi/pull/46).
 
+Installation reconciliation2026-10-28: the local receipt confirms installed source
+`6eb299340768daf807edf5b223a84f046a16b140`, merged main
+`85873c7e20a5f705cd78b9c4c0880f2772c29d1d`, native launch and history reopen. The dated source
+checkpoints below retain their original meaning. This does not establish M4 or source-task acceptance.
+
 ## Problem and decision
 
 The installed [M2 baseline, PR #45](https://github.com/Peerframe/moyyi/pull/45), provides material

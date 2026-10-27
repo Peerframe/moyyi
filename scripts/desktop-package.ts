@@ -138,6 +138,12 @@ const manifest = {
   platform: "darwin-arm64",
   version: "0.0.0",
   publicRelease: false,
+  maintenanceCompatibility: {
+    schemaVersion: 2,
+    persistedFormat: 1,
+    settingsFormat: 1,
+    settingsKeys: ["preset", "maxRequests", "timeoutMs", "kimiReasoningEffort"],
+  },
   electron: "45.0.0",
   react: "19.3.1",
   node: nodeVersion,

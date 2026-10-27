@@ -133,7 +133,7 @@ Enforced by [tests/boundaries.ts](../tests/boundaries.ts):
 - `shared.ts` is a data-only contract without external imports. `security.ts` is likewise pure;
   `wire.ts` can use only shared data and security validation. `preload.ts` imports only these
   three modules and Electron, exposing named methods rather than generic IPC or Node access.
-- The trusted desktop host consists of `main.ts`, `bridge.ts`, `connection.ts`, `worker.ts` and
+- The trusted desktop host consists of `main.ts`, `bridge.ts`, `connection.ts`, `worker.ts`, `maintenance-worker.ts` and
   `host/`. It may use Node, its own host/shared/validation modules and the public `moyyi/runtime`
   and `moyyi/contracts` exports. Among these host files, only `main.ts` imports Electron. Relative imports into `src`
   or other repository code, unlisted desktop paths and undeclared application directories fail

@@ -3,6 +3,7 @@ export interface DesktopSettings {
   readonly preset: "flash" | "kimi-cn" | "kimi-global";
   readonly maxRequests: number;
   readonly timeoutMs: number;
+  readonly kimiReasoningEffort?: "low" | "high";
 }
 export const DEFAULT_DESKTOP_SETTINGS: DesktopSettings = {
   preset: "flash",
@@ -174,8 +175,24 @@ export type DesktopAction = Exclude<
 >;
 
 /** Promise resolution acknowledges handling; run/outcome events determine actual completion. */
+export interface DesktopMaintenanceResult {
+  readonly kind: "backup" | "restore" | "rollback";
+  readonly path: string;
+  readonly rescuePath: string | null;
+  readonly sessionCount: number | null;
+  readonly schemaVersion: number | null;
+  readonly persistedFormat: number | null;
+  readonly targetRevision: string | null;
+  readonly settingsPreserved: true;
+  readonly workspacesUntouched: true;
+  readonly credentialsExported: false;
+}
+
 export interface DesktopBridge {
   getState(): Promise<DesktopState>;
+  createBackup(): Promise<DesktopMaintenanceResult | null>;
+  restoreBackup(): Promise<DesktopMaintenanceResult | null>;
+  rollbackApplication(): Promise<DesktopMaintenanceResult | null>;
   subscribe(listener: (state: DesktopState) => void): () => void;
   selectWorkspace(options: { readonly askEachRead: boolean }): Promise<DesktopState>;
   act(command: DesktopAction): Promise<DesktopState>;

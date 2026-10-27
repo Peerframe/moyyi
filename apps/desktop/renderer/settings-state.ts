@@ -13,11 +13,38 @@ export function selectSettingsPreset(
   draft: SettingsDraft,
   preset: DesktopSettings["preset"],
 ): SettingsDraft {
-  return { settings: { ...draft.settings, preset }, apiKey: "" };
+  const { kimiReasoningEffort, ...settings } = draft.settings;
+  return {
+    settings: {
+      ...settings,
+      preset,
+      ...(preset !== "flash" && kimiReasoningEffort === "high" ? { kimiReasoningEffort } : {}),
+    },
+    apiKey: "",
+  };
+}
+
+export function selectKimiReasoningEffort(
+  draft: SettingsDraft,
+  effort: "low" | "high",
+): SettingsDraft {
+  const { kimiReasoningEffort: _previous, ...settings } = draft.settings;
+  return {
+    ...draft,
+    settings: {
+      ...settings,
+      ...(settings.preset !== "flash" && effort === "high" ? { kimiReasoningEffort: effort } : {}),
+    },
+  };
 }
 
 export function validateSettingsDraft(draft: SettingsDraft): string | null {
-  const { maxRequests, timeoutMs } = draft.settings;
+  const { maxRequests, timeoutMs, preset, kimiReasoningEffort } = draft.settings;
+  if (
+    (kimiReasoningEffort !== undefined && !["low", "high"].includes(kimiReasoningEffort)) ||
+    (preset === "flash" && kimiReasoningEffort === "high")
+  )
+    return "仅 Kimi 可显式选择 high；Flash 固定使用 low。";
   if (!Number.isSafeInteger(maxRequests) || maxRequests < 1 || maxRequests > 8)
     return "每轮请求上限应为 1 到 8 的整数。";
   if (!Number.isSafeInteger(timeoutMs) || timeoutMs < 30_000 || timeoutMs > 300_000)

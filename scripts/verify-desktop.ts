@@ -95,7 +95,13 @@ try {
 
   const fixture = join(appDirectory, ".verification");
   mkdirSync(fixture);
-  for (const name of ["host.mjs", "host-m2.mjs", "host-m3.mjs", "production-settings.mjs"]) {
+  for (const name of [
+    "host.mjs",
+    "host-m2.mjs",
+    "host-m3.mjs",
+    "production-settings.mjs",
+    "maintenance.mjs",
+  ]) {
     copyFileSync(join(repository, "scripts/desktop-fixtures", name), join(fixture, name));
   }
   for (const name of ["document-confinement.mjs", "document-confinement-runner.mjs"]) {
@@ -176,7 +182,7 @@ try {
     ]),
   );
   assert.equal(productionSettings.passed, true);
-  assert.equal(productionSettings.count, 4);
+  assert.equal(productionSettings.count, 6);
   assert.equal(productionSettings.cases.length, productionSettings.count);
   assert.equal(productionSettings.savedMaxRequests, 4);
   assert.equal(productionSettings.restoredMaxRequests, 4);
@@ -184,6 +190,24 @@ try {
   assert.equal(productionSettings.credentialWrites, 0);
   assert.equal(productionSettings.networkAttempts, 0);
   assert.equal(productionSettings.liveModel, false);
+  const maintenanceWorkspace = join(temporary, "maintenance-workspace");
+  mkdirSync(maintenanceWorkspace);
+  const maintenance = JSON.parse(
+    run(node, [
+      "--no-experimental-strip-types",
+      join(fixture, "maintenance.mjs"),
+      join(temporary, "maintenance-home"),
+      maintenanceWorkspace,
+    ]),
+  );
+  assert.equal(maintenance.passed, true);
+  assert.equal(maintenance.cases.length, 7);
+  assert.equal(maintenance.seedSyntheticModelRequests, 1);
+  assert.equal(maintenance.maintenanceModelRequests, 0);
+  assert.equal(maintenance.credentialReads, 0);
+  assert.equal(maintenance.helperNativeCalls, 0);
+  assert.equal(maintenance.helperNetworkAttempts, 0);
+  assert.equal(maintenance.workspaceUnchanged, true);
   const confinement = JSON.parse(
     run(node, ["--no-experimental-strip-types", join(fixture, "document-confinement-runner.mjs")]),
   );
@@ -206,6 +230,7 @@ try {
         materialsAndReports,
         editsAndRecovery,
         productionSettings,
+        maintenance,
         confinement,
         outsideCheckout: true,
         temporaryCopyRemoved: true,

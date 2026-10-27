@@ -10,6 +10,7 @@ for (const [name, platform, format] of [
   ["main", "node", "esm"],
   ["preload", "node", "cjs"],
   ["worker", "node", "esm"],
+  ["maintenance-worker", "node", "esm"],
   ["host/service", "node", "esm"],
 ] as const) {
   await build({

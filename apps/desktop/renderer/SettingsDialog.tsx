@@ -4,6 +4,7 @@ import {
   newSettingsDraft,
   presetLabel,
   saveSettingsDraft,
+  selectKimiReasoningEffort,
   selectSettingsPreset,
   validateSettingsDraft,
 } from "./settings-state.ts";
@@ -118,9 +119,26 @@ export function SettingsDialog({
           <p className="panel-note">
             {draft.settings.preset === "flash"
               ? "Flash 使用 low 档位。"
-              : "Kimi 使用 low 档位；尚未验证为复杂任务推荐方案。"}
+              : "Kimi high 尚未通过复杂任务验收，不能视为更可靠的方案。"}
             服务地址固定；选择不同区域时请使用对应的密钥。
           </p>
+          {draft.settings.preset !== "flash" ? (
+            <label>
+              <span>Kimi 推理强度</span>
+              <select
+                value={draft.settings.kimiReasoningEffort ?? "low"}
+                onChange={(event) => {
+                  const effort = event.target.value as "low" | "high";
+                  setDraft((current) => selectKimiReasoningEffort(current, effort));
+                  setNotice(null);
+                  setError(null);
+                }}
+              >
+                <option value="low">low（默认）</option>
+                <option value="high">high（实验）</option>
+              </select>
+            </label>
+          ) : null}
           <label>
             <span>{presetLabel(draft.settings.preset)} API Key</span>
             <input
