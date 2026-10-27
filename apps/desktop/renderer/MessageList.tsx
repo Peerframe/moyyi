@@ -1,5 +1,5 @@
 import type { DesktopState } from "../shared.ts";
-import { toolStateLabel } from "./view-state.ts";
+import { noticeLabel, toolStateLabel } from "./view-state.ts";
 
 export function MessageList({
   messages,
@@ -28,7 +28,9 @@ export function MessageList({
             <p className="message-label">
               {message.role === "user" ? "你" : message.role === "assistant" ? "moyyi" : "会话记录"}
             </p>
-            <p className="message-text">{message.text}</p>
+            <p className="message-text">
+              {message.role === "notice" ? noticeLabel(message.text) : message.text}
+            </p>
           </article>
         ),
       )}

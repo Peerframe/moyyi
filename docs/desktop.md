@@ -28,6 +28,23 @@ M1 displays at most100 recent messages and a bounded text projection. It does no
 full transcript browsing, rich Markdown, image preview, document import, settings editing,
 generated-file cards or write/undo controls. These belong to subsequent milestones.
 
+## Demonstrated M1 acceptance
+
+The external macOS arm64 app completed one real Flash task through the visible native UI:
+choose a public synthetic workspace, request four exact facts from `README.md`, approve the
+actual read once, and inspect the answer/source. It used2 requests, zero retries, within the
+3-request ceiling. All four facts matched and source/configuration bytes were unchanged. After
+quit and reopen, the answer/tool observations remained; entries/effects were identical and no
+additional request occurred. The full recorded tool result matched the next model request.
+
+The independent bundle gate uses synthetic models for denial, stale approval, cancellation,
+read/reopen, writer-lock and containment cases. This is separate from that one live task and
+from the original six-item source-analysis task, whose failure is unchanged. The live trial
+preceded a display-only translation of recorded budget notices; no model prompt, runtime,
+provider or persisted record changed for that polish. Final package/CI/installation identities
+are recorded in the M1 PR delivery receipt. The first measured bundle was approximately524MiB
+unpacked and199MiB compressed; this is not a memory or performance benchmark.
+
 ## Connection and storage
 
 M1 uses the existing macOS Keychain generic password service `moyyi.deepseek.api-key`, account

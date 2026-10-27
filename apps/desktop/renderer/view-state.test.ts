@@ -3,6 +3,7 @@ import {
   approvalIdentity,
   createActionGate,
   createSnapshotReceiver,
+  noticeLabel,
   outcomeLabel,
   toolStateLabel,
 } from "./view-state.ts";
@@ -63,5 +64,17 @@ describe("desktop view state", () => {
     expect(outcomeLabel({ kind: "budget_exhausted" })).toContain("已经收到的内容");
     expect(toolStateLabel("unknown")).toBe("结果未知");
     expect(toolStateLabel("succeeded")).toBe("已返回");
+  });
+
+  it("shows recorded request counts without changing ordinary evidence text", () => {
+    expect(
+      noticeLabel(
+        "Model request budget: attempt 2 of 3; 2 request(s) remaining including this one. Reserve the final request for an answer.",
+      ),
+    ).toBe("本轮模型请求：第 2 / 3 次。剩余 2 次（含本次）。");
+    expect(noticeLabel("Recovered unknown. No automatic replay.")).toBe(
+      "Recovered unknown. No automatic replay.",
+    );
+    expect(toolStateLabel("requested")).toBe("已请求");
   });
 });

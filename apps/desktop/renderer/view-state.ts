@@ -53,6 +53,7 @@ export function toolStateLabel(state: string | undefined): string {
   if (!state) return "工具活动";
   return (
     {
+      requested: "已请求",
       intended: "已准备",
       awaiting_approval: "等待批准",
       approved: "已批准",
@@ -64,6 +65,17 @@ export function toolStateLabel(state: string | undefined): string {
       unknown: "结果未知",
     }[state] ?? state
   );
+}
+
+/** Present the runtime's recorded budget notice without exposing its model-facing guidance. */
+export function noticeLabel(text: string): string {
+  const match =
+    /^Model request budget: attempt (\d+) of (\d+); (\d+) request\(s\) remaining including this one\./.exec(
+      text,
+    );
+  return match
+    ? `本轮模型请求：第 ${match[1]} / ${match[2]} 次。剩余 ${match[3]} 次（含本次）。`
+    : text;
 }
 
 export function workspaceName(path: string | null): string {
