@@ -106,6 +106,27 @@ model interpretation. This is not evidence to broaden the default grants silentl
 
 ## Current delivery and next boundary
 
+**Product target: an installed personal desktop candidate with complete user workflows.**
+The owner has requested a whole-product plan after finding the CLI candidate less complete in
+use than OpenBot. GUI is now the next product priority, alongside a separate answer-quality lane.
+The [roadmap](roadmap.md#current-target-a-usable-personal-desktop-candidate) is the single delivery
+sequence: M1 installed read-only desktop loop; M2 settings/materials/actual reports; M3 controlled
+editing/recovery/undo; M4 combined installed acceptance. The current planning delivery changes no
+product code, model config or installed package and makes no paid calls.
+
+| Current milestone | Usable baseline / demonstrated limit | Next bounded checkpoint | Actual blocker |
+|---|---|---|---|
+| M1 desktop loop: planned, not implemented | Installed CLI and trusted in-process runtime already work; no GUI or validated renderer bridge exists | One installed shell/Node26/bridge/store-ownership probe followed directly by the same workspace → read → answer → reopen flow, with narrow OpenBot approval-view reuse | No known external blocker for offline integration; actual bundle compatibility still needs proof |
+| M2/M3 daily workflows: planned | Document, report, controlled-edit/undo and recovery have bounded CLI/runtime evidence | Present and connect existing capabilities through the desktop; use source-backed result/permission checks | Depends on M1 and affected scoped host boundaries, not on model-training/MCP/GUI mock projects |
+| Quality lane: unresolved | Original source task FAILs and the withdrawn notes candidate remain; high control has no answer | Service-available, separately recorded original Kimi high control only under unchanged budgets; public counterexamples and optional high entry only if strict pass | Kimi server capacity blocks that live comparison; it does not block unrelated desktop work |
+| M4 integrated target: not accepted | Installed product remains PR41; no claim that previous engineering phases make a polished desktop product | All three fixed user workflows pass interaction, authority/recovery and factual/artifact gates from the actual installed entry; backup/rollback and guide | Both desktop delivery and applicable task correctness must be demonstrated |
+
+The GUI uses the self-owned core through a narrow client boundary. It neither replaces core
+permissions with UI states nor imports OpenBot's Bot/team/Server architecture. Planned reuse is
+[explicit and versioned](openbot-provenance.md#planned-desktop-reuse-not-yet-ported). First functional
+work should produce the M1 user path; a visual mockup or another generic checklist is not that
+checkpoint. Original task standards stay intact; an honest limited candidate may be inspected
+before M4, but the full target is not complete while its required source-analysis task fails.
 
 **Current bounded work: source interpretation remains unresolved; Kimi high is service-blocked.**
 The structured-findings candidate was withdrawn after one unchanged original-task trial. Eight
