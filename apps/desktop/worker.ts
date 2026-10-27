@@ -1,4 +1,4 @@
-import { connectionStatus, productionOptions } from "./connection.ts";
+import { productionConfiguration } from "./connection.ts";
 import { createDesktopHost } from "./host/service.ts";
 import { isWorkerRequest, type WorkerMessage } from "./wire.ts";
 
@@ -8,9 +8,13 @@ function publish(message: WorkerMessage): void {
   if (process.connected) process.send?.(message);
 }
 try {
+  const configuration = productionConfiguration();
+  const initial = await configuration.current();
   const host = await createDesktopHost({
-    runtimeOptions: productionOptions,
-    connection: await connectionStatus(),
+    runtimeOptions: () => initial.runtimeOptions,
+    settings: initial.settings,
+    configure: configuration.save,
+    connection: initial.connection,
     maxOutputTokens: 8192,
   });
   host.subscribe((state) => publish({ type: "state", state }));

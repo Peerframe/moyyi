@@ -32,6 +32,11 @@ export function isDesktopState(s: unknown): s is DesktopState {
     !object(s, [
       "status",
       "connection",
+      "settings",
+      "materials",
+      "reportTarget",
+      "artifacts",
+      "artifactPreview",
       "sessions",
       "activeSessionId",
       "workspaceRoot",
@@ -53,6 +58,70 @@ export function isDesktopState(s: unknown): s is DesktopState {
     !object(s.connection, ["ready", "message"]) ||
     typeof s.connection.ready !== "boolean" ||
     (s.connection.message !== undefined && !string(s.connection.message, 4096))
+  )
+    return false;
+  if (
+    !object(s.settings, ["preset", "maxRequests", "timeoutMs"]) ||
+    !choice(s.settings.preset, ["flash", "kimi-cn", "kimi-global"]) ||
+    !integer(s.settings.maxRequests) ||
+    Number(s.settings.maxRequests) < 1 ||
+    Number(s.settings.maxRequests) > 8 ||
+    !integer(s.settings.timeoutMs) ||
+    Number(s.settings.timeoutMs) < 30_000 ||
+    Number(s.settings.timeoutMs) > 300_000
+  )
+    return false;
+  const hash = (value: unknown) => typeof value === "string" && /^[a-f0-9]{64}$/.test(value);
+  if (
+    !nullableString(s.reportTarget, 4096) ||
+    !Array.isArray(s.materials) ||
+    s.materials.length > 8 ||
+    !s.materials.every(
+      (v) =>
+        object(v, ["path", "format", "sourceBytes", "sha256"]) &&
+        string(v.path, 4096) &&
+        choice(v.format, ["pdf", "docx", "xlsx", "pptx", "odt", "ods", "odp"]) &&
+        integer(v.sourceBytes) &&
+        Number(v.sourceBytes) <= 10 * 1024 * 1024 &&
+        hash(v.sha256),
+    )
+  )
+    return false;
+  if (
+    !object(s.artifacts, ["items", "offset", "hasMore"]) ||
+    !integer(s.artifacts.offset) ||
+    typeof s.artifacts.hasMore !== "boolean" ||
+    !Array.isArray(s.artifacts.items) ||
+    s.artifacts.items.length > 20 ||
+    !s.artifacts.items.every(
+      (v) =>
+        object(v, ["effectId", "path", "afterHash", "state"]) &&
+        string(v.effectId, 128) &&
+        string(v.path, 4096) &&
+        hash(v.afterHash) &&
+        choice(v.state, ["unchecked", "current", "changed", "missing", "unavailable"]),
+    )
+  )
+    return false;
+  if (
+    s.artifactPreview !== null &&
+    !(
+      object(s.artifactPreview, [
+        "effectId",
+        "path",
+        "sha256",
+        "text",
+        "sourceBytes",
+        "truncated",
+      ]) &&
+      string(s.artifactPreview.effectId, 128) &&
+      string(s.artifactPreview.path, 4096) &&
+      hash(s.artifactPreview.sha256) &&
+      string(s.artifactPreview.text, 65_536) &&
+      integer(s.artifactPreview.sourceBytes) &&
+      Number(s.artifactPreview.sourceBytes) <= 1_048_576 &&
+      typeof s.artifactPreview.truncated === "boolean"
+    )
   )
     return false;
   if (

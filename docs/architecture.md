@@ -144,6 +144,41 @@ Enforced by [tests/boundaries.ts](../tests/boundaries.ts):
   policy still enforce behavior. Test-only Vitest and React server rendering do not widen
   production imports.
 
+### Desktop M2 host boundary
+
+[ADR 0038](decisions/0038-desktop-materials-and-reports.md) keeps the existing client/runtime
+split. The renderer receives bounded settings/material/receipt projections. Its named bridge
+can request configuration, native selection, receipt inspection and Finder reveal; it cannot
+choose arbitrary absolute file paths or retrieve credentials. Main validates the owning frame,
+input shape and current selection, including session/workspace checks after native dialogs.
+The worker validates commands again and admits these operations only while idle.
+
+`host/settings.ts` stores data-only preset/limit/credential-reference JSON under the protected
+desktop directory with mode0600, a unique temporary file, fsync and rename. The existing runtime
+closes before a connection changes, and the new runtime reopens the same SQLite store. The
+fixed `native/keychain.swift` helper is compiled into the macOS bundle with Foundation/Security;
+it is not a dynamic plugin or another TypeScript import permission. New credentials use distinct
+UUID services, bounded stdin and native Keychain operations. Startup queries attributes only;
+actual provider requests lazily read the selected credential. Secrets are absent from snapshots,
+transcripts, argv and environment. Existing CLI Keychain items remain unchanged.
+
+`host/materials.ts` inspects only bounded ordinary files inside the selected workspace. It
+rejects protected paths, aliases/symlinks, hard links and changed identities; the selected paths,
+sizes and hashes are checked again before a task starts. This selection does not add parser or
+model authority. The seven existing document formats and parser isolation are reused.
+
+`host/report-policy.ts` permits only `create` for one user-picked, missing JSON/Markdown/text/CSV
+path, with approval for each prepared digest. Existing core write preparation, missing-file
+preconditions, recording and postcheck remain authoritative. Clearing the target, changing the
+connection or creating/reopening a session removes this write grant; active work must finish or
+be cancelled first. Edit, undo, process and web capabilities remain unavailable in this slice.
+
+`host/reports.ts` uses actual successful create receipts and a fresh guarded file read/hash match
+to supply bounded UTF-8 plain text. Missing/changed/unavailable reports never become a successful
+preview. Finder receives only the inspected receipt path and does not execute the file; its
+invocation is not a confirmed user-visible selection. Historical receipts certify recorded
+execution, not current bytes or answer correctness. No persisted core/session schema changes.
+
 ## Data model
 
 Three kinds of authoritative records, committed together in one SQLite transaction:

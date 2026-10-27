@@ -1,12 +1,20 @@
 import { Buffer } from "node:buffer";
 import { isAbsolute } from "node:path";
 import type { DesktopCommand } from "../shared.ts";
+import { parseSettings, validateApiKey } from "./settings-schema.ts";
 
 const invalid = () => new Error("Invalid desktop command");
 const containsControl = (value: string) =>
   [...value].some((character) => character.charCodeAt(0) < 32 || character.charCodeAt(0) === 127);
 const identifier = (value: unknown): value is string =>
   typeof value === "string" && value.length > 0 && value.length <= 512 && !containsControl(value);
+const path = (value: unknown): value is string =>
+  typeof value === "string" &&
+  value.length > 0 &&
+  Buffer.byteLength(value) <= 4096 &&
+  !containsControl(value);
+const page = (value: unknown) =>
+  Number.isSafeInteger(value) && Number(value) >= 0 && Number(value) <= 10_000;
 
 /** Validate the untrusted boundary before casting to the trusted runtime protocol. */
 export function parseDesktopCommand(value: unknown): DesktopCommand {
@@ -42,12 +50,7 @@ export function parseDesktopCommand(value: unknown): DesktopCommand {
       break;
     case "list":
       exact(["type", "offset"]);
-      if (
-        !Number.isSafeInteger(input.offset) ||
-        Number(input.offset) < 0 ||
-        Number(input.offset) > 10_000
-      )
-        throw invalid();
+      if (!page(input.offset)) throw invalid();
       break;
     case "start":
       exact(["type", "sessionId", "text"]);
@@ -71,6 +74,51 @@ export function parseDesktopCommand(value: unknown): DesktopCommand {
         (input.decision !== "approve" && input.decision !== "deny")
       )
         throw invalid();
+      break;
+    case "configure": {
+      exact(input.apiKey === undefined ? ["type", "settings"] : ["type", "settings", "apiKey"]);
+      try {
+        const settings = parseSettings(input.settings);
+        return input.apiKey === undefined
+          ? { type: "configure", settings }
+          : { type: "configure", settings, apiKey: validateApiKey(input.apiKey) };
+      } catch {
+        throw invalid();
+      }
+    }
+    case "materials":
+      exact(["type", "sessionId", "paths"]);
+      if (
+        !identifier(input.sessionId) ||
+        !Array.isArray(input.paths) ||
+        input.paths.length > 8 ||
+        !input.paths.every(path)
+      )
+        throw invalid();
+      return { type: "materials", sessionId: input.sessionId, paths: [...input.paths] };
+    case "material.remove":
+      exact(["type", "sessionId", "path"]);
+      if (!identifier(input.sessionId) || !path(input.path)) throw invalid();
+      break;
+    case "report.target":
+      exact(["type", "sessionId", "path"]);
+      if (!identifier(input.sessionId) || (input.path !== null && !path(input.path)))
+        throw invalid();
+      break;
+    case "report.clear":
+      exact(["type", "sessionId"]);
+      if (!identifier(input.sessionId)) throw invalid();
+      break;
+    case "artifacts":
+      exact(["type", "sessionId", "offset"]);
+      if (!identifier(input.sessionId) || !page(input.offset)) throw invalid();
+      break;
+    case "artifact.open":
+      exact(["type", "sessionId", "effectId"]);
+      if (!identifier(input.sessionId) || !identifier(input.effectId)) throw invalid();
+      break;
+    case "artifact.close":
+      exact(["type"]);
       break;
     case "close":
       exact(["type"]);

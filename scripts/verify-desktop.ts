@@ -60,6 +60,16 @@ try {
     manifest.desktopBundleSha256,
     "Installed application bytes do not match their candidate manifest",
   );
+  assert(
+    existsSync(join(resources, "keychain-helper")),
+    "Installed native credential helper is required",
+  );
+  assert.equal(
+    manifest.keychainHelperSourceSha256,
+    createHash("sha256")
+      .update(readFileSync(join(repository, "apps/desktop/native/keychain.swift")))
+      .digest("hex"),
+  );
   assert.equal(manifest.node, "26.12.1");
   assert.equal(manifest.publicRelease, false);
   assert.equal(run(node, ["--version"]).trim(), "v26.12.1");
@@ -85,7 +95,9 @@ try {
 
   const fixture = join(appDirectory, ".verification");
   mkdirSync(fixture);
-  copyFileSync(join(repository, "scripts/desktop-fixtures/host.mjs"), join(fixture, "host.mjs"));
+  for (const name of ["host.mjs", "host-m2.mjs", "production-settings.mjs"]) {
+    copyFileSync(join(repository, "scripts/desktop-fixtures", name), join(fixture, name));
+  }
   for (const name of ["document-confinement.mjs", "document-confinement-runner.mjs"]) {
     copyFileSync(join(repository, "scripts/package-fixtures", name), join(fixture, name));
   }
@@ -106,6 +118,55 @@ try {
   assert.equal(host.count, 7);
   assert.equal(host.liveModel, false);
   assert.equal(host.credentialReads, 0);
+  const documentsWorkspace = join(temporary, "documents-workspace");
+  mkdirSync(documentsWorkspace);
+  for (const name of [
+    "aster.pdf",
+    "birch.docx",
+    "cedar.xlsx",
+    "dahlia.pptx",
+    "elm.odt",
+    "fir.ods",
+    "ginkgo.odp",
+  ]) {
+    copyFileSync(
+      join(repository, "src/runtime/fixtures/documents/standard/eval", name),
+      join(documentsWorkspace, name),
+    );
+  }
+  const materialsAndReports = JSON.parse(
+    run(node, [
+      "--no-experimental-strip-types",
+      join(fixture, "host-m2.mjs"),
+      documentsWorkspace,
+      join(temporary, "m2-private"),
+    ]),
+  );
+  assert.equal(materialsAndReports.passed, true);
+  assert.equal(materialsAndReports.count, 7);
+  assert.equal(materialsAndReports.cases.length, materialsAndReports.count);
+  assert.equal(materialsAndReports.syntheticRequests, 7);
+  assert.equal(materialsAndReports.credentialReads, 0);
+  assert.equal(materialsAndReports.liveModel, false);
+  const settingsWorkspace = join(temporary, "settings-workspace");
+  mkdirSync(settingsWorkspace);
+  const productionSettings = JSON.parse(
+    run(node, [
+      "--no-experimental-strip-types",
+      join(fixture, "production-settings.mjs"),
+      settingsWorkspace,
+      join(temporary, "settings-worker-home"),
+    ]),
+  );
+  assert.equal(productionSettings.passed, true);
+  assert.equal(productionSettings.count, 4);
+  assert.equal(productionSettings.cases.length, productionSettings.count);
+  assert.equal(productionSettings.savedMaxRequests, 4);
+  assert.equal(productionSettings.restoredMaxRequests, 4);
+  assert.equal(productionSettings.credentialReads, 0);
+  assert.equal(productionSettings.credentialWrites, 0);
+  assert.equal(productionSettings.networkAttempts, 0);
+  assert.equal(productionSettings.liveModel, false);
   const confinement = JSON.parse(
     run(node, ["--no-experimental-strip-types", join(fixture, "document-confinement-runner.mjs")]),
   );
@@ -125,6 +186,8 @@ try {
         desktopBundleSha256,
         runtime: manifest.runtime,
         host,
+        materialsAndReports,
+        productionSettings,
         confinement,
         outsideCheckout: true,
         temporaryCopyRemoved: true,

@@ -1,4 +1,13 @@
-import { mkdirSync, mkdtempSync, readFileSync, realpathSync, rmSync, writeFileSync } from "node:fs";
+import {
+  existsSync,
+  mkdirSync,
+  mkdtempSync,
+  readFileSync,
+  realpathSync,
+  rmSync,
+  unlinkSync,
+  writeFileSync,
+} from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import {
@@ -11,7 +20,7 @@ import {
 import type { RuntimeOptions } from "moyyi/runtime";
 import { afterEach, describe, expect, it } from "vitest";
 import type { DesktopState } from "../shared.ts";
-import { createDesktopHost, type DesktopHost } from "./service.ts";
+import { createDesktopHost, type DesktopHost, type DesktopHostOptions } from "./service.ts";
 import { parseDesktopCommand } from "./validation.ts";
 
 type Step =
@@ -61,6 +70,7 @@ async function fixture(
   steps: Step[],
   options: Partial<RuntimeOptions> = {},
   connection = { ready: true },
+  display: Omit<DesktopHostOptions, "runtimeOptions" | "connection"> = {},
 ) {
   const directory = realpathSync(mkdtempSync(join(tmpdir(), "moyyi-desktop-host-")));
   const workspace = join(directory, "workspace"),
@@ -121,6 +131,7 @@ async function fixture(
       runtimeOptions: () => runtimeOptions,
       maxOutputTokens: 8192,
       connection,
+      ...display,
     });
     resource.hosts.push(host);
     return host;
@@ -434,6 +445,258 @@ describe("desktop host boundary over the public runtime", () => {
   });
 });
 
+describe("desktop M2 materials and report delivery", () => {
+  it("adds selected file identities as separate user input and rejects stale selections without a request", async () => {
+    const f = await fixture([answer("Observed selection")]);
+    writeFileSync(join(f.workspace, "source.pdf"), "SOURCE_BYTES");
+    await f.host.dispatch({ type: "create", workspaceRoot: f.workspace, askEachRead: false });
+    const sessionId = f.host.getState().activeSessionId;
+    await f.host.dispatch({
+      type: "materials",
+      sessionId,
+      paths: [join(f.workspace, "source.pdf")],
+    });
+    const selected = f.host.getState().materials;
+    await f.host.dispatch({ type: "materials", sessionId, paths: [] });
+    expect(f.host.getState().materials).toEqual(selected);
+    await expect(
+      f.host.dispatch({ type: "materials", sessionId, paths: [join(f.other, "outside.pdf")] }),
+    ).rejects.toThrow();
+    expect(f.host.getState().materials).toEqual(selected);
+    expect(f.requests).toHaveLength(0);
+    await f.host.dispatch({ type: "start", sessionId, text: "Read the selected material" });
+    await waitFor(f.host, (state) => state.outcome?.kind === "completed");
+    const parts =
+      f.requests[0]?.messages
+        .filter((message) => message.role === "user")
+        .flatMap((message) => message.content) ?? [];
+    expect(
+      parts.some((part) => part.type === "text" && part.text === "Read the selected material"),
+    ).toBe(true);
+    expect(
+      parts.some(
+        (part) =>
+          part.type === "text" &&
+          part.text.includes("contents have not been extracted") &&
+          part.text.includes(selected[0]?.sha256 ?? "missing"),
+      ),
+    ).toBe(true);
+    expect(JSON.stringify(parts)).not.toContain("SOURCE_BYTES");
+    writeFileSync(join(f.workspace, "source.pdf"), "CHANGED");
+    await expect(f.host.dispatch({ type: "start", sessionId, text: "Read again" })).rejects.toThrow(
+      "changed",
+    );
+    expect(f.requests).toHaveLength(1);
+    await f.host.dispatch({ type: "material.remove", sessionId, path: "source.pdf" });
+    expect(f.host.getState().materials).toEqual([]);
+  });
+
+  it("requires the displayed report approval, returns real receipts and reopens only unchanged file bytes", async () => {
+    const text = '{"answer":"ACTUAL_REPORT"}\n';
+    const f = await fixture([
+      call("create", { path: "report.json", text }),
+      answer("Denied"),
+      call("create", { path: "report.json", text }),
+      answer("Created"),
+    ]);
+    await f.host.dispatch({ type: "create", workspaceRoot: f.workspace, askEachRead: false });
+    const sessionId = f.host.getState().activeSessionId;
+    await f.host.dispatch({
+      type: "report.target",
+      sessionId,
+      path: join(f.workspace, "report.json"),
+    });
+    expect(f.host.getState().reportTarget).toBe("report.json");
+    await f.host.dispatch({ type: "report.target", sessionId, path: null });
+    expect(f.host.getState().reportTarget).toBe("report.json");
+    await f.host.dispatch({ type: "start", sessionId, text: "Create the report" });
+    let approval = required(
+      (await waitFor(f.host, (state) => !!state.pendingApproval)).pendingApproval,
+    );
+    await expect(f.host.dispatch({ type: "report.clear", sessionId })).rejects.toThrow(
+      "active run",
+    );
+    await expect(
+      f.host.dispatch({
+        type: "approve",
+        effectId: approval.effectId,
+        digest: "stale",
+        decision: "approve",
+      }),
+    ).rejects.toThrow("stale");
+    await f.host.dispatch({
+      type: "approve",
+      effectId: approval.effectId,
+      digest: approval.digest,
+      decision: "deny",
+    });
+    await waitFor(f.host, (state) => state.outcome?.kind === "completed");
+    expect(existsSync(join(f.workspace, "report.json"))).toBe(false);
+    await f.host.dispatch({ type: "start", sessionId, text: "Create with approval" });
+    approval = required(
+      (await waitFor(f.host, (state) => !!state.pendingApproval)).pendingApproval,
+    );
+    expect(approval.preview).toContain("ACTUAL_REPORT");
+    await f.host.dispatch({
+      type: "approve",
+      effectId: approval.effectId,
+      digest: approval.digest,
+      decision: "approve",
+    });
+    const done = await waitFor(f.host, (state) => state.artifacts.items.length === 1);
+    const artifact = required(done.artifacts.items[0]);
+    expect(readFileSync(join(f.workspace, "report.json"), "utf8")).toBe(text);
+    await expect(
+      f.host.dispatch({ type: "artifact.open", sessionId, effectId: "forged" }),
+    ).rejects.toThrow("recorded report");
+    await f.host.dispatch({ type: "artifact.open", sessionId, effectId: artifact.effectId });
+    expect(f.host.getState().artifactPreview).toMatchObject({
+      text,
+      sha256: artifact.afterHash,
+      truncated: false,
+    });
+    await f.host.close();
+    const resumed = await f.reopen();
+    await resumed.dispatch({ type: "load", sessionId, askEachRead: false });
+    expect(resumed.getState().reportTarget).toBeNull();
+    expect(resumed.getState().artifacts.items[0]).toEqual({ ...artifact, state: "unchecked" });
+    expect(f.requests).toHaveLength(4);
+    writeFileSync(join(f.workspace, "report.json"), "EXTERNAL_CHANGE");
+    await expect(
+      resumed.dispatch({ type: "artifact.open", sessionId, effectId: artifact.effectId }),
+    ).rejects.toThrow("changed");
+    expect(resumed.getState().artifactPreview).toBeNull();
+    expect(resumed.getState().artifacts.items[0]?.state).toBe("changed");
+    unlinkSync(join(f.workspace, "report.json"));
+    await expect(
+      resumed.dispatch({ type: "artifact.open", sessionId, effectId: artifact.effectId }),
+    ).rejects.toThrow("missing");
+    expect(resumed.getState().artifactPreview).toBeNull();
+  });
+
+  it("never turns the report target into edit, undo, shell or another-path authority", async () => {
+    const attempts = [
+      { name: "create", args: { path: "elsewhere.json", text: "NO" } },
+      { name: "edit", args: { path: "note.txt", oldText: "ORIGINAL", newText: "NO" } },
+      { name: "undo", args: { snapshotId: "made-up" } },
+      { name: "shell", args: { command: "echo NO > note.txt" } },
+      { name: "web_fetch", args: { url: "https://example.test/private" } },
+    ];
+    const f = await fixture(
+      attempts.flatMap(({ name, args }) => [call(name, args), answer("Stopped")]),
+    );
+    await f.host.dispatch({ type: "create", workspaceRoot: f.workspace, askEachRead: false });
+    const sessionId = f.host.getState().activeSessionId;
+    await expect(
+      f.host.dispatch({ type: "report.target", sessionId, path: "note.txt" }),
+    ).rejects.toThrow("new file");
+    await f.host.dispatch({ type: "report.target", sessionId, path: "report.json" });
+    for (const attempt of attempts) {
+      await f.host.dispatch({ type: "start", sessionId, text: `Try ${attempt.name}` });
+      await waitFor(f.host, (state) => state.outcome?.kind === "completed");
+      expect(f.host.getState().pendingApproval).toBeNull();
+      expect(
+        f.host
+          .getState()
+          .messages.some((message) => message.tool === attempt.name && message.state === "denied"),
+      ).toBe(true);
+    }
+    expect(readFileSync(join(f.workspace, "note.txt"), "utf8")).toBe("ORIGINAL");
+    expect(existsSync(join(f.workspace, "elsewhere.json"))).toBe(false);
+    expect(f.host.getState().artifacts.items).toEqual([]);
+    await f.host.dispatch({ type: "load", sessionId, askEachRead: false });
+    expect(f.host.getState().reportTarget).toBeNull();
+  });
+
+  it("cancels a pending report without creating a file or restoring its approval on reopen", async () => {
+    const f = await fixture([call("create", { path: "report.md", text: "NEVER_WRITTEN" })]);
+    await f.host.dispatch({ type: "create", workspaceRoot: f.workspace, askEachRead: false });
+    const sessionId = f.host.getState().activeSessionId;
+    await f.host.dispatch({ type: "report.target", sessionId, path: "report.md" });
+    await f.host.dispatch({ type: "start", sessionId, text: "Prepare report" });
+    const waiting = await waitFor(f.host, (state) => !!state.pendingApproval);
+    await f.host.dispatch({ type: "cancel", runId: required(waiting.run).id });
+    await waitFor(f.host, (state) => state.outcome?.kind === "cancelled");
+    await f.host.close();
+    const resumed = await f.reopen();
+    await resumed.dispatch({ type: "load", sessionId, askEachRead: false });
+    expect(resumed.getState().pendingApproval).toBeNull();
+    expect(resumed.getState().reportTarget).toBeNull();
+    expect(resumed.getState().artifacts.items).toEqual([]);
+    expect(existsSync(join(f.workspace, "report.md"))).toBe(false);
+    expect(f.requests).toHaveLength(1);
+  });
+
+  it("reconfigures only after releasing SQLite ownership and restores history without credentials in state", async () => {
+    let configured: RuntimeOptions | undefined;
+    let failure = false,
+      invalidModel = false,
+      calls = 0;
+    const f = await fixture(
+      [answer("Before settings")],
+      {},
+      { ready: true },
+      {
+        configure: async (settings, apiKey) => {
+          calls++;
+          expect(apiKey === undefined || apiKey === "TEST_ONLY_KEY").toBe(true);
+          if (failure) throw Error("PRIVATE_CONFIGURATION_CAUSE");
+          const options = required(configured);
+          const probe = await createDesktopHost({ runtimeOptions: () => options });
+          await probe.close();
+          return {
+            settings,
+            runtimeOptions: {
+              ...options,
+              ...(invalidModel ? { model: { provider: "missing-fixture", model: "missing" } } : {}),
+              limits: {
+                ...options.limits,
+                maxModelRequests: settings.maxRequests,
+                timeoutMs: settings.timeoutMs,
+              },
+            },
+            connection: { ready: false, message: "Fixture connection unavailable" },
+          };
+        },
+      },
+    );
+    configured = f.runtimeOptions;
+    await f.host.dispatch({ type: "create", workspaceRoot: f.workspace, askEachRead: false });
+    const sessionId = f.host.getState().activeSessionId;
+    await f.host.dispatch({ type: "start", sessionId, text: "Initial conversation" });
+    await waitFor(f.host, (state) => state.outcome?.kind === "completed");
+    await f.host.dispatch({ type: "report.target", sessionId, path: "report.json" });
+    const settings = { preset: "flash", maxRequests: 4, timeoutMs: 120_000 };
+    await f.host.dispatch({ type: "configure", settings, apiKey: "TEST_ONLY_KEY" });
+    expect(calls).toBe(1);
+    expect(f.host.getState().settings).toEqual(settings);
+    expect(f.host.getState().connection.ready).toBe(false);
+    expect(f.host.getState().reportTarget).toBeNull();
+    expect(f.host.getState().activeSessionId).toBe(sessionId);
+    expect(f.host.getState().messages.some((message) => message.text === "Before settings")).toBe(
+      true,
+    );
+    expect(JSON.stringify(f.host.getState())).not.toContain("TEST_ONLY_KEY");
+    expect(f.requests).toHaveLength(1);
+    failure = true;
+    await expect(
+      f.host.dispatch({ type: "configure", settings: { ...settings, maxRequests: 5 } }),
+    ).rejects.toThrow("could not be applied");
+    expect(f.host.getState().settings).toEqual(settings);
+    expect(f.host.getState().activeSessionId).toBe(sessionId);
+    expect(JSON.stringify(f.host.getState())).not.toContain("PRIVATE_CONFIGURATION_CAUSE");
+    expect(f.requests).toHaveLength(1);
+    failure = false;
+    invalidModel = true;
+    await expect(
+      f.host.dispatch({ type: "configure", settings: { ...settings, maxRequests: 6 } }),
+    ).rejects.toThrow("Settings were saved");
+    expect(f.host.getState().settings.maxRequests).toBe(6);
+    expect(f.host.getState().connection.ready).toBe(false);
+    expect(f.requests).toHaveLength(1);
+  });
+});
+
 describe("desktop command validation", () => {
   it("rejects extra keys, prototype/accessor payloads, invalid IDs and oversized messages", () => {
     const getter = {
@@ -451,6 +714,11 @@ describe("desktop command validation", () => {
       { type: "load", sessionId: "x" },
       { type: "cancel", runId: "\n" },
       { type: "create", workspaceRoot: "relative", askEachRead: false },
+      { type: "materials", sessionId: "x", paths: Array(9).fill("source.pdf") },
+      { type: "materials", sessionId: "x", paths: ["\u0000.pdf"] },
+      { type: "report.target", sessionId: "x", path: false },
+      { type: "artifact.open", sessionId: "x", effectId: "effect", path: "/private" },
+      { type: "configure", settings: { preset: "flash", maxRequests: 0, timeoutMs: 120_000 } },
       Object.create({ type: "close" }),
       getter,
     ])

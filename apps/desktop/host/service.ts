@@ -10,19 +10,33 @@ import type {
   TranscriptEntry,
 } from "moyyi/contracts";
 import { createRuntime, ReadOnlyPolicy, type Runtime, type RuntimeOptions } from "moyyi/runtime";
-import type {
-  DesktopApproval,
-  DesktopCommand,
-  DesktopMessage,
-  DesktopSessionSummary,
-  DesktopState,
+import {
+  DEFAULT_DESKTOP_SETTINGS,
+  type DesktopApproval,
+  type DesktopCommand,
+  type DesktopMessage,
+  type DesktopSessionSummary,
+  type DesktopSettings,
+  type DesktopState,
 } from "../shared.ts";
+import { FileBoundaryError, inspectMaterials } from "./materials.ts";
+import { ReportPolicy } from "./report-policy.ts";
+import { inspectReport, reportTarget } from "./reports.ts";
 import { parseDesktopCommand } from "./validation.ts";
 
 export interface DesktopHostOptions {
   readonly runtimeOptions: () => RuntimeOptions | Promise<RuntimeOptions>;
   readonly maxOutputTokens?: number;
   readonly connection?: DesktopState["connection"];
+  readonly settings?: DesktopSettings;
+  readonly configure?: (
+    settings: DesktopSettings,
+    apiKey?: string,
+  ) => Promise<{
+    settings: DesktopSettings;
+    runtimeOptions: RuntimeOptions;
+    connection: DesktopState["connection"];
+  }>;
 }
 
 export interface DesktopHost {
@@ -57,16 +71,24 @@ class Host implements DesktopHost {
   private commandError: string | null = null;
   private pluginWarning: string | null = null;
   private state: DesktopState;
-  private readonly options: RuntimeOptions;
+  private options: RuntimeOptions;
+  private readonly configure: DesktopHostOptions["configure"];
+  private refresh: Promise<void> | undefined;
 
   constructor(
     options: RuntimeOptions,
-    display: Pick<DesktopHostOptions, "connection" | "maxOutputTokens">,
+    display: Pick<DesktopHostOptions, "connection" | "maxOutputTokens" | "settings" | "configure">,
   ) {
     this.options = options;
+    this.configure = display.configure;
     this.state = {
       status: "ready",
       connection: display.connection ?? { ready: true },
+      settings: display.settings ?? DEFAULT_DESKTOP_SETTINGS,
+      materials: [],
+      reportTarget: null,
+      artifacts: { items: [], offset: 0, hasMore: false },
+      artifactPreview: null,
       sessions: { items: [], offset: 0, hasMore: false },
       activeSessionId: null,
       workspaceRoot: null,
@@ -117,14 +139,14 @@ class Host implements DesktopHost {
     throw Error(message);
   }
 
-  private async open(askEachRead: boolean): Promise<void> {
+  private async open(askEachRead: boolean, target: string | null = null): Promise<void> {
     if (this.runtime) {
       await this.runtime.close();
       this.unsubscribe?.();
       this.runtime = undefined;
     }
     if (this.state.status !== "ready") throw Error("Desktop host is closing");
-    // The factory is trusted connection composition, but M1 never inherits its effect grants.
+    // Connection composition never supplies effect grants; only the picked report target can.
     const {
       policy: _policy,
       workspaceWrites: _writes,
@@ -135,9 +157,14 @@ class Host implements DesktopHost {
     } = this.options;
     const runtime = await createRuntime({
       ...base,
-      policy: new ReadOnlyPolicy({
-        requireApproval: askEachRead ? ["read", "list", "search", "read_document"] : [],
-      }),
+      ...(target && this.state.workspaceRoot
+        ? { workspaceWrites: { roots: [this.state.workspaceRoot], approval: "ask" as const } }
+        : {}),
+      policy: target
+        ? new ReportPolicy(target, askEachRead)
+        : new ReadOnlyPolicy({
+            requireApproval: askEachRead ? ["read", "list", "search", "read_document"] : [],
+          }),
     });
     if (this.state.status !== "ready") {
       await runtime.close();
@@ -150,6 +177,7 @@ class Host implements DesktopHost {
       : null;
     this.update({
       askEachRead,
+      reportTarget: target,
       error: this.pluginWarning,
     });
   }
@@ -197,11 +225,105 @@ class Host implements DesktopHost {
   }
 
   private safeError(error: unknown): string {
-    return error instanceof BoundaryError ? error.message : "Desktop operation failed safely";
+    return error instanceof BoundaryError || error instanceof FileBoundaryError
+      ? error.message
+      : "Desktop operation failed safely";
+  }
+
+  private excluded(): readonly string[] {
+    return [
+      ...(this.options.protectedPaths ?? []),
+      ...(this.options.dataDirectory ? [this.options.dataDirectory] : []),
+    ];
+  }
+
+  private selected(sessionId: string): string {
+    if (sessionId !== this.state.activeSessionId || !this.state.workspaceRoot)
+      throw new BoundaryError("Session is not selected");
+    return this.state.workspaceRoot;
+  }
+
+  private async refreshArtifacts(offset: number): Promise<void> {
+    if (!this.state.activeSessionId || !this.runtime) return;
+    await this.runtime.idle();
+    if (this.state.status !== "ready") return;
+    await this.send({
+      type: "session.results",
+      sessionId: this.state.activeSessionId as SessionId,
+      offset,
+      limit: 20,
+    });
+  }
+
+  private scheduleArtifacts(): void {
+    if (this.state.status !== "ready" || !this.runtime) return;
+    const runtime = this.runtime,
+      session = this.state.activeSessionId;
+    const task = (async () => {
+      await runtime.idle();
+      if (
+        this.runtime === runtime &&
+        this.state.activeSessionId === session &&
+        this.state.status === "ready"
+      )
+        await this.refreshArtifacts(0);
+    })()
+      .catch(() => {
+        if (this.state.status === "ready")
+          this.update({ error: "Report history could not be refreshed" });
+      })
+      .finally(() => {
+        if (this.refresh === task) this.refresh = undefined;
+      });
+    this.refresh = task;
+  }
+
+  private async reloadSelected(): Promise<void> {
+    const sessionId = this.state.activeSessionId,
+      workspace = this.state.workspaceRoot;
+    if (!sessionId || !workspace) {
+      await this.send({ type: "session.list", offset: 0, limit: 20 });
+      return;
+    }
+    this.entryIds.clear();
+    this.toolNames.clear();
+    this.pendingWorkspace = workspace;
+    this.expectedSession = sessionId;
+    this.update({
+      messages: [],
+      streamText: "",
+      historyTruncated: false,
+      artifactPreview: null,
+      pendingApproval: null,
+    });
+    try {
+      await this.send({ type: "session.load", sessionId: sessionId as SessionId });
+    } finally {
+      this.pendingWorkspace = undefined;
+      this.expectedSession = undefined;
+    }
+    await this.refreshArtifacts(0);
+  }
+
+  private async changeReport(target: string | null): Promise<void> {
+    try {
+      await this.open(this.state.askEachRead, target);
+      await this.reloadSelected();
+    } catch {
+      this.update({ reportTarget: null });
+      if (this.state.status === "ready") {
+        await this.open(this.state.askEachRead);
+        await this.reloadSelected();
+      }
+      throw new BoundaryError(
+        "Report permission could not be changed; no report permission was retained",
+      );
+    }
   }
 
   private async perform(command: Exclude<DesktopCommand, { type: "close" }>): Promise<void> {
     if (command.type !== "approve" && command.type !== "cancel") {
+      await this.refresh;
       // run.finished is emitted just before core cleanup settles. Do not race the next admission.
       await this.runtime?.idle();
       if (this.state.status !== "ready") throw new BoundaryError("Desktop host is closing");
@@ -224,7 +346,11 @@ class Host implements DesktopHost {
         throw new BoundaryError("The selected workspace is missing or has changed");
       }
       if (this.state.status !== "ready") throw new BoundaryError("Desktop host is closing");
-      if (!this.runtime || command.askEachRead !== this.state.askEachRead)
+      if (
+        !this.runtime ||
+        command.askEachRead !== this.state.askEachRead ||
+        this.state.reportTarget !== null
+      )
         await this.open(command.askEachRead);
       this.approvals.clear();
       this.effectRuns.clear();
@@ -238,6 +364,10 @@ class Host implements DesktopHost {
         historyTruncated: false,
         pendingApproval: null,
         outcome: null,
+        materials: [],
+        reportTarget: null,
+        artifacts: { items: [], offset: 0, hasMore: false },
+        artifactPreview: null,
       });
       try {
         await this.send(
@@ -249,6 +379,131 @@ class Host implements DesktopHost {
         this.pendingWorkspace = undefined;
         this.expectedSession = undefined;
       }
+      await this.refreshArtifacts(0);
+      return;
+    }
+    if (command.type === "configure") {
+      if (!this.configure)
+        throw new BoundaryError("Desktop settings cannot be changed by this host");
+      const previous = this.options;
+      const previousSettings = this.state.settings,
+        previousConnection = this.state.connection;
+      await this.runtime?.close();
+      this.unsubscribe?.();
+      this.runtime = undefined;
+      this.update({ reportTarget: null, pendingApproval: null, artifactPreview: null });
+      let saved = false;
+      try {
+        const configured = await this.configure(command.settings, command.apiKey);
+        saved = true;
+        this.update({ settings: configured.settings });
+        if (
+          !configured.runtimeOptions.dataDirectory ||
+          configured.runtimeOptions.dataDirectory !== previous.dataDirectory ||
+          configured.runtimeOptions.store
+        )
+          throw Error("Configuration changed store ownership");
+        this.options = configured.runtimeOptions;
+        this.update({
+          settings: configured.settings,
+          connection: configured.connection,
+          model: this.options.model ? { ...this.options.model } : null,
+          budgets: {
+            maxRequests: this.options.limits?.maxModelRequests ?? null,
+            timeoutMs: this.options.limits?.timeoutMs ?? null,
+            maxOutputTokens: this.state.budgets.maxOutputTokens,
+          },
+        });
+        await this.open(this.state.askEachRead);
+        await this.reloadSelected();
+      } catch {
+        if (saved) {
+          this.update({
+            connection: {
+              ready: false,
+              message: "Settings were saved, but the runtime must be reopened",
+            },
+          });
+          throw new BoundaryError(
+            "Settings were saved, but the runtime could not reopen; existing conversations were retained",
+          );
+        }
+        this.options = previous;
+        this.update({
+          settings: previousSettings,
+          connection: previousConnection,
+          model: previous.model ? { ...previous.model } : null,
+          budgets: {
+            maxRequests: previous.limits?.maxModelRequests ?? null,
+            timeoutMs: previous.limits?.timeoutMs ?? null,
+            maxOutputTokens: this.state.budgets.maxOutputTokens,
+          },
+        });
+        if (this.state.status === "ready") {
+          try {
+            await this.open(this.state.askEachRead);
+            await this.reloadSelected();
+          } catch {
+            this.update({
+              connection: { ready: false, message: "Desktop runtime must be reopened" },
+            });
+          }
+        }
+        throw new BoundaryError(
+          "Desktop settings could not be applied; existing conversations were retained",
+        );
+      }
+      return;
+    }
+    if (command.type === "materials") {
+      const workspace = this.selected(command.sessionId);
+      if (command.paths.length)
+        this.update({ materials: inspectMaterials(workspace, command.paths, this.excluded()) });
+      return;
+    }
+    if (command.type === "material.remove") {
+      this.selected(command.sessionId);
+      this.update({ materials: this.state.materials.filter((item) => item.path !== command.path) });
+      return;
+    }
+    if (command.type === "report.target" || command.type === "report.clear") {
+      const workspace = this.selected(command.sessionId);
+      if (command.type === "report.target" && command.path === null) return;
+      const target =
+        command.type === "report.clear"
+          ? null
+          : reportTarget(workspace, command.path as string, this.excluded());
+      await this.changeReport(target);
+      return;
+    }
+    if (command.type === "artifacts") {
+      this.selected(command.sessionId);
+      await this.refreshArtifacts(command.offset);
+      return;
+    }
+    if (command.type === "artifact.close") {
+      this.update({ artifactPreview: null });
+      return;
+    }
+    if (command.type === "artifact.open") {
+      const workspace = this.selected(command.sessionId);
+      const artifact = this.state.artifacts.items.find(
+        (item) => item.effectId === command.effectId,
+      );
+      this.update({ artifactPreview: null });
+      if (!artifact) throw new BoundaryError("Select a recorded report first");
+      const checked = inspectReport(workspace, artifact, this.excluded());
+      this.update({
+        artifacts: {
+          ...this.state.artifacts,
+          items: this.state.artifacts.items.map((item) =>
+            item.effectId === artifact.effectId ? { ...item, state: checked.state } : item,
+          ),
+        },
+        artifactPreview: checked.preview ?? null,
+      });
+      if (checked.state !== "current")
+        throw new BoundaryError(`Report is ${checked.state}; the recorded version was not opened`);
       return;
     }
     if (command.type === "list") {
@@ -256,11 +511,28 @@ class Host implements DesktopHost {
       return;
     }
     if (command.type === "start") {
-      if (command.sessionId !== this.state.activeSessionId)
-        throw new BoundaryError("Session is not selected");
+      const workspace = this.selected(command.sessionId);
       if (!this.state.connection.ready)
         throw new BoundaryError("The model connection is unavailable");
       const input = [{ type: "text" as const, text: command.text }];
+      if (this.state.materials.length) {
+        const current = inspectMaterials(
+          workspace,
+          this.state.materials.map((item) => item.path),
+          this.excluded(),
+        );
+        if (JSON.stringify(current) !== JSON.stringify(this.state.materials))
+          throw new BoundaryError("Selected documents changed; select them again before sending");
+        input.push({
+          type: "text",
+          text: `Selected workspace documents (file identity only; contents have not been extracted):\n${JSON.stringify(current)}`,
+        });
+      }
+      if (this.state.reportTarget)
+        input.push({
+          type: "text",
+          text: `Selected new report destination: ${JSON.stringify(this.state.reportTarget)}. Only create at this exact relative path is enabled, with approval; existing files cannot be edited or overwritten.`,
+        });
       if (Buffer.byteLength(JSON.stringify(input)) > (this.options.limits?.maxInputBytes ?? 65_536))
         throw new BoundaryError("Message exceeds the configured input limit");
       await this.send({ type: "run.start", sessionId: command.sessionId as SessionId, input });
@@ -442,7 +714,12 @@ class Host implements DesktopHost {
         break;
       case "run.started":
         if (event.sessionId !== this.state.activeSessionId) return;
-        this.update({ run: { id: event.runId, state: "running" }, outcome: null, streamText: "" });
+        this.update({
+          run: { id: event.runId, state: "running" },
+          outcome: null,
+          streamText: "",
+          artifactPreview: null,
+        });
         break;
       case "assistant.delta":
         if (event.runId !== this.state.run?.id) return;
@@ -465,7 +742,7 @@ class Host implements DesktopHost {
           effectId: event.effectId,
           digest: event.digest,
           summary: clip(event.summary),
-          ...(event.preview === undefined ? {} : { preview: clip(event.preview) }),
+          ...(event.preview === undefined ? {} : { preview: clip(event.preview, 131_072) }),
         });
         this.update({ pendingApproval: this.approvals.values().next().value ?? null });
         break;
@@ -485,6 +762,7 @@ class Host implements DesktopHost {
                 : {}),
           },
         });
+        this.scheduleArtifacts();
         break;
       case "command.rejected":
         this.commandError =
@@ -498,6 +776,34 @@ class Host implements DesktopHost {
         }
         break;
       case "session.results":
+        if (
+          event.page.sessionId !== this.state.activeSessionId ||
+          event.page.workspaceRoot !== this.state.workspaceRoot
+        )
+          return;
+        this.update({
+          artifacts: {
+            offset: event.page.offset,
+            hasMore: event.page.hasMore,
+            items: event.page.effects.flatMap((effect) =>
+              effect.tool === "create" &&
+              effect.state === "succeeded" &&
+              effect.receipt?.kind === "file" &&
+              effect.receipt.beforeHash === null &&
+              effect.receipt.afterHash !== null
+                ? [
+                    {
+                      effectId: effect.effectId,
+                      path: effect.receipt.path,
+                      afterHash: effect.receipt.afterHash,
+                      state: "unchecked" as const,
+                    },
+                  ]
+                : [],
+            ),
+          },
+          artifactPreview: null,
+        });
         break;
     }
   }

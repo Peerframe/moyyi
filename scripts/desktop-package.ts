@@ -16,7 +16,7 @@ import { buildCandidate, command, repository } from "./packaging.ts";
 
 assert(
   process.platform === "darwin" && process.arch === "arm64",
-  "M1 desktop packaging supports macOS arm64 only",
+  "Desktop packaging supports macOS arm64 only",
 );
 const nodeVersion = "26.12.1";
 const nodeArchive = `node-v${nodeVersion}-darwin-arm64.tar.gz`;
@@ -76,6 +76,19 @@ assert(
 command("/usr/bin/ditto", [join(electron, "Electron.app"), app], repository);
 const resources = join(app, "Contents/Resources");
 rmSync(join(resources, "default_app.asar"), { force: true });
+command(
+  "/usr/bin/xcrun",
+  [
+    "swiftc",
+    "-O",
+    "-target",
+    "arm64-apple-macos14.0",
+    join(repository, "apps/desktop/native/keychain.swift"),
+    "-o",
+    join(resources, "keychain-helper"),
+  ],
+  repository,
+);
 const appDirectory = join(resources, "app");
 cpSync(join(output, "app"), appDirectory, { recursive: true });
 mkdirSync(join(resources, "node/bin"), { recursive: true });
@@ -130,6 +143,9 @@ const manifest = {
   node: nodeVersion,
   nodeArchiveSha256: nodeSha256,
   runtime: candidate,
+  keychainHelperSourceSha256: createHash("sha256")
+    .update(readFileSync(join(repository, "apps/desktop/native/keychain.swift")))
+    .digest("hex"),
   desktopBundleSha256: createHash("sha256")
     .update(
       Buffer.concat(

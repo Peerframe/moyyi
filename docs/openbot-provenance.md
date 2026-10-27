@@ -41,6 +41,7 @@ write tools were synthetic; phase 2 introduces an explicit runtime write grant. 
 | `src/runtime/document-worker.ts` | `apps/server-python/src/openbot_server/parser_worker.ts` (`adaptPdf`, `adaptOffice`, input/output bounds and failure cases) | `010439bb9002fabb7e1facd8450ee85edbafa309` | Narrowly adapted parsing methods only; new runtime/plugin/sandbox/FD reader. MIT notice retained. |
 | `src/runtime/fixtures/{encrypted,image-only}.pdf` | `tests/oracles/legacy-server/src/__fixtures__/attachments/` | `010439bb9002fabb7e1facd8450ee85edbafa309` | Fixed synthetic binary inputs, newly exercised against moyyi; old test results are not evidence. |
 | `apps/desktop/renderer/ApprovalCard.tsx`, `styles.css` | `apps/web/src/components/ApprovalCard.tsx`, `apps/web/src/tokens.css`, `apps/web/src/styles.css` | `010439bb9002fabb7e1facd8450ee85edbafa309` | Narrow view/token adaptation; new authority and session bridge. MIT retained in app. |
+| `apps/desktop/renderer/ArtifactCard.tsx` | `apps/web/src/components/ArtifactCard.tsx`, `apps/web/src/artifact-shell-save.ts` | `010439bb9002fabb7e1facd8450ee85edbafa309` | Narrow presentation/pending/error and identity-only action adaptation. New moyyi receipt/hash checks and local plain-text/reveal actions replace Server downloads. MIT notice retained; M2 external bundle and native-UI live-task checks passed, final integration/install pending. |
 | `src/plugins/skills/parse.ts` | `packages/employee-publisher/src/agent-skills.ts` | `010439bb9002fabb7e1facd8450ee85edbafa309` | Adapted bounded YAML AST-validation approach (aliases, anchors/tags, scalar keys, node/depth caps); rewritten schema checks and moyyi plugin/port, no publisher or authority code. MIT notice in `THIRD_PARTY_NOTICES.md` |
 
 ## Desktop M1 adaptation
@@ -56,6 +57,28 @@ approval presentation from `apps/web/src/styles.css` at that revision. The MIT t
 renderer/bridge, actual readonly runtime, SQLite, denial, stale digest, cancellation and recovery.
 No Bot/channel/risk/domain DTO, login recovery, Server API or old task engine was copied.
 See [desktop guide](desktop.md) and [ADR 0037](decisions/0037-installed-desktop-client.md).
+
+## Desktop M2 adaptation
+
+`apps/desktop/renderer/ArtifactCard.tsx` adapts the fixed revision's
+`apps/web/src/components/ArtifactCard.tsx` and `apps/web/src/artifact-shell-save.ts`: document-card
+presentation, in-flight/error feedback and an identity-only action boundary. It replaces Server
+URLs and download/PNG behavior with moyyi's session/effect identity, actual create receipts,
+fresh file/hash checks, in-app plain text and a Finder-location request. File paths and model
+text never become renderer-controlled navigation. The source comment and existing distributed
+MIT license retain attribution; see [third-party notices](../THIRD_PARTY_NOTICES.md).
+
+The settings form and material picker are independently rewritten against the local host.
+Review of `ModelSettingsScreen.tsx`, `ModelSelector.tsx` and `ComposerAttachmentPicker.tsx` informed
+credential clearing, explicit unavailable choices, cancellation and stale-result handling.
+No Server catalog, revision/identity DTO, upload endpoint, channel model or attachment parser is
+copied. This slice uses only workspace-local native selection; upstream drag/drop, OCR and
+transcription are not ported. New renderer tests exercise escaped result text, historical states,
+empty result pages, input clearing and action locking. Upstream tests were read, not run.
+The external candidate and both original live document tasks passed through the native UI;
+actual report text and comparison-file Finder selection were observed. This is moyyi candidate
+evidence, not an upstream test result or a general reliability claim. Final rebuilt-app restart,
+CI, merge and owner installation remain in the M2 PR delivery receipt.
 
 ## Skills boundary experience
 
@@ -99,21 +122,24 @@ The new seven-format fixtures are independently generated in
 `src/runtime/fixtures/document-fixtures.ts`; only the two specifically listed PDF inputs come from
 OpenBot. Neither the OpenBot checkout's unrelated work nor its legacy runtime is imported.
 
-## Planned desktop reuse (not yet ported)
+<a id="planned-desktop-reuse-not-yet-ported"></a>
+
+## Desktop reuse inventory
 
 The [current product plan](roadmap.md#openbot-reuse-within-this-sequence) moves a personal desktop
 client into the next delivery. The following candidates were read at fixed OpenBot commit
 `010439bb9002fabb7e1facd8450ee85edbafa309`, under its
 [MIT license](https://github.com/Peerframe/openbot/blob/010439bb9002fabb7e1facd8450ee85edbafa309/LICENSE).
 The owner's dirty checkout was not used as source. This is a candidate inventory: no UI source
-was copied during planning. M1 now adapts the approval view and presentation subset listed below;
+was copied during planning. M1 adapts the approval view; the M2 source candidate now adapts the
+result card and independently implements the settings/material interactions described above;
 upstream tests have not been run, and this inventory itself certifies no desktop behavior.
 Record actual adapted files/notices and moyyi verification when each port is implemented.
 
 | Candidate at the fixed revision | Reuse decision and dependency boundary | Planned slice |
 |---|---|---|
 | [ApprovalCard.tsx](https://github.com/Peerframe/openbot/blob/010439bb9002fabb7e1facd8450ee85edbafa309/apps/web/src/components/ApprovalCard.tsx) | First candidate for narrow view adaptation: pending/error/duplicate-click presentation. Replace Bot/channel/risk DTOs with moyyi's actual effect summary and exact digest-bound callbacks. The view cannot decide authority. | M1 |
-| [ArtifactCard.tsx](https://github.com/Peerframe/openbot/blob/010439bb9002fabb7e1facd8450ee85edbafa309/apps/web/src/components/ArtifactCard.tsx) | Adapt presentation and save/cancel/existing-file feedback; replace HTTP downloads and Desktop bridge with receipt-backed local actions. Existing PNG/Markdown distinctions do not establish arbitrary-file preview support. | M2 |
+| [ArtifactCard.tsx](https://github.com/Peerframe/openbot/blob/010439bb9002fabb7e1facd8450ee85edbafa309/apps/web/src/components/ArtifactCard.tsx) | M2 source adaptation recorded above; local receipt/hash checks and plain-text/reveal actions replace HTTP downloads. Existing PNG/Markdown distinctions do not establish arbitrary-file preview support. | M2 candidate |
 | [ComposerAttachmentPicker.tsx](https://github.com/Peerframe/openbot/blob/010439bb9002fabb7e1facd8450ee85edbafa309/apps/web/src/components/ComposerAttachmentPicker.tsx) | Reimplement local selection/import using drag/drop, cancellation and late-response lessons. Do not port channel IDs, upload service, OCR/transcription or duplicate existing parsers. | M2 |
 | [ModelSelector.tsx](https://github.com/Peerframe/openbot/blob/010439bb9002fabb7e1facd8450ee85edbafa309/apps/web/src/components/ModelSelector.tsx), [ModelSettingsScreen.tsx](https://github.com/Peerframe/openbot/blob/010439bb9002fabb7e1facd8450ee85edbafa309/apps/web/src/components/ModelSettingsScreen.tsx) | Reimplement against explicit local host settings. Preserve unavailable selections and save feedback; no silent model change. Exclude Server catalogs, identity/revision and credential DTOs. | M2 |
 | [TaskSteps.tsx](https://github.com/Peerframe/openbot/blob/010439bb9002fabb7e1facd8450ee85edbafa309/apps/web/src/components/TaskSteps.tsx), [WorkTasksEntry.tsx](https://github.com/Peerframe/openbot/blob/010439bb9002fabb7e1facd8450ee85edbafa309/apps/web/src/components/WorkTasksEntry.tsx), [WorkTasksScreen.tsx](https://github.com/Peerframe/openbot/blob/010439bb9002fabb7e1facd8450ee85edbafa309/apps/web/src/components/WorkTasksScreen.tsx) | Reimplement bounded progress/history/late-response behavior from runtime events and session catalog. No Server polling, WorkSnapshot, Bot or database model. OpenBot local-session-recovery restores Server login, not moyyi task state; do not port it. | M1/M3 |

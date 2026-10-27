@@ -78,6 +78,26 @@ export function noticeLabel(text: string): string {
     : text;
 }
 
+export function artifactStateLabel(state: string): string {
+  return (
+    {
+      unchecked: "历史回执；尚未检查当前文件",
+      current: "本次读取时与生成回执一致",
+      changed: "文件已变化，当前内容与生成回执不一致",
+      missing: "文件不存在，可能已被移动或删除",
+      unavailable: "当前无法安全读取此文件",
+    }[state] ?? "文件状态未知"
+  );
+}
+
+export function formatBytes(value: number): string {
+  return value < 1024
+    ? `${value} B`
+    : value < 1024 * 1024
+      ? `${(value / 1024).toFixed(1)} KB`
+      : `${(value / (1024 * 1024)).toFixed(1)} MB`;
+}
+
 export function workspaceName(path: string | null): string {
   return path?.split("/").filter(Boolean).at(-1) ?? "未选择工作目录";
 }

@@ -1,8 +1,18 @@
 import { useEffect, useRef, useState } from "react";
-import type { DesktopAction, DesktopApproval, DesktopBridge, DesktopState } from "../shared.ts";
+import type {
+  DesktopAction,
+  DesktopApproval,
+  DesktopArtifact,
+  DesktopBridge,
+  DesktopState,
+} from "../shared.ts";
 import { ApprovalCard } from "./ApprovalCard.tsx";
+import { ArtifactsPanel } from "./ArtifactsPanel.tsx";
+import { MaterialsPanel } from "./MaterialsPanel.tsx";
 import { MessageList } from "./MessageList.tsx";
 import { SessionSidebar } from "./SessionSidebar.tsx";
+import { SettingsDialog } from "./SettingsDialog.tsx";
+import { presetLabel } from "./settings-state.ts";
 import {
   approvalIdentity,
   createActionGate,
@@ -18,6 +28,7 @@ export function App({ bridge }: { bridge: DesktopBridge }) {
   const [newSession, setNewSession] = useState(false);
   const [askEachRead, setAskEachRead] = useState(false);
   const [draft, setDraft] = useState("");
+  const [settingsOpen, setSettingsOpen] = useState(false);
   const gate = useRef(createActionGate());
   const scrollArea = useRef<HTMLDivElement>(null);
   const followOutput = useRef(true);
@@ -46,7 +57,10 @@ export function App({ bridge }: { bridge: DesktopBridge }) {
     scrollArea.current.scrollTop = scrollArea.current.scrollHeight;
   }, [scrollMarker]);
 
-  async function perform(operation: () => Promise<DesktopState>): Promise<DesktopState | null> {
+  async function perform(
+    operation: () => Promise<DesktopState>,
+    failureMessage?: string,
+  ): Promise<DesktopState | null> {
     if (!gate.current.begin()) return null;
     setPending(true);
     setViewError(null);
@@ -54,7 +68,7 @@ export function App({ bridge }: { bridge: DesktopBridge }) {
       // State is delivered through the subscription; a delayed ACK cannot overwrite it.
       return await operation();
     } catch (cause) {
-      if (mounted.current) setViewError(errorMessage(cause));
+      if (mounted.current) setViewError(failureMessage ?? errorMessage(cause));
       return null;
     } finally {
       gate.current.end();
@@ -85,6 +99,7 @@ export function App({ bridge }: { bridge: DesktopBridge }) {
       !state?.activeSessionId ||
       state.run ||
       !state.connection.ready ||
+      settingsOpen ||
       newSession ||
       !draft.trim()
     )
@@ -113,6 +128,15 @@ export function App({ bridge }: { bridge: DesktopBridge }) {
     void perform(() => bridge.act(command));
   }
 
+  async function artifactAction(artifact: DesktopArtifact, reveal: boolean) {
+    if (!state?.activeSessionId) throw Error("请先打开会话。");
+    const identity = { sessionId: state.activeSessionId, effectId: artifact.effectId };
+    const result = await perform(() =>
+      reveal ? bridge.revealArtifact(identity) : bridge.act({ type: "artifact.open", ...identity }),
+    );
+    if (!result) throw Error("报告操作未完成。");
+  }
+
   if (!state)
     return (
       <main className="boot-screen">
@@ -131,7 +155,8 @@ export function App({ bridge }: { bridge: DesktopBridge }) {
   const busy = pending || state.run !== null || state.status !== "ready";
   const configuring = newSession || !state.activeSessionId;
   const error = viewError ?? state.error;
-  const canSend = !busy && !configuring && state.connection.ready && draft.trim().length > 0;
+  const canSend =
+    !busy && !configuring && !settingsOpen && state.connection.ready && draft.trim().length > 0;
   const requestBudget =
     state.budgets.maxRequests === null
       ? "请求预算尚未加载"
@@ -168,23 +193,34 @@ export function App({ bridge }: { bridge: DesktopBridge }) {
               {configuring ? "选择一个目录，开始只读任务" : state.workspaceRoot}
             </p>
           </div>
-          {!configuring ? (
-            <button type="button" disabled={busy} onClick={() => setNewSession(true)}>
-              切换目录
+          <div className="header-actions">
+            <button type="button" disabled={busy} onClick={() => setSettingsOpen(true)}>
+              模型设置
             </button>
-          ) : null}
+            {!configuring ? (
+              <button type="button" disabled={busy} onClick={() => setNewSession(true)}>
+                切换目录
+              </button>
+            ) : null}
+          </div>
         </header>
         <p className="permission-line">
-          Flash · low · {requestBudget}
+          {presetLabel(state.settings.preset)} · low · {requestBudget} ·{" "}
+          {state.settings.timeoutMs / 1000} 秒 · 输出 8192 tokens · 重试 0 次
           <br />
-          只读所选工作目录 · 不写入文件、不执行命令、不访问网页
+          {!configuring && state.reportTarget
+            ? `可读工作目录；仅可审批创建报告：${state.reportTarget} · 不执行命令、不访问网页`
+            : "只读所选工作目录 · 不写入文件、不执行命令、不访问网页"}
           {!configuring ? ` · ${state.askEachRead ? "工具读取逐次审批" : "工具读取已授权"}` : ""}
         </p>
         {!state.connection.ready ? (
-          <p className="error error-banner" role="alert">
-            {state.connection.message ??
-              "尚未配置 Flash 连接。请使用 moyyi-deepseek setup-key 完成配置，再重新打开应用；已有会话仍可查看。"}
-          </p>
+          <div className="error error-banner" role="alert">
+            <span>当前模型连接未就绪。已有会话仍可查看，材料仍可选择。</span>
+            {state.connection.message ? <p>{state.connection.message}</p> : null}
+            <button type="button" disabled={busy} onClick={() => setSettingsOpen(true)}>
+              打开模型设置
+            </button>
+          </div>
         ) : null}
         {error ? (
           <p className="error error-banner" role="alert">
@@ -227,6 +263,32 @@ export function App({ bridge }: { bridge: DesktopBridge }) {
               </section>
             ) : (
               <>
+                <MaterialsPanel
+                  materials={state.materials}
+                  reportTarget={state.reportTarget}
+                  busy={busy}
+                  running={state.run !== null}
+                  onSelect={() =>
+                    void perform(() =>
+                      bridge.selectDocuments({ sessionId: state.activeSessionId as string }),
+                    )
+                  }
+                  onRemove={(path) =>
+                    act({
+                      type: "material.remove",
+                      sessionId: state.activeSessionId as string,
+                      path,
+                    })
+                  }
+                  onSelectReport={() =>
+                    void perform(() =>
+                      bridge.selectReportTarget({ sessionId: state.activeSessionId as string }),
+                    )
+                  }
+                  onClearReport={() =>
+                    act({ type: "report.clear", sessionId: state.activeSessionId as string })
+                  }
+                />
                 {state.messages.length === 0 && !state.run ? (
                   <section className="empty-state">
                     <h2>想了解这个目录里的什么？</h2>
@@ -252,6 +314,17 @@ export function App({ bridge }: { bridge: DesktopBridge }) {
                     {outcomeLabel(state.outcome)}
                   </p>
                 ) : null}
+                <ArtifactsPanel
+                  artifacts={state.artifacts}
+                  preview={state.artifactPreview}
+                  busy={busy}
+                  onPage={(offset) =>
+                    act({ type: "artifacts", sessionId: state.activeSessionId as string, offset })
+                  }
+                  onOpen={(artifact) => artifactAction(artifact, false)}
+                  onReveal={(artifact) => artifactAction(artifact, true)}
+                  onClose={() => act({ type: "artifact.close" })}
+                />
               </>
             )}
           </div>
@@ -298,7 +371,7 @@ export function App({ bridge }: { bridge: DesktopBridge }) {
                   </button>
                 ) : (
                   <button className="primary" type="submit" disabled={!canSend}>
-                    {pending ? "正在打开…" : "发送"}
+                    {pending ? "正在处理…" : "发送"}
                   </button>
                 )}
               </div>
@@ -307,6 +380,20 @@ export function App({ bridge }: { bridge: DesktopBridge }) {
           </div>
         </form>
       </main>
+      {settingsOpen ? (
+        <SettingsDialog
+          settings={state.settings}
+          onConfigure={async (options) => {
+            const result = await perform(
+              () => bridge.configure(options),
+              "设置未能确认应用。请重新打开模型设置核对，或处理系统授权后重试；已有密钥和会话未删除。",
+            );
+            if (!result) throw Error("设置未能确认应用。");
+            return result;
+          }}
+          onClose={() => setSettingsOpen(false)}
+        />
+      ) : null}
     </div>
   );
 }

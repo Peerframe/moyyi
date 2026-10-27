@@ -179,7 +179,10 @@ Existing continuous paid-validation authorization does not waive zero-retry or f
 Use only fixed committed source, not the current dirty OpenBot checkout. The inspected revision
 is010439bb9002fabb7e1facd8450ee85edbafa309 (MIT). Existing document parsing reuse is already integrated;
 next reuse concerns presentation and interaction. Candidate inventory and precise paths live in
-[provenance](openbot-provenance.md#planned-desktop-reuse-not-yet-ported). M1 now adapts the approval presentation; later candidates remain unported.
+[provenance](openbot-provenance.md#desktop-reuse-inventory). M1 adapts the approval presentation;
+M2 adapts the result card; its external bundle and both original native-UI live document tasks
+passed. Final rebuilt-app restart, CI, merge and owner installation remain pending in the M2 PR
+delivery receipt; M3/M4 acceptance has not been inferred from these results.
 
 - M1: adapt the approval-card view and duplicate-click/pending feedback to moyyi events and exact
   effect/digest callbacks. Keep authorization in moyyi; no Bot/channel/domain DTO imports.
