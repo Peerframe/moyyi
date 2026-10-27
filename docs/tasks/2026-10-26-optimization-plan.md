@@ -7,12 +7,65 @@ Owner 已授权先做整体计划，再针对已证实的缺口优化。本计�
 
 ## 持续交付：日常任务闭环（当前）
 
-### M1 桌面实现（2026-10-27，候选验收中）
+### M2 材料、设置与报告（2026-10-27，本地功能与两题通过，最终集成安装待完成）
+
+承接已合并M1基线`eca4d06`，仍按原[roadmap](../roadmap.md)推进，不改自研核心、原任务或评分。
+本轮增加本地模型设置、工作目录内材料选择、精确报告创建授权及真实回执成果卡；
+[ADR0038](../decisions/0038-desktop-materials-and-reports.md)记录本次边界与官方依据，
+[桌面指南](../desktop.md)分别记录M1、M2的实际证据与安装边界。M3/M4尚未验收，不公开发布。
+
+- 设置仅接受Flash、Kimi中国、Kimi全球固定preset，均low；默认仍3请求/120秒/8192输出/零重试。
+  请求上限可选1–8、时限30–300秒，保存只在本机进行，不自动probe或产生模型请求。
+  Kimi选项不等于已验证的复杂任务推荐。切换连接先关闭runtime并在同SQLite库重开，清旧缓存与报告授权。
+- 非可执行设置及credential reference写入`~/.moyyi/desktop/settings.json`，0600、临时文件fsync后rename。
+  新Key由随包原生helper写入login Keychain的唯一UUID不可变条目；旧CLI及旧desktop凭据不覆盖。
+  新输入只经专用写入IPC/stdin，切换preset/保存/关闭清空输入框；不进入状态快照、transcript、argv或环境。
+  启动只查元信息，实际请求才lazy read。提交后重开失败仍可能已经保存，文案为“未能确认应用”。
+- 原生picker仅接收当前workspace的PDF/DOCX/XLSX/PPTX/ODT/ODS/ODP，每份≤10MiB、最多8份。
+  展示路径/大小/hash而不宣称读到正文；发送前再核对。外部导入、OCR、新parser及任意绝对路径入口均未引入。
+- 用户仅能选择workspace内一个缺失的json/md/txt/csv报告路径；exact create仍逐次按effect/digest审批，
+  不能覆盖/编辑/undo其他文件。撤销报告授权、新建/恢复会话及换连接回到只读，运行中先停止并等待收尾。
+  成果卡来自成功create回执；打开时实际读文件并比较hash，以纯文本显示，变化/缺失/不可用清旧预览。
+  Finder只请求定位已核验回执路径，不执行文件、不宣称已确认系统定位。
+- `ArtifactCard.tsx`实际窄改编OpenBot固定`010439bb9002fabb7e1facd8450ee85edbafa309`的
+  `apps/web/src/components/ArtifactCard.tsx`及`apps/web/src/artifact-shell-save.ts`，MIT保留。
+  settings/material视图按本地host重写，不搬Server/channel/旧runtime；七格式解析复用既有实现。
+
+本轮已执行根目录`npm run check`：128文件/2610测试，77.1秒；此前renderer定向16测试和desktop
+typecheck通过。新pack的实际应用复制到仓库外后，`verify:desktop`全部通过：M1原7项、M2七项
+（合成7请求）、production settings四项（实际worker保存max4后进程重启恢复4，Key读写/网络均0），
+以及Seatbelt文档隔离检查。另以随包原生helper完成独立合成UUID的add/status/read/delete/missing，
+现有凭据不变。早前额外用`security`读取新helper条目因ACL提示30秒超时，合成条目已清理；
+保留该失败，不宣传新Key与CLI同步、不修改旧条目授权。
+
+M1退出且无写者后，已备份到`~/.moyyi/backups/pre-desktop-m2-2026-10-27T14-23-52.404Z`。
+两题原fixture、instruction、checker和shared8上限在任何live请求前预注册于
+`~/.moyyi/reviews/desktop-m2-2026-10-27/live-manifest.json`。随后实际原生UI完成两题：
+
+| 原任务 | 实际请求 / 原上限 | 耗时 | 原检查结论 | 实际报告SHA-256 |
+|---|---|---|---|---|
+| `document-comparison-seven-formats` | 4 / 4；120秒/8192 | 34.809秒 | PASS | `47b26dd78f8e34f0b01c35af407d052a2334b9af78f176a9b7fa42237bd512a0` |
+| `document-report-seven-formats` | 4 / 4；120秒/8192 | 30.865秒 | PASS | `18329b12cb6efe41d322f3272dbe69f992dfc09170ef246249507ee83d96538b` |
+
+两题均为Flash + Responses + low、零重试，共8请求；每题实际解析7文件、逐次批准1次exact create、
+再1次readback。原checker事实/hash/quote/totals均通过，原始材料字节未变；每题全部9个工具结果
+与下一次模型请求逐项一致。原prompt第一part字节未变，UI增加的可见user parts仅为材料身份与
+所选目标，没有注入expected。已实际看到报告正文纯文本preview和Finder中被选中的比较报告文件。
+这些结果证明两道固定题和本次用户流程，不扩大为通用可靠率，也不把文件存在当成内容正确。
+
+验收后已通过UI把默认请求上限保存回3，Flash不变，应用退出。随后仅修正成果preview自动滚动，
+6个renderer测试及desktop typecheck通过，不改变模型输入或原题证据。最终完整`npm run check`
+再次通过128文件/2610测试，91.02秒，typecheck及Biome367文件通过。最终重建/重启、CI、合并及
+owner安装尚待完成，最终包hash与坐标见本轮PR receipt。私有证据保留在
+`~/.moyyi/reviews/desktop-m2-2026-10-27/`，不提交原始transcript。
+原源码六项rubric FAIL及Kimi high的429无语义证据保持原结论；M1证据没有改名充数。
+
+### M1 桌面实现（2026-10-27，已验收基线）
 
 Owner授权按分支/PR交付，审查与CI通过后合并安装，不公开发布。实现范围为macOS arm64的
 实际窗口→原生目录选择→现有Flash/Responses/low→实际读取/审批/停止→磁盘会话恢复。
 OpenBot固定010439bb的ApprovalCard及少量tokens/审批样式已改编，MIT随包保留；自研核心、
-会话格式和原题标准未改，写入/shell/web权限未开放。M2–M4未开始。
+会话格式和原题标准未改，写入/shell/web权限未开放。该M1验收不包含M2–M4。
 
 新桌面协议验证窗口/顶层frame、参数/大小、当前session/run、精确effect/digest；worker运行在
 随包Node26.12.1，通过公共runtime API使用原SQLite独占锁。CLI与桌面不能同时持有同一库。
@@ -34,6 +87,8 @@ entry/effect逐项相同，新增请求0；完整工具结果与下一次模型�
 另在dist不存在时运行全check通过124文件/2586测试（83.76秒）。首次失败保留，最终CI见PR回执。
 
 ### 当前目标与总体产品计划（2026-10-27）
+
+以下保留启动M1前的规划判断；当前实现与验收进度见上方交付记录及系统总览。
 
 Owner要求制定计划、设定目标，以总体性思考。**总目标：把moyyi做成在本机打开后就能连续使用的
 个人单Agent产品。** 能配置模型、选择工作区和材料、交代任务、理解进度、控制执行、打开成果，

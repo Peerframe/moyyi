@@ -25,6 +25,11 @@ class ChildPipe extends EventEmitter {
 const initial: DesktopState = {
   status: "ready",
   connection: { ready: true },
+  settings: { preset: "flash", maxRequests: 3, timeoutMs: 120_000 },
+  materials: [],
+  reportTarget: null,
+  artifacts: { items: [], offset: 0, hasMore: false },
+  artifactPreview: null,
   sessions: { items: [], offset: 0, hasMore: false },
   activeSessionId: null,
   workspaceRoot: null,

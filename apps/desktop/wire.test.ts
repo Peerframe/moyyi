@@ -5,6 +5,11 @@ import { isDesktopState, isWorkerMessage, isWorkerRequest } from "./wire.ts";
 const state: DesktopState = {
   status: "ready",
   connection: { ready: true },
+  settings: { preset: "flash", maxRequests: 3, timeoutMs: 120_000 },
+  materials: [],
+  reportTarget: null,
+  artifacts: { items: [], offset: 0, hasMore: false },
+  artifactPreview: null,
   sessions: { items: [], offset: 0, hasMore: false },
   activeSessionId: null,
   workspaceRoot: null,
@@ -31,6 +36,29 @@ describe("desktop wire data", () => {
     ).toBe(true);
     for (const changed of [
       { apiKey: "secret" },
+      { settings: { preset: "flash", maxRequests: 3, timeoutMs: 120000, apiKey: "secret" } },
+      { settings: { preset: "flash", maxRequests: 99, timeoutMs: 120000 } },
+      {
+        materials: [
+          {
+            path: "a.pdf",
+            format: "pdf",
+            sha256: "a".repeat(64),
+            sourceBytes: 1,
+            rawBytes: "secret",
+          },
+        ],
+      },
+      {
+        artifactPreview: {
+          effectId: "e",
+          path: "r.json",
+          sha256: "a".repeat(64),
+          sourceBytes: 1,
+          truncated: false,
+          text: "x".repeat(65537),
+        },
+      },
       { connection: { ready: "yes" } },
       { sessions: { items: [], offset: -1, hasMore: false } },
       { messages: [{ id: "1", role: "system", text: "x" }] },

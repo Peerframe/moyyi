@@ -12,6 +12,10 @@ const bridge: DesktopBridge = {
   selectWorkspace: (options: { askEachRead: boolean }) =>
     state(ipcRenderer.invoke("moyyi:workspace", options)),
   act: (command: DesktopAction) => state(ipcRenderer.invoke("moyyi:act", command)),
+  configure: (options) => state(ipcRenderer.invoke("moyyi:configure", options)),
+  selectDocuments: (options) => state(ipcRenderer.invoke("moyyi:documents", options)),
+  selectReportTarget: (options) => state(ipcRenderer.invoke("moyyi:report-target", options)),
+  revealArtifact: (options) => state(ipcRenderer.invoke("moyyi:reveal-artifact", options)),
   subscribe(listener: (snapshot: DesktopState) => void) {
     const handler = (_event: Electron.IpcRendererEvent, value: unknown) => {
       if (isDesktopState(value)) listener(value);

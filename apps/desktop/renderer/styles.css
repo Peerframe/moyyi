@@ -32,6 +32,7 @@ body {
 }
 button,
 input,
+select,
 textarea {
   font: inherit;
 }
@@ -49,6 +50,7 @@ textarea {
 }
 button:focus-visible,
 input:focus-visible,
+select:focus-visible,
 textarea:focus-visible,
 summary:focus-visible {
   outline: 2px solid var(--focus);
@@ -223,6 +225,7 @@ svg {
   line-height: 1.6;
   border-bottom: 1px solid var(--line);
   background: var(--surface);
+  overflow-wrap: anywhere;
 }
 .messages {
   overflow-y: auto;
@@ -476,6 +479,229 @@ svg {
 .boot-screen p {
   line-height: 1.7;
   color: var(--muted);
+}
+
+.header-actions,
+.material-actions,
+.artifact-pagination,
+.dialog-actions {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+.header-actions {
+  justify-content: flex-end;
+  flex-shrink: 0;
+}
+.panel-heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+.panel-heading h2,
+.panel-heading h3 {
+  margin: 0;
+  font-size: 14px;
+  font-weight: 600;
+}
+.panel-note {
+  margin: 8px 0;
+  color: var(--muted);
+  font-size: 11px;
+  line-height: 1.65;
+  overflow-wrap: anywhere;
+}
+.materials-panel {
+  padding: 14px;
+  margin-bottom: 24px;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background: var(--surface);
+}
+.material-list {
+  margin: 12px 0 0;
+  padding: 0;
+  list-style: none;
+}
+.material-list li {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 9px 0;
+  border-top: 1px solid var(--line);
+}
+.material-list details {
+  min-width: 0;
+  flex: 1;
+}
+.material-list summary {
+  cursor: pointer;
+  font-size: 12px;
+  line-height: 1.7;
+  overflow-wrap: anywhere;
+}
+.material-list small {
+  display: block;
+  color: var(--muted);
+}
+.hash-label {
+  font:
+    10px / 1.7 ui-monospace,
+    SFMono-Regular,
+    Menlo,
+    monospace;
+  color: var(--muted);
+  overflow-wrap: anywhere;
+  margin: 7px 0;
+}
+.report-target {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 12px;
+  padding-top: 12px;
+  border-top: 1px solid var(--line);
+}
+.report-target strong {
+  font-size: 12px;
+  font-weight: 500;
+  overflow-wrap: anywhere;
+}
+.artifacts-panel {
+  border-top: 1px solid var(--line);
+  padding-top: 16px;
+  margin-top: 24px;
+}
+.artifact-card {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  margin: 12px 0;
+  padding: 14px;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background: var(--surface);
+}
+.artifact-document-icon {
+  padding: 12px 8px;
+  border-radius: 7px;
+  background: var(--fill);
+  color: var(--muted);
+  font-size: 10px;
+}
+.artifact-card-label {
+  min-width: 0;
+  flex: 1;
+}
+.artifact-card-label strong,
+.artifact-card-label small {
+  display: block;
+  overflow-wrap: anywhere;
+  line-height: 1.7;
+}
+.artifact-card-label strong {
+  font-size: 12px;
+  font-weight: 550;
+}
+.artifact-card-label small,
+.artifact-card-label summary {
+  color: var(--muted);
+  font-size: 11px;
+}
+.artifact-card-label details {
+  margin: 6px 0 10px;
+}
+.artifact-card-label summary {
+  cursor: pointer;
+}
+.artifact-pagination {
+  justify-content: space-between;
+  margin: 12px 0;
+}
+.artifact-preview {
+  margin-top: 18px;
+  padding: 16px;
+  background: var(--fill);
+  border-radius: 12px;
+}
+.preview-path {
+  font-size: 12px;
+  overflow-wrap: anywhere;
+}
+.preview-warning {
+  color: var(--attention);
+  font-size: 12px;
+}
+.artifact-preview pre {
+  max-height: 420px;
+  overflow: auto;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  font:
+    12px / 1.8 ui-monospace,
+    SFMono-Regular,
+    Menlo,
+    monospace;
+}
+.settings-dialog {
+  width: min(560px, calc(100vw - 40px));
+  max-height: calc(100dvh - 50px);
+  overflow-y: auto;
+  border: 1px solid var(--line);
+  border-radius: 16px;
+  padding: 24px;
+  color: var(--text);
+  background: var(--surface);
+}
+.settings-dialog::backdrop {
+  background: rgb(0 0 0 / 28%);
+}
+.settings-dialog h2 {
+  font-size: 18px;
+}
+.settings-fields {
+  margin: 22px 0 0;
+  padding: 0;
+  border: 0;
+  min-width: 0;
+}
+.settings-fields label {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-top: 16px;
+  font-size: 12px;
+}
+.settings-fields label:first-child {
+  margin-top: 0;
+}
+.settings-fields input,
+.settings-fields select {
+  width: 100%;
+  padding: 10px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--surface);
+  color: var(--text);
+}
+.settings-budget {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  align-items: end;
+  gap: 16px;
+  margin-top: 16px;
+}
+.settings-budget label {
+  margin-top: 0;
+}
+.dialog-actions {
+  justify-content: flex-end;
+  margin-top: 24px;
 }
 
 @media (max-width: 800px) {

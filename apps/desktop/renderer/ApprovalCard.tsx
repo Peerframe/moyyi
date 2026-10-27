@@ -49,8 +49,8 @@ export function ApprovalCard({
   }
 
   return (
-    <article className="approval-card" aria-label="待批准的读取">
-      <header>需要你批准这次读取</header>
+    <article className="approval-card" aria-label="待批准的操作">
+      <header>需要你批准本次操作</header>
       <h2>{approval.summary}</h2>
       {approval.preview ? <pre>{approval.preview}</pre> : null}
       <p className="approval-note">本次选择只针对上面显示的动作。</p>
@@ -64,7 +64,7 @@ export function ApprovalCard({
           disabled={decision !== null}
           onClick={() => void decide("approve")}
         >
-          {decision === "approve" ? "正在批准…" : "批准这次读取"}
+          {decision === "approve" ? "正在批准…" : "批准本次操作"}
         </button>
       </div>
       {error ? (

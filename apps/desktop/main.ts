@@ -1,7 +1,7 @@
 import { realpathSync, statSync } from "node:fs";
-import { dirname, join } from "node:path";
+import { dirname, join, relative } from "node:path";
 import { pathToFileURL } from "node:url";
-import { app, BrowserWindow, dialog, ipcMain, Menu, session } from "electron";
+import { app, BrowserWindow, dialog, ipcMain, Menu, session, shell } from "electron";
 import { DesktopProcess } from "./bridge.ts";
 import { parseDesktopCommand } from "./host/validation.ts";
 import { isTrustedSender, pickerOptions } from "./security.ts";
@@ -133,7 +133,8 @@ else {
       ipcMain.handle("moyyi:act", async (event, value: unknown) => {
         trusted(event);
         const command = parseDesktopCommand(value);
-        if (command.type === "create" || command.type === "close")
+        if (selecting) throw Error("请先完成或取消当前选择。 ");
+        if (["create", "close", "configure", "materials", "report.target"].includes(command.type))
           throw Error("此操作只能从原生入口发起。");
         return host.send(command);
       });
@@ -156,6 +157,140 @@ else {
         } finally {
           selecting = false;
         }
+      });
+      async function currentSession(sessionId: string) {
+        const state = await host.getState();
+        if (
+          selecting ||
+          state.run ||
+          state.status !== "ready" ||
+          state.activeSessionId !== sessionId ||
+          !state.workspaceRoot
+        )
+          throw Error("请先结束当前任务，并选择当前会话。 ");
+        return state;
+      }
+      function identity(value: unknown): string {
+        if (
+          !value ||
+          typeof value !== "object" ||
+          Array.isArray(value) ||
+          Object.keys(value).length !== 1 ||
+          !("sessionId" in value)
+        )
+          throw Error("Invalid session selection");
+        const parsed = parseDesktopCommand({
+          type: "artifacts",
+          sessionId: value.sessionId,
+          offset: 0,
+        });
+        if (parsed.type !== "artifacts") throw Error("Invalid session selection");
+        return parsed.sessionId;
+      }
+      ipcMain.handle("moyyi:configure", async (event, value: unknown) => {
+        trusted(event);
+        if (
+          !value ||
+          typeof value !== "object" ||
+          Array.isArray(value) ||
+          Object.keys(value).some((k) => !["settings", "apiKey"].includes(k))
+        )
+          throw Error("Invalid model settings");
+        if (selecting) throw Error("请先完成或取消当前选择。 ");
+        const command = parseDesktopCommand({ ...value, type: "configure" });
+        return host.send(command);
+      });
+      ipcMain.handle("moyyi:documents", async (event, value: unknown) => {
+        trusted(event);
+        const sessionId = identity(value);
+        const state = await currentSession(sessionId);
+        selecting = true;
+        try {
+          const selected = await dialog.showOpenDialog(ownedWindow, {
+            title: "选择工作目录内的文档",
+            defaultPath: state.workspaceRoot as string,
+            message:
+              "只选择当前工作目录内的文件，每份最多10MiB，最多8份；选择不会自动上传或调用模型。",
+            properties: ["openFile", "multiSelections", "noResolveAliases"],
+            filters: [
+              {
+                name: "支持的文档",
+                extensions: ["pdf", "docx", "xlsx", "pptx", "odt", "ods", "odp"],
+              },
+            ],
+            buttonLabel: "选择文档",
+          });
+          if (selected.canceled) return host.getState();
+          const current = await host.getState();
+          if (
+            current.activeSessionId !== sessionId ||
+            current.workspaceRoot !== state.workspaceRoot ||
+            current.run
+          )
+            throw Error("会话已变化，请重新选择文档。");
+          return host.send({
+            type: "materials",
+            sessionId,
+            paths: selected.filePaths.map((p) => relative(state.workspaceRoot as string, p)),
+          });
+        } finally {
+          selecting = false;
+        }
+      });
+      ipcMain.handle("moyyi:report-target", async (event, value: unknown) => {
+        trusted(event);
+        const sessionId = identity(value);
+        const state = await currentSession(sessionId);
+        selecting = true;
+        try {
+          const selected = await dialog.showSaveDialog(ownedWindow, {
+            title: "选择报告保存位置",
+            defaultPath: join(state.workspaceRoot as string, "report.json"),
+            message: "仅授权在当前工作目录新建这一份报告；不能覆盖已有文件，写入前仍需逐次批准。",
+            buttonLabel: "设置报告位置",
+            showsTagField: false,
+            filters: [{ name: "纯文本报告", extensions: ["json", "md", "txt", "csv"] }],
+          });
+          if (selected.canceled || !selected.filePath) return host.getState();
+          const current = await host.getState();
+          if (
+            current.activeSessionId !== sessionId ||
+            current.workspaceRoot !== state.workspaceRoot ||
+            current.run
+          )
+            throw Error("会话已变化，请重新选择报告位置。");
+          return host.send({
+            type: "report.target",
+            sessionId,
+            path: relative(state.workspaceRoot as string, selected.filePath),
+          });
+        } finally {
+          selecting = false;
+        }
+      });
+      ipcMain.handle("moyyi:reveal-artifact", async (event, value: unknown) => {
+        trusted(event);
+        if (
+          !value ||
+          typeof value !== "object" ||
+          Array.isArray(value) ||
+          Object.keys(value).sort().join() !== "effectId,sessionId"
+        )
+          throw Error("Invalid result selection");
+        const command = parseDesktopCommand({ ...value, type: "artifact.open" });
+        if (command.type !== "artifact.open") throw Error("Invalid result selection");
+        await currentSession(command.sessionId);
+        const state = await host.send(command);
+        if (
+          !state.artifactPreview ||
+          state.artifactPreview.effectId !== command.effectId ||
+          state.activeSessionId !== command.sessionId ||
+          !state.workspaceRoot
+        )
+          throw Error("文件已变化或不可用，未打开访达。");
+        // Only locate a receipt-verified report. Never execute a generated file or model URL.
+        shell.showItemInFolder(join(state.workspaceRoot, state.artifactPreview.path));
+        return state;
       });
       await ownedWindow.loadURL(entry);
     })

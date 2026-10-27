@@ -1,6 +1,6 @@
 # Third-party notices
 
-## OpenBot: bounded YAML validation, document parsing and approval presentation
+## OpenBot: bounded YAML validation, document parsing and desktop presentation
 
 `src/plugins/skills/parse.ts` adapts the bounded YAML AST-validation approach from
 `packages/employee-publisher/src/agent-skills.ts`, OpenBot revision
@@ -10,6 +10,10 @@
 PDF test fixtures (encrypted and image-only) are copied from that commit.
 `apps/desktop/renderer/ApprovalCard.tsx` adapts its approval view's pending/error handling,
 and `styles.css` adapts a small presentation/token subset, at the same fixed commit.
+`apps/desktop/renderer/ArtifactCard.tsx` also narrowly adapts presentation, pending/error feedback
+and the identity-only action pattern from `apps/web/src/components/ArtifactCard.tsx` and
+`apps/web/src/artifact-shell-save.ts` at that commit. Its receipt/hash inspection, in-app text
+preview and Finder request use moyyi's new local host boundary rather than the upstream Server.
 Bot/channel DTOs, Server authority and the old runtime are not imported. The desktop distribution
 also carries `apps/desktop/renderer/OPENBOT-LICENSE.txt` under its Resources/licenses directory.
 The source and fixtures are licensed under MIT:
