@@ -252,3 +252,90 @@ finding that Kimi missed the defects or that the review mechanism works. No furt
 prompt variant, review framework or default-model change is made. Separately, the concrete
 final-attempt output-limit classification defect is corrected under [ADR0034](../decisions/0034-incomplete-response-outcomes.md#correct-the-final-request-cause-2026-10-27);
 that product change does not resolve or regrade the source-answer omissions.
+
+## Form findings during investigation, 2026-10-27
+
+A fresh audit distinguishes proposition formation from final copying loss. Both original final
+answers ended normally below8,192 output tokens. Their recorded final visible reasoning had the
+frozen-selection fact but did not explicitly form either complete missing proposition. Original
+source observations remained in the final requests: Flash20 results/101,155 characters; Kimi32
+results/243,845 characters. Exact numbered-line duplication was negligible. This suggests attention
+competition and incomplete operational inference, not another lost-result or duplicate-read defect.
+It does not establish either as the cause. The old six-item rubric and both strict FAILs remain.
+
+Additional primary-source review settles the next bounded candidate:
+
+| Pinned source and license | Relevant mechanism and limits |
+|---|---|
+| [LangChain1.4.7 todo middleware](https://github.com/langchain-ai/langchain/blob/575db57ab3658e38ba1d8c40c2bf62110c8a0c27/libs/langchain_v1/langchain/agents/middleware/todo.py), MIT | Structured state, with rejection of parallel whole-list updates; statuses are model assertions. Its tests check state/message handling, not factual completeness. Open issues [39945](https://github.com/langchain-ai/langchain/issues/39945) and [36624](https://github.com/langchain-ai/langchain/issues/36624) show why completed status and stored-but-unread state are insufficient. |
+| [LangGraph1.2.18 join tests](https://github.com/langchain-ai/langgraph/blob/858891aaa164ebdacf33b8f5e7f88b38b9132211/libs/langgraph/tests/test_pregel.py) and [current official workflow](https://github.com/langchain-ai/docs/blob/df8e50b7a43d29baf36ea6b48c4b8eca49a226cf/src/oss/langgraph/workflows-agents.mdx), MIT | Collect component results, then synthesize them. Tests establish deterministic data flow, not whether the components are true or complete. |
+| [Anthropic think-tool update](https://www.anthropic.com/research/claude-think-tool) and [cookbook](https://github.com/anthropics/claude-cookbooks/blob/bfe50e59dbb4f5546a0af9ca36ebb77e637c9ce1/managed_agents/CMA_plan_big_execute_small.ipynb), MIT cookbook | The December2025 update prefers extended thinking in most cases. The planning example also records missing premises. A free-form thinking tool or a separate strong planner is not evidence for Flash. |
+| [DeepAgents default-todo removal](https://github.com/langchain-ai/deepagents/pull/4929), MIT | Maintainers report no statistically significant accuracy gain across three models and higher cost for two. Current [tests](https://github.com/langchain-ai/deepagents/blob/1f4237af32eef17581e507f914424d523fd7b296/libs/deepagents/tests/unit_tests/test_graph.py) assert no default todo. This is negative evidence against adding a generic checklist. |
+
+No upstream source or prompt is copied, no dependency is added, and upstream tests were inspected,
+not executed. The candidate instead records compact source facts, conditions, operational
+consequences and limits *during* investigation. It has no completion status or truth score. The
+model-declared source references are explicitly unverified; notes are fallible and cannot grant
+permissions. A pure plugin returns the whole bounded record through the existing tool transcript;
+there is no workspace-keyed memory, context rewrite, hidden review model or automatic continuation.
+At most two successful records per run,12 findings and8KiB arguments limit its cost. The final
+request remains tool-free and every note-producing request consumes the original request budget.
+
+Selection is opt-in until evidence supports adoption. First freeze one original-task candidate:
+unchanged source1838248/question/rubric, Flash/Responses/low,8 requests/300 seconds/8,192 output,
+zero retries. No rubric, old answer, manual correction or omitted proposition is supplied. Compare
+with the sealed original Flash baseline; intervening diagnostic fixes mean this is a product
+candidate comparison, not isolated causal proof. If original completeness improves without false
+facts, run the unchanged source-lifecycle-report and source-dataflow-report tasks once per current
+baseline/candidate with their8-request/120-second limits. Their executable checks and dynamic-config
+counterexample guard against simple overfitting; they do not establish autonomous discovery of
+unasked resource boundaries. Do not rerun an arm or relax checkers. If notes fail to form the
+missing propositions, reject this candidate; if formed notes are lost in final prose, the evidence
+then supports examining final assembly. Record outcomes separately from implementation and offline
+transport conformance before deciding whether to ship or enable it.
+
+The candidate was implemented and tested in isolation, then **withdrawn**. Offline24 focused
+checks and the full check2,577 tests passed; the real runtime retained the complete notes in the
+final request and enforced permissions/final-none. Private preflight used nine synthetic requests
+and no credentials/network. The single live original-task run used eight HTTP200, zero retries;
+all source bytes stayed unchanged. It produced one note record and a normal answer. Neither the
+notes nor the answer included the two complete missing propositions, and the answer again falsely
+claimed allowed-tools was absent from model-visible text. Successful state transfer therefore did
+not improve proposition formation. Do not ship this plugin, call its synthetic checks a semantic
+pass, proceed to the conditional public trials, or tweak its guidance until this question passes.
+The rejected implementation/build and all evidence remain in the private review archive; the
+product and daily host are unchanged. Independent rubric review is recorded in the delivery log.
+
+### Conditional complex-task configuration control
+
+The next control changes model configuration rather than adding guidance or working-state tools.
+Use Kimi K3.1 Pro `high` once with the exact isolated4e3cddb runtime used by its sealed `low`
+comparison. The [official effort guide](https://platform.kimi.com/docs/guide/use-reasoning-effort)
+confirms low/high/max are supported and complete reasoning/tool messages must be replayed; the
+existing adapter already does both. Keep the same source/question/rubric, system and tools,
+8 requests/300 seconds/8,192 output and zero retry. The credential configuration and daily Flash
+host remain unchanged. Only the request effort changes. The previous low arm ended normally in
+six requests with remaining output capacity but close to the time ceiling; a high timeout or
+truncation is a failed budget-constrained delivery, not permission to extend the trial.
+
+This is preferable to another Flash-high/source-pack run: historical high source-supplied controls
+already exhausted output without a complete answer. It does not prove high autonomous Flash would
+fail, but supplies less actionable evidence than the already-connected Kimi route. Do not run both
+routes or reroll either. No notes, hidden rubric, previous answer or expected facts enter Kimi's
+input. All six old criteria and absence of new material factual errors are required before
+implementing an optional complex-task entry and running the unchanged public lifecycle/dataflow
+counterexamples. Historical comparison, nondeterminism, latency and cache differences limit causal
+claims; a single pass cannot establish general reliability. The owner explicitly approved this
+conditional route, preserving Flash default, request budgets and the no-public-release boundary.
+
+
+The high control is sealed after its first actual request: HTTP429 `engine_overloaded_error`,
+23.867 seconds, no answer/tools, unknown usage, zero retry, original source unchanged. Offline14
+gates/nine synthetic requests had passed. The [official troubleshooting guide](https://platform.kimi.com/docs/guide/troubleshooting)
+distinguishes this server-capacity subtype from `rate_limit_reached_error` and
+`exceeded_current_quota_error`; adding credit or raising tier cannot directly remove it. Do not
+change prompts, credentials, region, or retry limits to manufacture a quality result. This run
+provides no semantic answer to score. The conditional optional entry and public-task arms remain
+unstarted. Previous credentials-helper/configuration hashes differ from the old low run but match
+this run's frozen records; the compared model inputs/runtime are unchanged. Preserve this service
+failure separately from completed semantic FAILs and do not reopen its ledger.
