@@ -7,7 +7,59 @@ Owner 已授权先做整体计划，再针对已证实的缺口优化。本计�
 
 ## 持续交付：日常任务闭环（当前）
 
-### 当前交付：独立来源核对与报告修复（2026-10-27）
+### 当前验收：恢复原源码题八次上限（2026-10-27）
+
+PR #36 已合并到`ae960de`，分支与main双平台CI通过，安装产品仍为`4e3cddb`且打包输入一致。
+本轮回到未通过的原源码题，不用其他简单题覆盖。逐项审计后确认：路径导航已启用；实际搜索16命中、
+12窗口全部送达，11个测试命中并未挤掉生产命中。局部窗口未覆盖完整函数，但底层reader和core使用
+不同符号，加大窗口也不能自动追完整条链。与Pi/Codex/Serena的定向源码核对见[既有研究记录](../research/2026-10-26-agent-navigation.md#original-task-boundary-audit-2026-10-27)。
+
+原题明确禁止命令，不能临时给shell权限绕过。它同时明确允许8次模型请求，后来4+4分配使该题实际
+只剩4次、最后一轮禁工具。Owner已明确恢复原题8次上限：本轮真实调用总数仍最多8，公共题复用既有
+通过证据，不重跑。原题、源码1838248、六项评分标准、Flash/Responses/low及零重试均不变。
+旧4次结果不改分；当前安装已有后续修复，也不把新结果当作隔离变量的预算因果实验。
+
+实际安装版离线预检通过：11项门控，八次合成模型请求后第九次拒绝，另一次503不重试；
+13份合成工具结果精确送达，只读边界和源码不变。独立审查冻结manifest/runner后执行唯一一次live。
+8次HTTP200、零重试，20个工具结果（10read＋10search）全部逐字进入下一请求和最后请求；
+一次contextLines=30超过20的schema拒绝，模型自行修正。140源码文件前后指纹不变，零写入snapshot。
+
+原六项判定1/2/3/5满足、4/6部分，严格总判仍FAIL。真实reader→collect→core→render链已读到并正确解释；
+漏答改变enabled选择需重建runtime、不会自动读references/assets/scripts，后者证据已在请求2–8。
+这两项包含原评分对可见题目的扩展，不能再说关键链仍未查完。另有一处把WorkspaceProcessPolicy
+写成WorkspaceWritePolicy，以及结尾“任何读写失败都会失败”措辞过宽；不伪称执行测试。
+本次输入159371、输出7747，合计167118 tokens；缓存104448/推理2822各自是子集，未查真实账单。
+647012请求字节、1987343原始SSE字节；manifest `ef4011625df0132925d4504a2efde52a7f03e74b58ad234da77019b676b49e0f`。
+私有原始证据与独立assessment在`~/.moyyi/acceptance/source-investigation-eight-2026-10-27/`封存。
+8次额度全部用完，不追加同题。本次验收本身未改变产品、默认权限/模型/额度或persisted。
+
+### 当前实现：写后实际正文回传（2026-10-27）
+
+整体调查确认：现有writes.apply发布后实际读盘并核对hash/mode，但只把哈希/快照送给模型；
+旧联网报告最后8700字节与回执匹配，却未进入最后请求。Cline内存diff、Aider下轮重读的定向源码比较
+已记录，复用moyyi已有核验观察的整合成本更低，不引入依赖、额外I/O或模型请求。
+按[ADR 0035](../decisions/0035-verified-write-observations.md)接通非持久化合同、runtime与fs展示：
+实际正文必须额外获得read授权，ask/deny/缺hook/异常或撤销只留回执；继续原写撤权/取消边界。
+单JSON回执保留，16KiB正文和32KiB/工具预算双限、Unicode安全截断，明确缺失/空文件/不可用。
+这关闭结果送达缺口，不是事实核验器；不改旧web任务分数，不声称解决已送达事实的解释错误。
+原8项write eval全部保留，补充6份观察进入下一模型请求；新增实际安装包接线验证。
+定向runtime84/84、展示15/15、原write eval8/8通过；收短工具说明后原CLI场景与展示共22/22通过。
+全量`npm run check`通过112文件/2465测试；118本地文档链接和diff检查通过，独立审查无阻断。
+首轮全量暴露新增重复说明挤爆原10000上下文上限（10725）的回归，保留失败；两次局部压缩仍超限、
+其中最后差1字节。随后删去重复回执说明，总说明短于旧版，原断言/容量未改即通过。
+一次在仍失败时误启动的全量重跑已主动中止，不能计作通过。完整最终check为独立成功执行。
+[PR #37](https://github.com/Peerframe/moyyi/pull/37)产品`6a3da0b`已固定审查无阻断；
+[Linux/macOS产品CI](https://github.com/Peerframe/moyyi/actions/runs/40427690752)通过。
+`npm run verify:package -- --offline`外部安装CLI12/client13/documents9、原生隔离/严格类型/PTY7通过。
+实际包375文件，SHA256 `78469e6d03adf87bb39af6d1f410391c9ec0cd02c7b5c26a517930c3ab68954c`；
+安装前备份会话/配置，保留PR #35旧包。新安装逐文件哈希一致；实际client13/CLI12及旧会话resume/help/exit通过。
+host/管理器/两个启动器字节未变，安装不读Key、不发模型请求；新增正文确实进入实际安装client下一请求，
+原/results仍能提取回执。没有新增真实语义试验，也不把合成模型结果计作事实准确性提高。
+私有安装/回退与日志在`~/.moyyi/reviews/verified-write-observations/`，原题回答与审查摘要已交付
+`~/moyyi-demo/source-investigation-2026-10-27/`。最终证据提交CI与合并后main结果在PR记录；不公开发布。
+
+
+### 上次交付：独立来源核对与报告修复（2026-10-27）
 
 PR #35 已合并到 `8ab4054`，双平台main检查通过；安装产品`4e3cddb`仍与当前main打包输入一致。
 全链路复核实际wire没有发现新的provider/context缺陷：Skills读到的结果与推理续接保真，关键reader/core

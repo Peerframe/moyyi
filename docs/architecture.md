@@ -225,6 +225,12 @@ transcript/effect v1 is unchanged. Undo is a new approved effect and refuses lat
 Recovery only inspects recorded pre/post-state and never replays a mutation. See
 [ADR 0012](decisions/0012-controlled-workspace-writes.md) and [usage](writes.md).
 
+[ADR 0035](decisions/0035-verified-write-observations.md) returns the existing verified post-write
+observation through the same receipt only when independently read-authorized. Runtime supplies
+actual bytes and rechecks disclosure after cleanup; fs fits bounded text into one JSON receipt.
+No new I/O, core extension point or persisted schema is introduced. Denied reads withhold the
+optional body without changing a successful write; content truth remains a separate task check.
+
 ## Sandboxed commands (merged phase 3)
 
 [ADR 0013](decisions/0013-native-process-sandbox.md) records accepted D6: native OS sandbox by

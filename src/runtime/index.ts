@@ -479,7 +479,19 @@ export async function createRuntime(
     if (writeRoots && !(store instanceof SqliteSessionStore))
       throw Error("Workspace writes require the snapshot-aware SQLite store");
     const writes = writeRoots
-      ? new NodeWorkspaceWrites(store as SqliteSessionStore, excluded)
+      ? new NodeWorkspaceWrites(store as SqliteSessionStore, excluded, {
+          canReadPostcheck: (path) =>
+            policy.beforeContextRead?.(path, "read").kind === "allow" &&
+            policy.beforePrepare(
+              "read",
+              {
+                class: "read",
+                reversibility: "not_applicable",
+                verification: "not_applicable",
+              },
+              { path },
+            ).kind === "allow",
+        })
       : undefined;
     const processes = workspaceProcesses
       ? new NodeWorkspaceProcesses({ ...workspaceProcesses, protectedPaths: excluded })

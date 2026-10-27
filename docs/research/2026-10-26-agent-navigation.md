@@ -114,3 +114,67 @@ are later options if direct navigation measurements show the need. An evidence c
 agent cannot certify its own truth, and an extra reviewer must not silently increase the request cap.
 The next milestone and per-layer decision rules are in the system overview, so this research does
 not become another disconnected list of possible improvements.
+
+
+## Original task boundary audit, 2026-10-27
+
+A later inspection used the sealed autonomous Flash trace over source `1838248`, rather than
+inferring a missing tool from the final answer. Request three searched `readEnabled` under `src`
+with `contextLines:6` and `maxMatches:20`. All16 hits and12 windows reached request four exactly;
+6,580 bytes of source context, `truncated:false`, `skippedFiles:0`. Eleven hits were in tests, but
+they did not displace other matches. The `instructions.ts` windows were99–111 and160–172; the
+actual definition spans105–149. Calculating the existing20-line windows still omits126–145.
+The lower-level reader in `files.ts:225–250` and core collection in `core/index.ts:565–592` do not
+contain that search term. A larger local window cannot establish the whole call chain.
+
+The reviewed [Pi grep](https://github.com/earendil-works/pi/blob/4a080252f06caf63a525d7873c5d94d3c23887e0/packages/coding-agent/src/core/tools/grep.ts#L195-L216)
+and [context tests](https://github.com/earendil-works/pi/blob/4a080252f06caf63a525d7873c5d94d3c23887e0/packages/coding-agent/test/tools.test.ts#L876-L936)
+(v1.4.0, MIT) likewise expose explicit line windows, not complete call chains. The released
+[Codex0.164 handlers](https://github.com/openai/codex/blob/6aaac694803004a63c6f393d153c96d22521a6b9/codex-rs/core/src/tools/handlers/mod.rs)
+(also reviewed above) support composable command execution, not an applicable standalone
+indentation-block reader. [Serena symbol tools](https://github.com/oraios/serena/blob/9e1cced0c34ed48d668e179f7c56c77b4d14a3e3/src/serena/tools/symbol_tools.py#L73-L196)
+and [reference tests](https://github.com/oraios/serena/blob/9e1cced0c34ed48d668e179f7c56c77b4d14a3e3/test/solidlsp/test_referencing_symbols.py#L61-L85)
+at `9e1cced0c34ed48d668e179f7c56c77b4d14a3e3` provide definition bodies/references through Python
+and language servers. That deployment and confinement cost is not justified by this trace. Its
+[application license](https://github.com/oraios/serena/blob/9e1cced0c34ed48d668e179f7c56c77b4d14a3e3/LICENSE)
+is GPL-3.0-or-later; the separate SolidLSP component is MIT. None was copied, installed or executed
+for this audit. Exact-file filtering and merged guarded-snapshot windows already exist in moyyi.
+
+The frozen user question explicitly prohibits running commands as well as writes and web access.
+Enabling a read-only shell while retaining that question would be an invalid diagnostic. More
+critically, the visible original question permits8 model requests, but the later4+4 regression
+allocation enforced4 for this question; request four therefore prohibited further tool calls.
+This is a declared budget difference, not a transport defect or proof of architectural inferiority.
+
+The owner explicitly restored the original eight-request ceiling on2026-10-27: one fresh original
+question trial, total8 requests, with the existing public-task pass reused. Source, question,
+six-item rubric, Flash/Responses/low, output8192, zero retries and all original tool prohibitions
+remain fixed. Preserve the earlier four-request failures. The newer installed product also
+contains intervening read-budget/completion fixes, so this is current-product acceptance under
+the restored original budget, not an isolated causal cap experiment. Results belong in the
+existing delivery record; this audit does not justify a new parser, index or search abstraction.
+
+
+## Edit-result visibility, 2026-10-27
+
+A separate trace shows that the web report's final revision reached disk and matched the recorded
+write hash, while its8,700-byte body did not enter the final model request. moyyi's
+`runtime/writes.ts` already performs a guarded post-publication read and checks hash/mode before
+returning success; `post.version.text` is then discarded from the returned receipt.
+
+Cline's [editor executor](https://github.com/cline/cline/blob/c35b729049c7bb26c340df63ea9235c40b32dd29/sdk/packages/core/src/extensions/tools/executors/editor.ts#L162-L191)
+at `c35b729049c7bb26c340df63ea9235c40b32dd29` (Apache-2.0) returns a bounded diff from its in-memory
+updated text, without a post-write disk read. Its [wrapper](https://github.com/cline/cline/blob/c35b729049c7bb26c340df63ea9235c40b32dd29/apps/vscode/src/sdk/sdk-diff-edit-coordinator.ts#L118-L140)
+does not add model-visible readback. Aider's [next-request assembly](https://github.com/Aider-AI/aider/blob/5dc9490bb35f9729ef2c95d00a19ccd30c26339c/aider/coders/base_coder.py#L598-L657)
+and [text read](https://github.com/Aider-AI/aider/blob/5dc9490bb35f9729ef2c95d00a19ccd30c26339c/aider/io.py#L453-L476)
+(earlier pinned Apache-2.0 source) reload selected files, but do not bind those decoded strings to
+the edit's verified hash; Python text decoding can normalize line endings. Neither is proof of
+byte-exact postcondition observation. No upstream code was copied or upstream tests executed.
+
+A possible narrow enhancement is to expose moyyi's existing verified postcheck text under the
+existing result budget and afterHash, preserving the original receipt fields. Disclosure would
+need an independent read-policy check: write authorization alone does not authorize returning a
+file body. Denied/approval-required reads should leave a successful write receipt without body;
+post-publication verification failure remains unknown. This is a design candidate, not an
+implemented capability or a substitute for fact checking, ordinary reads after later changes,
+or the old web task's missing readback evidence.

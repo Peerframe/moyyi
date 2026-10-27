@@ -35,6 +35,20 @@ loop; there is no separate `/undo` command or arbitrary filesystem rollback. Und
 snapshot, so it can be reversed. If another editor changed the file or its permissions, undo
 refuses to overwrite it. Cancellation stops further work; it does not undo completed changes.
 
+When separately allowed to read the target, the result also includes `postcheck` body text from
+runtime's actual post-write hash/mode verification. `available: true` includes `text`,
+`sourceBytes`, `returnedBytes` and `truncated`, bound to the surrounding path and `afterHash`.
+Null text means verified absence after undo; empty text means an existing empty file. Read denial,
+approval-required reads or a host without an automatic-read hook withhold the observation while
+retaining the successful write receipt. No separate read approval is requested implicitly.
+
+Text is capped at16KiB UTF-8; the complete serialized result must fit both32KiB and the configured
+tool output budget. Escaping counts. A prefix explicitly reports truncation; an unavailable or
+omitted observation does not mean an empty file. Use `read` when needed for omitted text or later
+changes. The ordinary next model request receives this result without another tool call, but a
+postcheck proves the observed bytes, not factual correctness. Independent source/test checks
+remain necessary. See [ADR 0035](decisions/0035-verified-write-observations.md).
+
 The CLI's existing `/approve <effectId>` and `/deny <effectId>` commands answer the exact displayed
 digest. Noninteractive input denies pending approvals. Read-only tools remain available. No shell
 or subprocess capability is provided. The offline behavior can be reproduced without credentials:
@@ -45,7 +59,8 @@ npm run eval:writes
 
 This creates and removes disposable workspaces, executes real file operations through the full
 runtime and SQLite, and checks eight scripted scenarios. It checks actual files, tool statuses and
-outside/protected canaries, including deliberately false assistant success claims. It does not
+outside/protected canaries, including deliberately false assistant success claims. It also verifies
+exact postcheck-text delivery to the next request for create/edit/undo without a separate read. It does not
 measure real-model competence, live API compatibility, latency or cost. Existing public evaluation
 tasks and checkers are unchanged; no private corpus is accessed.
 
