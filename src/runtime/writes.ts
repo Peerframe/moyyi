@@ -29,6 +29,8 @@ export type WriteCheckpoint =
   | "after_parent_sync";
 export interface WorkspaceWriteOptions {
   readonly checkpoint?: (point: WriteCheckpoint) => void;
+  /** Separate authority to disclose the verified bytes; absent means no disclosure. */
+  readonly canReadPostcheck?: (path: string) => boolean;
 }
 class WriteError extends Error {}
 interface Identity {
@@ -363,8 +365,9 @@ class WriteScope {
   inspectUndo(id: string): Promise<WorkspaceChange> {
     return this.safe(() => this.undo(id));
   }
-  apply(): Promise<WorkspaceWriteReceipt> {
-    return this.safe(async () => {
+  async apply(): Promise<WorkspaceWriteReceipt> {
+    let postcheck: WorkspaceWriteReceipt["postcheck"];
+    const receipt = await this.safe(async () => {
       if (this.applied) throw new WriteError("Write capability can be applied only once");
       this.applied = true;
       const { effect, action } = this.scope;
@@ -510,6 +513,8 @@ class WriteScope {
         const post = await this.read(mutation.path);
         if (!matches(post.version, afterHash, mutation.mode))
           throw new WriteError("Published file changed before verification");
+        if (this.canReadPostcheck(post.version.path))
+          postcheck = { text: post.version.text, bytes: post.bytes?.byteLength ?? 0 };
         return {
           snapshotId: effect.id,
           path: mutation.path,
@@ -536,6 +541,24 @@ class WriteScope {
         }
       }
     });
+    // Do not disclose cached text on a grant that expired during asynchronous cleanup.
+    // An optional read denial does not invalidate the already verified write receipt.
+    try {
+      this.guard();
+    } catch (error) {
+      if (error instanceof WriteError) throw error;
+      throw new WriteError("Workspace write unavailable, cancelled, revoked, or target changed");
+    }
+    return postcheck !== undefined && this.canReadPostcheck(receipt.path)
+      ? { ...receipt, postcheck }
+      : receipt;
+  }
+  private canReadPostcheck(path: string): boolean {
+    try {
+      return this.options.canReadPostcheck?.(path) === true;
+    } catch {
+      return false;
+    }
   }
   private checkpoint(point: WriteCheckpoint): void {
     this.options.checkpoint?.(point);

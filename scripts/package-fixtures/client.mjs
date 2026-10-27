@@ -346,6 +346,26 @@ try {
     assert.equal(lastOutcome(), "completed");
     assert(!JSON.stringify(requests.at(-1).system).includes("INSTALLED_ROOT_GUIDANCE_CHANGED"));
     assert.equal(readFileSync(join(workspace, "created.txt"), "utf8"), "APPROVED_CONTENT");
+    const postcheckResult = requests
+      .at(-1)
+      .messages.flatMap((message) => message.content)
+      .findLast(
+        (part) =>
+          part.type === "tool_result" &&
+          part.status === "succeeded" &&
+          part.content.length === 1 &&
+          part.content[0].type === "text" &&
+          JSON.parse(part.content[0].text).snapshotId === asked.effectId,
+      );
+    assert(postcheckResult, "installed write observation must reach the next model request");
+    assert.deepEqual(JSON.parse(postcheckResult.content[0].text).postcheck, {
+      format: "file-postcheck-v1",
+      available: true,
+      text: readFileSync(join(workspace, "created.txt"), "utf8"),
+      sourceBytes: 16,
+      returnedBytes: 16,
+      truncated: false,
+    });
     assert(
       events.some(
         (event) =>

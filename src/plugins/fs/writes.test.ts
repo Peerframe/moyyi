@@ -61,6 +61,27 @@ describe("snapshot write tools", () => {
     const action = await tool.prepare({ path: "a.txt", oldText: "two", newText: "three" }, context);
     await expect(tool.execute(action, context)).rejects.toThrow("sync failed");
   });
+  it("returns observed postcheck bytes rather than reconstructing the proposed edit", async () => {
+    const { context, tool, writes } = fixture();
+    const action = await tool.prepare({ path: "a.txt", oldText: "two", newText: "three" }, context);
+    vi.mocked(writes.apply).mockResolvedValue({
+      snapshotId: "snapshot",
+      path: "a.txt",
+      beforeHash: "a".repeat(64),
+      afterHash: "b".repeat(64),
+      postcheck: { text: "OBSERVED", bytes: 8 },
+    });
+    const result = await tool.execute(action, context);
+    expect(result.status).toBe("succeeded");
+    expect(result.content).toHaveLength(1);
+    expect(result.content[0]).toMatchObject({ type: "text" });
+    expect(JSON.parse((result.content[0] as { text: string }).text).postcheck).toMatchObject({
+      text: "OBSERVED",
+      available: true,
+      truncated: false,
+    });
+    expect(JSON.stringify(result.content)).not.toContain("one three one");
+  });
   it("declares snapshot recovery and no process or external side effects", () => {
     for (const tool of workspaceWriteTools()) {
       expect(tool.effect).toEqual({

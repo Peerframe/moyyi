@@ -13,6 +13,8 @@ import { afterEach, describe, expect, it } from "vitest";
 import {
   type ActionDigest,
   type ModelStreamEvent,
+  type PermissionPolicy,
+  type PolicyDecision,
   type RuntimeEvent,
   type ToolCallId,
   UNKNOWN_USAGE,
@@ -69,17 +71,18 @@ async function harness(
   const store = new SqliteSessionStore(join(directory, "data"));
   const provider = scriptedProvider(responses(calls));
   const counts: Record<string, number> = {};
+  const configured = configure(root);
   const options: RuntimeOptions = {
     store,
     model: scriptedProfile.origin,
-    plugins: [{ plugin: provider.plugin }],
     ids: {
       next: (prefix) => {
         counts[prefix] = (counts[prefix] ?? 0) + 1;
         return `${prefix}_${counts[prefix]}`;
       },
     },
-    ...configure(root),
+    ...configured,
+    plugins: [{ plugin: provider.plugin }, ...(configured.plugins ?? [])],
   };
   let runtime = await createRuntime(options);
   const events: RuntimeEvent[] = [];
@@ -342,4 +345,171 @@ it("write policy respects denied preparation reads and rejects invalid approval 
   expect(() => new WorkspaceWritePolicy({ approval: "invalid" as "ask" })).toThrow(
     "Invalid workspace approval mode",
   );
+});
+
+describe("post-write text uses the aggregate automatic-read grant", () => {
+  const call = { name: "edit", args: { path: "note.txt", oldText: "world", newText: "你好" } };
+  const readProfile = {
+    class: "read",
+    reversibility: "not_applicable",
+    verification: "not_applicable",
+  } as const;
+
+  it("sends actual post-write text to the next request without creating a synthetic read effect", async () => {
+    const contextReads: unknown[] = [];
+    const preparationReads: unknown[] = [];
+    const base = new WorkspaceWritePolicy({ approval: "allow" });
+    const h = await harness([call], (root) => ({
+      workspaceWrites: { roots: [root], approval: "allow" },
+      policy: {
+        beforeContextRead(path, operation) {
+          if (path === "note.txt") contextReads.push({ path, operation });
+          return base.beforeContextRead(path, operation);
+        },
+        beforePrepare(tool, profile, args) {
+          if (tool === "read") preparationReads.push({ tool, profile, args });
+          return base.beforePrepare(tool, profile, args);
+        },
+        beforeExecute: base.beforeExecute.bind(base),
+      },
+    }));
+    await h.start();
+    const s = await h.finish();
+    const result = s.results[0];
+    expect(result?.status).toBe("succeeded");
+    if (result?.content[0]?.type !== "text") throw Error("Missing receipt");
+    const receipt = JSON.parse(result.content[0].text);
+    expect(receipt.postcheck.text).toBe(readFileSync(join(h.root, "note.txt"), "utf8"));
+    expect(receipt.postcheck.text).toBe("hello 你好\n");
+    expect(contextReads).toEqual(Array(2).fill({ path: "note.txt", operation: "read" }));
+    expect(preparationReads).toContainEqual({
+      tool: "read",
+      profile: readProfile,
+      args: { path: "note.txt" },
+    });
+    expect(s.effects.map((effect) => effect.tool)).toEqual(["edit"]);
+    expect(h.client.requests).toHaveLength(2);
+    expect(JSON.stringify(h.client.requests[1])).toContain(JSON.stringify(result.content[0].text));
+  });
+
+  it.each([
+    ["context", "missing"],
+    ["context", "ask"],
+    ["context", "deny"],
+    ["context", "throw"],
+    ["prepare", "ask"],
+    ["prepare", "deny"],
+    ["prepare", "throw"],
+  ] as const)(
+    "omits text but keeps a successful write for %s read policy %s",
+    async (phase, decision) => {
+      const base = new WorkspaceWritePolicy({ approval: "allow" });
+      const restricted = (): PolicyDecision => {
+        if (decision === "throw") throw Error("PRIVATE_POLICY_CANARY");
+        return decision === "ask"
+          ? { kind: "ask" }
+          : { kind: "deny", reason: "PRIVATE_POLICY_CANARY" };
+      };
+      const policy: PermissionPolicy = {
+        ...(decision === "missing"
+          ? {}
+          : {
+              beforeContextRead(path: string, operation?: "read" | "list") {
+                return phase === "context" && path === "note.txt"
+                  ? restricted()
+                  : base.beforeContextRead(path, operation);
+              },
+            }),
+        beforePrepare(tool, profile, args) {
+          return phase === "prepare" &&
+            tool === "read" &&
+            (args as { path?: string }).path === "note.txt"
+            ? restricted()
+            : base.beforePrepare(tool, profile, args);
+        },
+        beforeExecute: base.beforeExecute.bind(base),
+      };
+      const h = await harness([call], (root) => ({
+        workspaceWrites: { roots: [root], approval: "allow" },
+        policy,
+      }));
+      await h.start();
+      const s = await h.finish();
+      expect(s.results[0]?.status).toBe("succeeded");
+      const part = s.results[0]?.content[0];
+      if (part?.type !== "text") throw Error("Missing receipt");
+      expect(JSON.parse(part.text).postcheck?.text).toBeUndefined();
+      expect(part.text).not.toContain("你好");
+      expect(part.text).not.toContain("PRIVATE_POLICY_CANARY");
+      expect(readFileSync(join(h.root, "note.txt"), "utf8")).toBe("hello 你好\n");
+      expect(s.effects[0]?.state).toBe("succeeded");
+      expect(await h.store.getSnapshot("effect_1")).not.toBeNull();
+      expect(h.events.filter((event) => event.type === "approval.requested")).toEqual([]);
+    },
+  );
+
+  it.each(["prepare", "execute"] as const)(
+    "honors a restrictive plugin's %s read rule",
+    async (phase) => {
+      const h = await harness([call], (root) => ({
+        workspaceWrites: { roots: [root], approval: "allow" },
+        plugins: [
+          {
+            plugin: {
+              name: "postcheck-read-restriction",
+              apiVersion: 1,
+              setup(host) {
+                host.registerPolicyRule({
+                  id: "restrict-postcheck",
+                  evaluate(request) {
+                    return request.tool === "read" && request.phase === phase
+                      ? { kind: "deny", reason: "No automatic file text" }
+                      : null;
+                  },
+                });
+              },
+            },
+          },
+        ],
+      }));
+      await h.start();
+      const s = await h.finish();
+      expect(s.results[0]?.status).toBe("succeeded");
+      const part = s.results[0]?.content[0];
+      if (part?.type !== "text") throw Error("Missing receipt");
+      expect(JSON.parse(part.text).postcheck?.text).toBeUndefined();
+      expect(readFileSync(join(h.root, "note.txt"), "utf8")).toBe("hello 你好\n");
+      expect(s.effects[0]?.state).toBe("succeeded");
+    },
+  );
+
+  it("rechecks the live read grant after verified text was collected", async () => {
+    const base = new WorkspaceWritePolicy({ approval: "allow" });
+    let granted = true;
+    let checks = 0;
+    const h = await harness([call], (root) => ({
+      workspaceWrites: { roots: [root], approval: "allow" },
+      policy: {
+        beforeContextRead(path, operation) {
+          if (path !== "note.txt") return base.beforeContextRead(path, operation);
+          checks++;
+          const allowed = granted;
+          queueMicrotask(() => {
+            granted = false;
+          });
+          return allowed ? { kind: "allow" } : { kind: "deny", reason: "Read grant revoked" };
+        },
+        beforePrepare: base.beforePrepare.bind(base),
+        beforeExecute: base.beforeExecute.bind(base),
+      },
+    }));
+    await h.start();
+    const s = await h.finish();
+    expect(checks).toBe(2);
+    expect(s.results[0]?.status).toBe("succeeded");
+    const part = s.results[0]?.content[0];
+    if (part?.type !== "text") throw Error("Missing receipt");
+    expect(JSON.parse(part.text).postcheck?.text).toBeUndefined();
+    expect(readFileSync(join(h.root, "note.txt"), "utf8")).toBe("hello 你好\n");
+  });
 });

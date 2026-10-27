@@ -25,7 +25,7 @@ read-only until explicitly enabled. Original tasks and acceptance standards stay
 | Last merged product change | [PR #35](https://github.com/Peerframe/moyyi/pull/35), `8ab4054eac2607ae9e35129951de5abcdc2b605f`; [merged main Linux/macOS CI](https://github.com/Peerframe/moyyi/actions/runs/40416058220) passed. Verify Git before editing. |
 | Installed product | `4e3cddb1a8243c925a469edf73f17121b20dfa92`; all372 files match tar SHA256 `4d7bb7122b1a6cd758e3010a374befc0f455675d29bb3e96e867c17a93896278`. Packaged inputs match merged main; nonpackaged evidence/eval updates do not require reinstalling the same program. |
 | Product acceptance | Check2,407 tests, files19/19, external CLI12/client13/documents9, isolation/strict types/PTY7 and product/final-head CI passed. Actual owner client13/CLI12 and old-session resume/help/exit passed without a model call. Sessions/config backed up and PR #34 package retained. |
-| Current evidence delivery | `codex/verified-report-workflow`: a user-requested source-derived check, controlled report repair and readback using existing capabilities. No core/provider/default-guidance change. Offline check2,433 tests passed; one actual installed workflow passed in5 requests, zero retries. Original failures remain separate. |
+| Last evidence delivery | [PR #36](https://github.com/Peerframe/moyyi/pull/36), merged `ae960de` with [main CI passed](https://github.com/Peerframe/moyyi/actions/runs/40421088168): a user-requested source-derived check, controlled report repair and readback using existing capabilities. No core/provider/default-guidance change. Offline check2,433 tests passed; one actual installed workflow passed in5 requests, zero retries. Original failures remain separate. |
 | Public version | None; local candidate installation and public source PRs are not a version release. |
 
 ## What the user can do
@@ -91,7 +91,7 @@ recovery and cancellation apply throughout the loop, not only after an answer.
 
 | Observation | What the evidence establishes | What not to infer or repeat |
 |---|---|---|
-| Original Skills investigation | Latest autonomous Flash4: items1/3/4/5 met,2/6 partial; reader/core chain not fully read and one delivered boundary omitted. Actual tool results reached subsequent requests. | Keep the failure. Root/enabled rebuild and reference-loading requirements partly extend the visible question; the prompt says8 but this comparison enforces4. Do not relabel old8 and new4+4 as equal budgets or inject rubric answers. |
+| Original Skills investigation | Restored Flash8: items1/2/3/5 met,4/6 partial. Actual reader/core/render chain now read and explained; enabled-selection rebuild and automatic-reference boundaries omitted. All20 results reached next/final requests. | Strict overall FAIL and old four-request failures remain. The omissions partly extend the visible question. Installed product also changed; do not claim isolated budget causality or repeat until green. |
 | Ledger amount association | In the clarified diagnostic, both98-byte CSVs reached every relevant request; the model wrote source-a INV-002 as80 rather than120, then read back its own incorrect report. No compaction or new delivery defect was found. | Readback is not independent validation. Original ledger publication/schema ambiguity remains documented separately. No evidence yet that source-specific default guidance caused the error. |
 | Model and effort controls | Frozen low/none decision probes and autonomous Flash/Pro controls did not justify a default change; real provider/tool/terminal observations are recorded separately. | Do not repeat the same question until green, infer stable gains from one arm, or add a mandatory review call that consumes the existing output budget without an answer. |
 | Mature-harness comparison | [Pi control](research/harness-comparison.md#pi-responses-control-2026-10-27) ran once:4 actual HTTP200, fifth local request blocked, no answer; six tool results delivered, three late reads not delivered. | Native guidance/tools, no moyyi navigation/countdown/final-none, timing/cache differences preclude causal ranking. Pi is not a product dependency. Earlier unsupported Codex/OpenCode routes remain closed at their documented boundaries. |
@@ -104,6 +104,24 @@ choice of independent verification must therefore be investigated separately fro
 model interpretation. This is not evidence to broaden the default grants silently.
 
 ## Current delivery and next boundary
+
+**Current implementation: verified write observations.**
+The runtime already checks actual disk bytes after a controlled edit; the fs tool previously
+returned only hashes and a snapshot. [ADR 0035](decisions/0035-verified-write-observations.md)
+returns that existing observation with independent read authority, bounded content and explicit
+availability/truncation. It adds no model request or file read and does not certify facts.
+Original web revision readback and source-question failures are not rescored. Source/package
+verification and installation evidence will be recorded before declaring delivery.
+
+**Closed trial: the original question with its restored eight-request ceiling.**
+The owner explicitly approved one trial on2026-10-27; it used8 HTTP200, zero retries and no
+write/shell/web authority. Source1838248, question and six-item rubric were unchanged; public-task
+pass reused. The reader/core chain is now covered; items1/2/3/5 met and4/6 partial, overallFAIL.
+All20 tool results reached subsequent/final requests and140 source files stayed unchanged.
+The two omitted boundaries were available; no new transport defect was found. Preserve older
+four-request evidence and the newer installed-product difference. The
+[audit](research/2026-10-26-agent-navigation.md#original-task-boundary-audit-2026-10-27) does not
+justify another index, wider grants or more same-question calls. This turn's8 requests are spent.
 
 **Established result: a report checked against its original sources and repaired.**
 Use the existing [independent verification recipe](recipes/verify-a-result.md). A reviewed,

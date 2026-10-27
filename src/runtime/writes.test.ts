@@ -29,14 +29,17 @@ import type {
   WorkspaceSnapshot,
   WorkspaceSnapshotStore,
 } from "../contracts/index.ts";
-import { NodeWorkspaceWrites, type WriteCheckpoint } from "./writes.ts";
+import { NodeWorkspaceWrites, type WorkspaceWriteOptions, type WriteCheckpoint } from "./writes.ts";
 
 const roots: string[] = [];
 afterEach(() => {
   for (const root of roots.splice(0)) rmSync(root, { recursive: true, force: true });
 });
 const hash = (value: string | Uint8Array) => createHash("sha256").update(value).digest("hex");
-function setup(content: Record<string, string | Uint8Array> = {}) {
+function setup(
+  content: Record<string, string | Uint8Array> = {},
+  options: Pick<WorkspaceWriteOptions, "canReadPostcheck"> = {},
+) {
   const root = realpathSync(mkdtempSync(join(tmpdir(), "moyyi-write-capability-")));
   roots.push(root);
   const workspace = join(root, "workspace");
@@ -80,6 +83,7 @@ function setup(content: Record<string, string | Uint8Array> = {}) {
     limits: { maxOutputBytes: 32768 },
   };
   const factory = new NodeWorkspaceWrites(store, [join(workspace, "private-store")], {
+    ...options,
     checkpoint: (point) => hook?.(point),
   });
   const guard = () => {
@@ -145,6 +149,7 @@ describe("confined workspace mutations", () => {
     const t = setup();
     const effect = t.prepare(create());
     const receipt = await effect.capability.apply();
+    expect(receipt).not.toHaveProperty("postcheck");
     expect(t.read("new.txt")).toBe("new text");
     expect(statSync(join(t.workspace, "new.txt")).mode & 0o777).toBe(0o600);
     expect(t.snapshots.get(receipt.snapshotId)).toMatchObject({
@@ -482,5 +487,170 @@ describe("confined workspace mutations", () => {
     expect(await t.factory.reconcile(p.effect, t.context, t.guard)).toMatchObject({
       resolved: false,
     });
+  });
+});
+
+describe("separately authorized post-write observations", () => {
+  it("observes create, edit and undo bytes, distinguishing empty files from absence", async () => {
+    const paths: string[] = [];
+    const t = setup(
+      {},
+      {
+        canReadPostcheck: (path) => {
+          paths.push(path);
+          return true;
+        },
+      },
+    );
+    mkdirSync(join(t.workspace, "dir"));
+    const created = await t.prepare({ ...create("dir/a.txt"), text: "" }).capability.apply();
+    expect(created.postcheck).toEqual({ text: "", bytes: 0 });
+    expect(existsSync(join(t.workspace, "dir/a.txt"))).toBe(true);
+    const text = '\ufeff你好\n"quoted"';
+    const edited = await t
+      .prepare({ path: "dir/a.txt", expectedHash: hash(""), text, mode: 0o600 })
+      .capability.apply();
+    expect(edited.postcheck).toEqual({ text, bytes: Buffer.byteLength(text) });
+    expect(edited.afterHash).toBe(hash(readFileSync(join(t.workspace, "dir/a.txt"))));
+    const restored = await t
+      .prepare(await t.inspect.inspectUndo(edited.snapshotId))
+      .capability.apply();
+    expect(restored.postcheck).toEqual({ text: "", bytes: 0 });
+    const removed = await t
+      .prepare(await t.inspect.inspectUndo(created.snapshotId))
+      .capability.apply();
+    expect(removed.postcheck).toEqual({ text: null, bytes: 0 });
+    expect(removed.afterHash).toBeNull();
+    expect(existsSync(join(t.workspace, "dir/a.txt"))).toBe(false);
+    expect(paths).toEqual(Array(8).fill("dir/a.txt"));
+  });
+
+  it.each(["missing", "denied", "throw"] as const)(
+    "keeps the successful receipt without text when the read callback is %s",
+    async (mode) => {
+      const t = setup(
+        { "a.txt": "before" },
+        mode === "missing"
+          ? {}
+          : {
+              canReadPostcheck: () => {
+                if (mode === "throw") throw Error("private policy detail");
+                return false;
+              },
+            },
+      );
+      const receipt = await t.prepare(edit()).capability.apply();
+      expect(receipt).toEqual({
+        snapshotId: "effect_1",
+        path: "a.txt",
+        beforeHash: hash("before"),
+        afterHash: hash("after"),
+      });
+      expect(t.read()).toBe("after");
+    },
+  );
+
+  it("omits text when read authority is revoked before postcondition verification", async () => {
+    let granted = true;
+    const t = setup({ "a.txt": "before" }, { canReadPostcheck: () => granted });
+    t.checkpoint((point) => {
+      if (point === "after_parent_sync") granted = false;
+    });
+    const receipt = await t.prepare(edit()).capability.apply();
+    expect(receipt.afterHash).toBe(hash("after"));
+    expect(receipt).not.toHaveProperty("postcheck");
+    expect(t.read()).toBe("after");
+  });
+
+  it.each(["revoke", "throw"] as const)(
+    "rechecks disclosure after the asynchronous return boundary (%s)",
+    async (mode) => {
+      let granted = true;
+      let checks = 0;
+      const t = setup(
+        { "a.txt": "before" },
+        {
+          canReadPostcheck: () => {
+            checks++;
+            if (!granted && mode === "throw") throw Error("private policy detail");
+            const decision = granted;
+            queueMicrotask(() => {
+              granted = false;
+            });
+            return decision;
+          },
+        },
+      );
+      const receipt = await t.prepare(edit()).capability.apply();
+      expect(checks).toBe(2);
+      expect(receipt).not.toHaveProperty("postcheck");
+      expect(receipt.afterHash).toBe(hash("after"));
+      expect(t.read()).toBe("after");
+    },
+  );
+
+  it.each(["content", "mode"] as const)(
+    "does not echo intended text when actual post-publication %s differs",
+    async (tamper) => {
+      let disclosureChecks = 0;
+      const t = setup(
+        { "a.txt": "before" },
+        {
+          canReadPostcheck: () => {
+            disclosureChecks++;
+            return true;
+          },
+        },
+      );
+      t.checkpoint((point) => {
+        if (point !== "after_parent_sync") return;
+        if (tamper === "content") t.write("a.txt", "external text");
+        else chmodSync(join(t.workspace, "a.txt"), 0o600);
+      });
+      const prepared = t.prepare(edit());
+      await expect(prepared.capability.apply()).rejects.toThrow(
+        "Published file changed before verification",
+      );
+      expect(disclosureChecks).toBe(0);
+      expect(await t.factory.reconcile(prepared.effect, t.context)).toMatchObject({
+        resolved: false,
+      });
+    },
+  );
+
+  it.each(["cancel", "revoke"] as const)(
+    "still fails the published effect when write authority is lost after observation (%s)",
+    async (mode) => {
+      const t = setup(
+        { "a.txt": "before" },
+        {
+          canReadPostcheck: () => {
+            queueMicrotask(() => {
+              // Revocation lands after safe()'s guard but before apply() resumes.
+              queueMicrotask(() => {
+                if (mode === "cancel") t.controller.abort();
+                else t.revoke();
+              });
+            });
+            return true;
+          },
+        },
+      );
+      const prepared = t.prepare(edit());
+      await expect(prepared.capability.apply()).rejects.toThrow(/cancelled|revoked/);
+      expect(t.read()).toBe("after");
+      expect(t.snapshots.get(prepared.effect.id)?.afterHash).toBe(hash("after"));
+    },
+  );
+
+  it("keeps the existing one-MiB write and complete observation limit", async () => {
+    const t = setup({}, { canReadPostcheck: () => true });
+    const text = "x".repeat(1024 * 1024);
+    const receipt = await t.prepare({ ...create(), text }).capability.apply();
+    expect(receipt.postcheck).toEqual({ text, bytes: 1024 * 1024 });
+    await expect(
+      t.prepare({ ...create("too-large.txt"), text: `${text}x` }).capability.apply(),
+    ).rejects.toThrow();
+    expect(existsSync(join(t.workspace, "too-large.txt"))).toBe(false);
   });
 });

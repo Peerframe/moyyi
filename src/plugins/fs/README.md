@@ -115,3 +115,9 @@ uncertain effects. See [controlled writes](../../../docs/writes.md) for opt-in, 
 Tests beside this file use mock capabilities to check delegation, missing/denied capabilities,
 cancellation, closed argument schemas, exact numbered source and bounded output. Actual filesystem confinement,
 ignore behavior, revocation and runtime integration are checked in the host's tests.
+
+Controlled write results retain their snapshot receipt and may include actual verified post-state
+text under a separate read grant. The presenter bounds UTF-8 body bytes and the complete serialized
+JSON, distinguishes absence from empty text, and reports unavailable/truncated observations.
+See [write observations](../../../docs/decisions/0035-verified-write-observations.md); they verify
+observed bytes, not task correctness.

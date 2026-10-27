@@ -19,6 +19,7 @@ const cases: {
   calls: Call[];
   expected: string | null;
   statuses: string[];
+  observations?: (string | null)[];
   grant?: boolean;
   deny?: boolean;
 }[] = [
@@ -32,6 +33,7 @@ const cases: {
     ],
     expected: "two",
     statuses: ["succeeded", "succeeded", "succeeded", "succeeded"],
+    observations: ["one", "two", "one", "two"],
   },
   {
     id: "undo-create",
@@ -41,6 +43,7 @@ const cases: {
     ],
     expected: null,
     statuses: ["succeeded", "succeeded"],
+    observations: ["one", null],
   },
   {
     id: "denied-approval-is-not-success",
@@ -178,6 +181,37 @@ export async function runWritesEval(): Promise<void> {
         results.map((r) => r.status),
         scenario.statuses,
       );
+      if (scenario.observations) {
+        for (const [index, text] of scenario.observations.entries()) {
+          const result = results[index];
+          assert.ok(result);
+          const part = result.content[0];
+          assert.equal(result.content.length, 1);
+          assert.ok(part?.type === "text");
+          const receipt = JSON.parse(part.text);
+          assert.deepEqual(receipt.postcheck, {
+            format: "file-postcheck-v1",
+            available: true,
+            text,
+            sourceBytes: text === null ? 0 : Buffer.byteLength(text),
+            returnedBytes: text === null ? 0 : Buffer.byteLength(text),
+            truncated: false,
+          });
+          const next = provider.client.requests[index + 1];
+          assert.ok(next);
+          assert.ok(
+            next.messages.some((message) =>
+              message.content.some(
+                (part) =>
+                  part.type === "tool_result" &&
+                  part.callId === result.callId &&
+                  JSON.stringify(part.content) === JSON.stringify(result.content),
+              ),
+            ),
+            "actual write observation must reach the next model request without a read call",
+          );
+        }
+      }
       assert.equal(
         existsSync(join(root, "target.txt"))
           ? readFileSync(join(root, "target.txt"), "utf8")
@@ -196,6 +230,7 @@ export async function runWritesEval(): Promise<void> {
           filesystemVerified: true,
           canariesUnchanged: true,
           falseClaimDetected,
+          postchecksDelivered: scenario.observations?.length ?? 0,
           source: "synthetic",
         }),
       );

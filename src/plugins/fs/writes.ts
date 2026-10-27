@@ -7,6 +7,7 @@ import {
   type ToolDefinition,
   type WorkspaceChange,
 } from "../../contracts/index.ts";
+import { presentWrite } from "./write-presentation.ts";
 
 const path = { type: "string", minLength: 1, maxLength: 4096 };
 const text = { type: "string", maxLength: 1048576 };
@@ -31,17 +32,18 @@ const schemas: Record<string, JsonSchema> = {
   },
 };
 const descriptions = {
-  create:
-    "Create workspace UTF-8 file; refuse existing files or missing parent. Approval shows exact content. Returns undo snapshotId.",
-  edit: "Replace one literal oldText with newText in workspace UTF-8; refuse missing/ambiguous matches. Approval binds content hash/replacement. Returns undo snapshotId.",
-  undo: "Restore snapshot file or remove snapshot-created file; refuse changed content/permissions. Requires approval; creates a new undoable snapshot.",
+  create: "Create missing UTF-8 file; parent must exist.",
+  edit: "Replace exactly one literal oldText in UTF-8; refuse ambiguity.",
+  undo: "Undo snapshot; refuse changed file/mode.",
 };
+const observationDescription =
+  " Postcheck: read-authorized bytes, not facts; inspect available/truncated; null=absent.";
 
 export function workspaceWriteTools(): readonly ToolDefinition[] {
   return (["create", "edit", "undo"] as const).map(
     (name): ToolDefinition => ({
       name,
-      description: descriptions[name],
+      description: descriptions[name] + observationDescription,
       inputSchema: schemas[name] as JsonSchema,
       effect: { class: "workspace_write", reversibility: "snapshot", verification: "postcheck" },
       async prepare(value, context) {
@@ -95,7 +97,7 @@ export function workspaceWriteTools(): readonly ToolDefinition[] {
         const result = await context.writes.apply();
         return {
           status: "succeeded",
-          content: [{ type: "text", text: canonicalizeJson(result) }],
+          content: presentWrite(result, context.limits.maxOutputBytes),
           evidence: `Workspace postcondition verified; snapshot ${result.snapshotId}`,
         };
       },

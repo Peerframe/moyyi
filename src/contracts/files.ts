@@ -98,6 +98,12 @@ export interface WorkspaceWriteReceipt {
   readonly path: string;
   readonly beforeHash: string | null;
   readonly afterHash: string | null;
+  /** Actual verified post-state, disclosed only with a separate automatic-read grant. */
+  readonly postcheck?: {
+    /** null is verified absence; an empty string is an existing empty file. */
+    readonly text: string | null;
+    readonly bytes: number;
+  };
 }
 
 /** apply has no arguments: only the already approved payload may change the workspace. */
