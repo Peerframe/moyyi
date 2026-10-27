@@ -42,7 +42,7 @@ failures, later corrections and private evidence coordinates.
 | Modify, check and undo | [Controlled writes](writes.md) plus [read-only Node commands](shell.md); one live repair/check/undo restored original bytes/mode/failure; actual everyday CLI repair/check/readback passed | Independent source/test checks are needed for meaning. Read-authorized bounded postcheck text now reaches the next request; it verifies bytes, not task correctness. |
 | Continue longer work | [SQLite and compaction](long-sessions.md); real eight-turn conversation across process reopen/summary/reopen preserved all ten checked facts/constraints | One bounded semantic case, not general long-session reliability. |
 | Read actual websites | [Web](web.md) fetched full RFC8259; a new copied-session revision passed the unchanged task in4 requests: two edits, a complete7,691-byte read and five independently checked facts | The original first report/revision failures remain. The new trial follows explicit human feedback; autonomous correction, search-service/Anthropic live use and general reliability remain unverified. |
-| Transform ordinary data/documents | Exact quoted CSV transformation and formatting-preserving worksheet edit passed with actual outputs/readback | A ledger report still associated a delivered amount with the wrong invoice. The new explicit verification workflow detected and repaired that type of error once; autonomous verification remains unproven. |
+| Transform ordinary data/documents | Exact quoted CSV transformation, formatting-preserving worksheet edit and a new unchanged roster merge task passed with actual outputs | Roster fields/older phone fallback/leading zeros passed independent review, but the model's commands inspected bytes/counts/hashes only. The separate explicit ledger verification workflow repaired an error once; autonomous source-derived verification remains unproven. |
 | Apply guidance and Skills | [Root instructions](instructions.md), explicitly selected [Skills](skills.md), refresh/authority/replay conformance | Correct loading does not guarantee guidance quality; nested instructions are not auto-discovered. |
 
 ## One task through the whole system
@@ -105,7 +105,30 @@ model interpretation. This is not evidence to broaden the default grants silentl
 
 ## Current delivery and next boundary
 
-**Current bounded result: the original web revision task passed on the installed product.**
+**Current bounded result: the unchanged roster merge task passed; autonomous source-derived
+verification was not demonstrated.** One installed Flash/Responses/low trial used5 HTTP200, zero
+retries and14.345 seconds within the existing15-request/180-second ceiling. The original task,
+fixtures and checker were unchanged; only merged.csv was writable, with the existing read-only
+Node sandbox available and no network/credentials inside commands. No check command or expected
+answer was supplied. All203 output bytes match an independently derived result: latest records,
+older nonempty phone fallback, duplicate removal and leading zeros are correct. Two source files
+and modes/canary stayed unchanged; all five tool results reached the next/final requests exactly.
+
+The model selected `wc`, hashes and an `od` byte dump, not an independent recomputation of the
+merge rules. Its first compound command included unsupported macOS `cat -A`; later subcommands
+returned zero, and the model then chose `od` in the next request. Do not treat aggregate exit0
+as proof that every subcommand succeeded. Final facts are correct; its claim that string comparison
+was actually applied overstates observable evidence (the output matches that order). Preserve
+this nonblocking wording issue. Task PASS does not establish general reliability or the separate
+verification-selection metric; the absent metric alone does not identify a core defect.
+
+The trial is sealed, without retries or follow-up prompts. The owner has unchanged inputs/output
+and the original final answer. No program, daily host or default authority changed. The existing
+[delivery record](tasks/2026-10-26-optimization-plan.md) retains exact coordinates and preparation
+failures; original source/ledger/web results remain unchanged. The source question now also has
+an explicitly engineering-reviewed correction, separate from the model answer and its FAIL score.
+
+**Delivered result: the original web revision task passed on the installed product.**
 One copied-session trial started from the original uncorrected9,264-byte report and unchanged
 revision prompt. Flash/Responses/low used4 HTTP200, zero retries, within the original4-request/
 180-second ceiling. Two edits were followed by a new complete107-line/7,691-byte `read` and final
