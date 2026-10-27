@@ -314,7 +314,7 @@ comparison. The [official effort guide](https://platform.kimi.com/docs/guide/use
 confirms low/high/max are supported and complete reasoning/tool messages must be replayed; the
 existing adapter already does both. Keep the same source/question/rubric, system and tools,
 8 requests/300 seconds/8,192 output and zero retry. The credential configuration and daily Flash
-host remain unchanged. Only the request effort changes. The previous low arm ended normally in
+host remain unchanged during this control. Only the request effort changes. The previous low arm ended normally in
 six requests with remaining output capacity but close to the time ceiling; a high timeout or
 truncation is a failed budget-constrained delivery, not permission to extend the trial.
 

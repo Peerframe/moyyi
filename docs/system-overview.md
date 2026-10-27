@@ -109,7 +109,7 @@ model interpretation. This is not evidence to broaden the default grants silentl
 
 **Current bounded work: source interpretation remains unresolved; Kimi high is service-blocked.**
 The structured-findings candidate was withdrawn after one unchanged original-task trial. Eight
-Flash/Responses/low requests completed, all16 observations and the notes reached the final request,
+Flash/Responses/low requests completed, all16 tool results, including the notes, reached the final request,
 and source bytes stayed unchanged. The notes never formed the two missing propositions and
 introduced an incorrect raw-metadata conclusion. Independent old-rubric result: items1/5 met,
 2/4/6 partial,3 wrong. Offline24 focused checks/full2,577 tests establish only the rejected
