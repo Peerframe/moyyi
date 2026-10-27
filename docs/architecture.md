@@ -14,7 +14,7 @@ The **plugins** own the capabilities: which models, which tools, which context. 
 core through five fixed points and can be added or removed without touching anything else.
 
 ```
-        cli ─┐   (future: gui, daemon transport, automation — all clients)
+cli / desktop host ─┐   (future: automation — also a client)
              ▼
           runtime ─────────── plugin registry ◄──── src/plugins/<name>/
              │                                       provider-*, fs, shell,
@@ -38,6 +38,7 @@ core through five fixed points and can be added or removed without touching anyt
 | Policy | `src/policy` | Base permission policy and approval modes |
 | Runtime | `src/runtime` | Plugin registry, wiring, the client protocol |
 | CLI | `src/cli` | Terminal client |
+| Desktop client | `apps/desktop` | Sandboxed React renderer, validated local bridge and a trusted host using the public runtime; installed acceptance is tracked separately |
 
 ### Plugin inventory
 
@@ -125,6 +126,23 @@ Enforced by [tests/boundaries.ts](../tests/boundaries.ts):
 - Each `src/plugins/<name>` is its own layer: it imports only contracts and its own files, never
   another plugin or the internals, and never `node:fs` or `node:child_process`.
 - Only `runtime` and `evals` import plugins.
+- Desktop TypeScript and TSX are checked too. `apps/desktop/renderer` imports only its own
+  views/styles, React's browser entry points and `shared.ts`; it cannot import Node, Electron,
+  runtime/contracts packages or any `src` internals. Model and document content remains plain
+  text, never executable markup or an authority grant.
+- `shared.ts` is a data-only contract without external imports. `security.ts` is likewise pure;
+  `wire.ts` can use only shared data and security validation. `preload.ts` imports only these
+  three modules and Electron, exposing named methods rather than generic IPC or Node access.
+- The trusted desktop host consists of `main.ts`, `bridge.ts`, `connection.ts`, `worker.ts` and
+  `host/`. It may use Node, its own host/shared/validation modules and the public `moyyi/runtime`
+  and `moyyi/contracts` exports. Among these host files, only `main.ts` imports Electron. Relative imports into `src`
+  or other repository code, unlisted desktop paths and undeclared application directories fail
+  the boundary check. This does not create a second task engine or persisted authority model.
+- The scanner covers static imports/re-exports, literal dynamic imports and `require` calls.
+  Desktop production modules and pure core layers reject computed module paths. This is a
+  dependency check, not an execution sandbox: native isolation, bridge validation and runtime
+  policy still enforce behavior. Test-only Vitest and React server rendering do not widen
+  production imports.
 
 ## Data model
 

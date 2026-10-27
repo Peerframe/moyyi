@@ -22,8 +22,8 @@ read-only until explicitly enabled. Original tasks and acceptance standards stay
 
 | Coordinate | Current evidence |
 |---|---|
-| Latest product candidate | [PR #41](https://github.com/Peerframe/moyyi/pull/41): accurate final-request output exhaustion and CLI partial/no-answer diagnostics; no automatic review stage. Its delivery receipt tracks fixed-head review, final CI, merge and local installation separately. |
-| Installation coordinate | The [PR #41 delivery receipt](https://github.com/Peerframe/moyyi/pull/41) is the current installation record: accepted tar SHA256 `76efa10a1b6f07cf575a3cbcfcb68c1d777255125b1460b6474206960b21731e`,394 files. Candidate acceptance does not imply the owner installation has happened; consult its explicit installation result. The prior PR #40 installation remains recorded in the dated delivery history. |
+| Latest product candidate | M1 macOS arm64 desktop: actual native launch, workspace selection, digest-bound read approval, Flash answer and restart/history passed. See [desktop guide](desktop.md); the M1 PR receipt records final head/CI/merge/owner installation. Previous CLI baseline [PR #41](https://github.com/Peerframe/moyyi/pull/41): accurate final-request output exhaustion and CLI partial/no-answer diagnostics; no automatic review stage. Its delivery receipt tracks fixed-head review, final CI, merge and local installation separately. |
+| Installation coordinate | M1 external candidate tested; owner app installation is tracked separately in its PR receipt. The unchanged CLI [PR #41 delivery receipt](https://github.com/Peerframe/moyyi/pull/41) is the current installation record: accepted tar SHA256 `76efa10a1b6f07cf575a3cbcfcb68c1d777255125b1460b6474206960b21731e`,394 files. Candidate acceptance does not imply the owner installation has happened; consult its explicit installation result. The prior PR #40 installation remains recorded in the dated delivery history. |
 | Product acceptance | Output-diagnostic candidate: check2,553 tests; external CLI13/client13/Kimi3/documents9, containment/strict types/PTY7 passed. Previous unchanged Kimi4/4 offline and live connection evidence remain valid. Initial CI failures and final corrected results are retained in the delivery record and PR receipt. |
 | Previous evidence-only delivery | [PR #36](https://github.com/Peerframe/moyyi/pull/36), merged `ae960de` with [main CI passed](https://github.com/Peerframe/moyyi/actions/runs/40421088168): user-requested source-derived check, controlled report repair and readback. Offline check2,433 passed; actual installed workflow passed once in5 requests. Its original task failures remain separate. |
 | Optional Kimi | Installed opt-in `kimi-k3.1-pro` Chat provider, low/high/max, preserving visible reasoning and final-request tool prohibition. Two-request Chat connection probe passed; Responses rejected final `none`. Original-task independent comparison: six HTTP200, zero retries; strict FAIL, items1/2/3/5 met and4/6 partial. Installation is verified; the six-item task FAIL remains separate. |
@@ -37,7 +37,7 @@ failures, later corrections and private evidence coordinates.
 
 | User outcome | Available evidence | Remaining boundary |
 |---|---|---|
-| Start, find work and resume | [CLI](cli.md), cross-workspace catalog/receipts, actual installed startup and reopen passed | Live credentials come from an explicit trusted host; old session state does not grant current authority. |
+| Start, find work and resume | [Desktop M1](desktop.md): external app launch, actual native workspace/approval/Flash read and history reopen passed; CLI catalog/receipts remain available | M1 macOS arm64 only, fixed Flash read-only host, one SQLite writer. Full visual connection setup and result cards remain M2. Old session state does not grant current authority. |
 | Read files and explain a project | Guarded path discovery/search/ranges (navigation enabled in the daily host), readable numbered source, complete next-request delivery; original public report task passed | Complex Skills explanation still fails the original rubric. More available text is not a factual verifier. |
 | Read PDF/DOCX/XLSX/PPTX/ODT/ODS/ODP | [Native parser](documents.md), actual installation/containment on Linux/macOS, two fixed live comparison/report tasks passed | Body text only; no OCR, legacy/macro files, formula calculation or visual-layout claim. Larger/repeated tasks unmeasured. |
 | Modify, check and undo | [Controlled writes](writes.md) plus [read-only Node commands](shell.md); one live repair/check/undo restored original bytes/mode/failure; actual everyday CLI repair/check/readback passed | Independent source/test checks are needed for meaning. Read-authorized bounded postcheck text now reaches the next request; it verifies bytes, not task correctness. |
@@ -111,21 +111,20 @@ The owner has requested a whole-product plan after finding the CLI candidate les
 use than OpenBot. GUI is now the next product priority, alongside a separate answer-quality lane.
 The [roadmap](roadmap.md#current-target-a-usable-personal-desktop-candidate) is the single delivery
 sequence: M1 installed read-only desktop loop; M2 settings/materials/actual reports; M3 controlled
-editing/recovery/undo; M4 combined installed acceptance. The current planning delivery changes no
-product code, model config or installed package and makes no paid calls.
+editing/recovery/undo; M4 combined installed acceptance. M1 now implements a thin Electron/React
+client with a bundled Node26 runtime, fixed Flash connection and narrow OpenBot approval reuse.
 
 | Current milestone | Usable baseline / demonstrated limit | Next bounded checkpoint | Actual blocker |
 |---|---|---|---|
-| M1 desktop loop: planned, not implemented | Installed CLI and trusted in-process runtime already work; no GUI or validated renderer bridge exists | One installed shell/Node26/bridge/store-ownership probe followed directly by the same workspace → read → answer → reopen flow, with narrow OpenBot approval-view reuse | No known external blocker for offline integration; actual bundle compatibility still needs proof |
+| M1 desktop loop: candidate accepted | External-bundle native startup/directory/approval/read; real host/SQLite/recovery and parser containment passed. One live Flash task used2 requests, zero retries: four exact facts/source, unchanged file/config; reopen added0 requests and changed no entries/effects. See [desktop guide](desktop.md). | Fixed-head PR review/CI, then authorized merge and owner installation; the PR receipt records exact hashes and outcomes | No unresolved code blocker; integration/install receipt remains distinct from candidate evidence |
 | M2/M3 daily workflows: planned | Document, report, controlled-edit/undo and recovery have bounded CLI/runtime evidence | Present and connect existing capabilities through the desktop; use source-backed result/permission checks | Depends on M1 and affected scoped host boundaries, not on model-training/MCP/GUI mock projects |
 | Quality lane: unresolved | Original source task FAILs and the withdrawn notes candidate remain; high control has no answer | Service-available, separately recorded original Kimi high control only under unchanged budgets; public counterexamples and optional high entry only if strict pass | Kimi server capacity blocks that live comparison; it does not block unrelated desktop work |
-| M4 integrated target: not accepted | Installed product remains PR41; no claim that previous engineering phases make a polished desktop product | All three fixed user workflows pass interaction, authority/recovery and factual/artifact gates from the actual installed entry; backup/rollback and guide | Both desktop delivery and applicable task correctness must be demonstrated |
+| M4 integrated target: not accepted | M1 read-only desktop candidate accepted; prior daily CLI remains PR41 until separately updated. No claim that M1 or prior engineering phases constitute the complete product | All three fixed user workflows pass interaction, authority/recovery and factual/artifact gates from the actual installed entry; backup/rollback and guide | Both desktop delivery and applicable task correctness must be demonstrated |
 
 The GUI uses the self-owned core through a narrow client boundary. It neither replaces core
-permissions with UI states nor imports OpenBot's Bot/team/Server architecture. Planned reuse is
-[explicit and versioned](openbot-provenance.md#planned-desktop-reuse-not-yet-ported). First functional
-work should produce the M1 user path; a visual mockup or another generic checklist is not that
-checkpoint. Original task standards stay intact; an honest limited candidate may be inspected
+permissions with UI states nor imports OpenBot's Bot/team/Server architecture. Actual approval presentation reuse is [recorded](openbot-provenance.md#desktop-m1-adaptation).
+The M1 window uses actual runtime commands/events; scripted tests and live task evidence remain
+separate. Original task standards stay intact; an honest limited candidate may be inspected
 before M4, but the full target is not complete while its required source-analysis task fails.
 
 **Current bounded work: source interpretation remains unresolved; Kimi high is service-blocked.**

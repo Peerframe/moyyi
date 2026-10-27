@@ -97,3 +97,25 @@ jobs:
         run: npm run eval:shell
       - name: Installable candidate and native document containment
         run: npm run verify:package
+
+  desktop-macos:
+    runs-on: macos-15
+    timeout-minutes: 10
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Set up Node.js
+        uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version-file: .nvmrc
+          package-manager-cache: false
+      - name: Install locked desktop build dependencies
+        run: npm ci --ignore-scripts
+      - name: Download pinned Electron binary
+        run: node node_modules/electron/install.js
+      - name: Build local desktop candidate
+        run: npm run desktop:package
+      - name: Verify actual bundle outside the checkout
+        run: npm run verify:desktop

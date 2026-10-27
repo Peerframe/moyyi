@@ -21,6 +21,7 @@ import { officeRuntimeFiles } from "./vendor-documents.ts";
 export const repository = realpathSync(fileURLToPath(new URL("..", import.meta.url)));
 export const installedGuides = [
   "docs/installation.md",
+  "docs/desktop.md",
   "docs/client-protocol.md",
   "docs/cli.md",
   "docs/deepseek.md",

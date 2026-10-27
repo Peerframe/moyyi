@@ -17,6 +17,10 @@ Start an offline terminal with `npm run moyyi -- --demo`, or explicitly connect 
 using `--host FILE`. The demo is a finite script, not an LLM. See [CLI usage](docs/cli.md),
 [DeepSeek configuration](docs/deepseek.md) and [future scope](docs/roadmap.md).
 
+The [M1 desktop candidate](docs/desktop.md) adds a macOS arm64 read-only window over the same
+runtime: choose a directory, ask with the existing Flash connection, approve reads and reopen
+history. Installed/live evidence is tracked separately in the system overview.
+
 ## Development setup
 
 For a source checkout, use Node 26 and npm ≥ 11 (bundled with Node 26). For a tarball installation,
@@ -51,6 +55,8 @@ npm run check
 | `npm run build` | Clean and compile production code to `dist/` |
 | `npm run package:candidate` | Create a local private tarball, checksum and inventory |
 | `npm run verify:package` | Package, install outside the repo and verify CLI, PTY, client and declarations |
+| `npm run desktop:package` | Build a self-contained local macOS arm64 desktop candidate |
+| `npm run verify:desktop` | Verify the existing app's bundled Node, host, SQLite and parser outside the repo |
 
 ## Layout
 

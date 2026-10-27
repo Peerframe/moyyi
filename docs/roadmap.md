@@ -144,8 +144,8 @@ M1 begins with one real installed transport/runtime feasibility probe, then comp
 user flow. It is not a separate framework project or a sequence of mock-only prerequisite PRs.
 If it cannot preserve runtime compatibility/authority, stop that integration path and compare the
 specific alternative before adding more infrastructure. Do not rewrite the core to fit a shell.
-When implementation begins, start with M1; this planning turn changes documents
-only and makes no paid calls or public release.
+M1 implementation follows this sequence; its actual delivery and verification status is recorded
+in the system overview. Later milestones remain separate scopes.
 
 ### Quality lane: independent progress, explicit final gate
 
@@ -179,7 +179,7 @@ Existing continuous paid-validation authorization does not waive zero-retry or f
 Use only fixed committed source, not the current dirty OpenBot checkout. The inspected revision
 is010439bb9002fabb7e1facd8450ee85edbafa309 (MIT). Existing document parsing reuse is already integrated;
 next reuse concerns presentation and interaction. Candidate inventory and precise paths live in
-[provenance](openbot-provenance.md#planned-desktop-reuse-not-yet-ported). No source is copied by this plan.
+[provenance](openbot-provenance.md#planned-desktop-reuse-not-yet-ported). M1 now adapts the approval presentation; later candidates remain unported.
 
 - M1: adapt the approval-card view and duplicate-click/pending feedback to moyyi events and exact
   effect/digest callbacks. Keep authorization in moyyi; no Bot/channel/domain DTO imports.

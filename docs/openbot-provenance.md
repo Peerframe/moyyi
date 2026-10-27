@@ -40,7 +40,22 @@ write tools were synthetic; phase 2 introduces an explicit runtime write grant. 
 |---|---|---|---|
 | `src/runtime/document-worker.ts` | `apps/server-python/src/openbot_server/parser_worker.ts` (`adaptPdf`, `adaptOffice`, input/output bounds and failure cases) | `010439bb9002fabb7e1facd8450ee85edbafa309` | Narrowly adapted parsing methods only; new runtime/plugin/sandbox/FD reader. MIT notice retained. |
 | `src/runtime/fixtures/{encrypted,image-only}.pdf` | `tests/oracles/legacy-server/src/__fixtures__/attachments/` | `010439bb9002fabb7e1facd8450ee85edbafa309` | Fixed synthetic binary inputs, newly exercised against moyyi; old test results are not evidence. |
+| `apps/desktop/renderer/ApprovalCard.tsx`, `styles.css` | `apps/web/src/components/ApprovalCard.tsx`, `apps/web/src/tokens.css`, `apps/web/src/styles.css` | `010439bb9002fabb7e1facd8450ee85edbafa309` | Narrow view/token adaptation; new authority and session bridge. MIT retained in app. |
 | `src/plugins/skills/parse.ts` | `packages/employee-publisher/src/agent-skills.ts` | `010439bb9002fabb7e1facd8450ee85edbafa309` | Adapted bounded YAML AST-validation approach (aliases, anchors/tags, scalar keys, node/depth caps); rewritten schema checks and moyyi plugin/port, no publisher or authority code. MIT notice in `THIRD_PARTY_NOTICES.md` |
+
+## Desktop M1 adaptation
+
+`apps/desktop/renderer/ApprovalCard.tsx` adapts the fixed revision's
+`apps/web/src/components/ApprovalCard.tsx`: pending decisions, both-buttons-disabled behavior
+and failure feedback. moyyi adds a synchronous duplicate-click lock and keys cards by the exact
+`effectId + digest`. The new host validates the currently pending operation; a resolved send
+promise is not a task-success claim, and old history cannot restore a pending approval.
+`styles.css` adapts a small color/font-token subset from `apps/web/src/tokens.css` and
+approval presentation from `apps/web/src/styles.css` at that revision. The MIT text is retained in
+`renderer/OPENBOT-LICENSE.txt` and shipped with the app. Tests independently exercise the new
+renderer/bridge, actual readonly runtime, SQLite, denial, stale digest, cancellation and recovery.
+No Bot/channel/risk/domain DTO, login recovery, Server API or old task engine was copied.
+See [desktop guide](desktop.md) and [ADR 0037](decisions/0037-installed-desktop-client.md).
 
 ## Skills boundary experience
 
@@ -91,7 +106,8 @@ client into the next delivery. The following candidates were read at fixed OpenB
 `010439bb9002fabb7e1facd8450ee85edbafa309`, under its
 [MIT license](https://github.com/Peerframe/openbot/blob/010439bb9002fabb7e1facd8450ee85edbafa309/LICENSE).
 The owner's dirty checkout was not used as source. This is a candidate inventory: no UI source
-has been copied, upstream tests have not been run, and no desktop behavior is certified by it.
+was copied during planning. M1 now adapts the approval view and presentation subset listed below;
+upstream tests have not been run, and this inventory itself certifies no desktop behavior.
 Record actual adapted files/notices and moyyi verification when each port is implemented.
 
 | Candidate at the fixed revision | Reuse decision and dependency boundary | Planned slice |
