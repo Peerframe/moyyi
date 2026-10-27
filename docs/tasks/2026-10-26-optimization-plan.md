@@ -7,7 +7,49 @@ Owner 已授权先做整体计划，再针对已证实的缺口优化。本计�
 
 ## 持续交付：日常任务闭环（当前）
 
-### 当前验收：通讯录合并与自主核对（2026-10-27）
+### 当前交付：Kimi 官方接口与同题独立对照（2026-10-27）
+
+Owner保存区域密钥后授权接口验证、原题/原标准对照；Flash + Responses + low日常默认保留，不公开发布。
+先验证路线：Responses合成工具探针2请求中首个HTTP200、第二个HTTP400明确拒绝`tool_choice:none`；
+不能为兼容而删除最后一轮禁止工具保证。独立Chat探针2次HTTP200完整通过工具→结果→none收尾；
+两组均封存、零重试，位于`~/.moyyi/reviews/kimi-{connection,chat-connection}-2026-10-27/live/`。
+这些是接口证据，不是任务质量。见[ADR0036](../decisions/0036-kimi-chat-provider.md)。
+
+新增可选provider-kimi及显式region/key callback HTTP接线；low/high/max、8192输出上限、完整可见推理续接、
+严格SSE/模型身份/finish/usage、record/replay、压缩重开、最后none与权限边界；不改core或持久化格式，
+不装Agent SDK/新依赖，不自动发现密钥，不更换Flash默认。安装包包括Kimi指南及外部consumer验收。
+
+原题对照使用隔离安装的旧`4e3cddb1a8243c925a469edf73f17121b20dfa92`包，372文件与原包逐字匹配，
+避免新PR #37工具描述成为额外变量。原源码1838248/140文件、原题、六项rubric、system/10工具定义、
+8次/300秒/8192输出及所有原限额、只读read/list/search权限不变；不向模型发送评分答案。
+新旧首轮common request除origin外精确一致，后续system/tools精确核对；实际协议、provider、推理语义、
+context profile不同，不能声称只比较模型权重。原Flash失败保留，不重评分、不补提示重跑取绿。
+
+私有位置`~/.moyyi/reviews/kimi-source-comparison-2026-10-27/`。offline门控14/14、8轮正常+1次503合成
+运行通过：第8次none、第9次零发送、503不重试、写/命令/web拒绝、原文next/final逐字送达、源码不变；
+0真实key/网络。manifest `16c50cecfb8a690800fe2a288683e90d5e60c7e95ea9ca2cb055e2a5d96f4f36`。
+
+**真实结果：接口/证据交付PASS；原六项严格FAIL。** 唯一live6次HTTP200、零重试、297.347秒（含本地
+准备/收尾），第6次自主结束，未耗尽8次限额；32工具结果逐字进入next/final，140文件未变。主控另核对
+6对raw request/response hash、流完整结束、before/after/final源码快照；未只相信runner完成标记。
+答案SHA256 `832c12b43374ec97413130048d304ac2357008b8ce272d0fc3d5936b0b766ebf`。
+1/2/3/5满足；4虽说明选择复制冻结与原文刷新，未明确改变启用列表需重建runtime；6说明12/48KiB与不截断，
+仍未说明不自动加载引用/运行脚本。两处与原Flash同属必需漏项，不能因为读得多或正常结束改判通过。另有两处细节不准：JSON字段实际为
+`text`而非`markdown`，48KiB内部错误会经catch脱敏，不能当作对外错误原样引用。原答案不手改。
+
+用量input211662/output6177；观测cacheRead141824/cacheWrite69120/reasoning1970是子集，首次缺失cacheRead
+保持unknown，合计不二次累加。未核对账户账单。仅这一固定样本，不代表一般准确率；不据此切换默认。
+Owner可在`~/moyyi-demo/kimi-comparison-2026-10-27/`查看两份未修改原答、原评分与独立对照说明。
+
+离线定向provider61项、runtime19项、`eval:kimi`4/4通过，真实Chat封存SSE离线分片回放通过。
+初次package inventory拒绝遗漏于已审查清单的新增指南，补精确`docs/kimi.md`条目后外部安装门槛通过。
+完整check首次在编辑期间误读混合旧新codec并遇I/O超时；稳定重跑仍发现原开发watcher漏通知和多文件
+I/O竞争。没有增加timeout或跳过用例：按[ADR0011](../decisions/0011-interactive-cli-and-development-reload.md)
+补仅显式entry的250ms指纹重核及3个确定性漏事件/关闭测试，原10项保留；worker上限4，原测试集/断言/
+超时不变。该开发模式缺陷与Kimi对照无关，固定旧runtime及封存provider不变。最终`npm run check`118文件/2548测试、typecheck/lint通过，耗时78.59秒；未跳过、重试或增加超时。
+最终CI、PR与本机安装坐标记录在本次PR；不能将早期失败改写为已通过。
+
+### 上次验收：通讯录合并与自主核对（2026-10-27）
 
 上一轮PR #38已合并到`76fd9a7`，分支及main双平台CI通过；原网页修订要求和新postcheck分别通过。
 实际安装仍为PR #37的`6a3da0b`，本轮不重复已封存的源码或网页题，也不修改默认指导/core来猜修答案遗漏。

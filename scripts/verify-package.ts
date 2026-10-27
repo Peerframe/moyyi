@@ -137,6 +137,7 @@ try {
     "cli.mjs",
     "client.mjs",
     "documents.mjs",
+    "kimi.mjs",
     "document-confinement.mjs",
     "document-confinement-runner.mjs",
   ])
@@ -154,6 +155,14 @@ try {
     command(
       process.execPath,
       ["--no-experimental-strip-types", join(consumer, "client.mjs")],
+      consumer,
+      env,
+    ),
+  );
+  checks.kimi = JSON.parse(
+    command(
+      process.execPath,
+      ["--no-experimental-strip-types", join(consumer, "kimi.mjs")],
       consumer,
       env,
     ),
@@ -180,6 +189,7 @@ try {
     ["cli", 12],
     ["client", 13],
     ["documents", 9],
+    ["kimi", 3],
   ] as const) {
     const result = checks[key] as {
       passed: boolean;

@@ -26,6 +26,7 @@ read-only until explicitly enabled. Original tasks and acceptance standards stay
 | Installed product | `6a3da0b35b344a613a4010cf6d63abb1376a277c`; all375 files match tar SHA256 `78469e6d03adf87bb39af6d1f410391c9ec0cd02c7b5c26a517930c3ab68954c`. Later nonpackaged evidence-only edits do not require reinstalling the same program. |
 | Product acceptance | Check2,465 tests, writes8/8 with six exact next-request observations, external CLI12/client13/documents9, containment/strict types/PTY7 and product CI passed. Actual owner client13/CLI12 and old-session resume/help/exit passed without a model call. Sessions/config backed up and PR #35 package retained. |
 | Previous evidence-only delivery | [PR #36](https://github.com/Peerframe/moyyi/pull/36), merged `ae960de` with [main CI passed](https://github.com/Peerframe/moyyi/actions/runs/40421088168): user-requested source-derived check, controlled report repair and readback. Offline check2,433 passed; actual installed workflow passed once in5 requests. Its original task failures remain separate. |
+| Kimi candidate | Opt-in `kimi-k3.1-pro` Chat provider, low/high/max, preserving visible reasoning and final-request tool prohibition. Two-request Chat connection probe passed; Responses rejected final `none`. Original-task independent comparison: six HTTP200, zero retries; strict FAIL, items1/2/3/5 met and4/6 partial. Candidate delivery/installation evidence follows in the current PR. |
 | Public version | None; local candidate installation and public source PRs are not a version release. |
 
 ## What the user can do
@@ -105,7 +106,32 @@ model interpretation. This is not evidence to broaden the default grants silentl
 
 ## Current delivery and next boundary
 
-**Current bounded result: the unchanged roster merge task passed; autonomous source-derived
+**Current bounded result: Kimi connects correctly, but does not pass the unchanged source rubric.**
+The owner selected official Kimi Open Platform and saved the regional key. A separate synthetic
+Responses probe returned HTTP200 then HTTP400 for final `tool_choice:none`; Chat completed the
+tool/result/final-none flow in two HTTP200 requests. [ADR 0036](decisions/0036-kimi-chat-provider.md)
+and [host setup](kimi.md) define the opt-in integration. Flash/Responses/low remains the daily default.
+
+One independent Kimi/Chat/low original-task trial used six HTTP200, zero retries, within the same
+eight-request/300-second limits (297.347 seconds including local setup/cleanup). It used the
+original `4e3cddb` runtime package in isolation, source1838248, unchanged prompt/six-item rubric,
+identical common system/tool definitions and read/list/search authority. Thirty-two tool results
+reached the exact next and final requests; all140 source files were unchanged. The old Flash
+trial remains sealed. Protocol, provider reasoning semantics, context profile, timing and cache
+state differ, so this is not an isolated model-weight comparison or a reliability estimate.
+
+Kimi explains the main collection/permission/render chain, inert allowed-tools and size/failure
+handling. It still omits the explicit requirement to rebuild runtime when changing the enabled
+selection and the prohibition on automatic reference/script loading. Items1/2/3/5 meet the old
+standard;4/6 remain partial: strict overall FAIL. Two secondary inaccuracies remain: the JSON
+field is `text`, not `markdown`, and the internal combined-budget error is sanitized before it
+escapes. Do not count a longer answer or more retrieved
+files as improvement in the acceptance result. No additional retry, follow-up prompt or hidden
+rubric was supplied. The next quality work concerns answer coverage/interpretation, not wider
+retrieval or more grants. This result does not justify changing the default model.
+
+
+**Previous bounded result: the unchanged roster merge task passed; autonomous source-derived
 verification was not demonstrated.** One installed Flash/Responses/low trial used5 HTTP200, zero
 retries and14.345 seconds within the existing15-request/180-second ceiling. The original task,
 fixtures and checker were unchanged; only merged.csv was writable, with the existing read-only

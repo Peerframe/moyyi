@@ -2,6 +2,7 @@ import {
   createRuntime, type Runtime, type RuntimeOptions, FileRecordingSink, loadModelRecordings,
   DEEPSEEK_API_PROFILE, ANTHROPIC_API_PROFILE, WebPolicy,
   deepSeekApiProfile, type DeepSeekReasoningEffort,
+  kimiApiProfile, type KimiReasoningEffort,
 } from "moyyi/runtime";
 import {
   type ActionDigest,
@@ -130,6 +131,15 @@ const lowReplay: RuntimeOptions = {
 // @ts-expect-error Unspecified provider aliases are not accepted reasoning efforts.
 const invalidEffort: RuntimeOptions = { deepseekReasoningEffort: "medium" };
 void [lowReplay, invalidEffort];
+
+const kimiEffort: KimiReasoningEffort = "low";
+const kimiHost: RuntimeOptions = { model: { provider: "kimi", model: "kimi-k3.1-pro" },
+  kimiReasoningEffort: kimiEffort, kimi: { region: "cn", getApiKey: () => "synthetic" } };
+// @ts-expect-error Kimi credentials cannot silently select an unspecified region.
+const regionMissing: RuntimeOptions = { kimi: { getApiKey: () => "synthetic" } };
+// @ts-expect-error Kimi thinking cannot be disabled for this model.
+const kimiDisabled: RuntimeOptions = { kimiReasoningEffort: "none" };
+void [kimiHost, regionMissing, kimiDisabled, kimiApiProfile(kimiEffort)];
 
 async function sourceWindows(files: WorkspaceFiles): Promise<readonly FileSearchContext[] | undefined> {
   const result = await files.search("src", "function", { contextLines: 8 });
