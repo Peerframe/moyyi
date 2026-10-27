@@ -9,7 +9,7 @@ installed at source `6eb2993`, merged main `85873c7`: external-copy/native gates
 authorized live repair/check/reopen/undo passed. The first live failure and an incorrect extra
 explanation remain recorded below. [PR #46](https://github.com/Peerframe/moyyi/pull/46) and the local
 installation receipt record native launch and history reopen verification. M4's optional high
-setting, local help and maintenance controls are source candidates awaiting installed acceptance;
+setting, local help and maintenance controls passed isolated bundle/native maintenance acceptance;
 they do not yet update this M3 installation. The complex source-analysis task still fails its
 original standard. This is not a public release or M4 completion claim.
 See [ADR 0037](decisions/0037-installed-desktop-client.md),
@@ -47,7 +47,7 @@ this client. Selecting files does not upload them or read their body into the mo
 
 Open **模型设置** to choose Flash, Kimi China or Kimi Global. Installed M3 uses low reasoning for
 all three. M4's settings candidate adds an explicit low/high choice for Kimi only. High is labelled
-**待任务验证**; it has not passed the fixed complex-source task and is not a reliability recommendation.
+**实验**; it did not pass the fixed complex-source task and is not a reliability recommendation.
 Flash always uses low. Switching back to Flash removes high from the configuration. Legacy
 three-field settings retain low behavior; saving low or Flash retains that older representation.
 Endpoints are fixed presets. The form accepts1–8 requests and30–300 seconds per turn;8192 output
@@ -149,8 +149,9 @@ Kimi high or a normal completion message do not establish correctness.
 
 ## Backup, restore and software rollback (M4 candidate)
 
-These controls are implemented in the M4 source candidate; installed/native acceptance is still
-pending in the [M4 receipt](tasks/2026-10-28-desktop-m4.md). The current installed M3 app does not
+These controls passed actual isolated bundle/native acceptance, recorded in the
+[M4 receipt](tasks/2026-10-28-desktop-m4.md). Full M4 quality acceptance remains blocked by the
+original source task. The current daily M3 app does not
 gain them from source edits. Open **备份与回退** only after work finishes. The app closes its session
 worker before maintenance and reopens it afterwards, with grants reset. Close any CLI using the
 same store first. Maintenance makes no model call and does not read or export Keychain secrets.

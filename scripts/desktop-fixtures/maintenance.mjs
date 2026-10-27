@@ -52,7 +52,7 @@ function installGuard() {
 }
 async function verify() {
   // External fixture only: the shipped helper and runtime use real SQLite and public exports.
-  // It never starts a model run, imports a source checkout or reads a Keychain credential.
+  // The maintenance helper never starts a model run, imports a source checkout or reads a Keychain credential.
   assert.equal(process.version, "v26.12.1");
   const [home, workspace] = process.argv.slice(2);
   assert(home && workspace && !existsSync(home), "A fresh isolated HOME is required");

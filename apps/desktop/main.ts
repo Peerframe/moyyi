@@ -212,7 +212,7 @@ else {
                 type: "warning",
                 title: "回退 moyyi 软件",
                 message: "退出并回退到上一份已验证的安装？",
-                detail: `目标版本：${result.targetRevision?.slice(0, 7)}\n\n保留当前会话、模型设置和工作区文件。当前软件保存在：${result.rescuePath}\n\n确认后安全退出，再替换软件并重新打开。`,
+                detail: `目标版本：${result.targetRevision?.slice(0, 7)}\n\n保留当前会话、模型设置和工作区文件。当前软件将保存在：${result.rescuePath}\n\n确认后安全退出，再替换软件并重新打开。`,
                 buttons: ["取消", "退出并回退"],
                 defaultId: 0,
                 cancelId: 0,

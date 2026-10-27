@@ -1,7 +1,7 @@
 # ADR 0040: Explicit desktop maintenance and optional Kimi effort
 
-Status: accepted design, implementation in progress2026-10-28; installed maintenance and M4
-task-quality acceptance remain pending in the [delivery receipt](../tasks/2026-10-28-desktop-m4.md).
+Status: accepted design, implemented2026-10-28. Isolated bundle/native maintenance passed; M4
+task-quality acceptance and daily installation remain pending in the [delivery receipt](../tasks/2026-10-28-desktop-m4.md).
 
 ## Decision
 

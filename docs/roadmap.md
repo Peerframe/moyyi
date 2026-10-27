@@ -171,13 +171,14 @@ usage stays unknown. Do not invent a universal pass percentage from a few cases.
 
 Current quality facts: original Flash and Kimi low explanations failed; the notes candidate was
 withdrawn; the earlier Kimi high control returned first-request429 engine overload and produced
-no answer to score. Keep these records sealed. M4 wires an explicit Kimi high selector labelled
-unverified; this is not a verified complex-task recommendation and Flash remains low. Freeze one
-new original-task attempt through the actual desktop entry with the limits above. Count its first
-request inside the ceiling and stop on a service error without retry. Only a strict six-item pass
-without new factual errors opens the two unchanged public tasks. The current runtime differs
-from the old isolated control; do not claim effort-only causality. Continuous paid-validation
-authorization does not waive zero-retry or fixed-budget rules.
+no answer to score. The new actual-desktop Kimi high trial completed in5 requests/138.996 seconds,
+with22 successful read tools and unchanged source. Original-rubric items1/2/3/5 were met and4/6
+were partial: runtime recreation after selection changes and no automatic script execution remain
+omitted despite reading the relevant implementations. Its strict FAIL is sealed; the two conditional
+public tasks were not triggered and each used0 requests. M4 labels high experimental, not a verified
+complex-task recommendation; Flash remains low. The current runtime differs from the old isolated
+control, so do not claim effort-only causality. Continuous paid-validation authorization does not
+waive zero-retry or fixed-budget rules, reopen sealed allowances, or authorize rerolling this answer.
 
 The other M4 checkpoint is local maintenance and daily usability. [ADR 0040](decisions/0040-desktop-local-maintenance.md)
 keeps backup/restore/rollback in the trusted local host, outside model tools. Restore only the
@@ -185,8 +186,11 @@ session store in place after publishing a rescue backup; preserve settings, Keyc
 files. Roll back only to a verified retained app compatible with current data/settings. Neither
 action replays effects or restores old grants. Current explicit high settings are incompatible
 with older three-field desktop settings; refuse rollback instead of silently rewriting them.
-These paths require offline and actual bundle/native evidence, not another task framework or
-repeat of unaffected paid document/edit trials. Their completion does not remove the source-task gate.
+These paths passed source, external-bundle and actual native backup/restore/rollback checks on
+clean source `edc5207`: restore kept a rescue backup, rollback cancelled once and then automatically
+reopened the retained M3 app with readable history. Current settings/workspace were unchanged;
+maintenance made0 model requests. Evidence is in the [M4 receipt](tasks/2026-10-28-desktop-m4.md).
+This isolated candidate acceptance does not remove the source-task gate or update the daily M3 app.
 
 ### OpenBot reuse within this sequence
 
