@@ -179,6 +179,38 @@ preview. Finder receives only the inspected receipt path and does not execute th
 invocation is not a confirmed user-visible selection. Historical receipts certify recorded
 execution, not current bytes or answer correctness. No persisted core/session schema changes.
 
+### Desktop M3 controlled workflows
+
+[ADR 0039](decisions/0039-desktop-controlled-workflows.md) extends this same host with two
+ephemeral grants: snapshot-backed file writes and read-only-workspace Node checks. Both start
+disabled. A dedicated main-process bridge confirms the selected workspace and revalidates the
+session after the native confirmation. The worker admits a grant change only while idle, closes
+the old runtime and reopens the same store. New/reopened sessions and model configuration reset
+the grants; changing grants clears the report target, and selecting a report target clears the
+broader grants. Generic renderer actions cannot bypass this native permission entry.
+
+The host uses the existing public runtime policies, file tools and process isolation. The only
+added runtime export is the existing `discoverNodeToolchain` implementation; no new core port or
+effect execution API is introduced. File edits/undo and commands still require their own exact
+prepared-action approval. The check grant selects the supported Node toolchain, a read-only
+workspace and no network; it does not grant command-based editing or dependency installation.
+
+The host projects the existing `session.results` page into bounded effect rows, retaining failed,
+cancelled and unknown states as well as matched file/process receipts. Inspection is a fresh
+guarded file/hash comparison against `afterHash`; expected absence is distinct from a missing
+expected file. It verifies bytes at inspection time, not file mode, undo readiness or semantic
+correctness. The existing undo tool separately rechecks hash/mode before restoring a snapshot.
+
+The renderer reuses its snapshot receiver, synchronous action gate and exact approval identity.
+Long-list folding is a narrow OpenBot view adaptation; host state determines all status labels.
+Preparing an undo or check only inserts an editable user draft, never dispatches an effect or
+starts a model call. The user must send it through the ordinary budgeted loop. Reopening history
+does not replay work or approvals. An interrupted started process can retain an unknown effect
+and workspace lease: read-only inspection remains available, while later mutations may be blocked
+even after a new write grant. Inspection does not clear the lease; no force-unlock API is added.
+A worker failure closes the bridge view and clears displayed
+grants, target and inspections; old records remain evidence, not active authority.
+
 ## Data model
 
 Three kinds of authoritative records, committed together in one SQLite transaction:

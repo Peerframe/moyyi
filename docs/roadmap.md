@@ -136,8 +136,8 @@ installation checks. These are acceptance checkpoints, not estimates or completi
 | Milestone | Deliverable and actual user checkpoint | Dependencies / exit gate |
 |---|---|---|
 | **M1: installed desktop read-only loop** | Open app → select workspace → use an existing secure Flash connection → send a request → observe real tool/output/error state → cancel or finish → reopen its history. First functional PR starts this path and adapts the OpenBot approval-card presentation where read approvals are needed. | Native startup/bridge/Node26/store ownership proven from an installed bundle; real runtime and temporary files, no product mock backend. Scripted interaction evidence and a separately labelled bounded live read case; denied/stale approval and close/reopen behavior checked. Missing connection has an actionable state. |
-| **M2: materials, settings and delivered reports** | Configure a connection without a terminal; select documents; generate an explicitly approved report; open it from a receipt-backed result card. Retain clear source/coverage/truncation information. | M1; seven existing parsers reused. Start with workspace-local materials; external files require a separately explicit, bounded copy/import into the chosen workspace with collision/cancel handling, leaving the original untouched. Report content checked against actual source, not only file existence. |
-| **M3: edit, inspect, resume and undo** | Preview a change → deny once → approve the intended change → run the supported check → interrupt/reopen → inspect actual outcomes → undo. | M1/M2; reuse current snapshot, policy, process isolation and recovery. Denial/stale approval changes nothing; restore original bytes/mode; no action replay after restart. Shell remains separately authorized and its read-only-workspace limitation stays visible. |
+| **M2: materials, settings and delivered reports — accepted baseline** | Configure a connection without a terminal; select documents; generate an explicitly approved report; open it from a receipt-backed result card. Accepted and installed through [PR #45](https://github.com/Peerframe/moyyi/pull/45). | Seven existing parsers reused; workspace-local materials only. External import remains separate. Report content was checked against actual source, not only file existence. |
+| **M3: edit, inspect, resume and undo — feature acceptance evidence complete** | Preview a change → deny once → approve → check → interrupt/reopen → inspect → undo. External-copy/native gates and one independently authorized live repair/check/two-snapshot reverse undo passed. Final source check131/2644 passed. See [ADR 0039](decisions/0039-desktop-controlled-workflows.md). | First live repair failure remains sealed; the passing repair added a false DOM explanation. Final integration/installation coordinates belong in [PR #46 receipt](https://github.com/Peerframe/moyyi/pull/46). Checks retain independent approval, read-only workspace/no network; unknown leases are not automatically released. No M4 acceptance claim. |
 | **M4: integrated personal candidate** | Use all three fixed workflows below from the installed app, with normal settings and no developer-assisted file/config repair. Backup/update/rollback and a short user guide accompany the candidate. | M1–M3 interaction/authority gates plus all applicable semantic gates. No unresolved blocker for the advertised workflow, no hidden failed criterion. General reliability and additional platforms remain unclaimed. |
 
 M1 begins with one real installed transport/runtime feasibility probe, then completes the same
@@ -181,14 +181,15 @@ is010439bb9002fabb7e1facd8450ee85edbafa309 (MIT). Existing document parsing reus
 next reuse concerns presentation and interaction. Candidate inventory and precise paths live in
 [provenance](openbot-provenance.md#desktop-reuse-inventory). M1 adapts the approval presentation;
 M2 adapts the result card; its external bundle and both original native-UI live document tasks
-passed. Final rebuilt-app restart, CI, merge and owner installation remain pending in the M2 PR
-delivery receipt; M3/M4 acceptance has not been inferred from these results.
+passed; final integration and installation are recorded in [PR #45](https://github.com/Peerframe/moyyi/pull/45).
+M3 now narrowly adapts the folded effect list and retains existing local snapshot handling;
+M3 has separate functional/recovery evidence; M4 acceptance has not been inferred from it or earlier results.
 
 - M1: adapt the approval-card view and duplicate-click/pending feedback to moyyi events and exact
   effect/digest callbacks. Keep authorization in moyyi; no Bot/channel/domain DTO imports.
 - M2: adapt result-card presentation to actual execution receipts and local file-open actions;
   rewrite attachment selection and model settings against local host ports.
-- M3: reuse history/late-response interaction lessons, implemented over moyyi session commands.
+- M3: adapt `TaskSteps` list folding and reuse history/late-response interaction lessons over moyyi session commands.
   Do not port OpenBot's server-login recovery as task recovery or introduce its Work polling model.
 
 Record actual copied/adapted files, upstream commit, MIT notice and new tests at port time. Prefer

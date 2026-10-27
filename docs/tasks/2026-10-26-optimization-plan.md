@@ -7,12 +7,84 @@ Owner 已授权先做整体计划，再针对已证实的缺口优化。本计�
 
 ## 持续交付：日常任务闭环（当前）
 
-### M2 材料、设置与报告（2026-10-27，本地功能与两题通过，最终集成安装待完成）
+### M3 修改、检查与恢复（2026-10-28，功能验收证据齐备，最终交付坐标见PR回执）
+
+承接已安装的M2 [PR #45](https://github.com/Peerframe/moyyi/pull/45)与main `b1d64e7`，
+当前[PR #46](https://github.com/Peerframe/moyyi/pull/46)、分支`codex/desktop-m3`在本证据检查点为
+`33ed114`。实际外部候选来自`4274de25e64a36f918afd4c499fbfe9b0964a5f2`，
+desktop bundle SHA-256为`75ef835ec3291f992e4dcf15e62e6249e199eff7a78f70755b5dd392e357e216`。
+这不是最终owner安装坐标；最终包、PR head CI、合并和安装坐标由PR #46交付回执记录，
+本节不预先声明已安装。M4未开始，不公开发布。
+
+M3保持自研core、原loop和持久格式：文件修改与Node检查是两个独立、默认关闭的临时授权，
+native确认后由宿主idle重建；每个edit/undo/check仍需精确预览与digest审批。恢复历史不恢复旧权限，
+不重放动作；检查/撤销按钮只填可审阅草稿。操作记录保留failed/cancelled/unknown，核验仅表示检查时
+文件字节与回执是否一致，不包含mode或“可撤销”保证；实际undo仍独立核对字节/mode。
+started命令中断后unknown可保留workspace lease，允许只读核对，但重新授权也可能继续阻止修改，
+没有强制重试/自动解锁入口。细节见[ADR0039](../decisions/0039-desktop-controlled-workflows.md)。
+
+已执行的离线与原生证据分开记录：
+
+- 初次源码完整check为131文件/2639测试PASS；随后权限文案窄修后4个renderer文件/36测试、
+  desktop typecheck及定向Biome通过。writes eval8/8、shell eval8/8通过。最终完整check见下文。
+- 实际候选复制到仓库外后`verify:desktop`通过：M1七项、M2七项、M3十项（33个合成请求）、
+  production settings四项及隔离检查。凭据读取和网络尝试均0，实际使用随包Node/public exports/
+  编译host。初次M3 fixture把beforePrepare拒绝误当成必须有effect journal记录；修正为逐callId匹配
+  tool_result、无新effect/审批及字节不变断言。失败保留，产品标准没有放宽。
+- 原生交互使用明确的临时QA副本：只替换合成worker、加入QA配置及变更bundle身份/本地签名；
+  main/preload/renderer/host与候选逐文件hash一致。真实runtime/SQLite/文件/沙箱下9项通过，7个
+  合成请求、0付费请求：native取消授权、独立授权、拒绝保原字节/mode、源文件变化后新digest重审、
+  edit/check结果送达、取消后续待审批edit、退出恢复零重放、实际回执核验/草稿按钮、重新授权后undo。
+  初次deny的脚本回复因tool_result也使用user role落入通用分支；deny已由实际字节/记录独立核验，
+  修改fixture定位用户题目后继续后续步骤，旧记录保留。这不是生产worker或live语义通过。
+
+首组真实试验使用原listener-leak源码/问题/检查标准，Flash + Responses + low、每run最多8请求/
+180秒/8192输出、shared12、零重试。原题第一组结果已封存：
+
+| 实际运行 | 请求数 | 结果与边界 |
+|---|---|---|
+| 修复 | 2 | **FAIL**。第一次edit已批准并成功；第二次审批因操作/上下文处理延迟超过原180秒时限而取消；没有执行检查，不能计为修复通过。 |
+| 退出重开后撤销 | 3 | **PASS，限定1个实际快照**。旧权限未恢复，新授权及实际undo恢复原字节/mode；独立probe恢复原3/3监听器且仍响应的失败基线。它不替代未完成的修复/检查及两快照逆序撤销门槛。 |
+
+该组累计5请求已封存，不改分、不从其中转移未用额度。原计划用余下7请求继续的补充准备已停止，
+没有新增请求。用户随后明确授权**另一次独立复测**：同样原始fixture、新session、原prompt/标准，
+每run8请求/180秒/8192，独立总12，零重试。新组已完成，未改变原题、源码或判分：
+
+| 独立复测 | 实际请求/用时 | 结果与边界 |
+|---|---|---|
+| 修复及检查 | 5 / 51.047秒 | **功能PASS**。三份源码实际读取后，两次edit保存/移除同一监听函数引用；经审批执行唯一固定命令`node check.mjs`，原checker确认销毁前两类监听器各3且有响应、销毁后均0且不再响应。 |
+| 重开及逆序撤销 | 3 / 30.123秒 | **恢复PASS**。重开后两项授权归零，重新授权后按真实snapshot逆序执行两次undo，恢复原字节/mode；其他源码、检查器及沙箱外canary未变。独立probe恢复原3/3监听器且仍响应的失败基线，确认撤销回原始状态。 |
+
+该独立组累计8/12请求，零重试，余量随组封存；原组5请求仍独立保留，两组合计13请求来自两次分别
+授权，不能说两组合计仍受同一个12次上限覆盖。修复后city.js SHA-256为
+`64fda9e91b8a4003b4ba96a306e54c877895cb20a86e6d4b8d0e0d03812b7499`；撤销后恢复
+`e8040dd8ed81eb3b315047dc4c066dc67ef1acdebbccc5a564e73bde701f231b`及原mode33188。
+原生UI已恢复日常Flash、low、3请求/120秒/8192/零重试，文件修改/命令检查均关闭。
+
+**额外解释错误仍未解决。** 修复答复末尾声称给`removeEventListener`传null回调会在真实DOM抛错，
+这是错误扩展；[WHATWG DOM标准](https://dom.spec.whatwg.org/#dom-eventtarget-removeeventlistener)允许
+nullable callback，无匹配监听器时不执行移除。固定fixture并未证明该扩展。因此本次结论仅为
+功能与恢复PASS，不能声称答复全文无误。没有为此增加请求或修改提示词，原源码六项FAIL不重评。
+
+最终源码`npm run check`通过131文件/2644测试（87.17秒，`final-check-after-split.log`）。此前一次
+完整检查为2642/2643通过，组合宿主场景触发原5秒超时；将两个独立场景拆开，阈值与断言不变，
+定向host28项通过后再执行上述完整检查。初次失败保留。检查点`33ed114`的三个CI作业已全绿；
+Ubuntu先前在apt镜像阶段取消且未到产品断言，随后失败作业重跑通过。独立审查未发现已证实P1/P2，
+不把它等同于全文正确或整个产品完成。
+
+私有证据位于`~/.moyyi/reviews/desktop-m3-2026-10-27/`：offline/native manifests/results、首组
+records/probe，以及`supplemental/`内独立组manifest/result/final-records/probe-repaired/restored
+和`daily-restored-ui.txt`；不提交原始transcript。M3功能验收证据至此齐备，最终集成、安装坐标以
+[PR #46回执](https://github.com/Peerframe/moyyi/pull/46)为准。原源码六项FAIL及Kimi high的429无语义
+证据不重评，M4及公开发布均不在本轮。
+
+### M2 材料、设置与报告（2026-10-27，已安装基线）
 
 承接已合并M1基线`eca4d06`，仍按原[roadmap](../roadmap.md)推进，不改自研核心、原任务或评分。
 本轮增加本地模型设置、工作目录内材料选择、精确报告创建授权及真实回执成果卡；
 [ADR0038](../decisions/0038-desktop-materials-and-reports.md)记录本次边界与官方依据，
-[桌面指南](../desktop.md)分别记录M1、M2的实际证据与安装边界。M3/M4尚未验收，不公开发布。
+[桌面指南](../desktop.md)分别记录M1、M2的实际证据与安装边界；本段保留M2交付历史，M3状态见上文。
+M4尚未验收，不公开发布。
 
 - 设置仅接受Flash、Kimi中国、Kimi全球固定preset，均low；默认仍3请求/120秒/8192输出/零重试。
   请求上限可选1–8、时限30–300秒，保存只在本机进行，不自动probe或产生模型请求。
@@ -56,7 +128,8 @@ M1退出且无写者后，已备份到`~/.moyyi/backups/pre-desktop-m2-2026-10-2
 验收后已通过UI把默认请求上限保存回3，Flash不变，应用退出。随后仅修正成果preview自动滚动，
 6个renderer测试及desktop typecheck通过，不改变模型输入或原题证据。最终完整`npm run check`
 再次通过128文件/2610测试，91.02秒，typecheck及Biome367文件通过。最终重建/重启、CI、合并及
-owner安装尚待完成，最终包hash与坐标见本轮PR receipt。私有证据保留在
+owner安装在随后[PR #45 receipt](https://github.com/Peerframe/moyyi/pull/45)完成并记录；上述为当时
+打包前检查点，最终包hash与坐标以该receipt为准。私有证据保留在
 `~/.moyyi/reviews/desktop-m2-2026-10-27/`，不提交原始transcript。
 原源码六项rubric FAIL及Kimi high的429无语义证据保持原结论；M1证据没有改名充数。
 

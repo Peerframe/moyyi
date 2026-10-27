@@ -5,6 +5,7 @@ import {
   readFileSync,
   realpathSync,
   rmSync,
+  statSync,
   unlinkSync,
   writeFileSync,
 } from "node:fs";
@@ -678,6 +679,7 @@ describe("desktop M2 materials and report delivery", () => {
     );
     expect(JSON.stringify(f.host.getState())).not.toContain("TEST_ONLY_KEY");
     expect(f.requests).toHaveLength(1);
+    await f.host.dispatch({ type: "permissions", sessionId, writes: true, checks: false });
     failure = true;
     await expect(
       f.host.dispatch({ type: "configure", settings: { ...settings, maxRequests: 5 } }),
@@ -685,6 +687,7 @@ describe("desktop M2 materials and report delivery", () => {
     expect(f.host.getState().settings).toEqual(settings);
     expect(f.host.getState().activeSessionId).toBe(sessionId);
     expect(JSON.stringify(f.host.getState())).not.toContain("PRIVATE_CONFIGURATION_CAUSE");
+    expect(f.host.getState().permissions).toEqual({ writes: false, checks: false });
     expect(f.requests).toHaveLength(1);
     failure = false;
     invalidModel = true;
@@ -695,6 +698,288 @@ describe("desktop M2 materials and report delivery", () => {
     expect(f.host.getState().connection.ready).toBe(false);
     expect(f.requests).toHaveLength(1);
   });
+});
+
+describe("desktop M3 explicit grants and recorded effects", () => {
+  it("keeps independent grants ephemeral and never truncates an approved edit proposal", async () => {
+    const steps: Step[] = [];
+    const f = await fixture(steps);
+    await f.host.dispatch({ type: "create", workspaceRoot: f.workspace, askEachRead: false });
+    const sessionId = f.host.getState().activeSessionId;
+    expect(f.host.getState().permissions).toEqual({ writes: false, checks: false });
+    await f.host.dispatch({ type: "permissions", sessionId, writes: true, checks: false });
+    // A unique match is necessary to reach the complete-preview boundary.
+    writeFileSync(join(f.workspace, "large.txt"), `UNIQUE${"a".repeat(80_000)}`);
+    steps.push(call("edit", { path: "large.txt", oldText: "UNIQUE", newText: "replacement" }));
+    steps.push(answer("Denied"));
+    let approvals = 0;
+    const off = f.host.subscribe((s) => {
+      if (s.pendingApproval) approvals++;
+    });
+    await f.host.dispatch({ type: "start", sessionId, text: "Edit the file" });
+    await waitFor(f.host, (s) => s.outcome?.kind === "completed");
+    off();
+    expect(approvals).toBe(0);
+    expect(readFileSync(join(f.workspace, "large.txt"), "utf8")).toBe(
+      `UNIQUE${"a".repeat(80_000)}`,
+    );
+    await f.host.dispatch({ type: "effects", sessionId, offset: 0 });
+    expect(
+      f.host.getState().effects.items.some((e) => e.tool === "edit" && e.state === "denied"),
+    ).toBe(true);
+    steps.push(call("shell", { command: "echo forbidden" }), answer("No checks grant"));
+    await f.host.dispatch({ type: "start", sessionId, text: "Try a check" });
+    await waitFor(f.host, (s) => s.outcome?.kind === "completed");
+    expect(f.host.getState().messages.some((m) => m.tool === "shell" && m.state === "denied")).toBe(
+      true,
+    );
+    await f.host.dispatch({ type: "report.target", sessionId, path: "report.md" });
+    expect(f.host.getState().permissions).toEqual({ writes: false, checks: false });
+    await f.host.dispatch({ type: "permissions", sessionId, writes: true, checks: false });
+    expect(f.host.getState().reportTarget).toBeNull();
+    await f.host.dispatch({ type: "load", sessionId, askEachRead: false });
+    expect(f.host.getState().openedHistory).toBe(true);
+    expect(f.host.getState().permissions).toEqual({ writes: false, checks: false });
+    await f.host.dispatch({ type: "permissions", sessionId, writes: true, checks: false });
+    await f.host.dispatch({ type: "create", workspaceRoot: f.other, askEachRead: false });
+    expect(f.host.getState().permissions).toEqual({ writes: false, checks: false });
+    expect(f.host.getState().openedHistory).toBe(false);
+  });
+
+  it("records deny/stale, two edits and reverse undo, rejects changed snapshots and restores history without replay", async () => {
+    const steps: Step[] = [];
+    const f = await fixture(steps);
+    await f.host.dispatch({ type: "create", workspaceRoot: f.workspace, askEachRead: false });
+    const sessionId = f.host.getState().activeSessionId;
+    await f.host.dispatch({ type: "permissions", sessionId, writes: true, checks: false });
+    const mode = statSync(join(f.workspace, "note.txt")).mode;
+    // Approval command accepts only its binding fields.
+    async function edit(oldText: string, newText: string, decision: "approve" | "deny") {
+      steps.push(call("edit", { path: "note.txt", oldText, newText }), answer("Recorded"));
+      await f.host.dispatch({ type: "start", sessionId, text: "Edit note.txt" });
+      const pending = required((await waitFor(f.host, (s) => !!s.pendingApproval)).pendingApproval);
+      await expect(
+        f.host.dispatch({ type: "approve", effectId: pending.effectId, digest: "stale", decision }),
+      ).rejects.toThrow("stale");
+      await f.host.dispatch({
+        type: "approve",
+        effectId: pending.effectId,
+        digest: pending.digest,
+        decision,
+      });
+      await waitFor(f.host, (s) => s.outcome?.kind === "completed");
+      await f.host.dispatch({ type: "effects", sessionId, offset: 0 });
+      return pending.effectId;
+    }
+    const denied = await edit("ORIGINAL", "FIRST", "deny");
+    expect(readFileSync(join(f.workspace, "note.txt"), "utf8")).toBe("ORIGINAL");
+    const first = await edit("ORIGINAL", "FIRST", "approve");
+    const second = await edit("FIRST", "SECOND", "approve");
+    expect(f.host.getState().effects.items.find((e) => e.effectId === denied)?.state).toBe(
+      "denied",
+    );
+    await f.host.dispatch({ type: "effect.inspect", sessionId, effectId: second });
+    expect(f.host.getState().effectInspection?.state).toBe("current");
+    writeFileSync(join(f.workspace, "note.txt"), "EXTERNAL");
+    await f.host.dispatch({ type: "effect.inspect", sessionId, effectId: second });
+    expect(f.host.getState().effectInspection?.state).toBe("changed");
+    steps.push(call("undo", { snapshotId: second }), answer("Conflict"));
+    await f.host.dispatch({ type: "start", sessionId, text: "Undo the snapshot" });
+    await waitFor(f.host, (s) => s.outcome?.kind === "completed");
+    expect(readFileSync(join(f.workspace, "note.txt"), "utf8")).toBe("EXTERNAL");
+    writeFileSync(join(f.workspace, "note.txt"), "SECOND");
+    for (const snapshotId of [second, first]) {
+      steps.push(call("undo", { snapshotId }), answer("Undone"));
+      await f.host.dispatch({ type: "start", sessionId, text: "Undo the recorded snapshot" });
+      const pending = required((await waitFor(f.host, (s) => !!s.pendingApproval)).pendingApproval);
+      await f.host.dispatch({
+        type: "approve",
+        effectId: pending.effectId,
+        digest: pending.digest,
+        decision: "approve",
+      });
+      await waitFor(f.host, (s) => s.outcome?.kind === "completed");
+    }
+    expect(readFileSync(join(f.workspace, "note.txt"), "utf8")).toBe("ORIGINAL");
+    expect(statSync(join(f.workspace, "note.txt")).mode).toBe(mode);
+    await f.host.dispatch({ type: "effects", sessionId, offset: 0 });
+    const recorded = f.host.getState().effects;
+    const requests = f.requests.length;
+    await f.host.close();
+    expect(f.host.getState().permissions).toEqual({ writes: false, checks: false });
+    const reopened = await f.reopen();
+    await reopened.dispatch({ type: "load", sessionId, askEachRead: false });
+    expect(reopened.getState().effects).toEqual(recorded);
+    expect(reopened.getState().pendingApproval).toBeNull();
+    expect(reopened.getState().permissions).toEqual({ writes: false, checks: false });
+    expect(f.requests).toHaveLength(requests);
+  });
+});
+
+it("runs a separately approved Node check with a read-only workspace and denied network", async () => {
+  const steps: Step[] = [];
+  const f = await fixture(steps);
+  await f.host.dispatch({ type: "create", workspaceRoot: f.workspace, askEachRead: false });
+  const sessionId = f.host.getState().activeSessionId;
+  await f.host.dispatch({ type: "permissions", sessionId, writes: false, checks: true });
+  expect(f.requests).toHaveLength(0);
+  const quote = (text: string) => `'${text.replaceAll("'", "'\\''")}'`;
+  const code =
+    'const fs=require("node:fs");console.log(fs.readFileSync("note.txt","utf8"));try{fs.writeFileSync("should-not-exist","bad");process.exitCode=9}catch{console.log("READ_ONLY_CONFIRMED")}';
+  steps.push(call("shell", { command: `node -e ${quote(code)}` }), answer("Check observed"));
+  await f.host.dispatch({ type: "start", sessionId, text: "Run the Node check" });
+  const pending = required((await waitFor(f.host, (s) => !!s.pendingApproval)).pendingApproval);
+  expect(pending.preview).toContain('"workspaceAccess":"read-only"');
+  expect(pending.preview).toContain('"network":"denied"');
+  await f.host.dispatch({
+    type: "approve",
+    effectId: pending.effectId,
+    digest: pending.digest,
+    decision: "approve",
+  });
+  await waitFor(f.host, (s) => s.outcome?.kind === "completed");
+  await f.host.dispatch({ type: "effects", sessionId, offset: 0 });
+  expect(
+    f.host.getState().effects.items.find((e) => e.effectId === pending.effectId)?.receipt,
+  ).toMatchObject({ kind: "process", termination: "exited", exitCode: 0 });
+  expect(JSON.stringify(f.requests.at(-1))).toContain("READ_ONLY_CONFIRMED");
+  expect(existsSync(join(f.workspace, "should-not-exist"))).toBe(false);
+  expect(readFileSync(join(f.workspace, "note.txt"), "utf8")).toBe("ORIGINAL");
+});
+
+it("retains a cancelled started process as unknown across reopen and blocks writes without replay", async () => {
+  const steps: Step[] = [];
+  const f = await fixture(steps);
+  await f.host.dispatch({ type: "create", workspaceRoot: f.workspace, askEachRead: false });
+  const sessionId = f.host.getState().activeSessionId;
+  await f.host.dispatch({ type: "permissions", sessionId, writes: false, checks: true });
+  expect(f.requests).toHaveLength(0);
+  steps.push(call("shell", { command: "node -e 'setInterval(()=>{},1000)'" }));
+  await f.host.dispatch({ type: "start", sessionId, text: "Run until cancelled" });
+  const pending = required((await waitFor(f.host, (s) => !!s.pendingApproval)).pendingApproval);
+  await f.host.dispatch({
+    type: "approve",
+    effectId: pending.effectId,
+    digest: pending.digest,
+    decision: "approve",
+  });
+  await waitFor(f.host, (s) =>
+    s.effects.items.some((e) => e.effectId === pending.effectId && e.state === "started"),
+  );
+  await new Promise((resolve) => setTimeout(resolve, 100));
+  await f.host.dispatch({ type: "cancel", runId: required(f.host.getState().run).id });
+  await waitFor(f.host, (s) => s.run === null);
+  await f.host.dispatch({ type: "effects", sessionId, offset: 0 });
+  expect(f.host.getState().effects.items.find((e) => e.effectId === pending.effectId)?.state).toBe(
+    "unknown",
+  );
+  expect(f.host.getState().outcome?.kind).toBe("failed");
+  const count = f.requests.length,
+    recorded = f.host.getState().effects;
+  await f.host.close();
+  const reopened = await f.reopen();
+  await reopened.dispatch({ type: "load", sessionId, askEachRead: false });
+  expect(reopened.getState().effects).toEqual(recorded);
+  expect(reopened.getState().permissions).toEqual({ writes: false, checks: false });
+  expect(f.requests).toHaveLength(count);
+  steps.push(call("read", { path: "note.txt" }), answer("Read after interruption"));
+  await reopened.dispatch({
+    type: "start",
+    sessionId,
+    text: "Inspect the file without changing it",
+  });
+  await waitFor(reopened, (s) => s.outcome?.kind === "completed");
+  expect(JSON.stringify(f.requests.at(-1))).toContain("ORIGINAL");
+  await reopened.dispatch({ type: "permissions", sessionId, writes: true, checks: false });
+  steps.push(call("edit", { path: "note.txt", oldText: "ORIGINAL", newText: "BLOCKED" }));
+  await reopened.dispatch({
+    type: "start",
+    sessionId,
+    text: "An unresolved lease must refuse this edit",
+  });
+  const blocked = required((await waitFor(reopened, (s) => !!s.pendingApproval)).pendingApproval);
+  await reopened.dispatch({
+    type: "approve",
+    effectId: blocked.effectId,
+    digest: blocked.digest,
+    decision: "approve",
+  });
+  await waitFor(reopened, (s) => s.run === null);
+  expect(reopened.getState().outcome?.kind).toBe("failed");
+  expect(readFileSync(join(f.workspace, "note.txt"), "utf8")).toBe("ORIGINAL");
+  expect(f.requests).toHaveLength(count + 3);
+});
+
+it("after pre-effect cancellation reopens read-only and explicitly regrants undo of a settled prior edit", async () => {
+  const steps: Step[] = [];
+  const f = await fixture(steps);
+  await f.host.dispatch({ type: "create", workspaceRoot: f.workspace, askEachRead: false });
+  const sessionId = f.host.getState().activeSessionId;
+  await f.host.dispatch({ type: "permissions", sessionId, writes: true, checks: false });
+  steps.push(
+    call("edit", { path: "note.txt", oldText: "ORIGINAL", newText: "SETTLED" }),
+    answer("Edited"),
+  );
+  await f.host.dispatch({ type: "start", sessionId, text: "Make the edit" });
+  const edit = required((await waitFor(f.host, (s) => !!s.pendingApproval)).pendingApproval);
+  await f.host.dispatch({
+    type: "approve",
+    effectId: edit.effectId,
+    digest: edit.digest,
+    decision: "approve",
+  });
+  await waitFor(f.host, (s) => s.outcome?.kind === "completed");
+  steps.push(call("edit", { path: "note.txt", oldText: "SETTLED", newText: "NEVER" }));
+  await f.host.dispatch({ type: "start", sessionId, text: "Pending edit" });
+  const waiting = await waitFor(f.host, (s) => !!s.pendingApproval);
+  await f.host.dispatch({ type: "cancel", runId: required(waiting.run).id });
+  await waitFor(f.host, (s) => s.run === null);
+  await f.host.close();
+  const reopened = await f.reopen();
+  await reopened.dispatch({ type: "load", sessionId, askEachRead: false });
+  expect(f.requests).toHaveLength(3);
+  expect(reopened.getState().permissions).toEqual({ writes: false, checks: false });
+  expect(readFileSync(join(f.workspace, "note.txt"), "utf8")).toBe("SETTLED");
+  await reopened.dispatch({ type: "permissions", sessionId, writes: true, checks: false });
+  steps.push(call("undo", { snapshotId: edit.effectId }), answer("Undone"));
+  await reopened.dispatch({ type: "start", sessionId, text: "Undo the previously settled edit" });
+  const undo = required((await waitFor(reopened, (s) => !!s.pendingApproval)).pendingApproval);
+  await reopened.dispatch({
+    type: "approve",
+    effectId: undo.effectId,
+    digest: undo.digest,
+    decision: "approve",
+  });
+  await waitFor(reopened, (s) => s.outcome?.kind === "completed");
+  expect(readFileSync(join(f.workspace, "note.txt"), "utf8")).toBe("ORIGINAL");
+  expect(f.requests).toHaveLength(5);
+});
+
+it("pages all effects independently of report cards without adding requests", async () => {
+  const events: ModelStreamEvent[] = Array.from(
+    { length: 21 },
+    (_, index) =>
+      ({ ...required(call("read", { path: "note.txt" })[0]), index }) as ModelStreamEvent,
+  );
+  events.push(complete("tool_use"));
+  const f = await fixture([events, answer("Read")]);
+  await f.host.dispatch({ type: "create", workspaceRoot: f.workspace, askEachRead: false });
+  const sessionId = f.host.getState().activeSessionId;
+  await f.host.dispatch({ type: "start", sessionId, text: "Read the fixture repeatedly" });
+  await waitFor(f.host, (s) => s.outcome?.kind === "completed");
+  await f.host.dispatch({ type: "effects", sessionId, offset: 0 });
+  const first = f.host.getState().effects;
+  expect(first.items).toHaveLength(20);
+  expect(first.hasMore).toBe(true);
+  await f.host.dispatch({ type: "effects", sessionId, offset: 20 });
+  const last = f.host.getState().effects;
+  expect(last.items).toHaveLength(1);
+  expect(last.hasMore).toBe(false);
+  expect(new Set([...first.items, ...last.items].map((e) => e.effectId)).size).toBe(21);
+  expect(f.host.getState().artifacts.offset).toBe(0);
+  await f.host.dispatch({ type: "artifacts", sessionId, offset: 0 });
+  expect(f.host.getState().effects).toEqual(last);
+  expect(f.requests).toHaveLength(2);
 });
 
 describe("desktop command validation", () => {

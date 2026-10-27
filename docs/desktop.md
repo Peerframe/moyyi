@@ -3,12 +3,16 @@
 The macOS arm64 desktop opens the existing moyyi runtime. M1's workspace selection, read-only
 conversation, approval, cancellation and history loop is accepted. M2's settings, document
 selection and delivered-report controls passed the external bundle checks and two fixed live
-tasks through the native UI. Final rebuild/restart, CI, merge and owner installation remain
-separate delivery gates; see the M2 PR receipt for final coordinates. These controls require an
-M2 bundle and do not appear in an earlier app merely because the source changed. This is not a
-public release.
+tasks through the native UI. M2 was merged and installed; the [PR #45 delivery receipt](https://github.com/Peerframe/moyyi/pull/45)
+records its final coordinates. M3 adds controlled changes/checks and operation history. Its
+feature acceptance evidence is complete: external-copy/native gates and an independently
+authorized live repair/check/reopen/undo passed. The first live failure and an incorrect extra
+explanation remain recorded below. Final integration and installation coordinates belong in
+[PR #46](https://github.com/Peerframe/moyyi/pull/46). New controls require the corresponding bundle;
+source changes do not update an earlier app. This is not a public release.
 See [ADR 0037](decisions/0037-installed-desktop-client.md),
-[ADR 0038](decisions/0038-desktop-materials-and-reports.md) and the
+[ADR 0038](decisions/0038-desktop-materials-and-reports.md),
+[ADR 0039](decisions/0039-desktop-controlled-workflows.md) and the
 [system overview](system-overview.md) for exact scope and separate evidence.
 
 ## Use
@@ -16,7 +20,8 @@ See [ADR 0037](decisions/0037-installed-desktop-client.md),
 Open `Moyyi.app`, choose **新会话 → 选择工作目录**, and describe the file or question. Send with
 the button or Command+Enter. The selected directory is the read scope, including supported
 document body text. New and reopened sessions are read-only. Report creation requires the
-separate explicit selection described below; shell, web, edit and undo remain unavailable.
+separate explicit selection described below. M3 file changes and Node checks require their own
+explicit grants; web access remains unavailable.
 The default is DeepSeek Flash through Responses, reasoning low, at most3 requests per turn,
 120 seconds,8192 output tokens and zero automatic retries. Reopening, selecting a directory
 and loading history make no model request.
@@ -32,8 +37,8 @@ The left sidebar lists recorded sessions. Reopening loads their existing history
 repeating effects or approvals. The current chosen approval setting applies, not old authority.
 Large histories are displayed with explicit truncation; full transcripts remain in the store.
 The conversation displays at most100 recent messages and a bounded text projection. Full
-transcript browsing, rich Markdown, image preview, external document import and edit/undo controls
-remain outside M2. Selecting files does not upload them or read their body into the model.
+transcript browsing, rich Markdown, image preview and external document import remain outside
+this client. Selecting files does not upload them or read their body into the model.
 
 ## M2 candidate: settings, materials and reports
 
@@ -72,6 +77,57 @@ Receipt pages follow the underlying20-effect history, so an empty report page ca
 next page. File existence, matching bytes and a completed turn do not prove report accuracy;
 check its claims, citations and coverage against the materials.
 
+## M3 candidate: changes, checks and recovery
+
+These controls have bounded functional/recovery acceptance evidence. Final integration and daily
+installation coordinates belong in the [PR #46 receipt](https://github.com/Peerframe/moyyi/pull/46).
+Open **会话权限** in an idle session. **允许提议文件修改** and **允许提议 Node 命令检查** are independent
+and initially off. Confirm the selected workspace in the native dialog; cancelling keeps the
+current permissions. File changes use snapshot-backed create/edit/undo and each operation still
+requires its own displayed preview and digest-bound approval. Node checks run with a read-only
+workspace and no network; they cannot install dependencies or modify project files.
+
+Changing these grants clears the single report target. Selecting a report target closes both
+broader grants. New/reopened sessions and model-configuration changes reset them to off. If work
+is running, stop and wait for cleanup before changing permissions. Stopping keeps the recorded
+results and does not undo completed changes.
+
+The **操作记录** panel shows every effect on a20-record page, including failed, denied, cancelled
+and unknown outcomes. Lists longer than12 initially show the first three and last six, with an
+explicit expansion. Unknown never means success; losing a response does not justify resubmitting
+an action. A command receipt reports termination/exit code/truncation, not task correctness.
+**核对当前文件** compares actual bytes with the selected file receipt. A match is only a statement
+about bytes at that check, not mode or guaranteed undo readiness. Expected absence after undo is
+shown separately from a missing file that should exist.
+
+**准备检查** and **准备撤销** only append editable text to the composer. Existing draft text is kept;
+neither button starts a model call or executes a command. Review the request, enable the needed
+grant and send it using the ordinary model budget. Undo uses the selected successful receipt's
+actual snapshot ID; approve its newly prepared action separately. For several changes, prepare
+the relevant snapshots in reverse order and inspect the request before sending. Changed bytes or
+mode can prevent undo. A missing/unknown receipt cannot prepare a snapshot undo.
+
+Reopening restores history and explains that old permissions/approvals are not restored. It does
+not replay interrupted actions. An interrupted started command may remain `unknown` and retain
+the workspace lease: read-only inspection can continue, but later changes may be protectively
+blocked even after re-enabling writes. Inspection does not release that lease. There is no force
+retry or automatic unlock control. Cancelling a pending approval is different: settled earlier
+edits can still be requested for undo after reopening and explicitly re-enabling writes.
+History alone does not prove a file is unchanged or a check passed. Original task standards and
+budgets remain unchanged; component tests are separate from installed workflow acceptance.
+
+M3 passed external-copy and instrumented native interaction gates with synthetic providers.
+A separately authorized live pair then repaired the unchanged listener-leak task, ran its fixed
+Node check, reopened with grants reset and undid both actual snapshots in reverse order, restoring
+original bytes/mode. It used5 repair and3 undo requests within its own shared12-request ceiling,
+with zero retries. Final source check passed131 files/2644 tests.
+
+This establishes the bounded functional/recovery workflow, not an error-free explanation: the
+repair answer incorrectly claimed that a null `removeEventListener` callback throws in real DOM.
+The first live repair failure also remains sealed. The [delivery record](tasks/2026-10-26-optimization-plan.md)
+preserves both groups and the correction; final integration/installation coordinates belong in
+[PR #46](https://github.com/Peerframe/moyyi/pull/46).
+
 ## Demonstrated M1 acceptance
 
 The external macOS arm64 app completed one real Flash task through the visible native UI:
@@ -109,7 +165,8 @@ synthetic requests, four production-worker settings cases, and parser containmen
 saved/reopened a4-request setting with zero credential reads/writes or network attempts. A
 separate native helper probe passed synthetic UUID add/status/read/delete/missing checks without
 changing existing credentials. A later preview-scroll polish passed six renderer tests and
-desktop typecheck; final rebuilt-app restart and integration are still pending in the PR receipt.
+desktop typecheck; final rebuild/restart, integration and installation are recorded in the
+[PR #45 receipt](https://github.com/Peerframe/moyyi/pull/45).
 
 ## Connection and storage
 
@@ -164,10 +221,10 @@ compiled host, checks real files/SQLite/approval/recovery, the packaged worker a
 parser containment canary with synthetic model responses. It never uses an API key. This gate
 does not replace visible GUI testing, paid task-quality checks or the original fixed tasks.
 
-M2's external-copy, native-control and two original live-task checks passed as recorded above.
-Complete the final frozen rebuild/restart, CI, merge and owner installation before treating the
-candidate as the installed daily version. The PR delivery receipt records those final identities
-and outcomes; earlier acceptance is not evidence that a later package was installed.
+M2's external-copy, native-control, live-task and final installation evidence is recorded above
+and in its PR receipt. M3's functional/recovery evidence is recorded above; its final package,
+CI, merge and daily installation coordinates belong in [PR #46](https://github.com/Peerframe/moyyi/pull/46).
+Source evidence alone does not establish installation of a later package.
 
 Before installing, close both clients, back up the session/configuration directories, preserve
 the prior CLI tarball and any previous app, then copy the verified app to `~/Applications`.

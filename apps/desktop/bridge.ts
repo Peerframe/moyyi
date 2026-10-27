@@ -81,10 +81,15 @@ export class DesktopProcess {
     if (this.state) {
       this.state = {
         ...this.state,
+        status: "closed",
         connection: { ready: false, message },
         error: message,
         run: null,
         pendingApproval: null,
+        permissions: { writes: false, checks: false },
+        reportTarget: null,
+        artifactPreview: null,
+        effectInspection: null,
       };
       onState(this.state);
     }

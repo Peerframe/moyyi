@@ -14,6 +14,10 @@ and `styles.css` adapts a small presentation/token subset, at the same fixed com
 and the identity-only action pattern from `apps/web/src/components/ArtifactCard.tsx` and
 `apps/web/src/artifact-shell-save.ts` at that commit. Its receipt/hash inspection, in-app text
 preview and Finder request use moyyi's new local host boundary rather than the upstream Server.
+`apps/desktop/renderer/EffectsPanel.tsx` and `effects-state.ts` narrowly adapt the long-list
+folding and row presentation from `apps/web/src/components/TaskSteps.tsx` at that commit. Their
+record identities, actual effect states, receipt inspection and draft-only undo are moyyi code;
+the upstream progress-fetch lifecycle and Server types are not imported.
 Bot/channel DTOs, Server authority and the old runtime are not imported. The desktop distribution
 also carries `apps/desktop/renderer/OPENBOT-LICENSE.txt` under its Resources/licenses directory.
 The source and fixtures are licensed under MIT:

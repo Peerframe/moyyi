@@ -95,7 +95,7 @@ try {
 
   const fixture = join(appDirectory, ".verification");
   mkdirSync(fixture);
-  for (const name of ["host.mjs", "host-m2.mjs", "production-settings.mjs"]) {
+  for (const name of ["host.mjs", "host-m2.mjs", "host-m3.mjs", "production-settings.mjs"]) {
     copyFileSync(join(repository, "scripts/desktop-fixtures", name), join(fixture, name));
   }
   for (const name of ["document-confinement.mjs", "document-confinement-runner.mjs"]) {
@@ -148,6 +148,23 @@ try {
   assert.equal(materialsAndReports.syntheticRequests, 7);
   assert.equal(materialsAndReports.credentialReads, 0);
   assert.equal(materialsAndReports.liveModel, false);
+  const changesWorkspace = join(temporary, "changes-workspace");
+  mkdirSync(changesWorkspace);
+  const editsAndRecovery = JSON.parse(
+    run(node, [
+      "--no-experimental-strip-types",
+      join(fixture, "host-m3.mjs"),
+      changesWorkspace,
+      join(temporary, "m3-private"),
+    ]),
+  );
+  assert.equal(editsAndRecovery.passed, true);
+  assert.equal(editsAndRecovery.count, 10);
+  assert.equal(editsAndRecovery.cases.length, editsAndRecovery.count);
+  assert.equal(editsAndRecovery.syntheticRequests, 33);
+  assert.equal(editsAndRecovery.credentialReads, 0);
+  assert.equal(editsAndRecovery.networkAttempts, 0);
+  assert.equal(editsAndRecovery.liveModel, false);
   const settingsWorkspace = join(temporary, "settings-workspace");
   mkdirSync(settingsWorkspace);
   const productionSettings = JSON.parse(
@@ -187,6 +204,7 @@ try {
         runtime: manifest.runtime,
         host,
         materialsAndReports,
+        editsAndRecovery,
         productionSettings,
         confinement,
         outsideCheckout: true,

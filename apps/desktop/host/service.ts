@@ -9,18 +9,25 @@ import type {
   SessionId,
   TranscriptEntry,
 } from "moyyi/contracts";
-import { createRuntime, ReadOnlyPolicy, type Runtime, type RuntimeOptions } from "moyyi/runtime";
+import {
+  createRuntime,
+  discoverNodeToolchain,
+  type Runtime,
+  type RuntimeOptions,
+} from "moyyi/runtime";
 import {
   DEFAULT_DESKTOP_SETTINGS,
   type DesktopApproval,
   type DesktopCommand,
   type DesktopMessage,
+  type DesktopPermissions,
   type DesktopSessionSummary,
   type DesktopSettings,
   type DesktopState,
 } from "../shared.ts";
+import { inspectEffectFile } from "./effects.ts";
 import { FileBoundaryError, inspectMaterials } from "./materials.ts";
-import { ReportPolicy } from "./report-policy.ts";
+import { DesktopPolicy } from "./permissions.ts";
 import { inspectReport, reportTarget } from "./reports.ts";
 import { parseDesktopCommand } from "./validation.ts";
 
@@ -74,6 +81,7 @@ class Host implements DesktopHost {
   private options: RuntimeOptions;
   private readonly configure: DesktopHostOptions["configure"];
   private refresh: Promise<void> | undefined;
+  private resultsDestination: "both" | "artifacts" | "effects" = "both";
 
   constructor(
     options: RuntimeOptions,
@@ -87,6 +95,10 @@ class Host implements DesktopHost {
       settings: display.settings ?? DEFAULT_DESKTOP_SETTINGS,
       materials: [],
       reportTarget: null,
+      permissions: { writes: false, checks: false },
+      openedHistory: false,
+      effects: { items: [], offset: 0, hasMore: false },
+      effectInspection: null,
       artifacts: { items: [], offset: 0, hasMore: false },
       artifactPreview: null,
       sessions: { items: [], offset: 0, hasMore: false },
@@ -139,14 +151,18 @@ class Host implements DesktopHost {
     throw Error(message);
   }
 
-  private async open(askEachRead: boolean, target: string | null = null): Promise<void> {
+  private async open(
+    askEachRead: boolean,
+    target: string | null = null,
+    permissions: DesktopPermissions = { writes: false, checks: false },
+  ): Promise<void> {
     if (this.runtime) {
       await this.runtime.close();
       this.unsubscribe?.();
       this.runtime = undefined;
     }
     if (this.state.status !== "ready") throw Error("Desktop host is closing");
-    // Connection composition never supplies effect grants; only the picked report target can.
+    // Connection composition never supplies effect grants; only explicit desktop actions can.
     const {
       policy: _policy,
       workspaceWrites: _writes,
@@ -157,14 +173,20 @@ class Host implements DesktopHost {
     } = this.options;
     const runtime = await createRuntime({
       ...base,
-      ...(target && this.state.workspaceRoot
+      ...((target || permissions.writes) && this.state.workspaceRoot
         ? { workspaceWrites: { roots: [this.state.workspaceRoot], approval: "ask" as const } }
         : {}),
-      policy: target
-        ? new ReportPolicy(target, askEachRead)
-        : new ReadOnlyPolicy({
-            requireApproval: askEachRead ? ["read", "list", "search", "read_document"] : [],
-          }),
+      ...(permissions.checks && this.state.workspaceRoot
+        ? {
+            workspaceProcesses: {
+              roots: [this.state.workspaceRoot],
+              approval: "ask" as const,
+              workspaceAccess: "read-only" as const,
+              ...(await discoverNodeToolchain()),
+            },
+          }
+        : {}),
+      policy: new DesktopPolicy(permissions, askEachRead, target),
     });
     if (this.state.status !== "ready") {
       await runtime.close();
@@ -178,6 +200,7 @@ class Host implements DesktopHost {
     this.update({
       askEachRead,
       reportTarget: target,
+      permissions,
       error: this.pluginWarning,
     });
   }
@@ -243,10 +266,14 @@ class Host implements DesktopHost {
     return this.state.workspaceRoot;
   }
 
-  private async refreshArtifacts(offset: number): Promise<void> {
+  private async refreshArtifacts(
+    offset: number,
+    destination: "both" | "artifacts" | "effects" = "both",
+  ): Promise<void> {
     if (!this.state.activeSessionId || !this.runtime) return;
     await this.runtime.idle();
     if (this.state.status !== "ready") return;
+    this.resultsDestination = destination;
     await this.send({
       type: "session.results",
       sessionId: this.state.activeSessionId as SessionId,
@@ -294,6 +321,7 @@ class Host implements DesktopHost {
       streamText: "",
       historyTruncated: false,
       artifactPreview: null,
+      effectInspection: null,
       pendingApproval: null,
     });
     try {
@@ -349,7 +377,9 @@ class Host implements DesktopHost {
       if (
         !this.runtime ||
         command.askEachRead !== this.state.askEachRead ||
-        this.state.reportTarget !== null
+        this.state.reportTarget !== null ||
+        this.state.permissions.writes ||
+        this.state.permissions.checks
       )
         await this.open(command.askEachRead);
       this.approvals.clear();
@@ -366,6 +396,10 @@ class Host implements DesktopHost {
         outcome: null,
         materials: [],
         reportTarget: null,
+        permissions: { writes: false, checks: false },
+        openedHistory: command.type === "load",
+        effects: { items: [], offset: 0, hasMore: false },
+        effectInspection: null,
         artifacts: { items: [], offset: 0, hasMore: false },
         artifactPreview: null,
       });
@@ -391,7 +425,13 @@ class Host implements DesktopHost {
       await this.runtime?.close();
       this.unsubscribe?.();
       this.runtime = undefined;
-      this.update({ reportTarget: null, pendingApproval: null, artifactPreview: null });
+      this.update({
+        reportTarget: null,
+        permissions: { writes: false, checks: false },
+        pendingApproval: null,
+        artifactPreview: null,
+        effectInspection: null,
+      });
       let saved = false;
       try {
         const configured = await this.configure(command.settings, command.apiKey);
@@ -455,6 +495,45 @@ class Host implements DesktopHost {
       }
       return;
     }
+    if (command.type === "permissions") {
+      this.selected(command.sessionId);
+      this.update({
+        reportTarget: null,
+        permissions: { writes: false, checks: false },
+        pendingApproval: null,
+        effectInspection: null,
+      });
+      try {
+        await this.open(this.state.askEachRead, null, {
+          writes: command.writes,
+          checks: command.checks,
+        });
+        await this.reloadSelected();
+      } catch {
+        this.update({ permissions: { writes: false, checks: false } });
+        if (this.state.status === "ready") {
+          await this.open(this.state.askEachRead);
+          await this.reloadSelected();
+        }
+        throw new BoundaryError(
+          "Desktop permissions could not be enabled; no effect permissions were retained",
+        );
+      }
+      return;
+    }
+    if (command.type === "effects") {
+      this.selected(command.sessionId);
+      await this.refreshArtifacts(command.offset, "effects");
+      return;
+    }
+    if (command.type === "effect.inspect") {
+      const workspace = this.selected(command.sessionId);
+      this.update({ effectInspection: null });
+      const effect = this.state.effects.items.find((item) => item.effectId === command.effectId);
+      if (!effect) throw new BoundaryError("Select a recorded operation first");
+      this.update({ effectInspection: inspectEffectFile(workspace, effect, this.excluded()) });
+      return;
+    }
     if (command.type === "materials") {
       const workspace = this.selected(command.sessionId);
       if (command.paths.length)
@@ -478,7 +557,7 @@ class Host implements DesktopHost {
     }
     if (command.type === "artifacts") {
       this.selected(command.sessionId);
-      await this.refreshArtifacts(command.offset);
+      await this.refreshArtifacts(command.offset, "artifacts");
       return;
     }
     if (command.type === "artifact.close") {
@@ -719,6 +798,7 @@ class Host implements DesktopHost {
           outcome: null,
           streamText: "",
           artifactPreview: null,
+          effectInspection: null,
         });
         break;
       case "assistant.delta":
@@ -731,6 +811,28 @@ class Host implements DesktopHost {
       case "effect.updated":
         if (event.effect.runId !== this.state.run?.id) return;
         this.effectRuns.set(event.effect.id, event.effect.runId);
+        if (this.state.effects.offset === 0) {
+          const previous = this.state.effects.items;
+          const projected = {
+            effectId: event.effect.id,
+            runId: event.effect.runId,
+            tool: event.effect.tool,
+            state: event.effect.state,
+            updatedAt: event.effect.updatedAt,
+            receipt: null,
+          };
+          const items = [
+            projected,
+            ...previous.filter((item) => item.effectId !== projected.effectId),
+          ];
+          this.update({
+            effects: {
+              offset: 0,
+              hasMore: this.state.effects.hasMore || items.length > 20,
+              items: items.slice(0, 20),
+            },
+          });
+        }
         if (event.effect.state !== "awaiting_approval") {
           this.approvals.delete(event.effect.id);
           this.update({ pendingApproval: this.approvals.values().next().value ?? null });
@@ -742,7 +844,7 @@ class Host implements DesktopHost {
           effectId: event.effectId,
           digest: event.digest,
           summary: clip(event.summary),
-          ...(event.preview === undefined ? {} : { preview: clip(event.preview, 131_072) }),
+          ...(event.preview === undefined ? {} : { preview: event.preview }),
         });
         this.update({ pendingApproval: this.approvals.values().next().value ?? null });
         break;
@@ -782,27 +884,41 @@ class Host implements DesktopHost {
         )
           return;
         this.update({
-          artifacts: {
-            offset: event.page.offset,
-            hasMore: event.page.hasMore,
-            items: event.page.effects.flatMap((effect) =>
-              effect.tool === "create" &&
-              effect.state === "succeeded" &&
-              effect.receipt?.kind === "file" &&
-              effect.receipt.beforeHash === null &&
-              effect.receipt.afterHash !== null
-                ? [
-                    {
-                      effectId: effect.effectId,
-                      path: effect.receipt.path,
-                      afterHash: effect.receipt.afterHash,
-                      state: "unchecked" as const,
-                    },
-                  ]
-                : [],
-            ),
-          },
-          artifactPreview: null,
+          ...(this.resultsDestination !== "artifacts"
+            ? {
+                effects: {
+                  offset: event.page.offset,
+                  hasMore: event.page.hasMore,
+                  items: event.page.effects,
+                },
+                effectInspection: null,
+              }
+            : {}),
+          ...(this.resultsDestination !== "effects"
+            ? {
+                artifacts: {
+                  offset: event.page.offset,
+                  hasMore: event.page.hasMore,
+                  items: event.page.effects.flatMap((effect) =>
+                    effect.tool === "create" &&
+                    effect.state === "succeeded" &&
+                    effect.receipt?.kind === "file" &&
+                    effect.receipt.beforeHash === null &&
+                    effect.receipt.afterHash !== null
+                      ? [
+                          {
+                            effectId: effect.effectId,
+                            path: effect.receipt.path,
+                            afterHash: effect.receipt.afterHash,
+                            state: "unchecked" as const,
+                          },
+                        ]
+                      : [],
+                  ),
+                },
+                artifactPreview: null,
+              }
+            : {}),
         });
         break;
     }
@@ -819,7 +935,14 @@ class Host implements DesktopHost {
         this.unsubscribe?.();
         this.runtime = undefined;
         this.approvals.clear();
-        this.update({ status: "closed", run: null, pendingApproval: null });
+        this.update({
+          status: "closed",
+          run: null,
+          pendingApproval: null,
+          reportTarget: null,
+          permissions: { writes: false, checks: false },
+          effectInspection: null,
+        });
         this.listeners.clear();
       }
     })();

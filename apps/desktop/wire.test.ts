@@ -8,6 +8,10 @@ const state: DesktopState = {
   settings: { preset: "flash", maxRequests: 3, timeoutMs: 120_000 },
   materials: [],
   reportTarget: null,
+  permissions: { writes: false, checks: false },
+  openedHistory: false,
+  effects: { items: [], offset: 0, hasMore: false },
+  effectInspection: null,
   artifacts: { items: [], offset: 0, hasMore: false },
   artifactPreview: null,
   sessions: { items: [], offset: 0, hasMore: false },
@@ -25,6 +29,78 @@ const state: DesktopState = {
   error: null,
 };
 describe("desktop wire data", () => {
+  it("preserves unknown effects, exact receipts and expected absence without accepting authority", () => {
+    const effect = {
+      effectId: "effect_1",
+      runId: "run_1",
+      tool: "undo",
+      state: "succeeded",
+      updatedAt: "2026-10-27T00:00:00Z",
+      receipt: {
+        kind: "file",
+        path: "report.md",
+        snapshotId: "effect_1",
+        beforeHash: "a".repeat(64),
+        afterHash: null,
+      },
+    };
+    const candidate = {
+      ...state,
+      permissions: { writes: true, checks: true },
+      openedHistory: true,
+      effects: {
+        items: [
+          effect,
+          { ...effect, effectId: "effect_2", tool: "shell", state: "unknown", receipt: null },
+        ],
+        offset: 20,
+        hasMore: true,
+      },
+      effectInspection: {
+        effectId: "effect_1",
+        path: "report.md",
+        state: "absent",
+        expectedHash: null,
+        actualHash: null,
+      },
+    };
+    expect(isDesktopState(candidate)).toBe(true);
+    for (const changed of [
+      { permissions: { writes: true, checks: true, remembered: true } },
+      { openedHistory: "replayed" },
+      { effects: { ...candidate.effects, items: Array(21).fill(effect) } },
+      { effects: { ...candidate.effects, items: [{ ...effect, state: "complete" }] } },
+      {
+        effects: {
+          ...candidate.effects,
+          items: [{ ...effect, receipt: { ...effect.receipt, apply: "now" } }],
+        },
+      },
+      { effectInspection: { ...candidate.effectInspection, actualHash: "bad" } },
+    ])
+      expect(isDesktopState({ ...candidate, ...changed })).toBe(false);
+    const process = { kind: "process", exitCode: 1, termination: "exited", outputTruncated: true };
+    expect(
+      isDesktopState({
+        ...state,
+        effects: {
+          items: [{ ...effect, tool: "shell", state: "failed", receipt: process }],
+          offset: 0,
+          hasMore: false,
+        },
+      }),
+    ).toBe(true);
+    expect(
+      isDesktopState({
+        ...state,
+        effects: {
+          items: [{ ...effect, receipt: { ...process, exitCode: 0.5 } }],
+          offset: 0,
+          hasMore: false,
+        },
+      }),
+    ).toBe(false);
+  });
   it("accepts only the bounded display projection, including partial/denied states", () => {
     expect(isDesktopState(state)).toBe(true);
     expect(

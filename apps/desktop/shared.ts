@@ -30,6 +30,41 @@ export interface DesktopArtifactPreview {
   readonly truncated: boolean;
 }
 
+/** Ephemeral host grants; opening history never restores these permissions. */
+export interface DesktopPermissions {
+  readonly writes: boolean;
+  readonly checks: boolean;
+}
+export interface DesktopEffect {
+  readonly effectId: string;
+  readonly runId: string;
+  readonly tool: string;
+  readonly state: string;
+  readonly updatedAt: string;
+  readonly receipt:
+    | {
+        readonly kind: "file";
+        readonly path: string;
+        readonly snapshotId: string;
+        readonly beforeHash: string | null;
+        readonly afterHash: string | null;
+      }
+    | {
+        readonly kind: "process";
+        readonly exitCode: number | null;
+        readonly termination: string;
+        readonly outputTruncated: boolean;
+      }
+    | null;
+}
+export interface DesktopEffectInspection {
+  readonly effectId: string;
+  readonly path: string;
+  readonly state: "current" | "changed" | "missing" | "absent" | "unavailable";
+  readonly expectedHash: string | null;
+  readonly actualHash: string | null;
+}
+
 /** Desktop projections contain display data, never a runtime, credential or raw transcript. */
 export interface DesktopMessage {
   readonly id: string;
@@ -59,6 +94,14 @@ export interface DesktopState {
   readonly settings: DesktopSettings;
   readonly materials: readonly DesktopMaterial[];
   readonly reportTarget: string | null;
+  readonly permissions: DesktopPermissions;
+  readonly openedHistory: boolean;
+  readonly effects: {
+    readonly items: readonly DesktopEffect[];
+    readonly offset: number;
+    readonly hasMore: boolean;
+  };
+  readonly effectInspection: DesktopEffectInspection | null;
   readonly artifacts: {
     readonly items: readonly DesktopArtifact[];
     readonly offset: number;
@@ -106,6 +149,14 @@ export type DesktopCommand =
       readonly decision: "approve" | "deny";
     }
   | { readonly type: "configure"; readonly settings: DesktopSettings; readonly apiKey?: string }
+  | {
+      readonly type: "permissions";
+      readonly sessionId: string;
+      readonly writes: boolean;
+      readonly checks: boolean;
+    }
+  | { readonly type: "effects"; readonly sessionId: string; readonly offset: number }
+  | { readonly type: "effect.inspect"; readonly sessionId: string; readonly effectId: string }
   | { readonly type: "materials"; readonly sessionId: string; readonly paths: readonly string[] }
   | { readonly type: "material.remove"; readonly sessionId: string; readonly path: string }
   | { readonly type: "report.target"; readonly sessionId: string; readonly path: string | null }
@@ -117,7 +168,9 @@ export type DesktopCommand =
 
 export type DesktopAction = Exclude<
   DesktopCommand,
-  { readonly type: "create" | "close" | "configure" | "materials" | "report.target" }
+  {
+    readonly type: "create" | "close" | "configure" | "materials" | "report.target" | "permissions";
+  }
 >;
 
 /** Promise resolution acknowledges handling; run/outcome events determine actual completion. */
@@ -132,6 +185,9 @@ export interface DesktopBridge {
   }): Promise<DesktopState>;
   selectDocuments(options: { readonly sessionId: string }): Promise<DesktopState>;
   selectReportTarget(options: { readonly sessionId: string }): Promise<DesktopState>;
+  configurePermissions(
+    options: DesktopPermissions & { readonly sessionId: string },
+  ): Promise<DesktopState>;
   revealArtifact(options: {
     readonly sessionId: string;
     readonly effectId: string;

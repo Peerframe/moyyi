@@ -8,8 +8,11 @@ import type {
 } from "../shared.ts";
 import { ApprovalCard } from "./ApprovalCard.tsx";
 import { ArtifactsPanel } from "./ArtifactsPanel.tsx";
+import { EffectsPanel } from "./EffectsPanel.tsx";
+import { appendReviewDraft, CHECK_DRAFT, permissionLabel } from "./effects-state.ts";
 import { MaterialsPanel } from "./MaterialsPanel.tsx";
 import { MessageList } from "./MessageList.tsx";
+import { PermissionsDialog } from "./PermissionsDialog.tsx";
 import { SessionSidebar } from "./SessionSidebar.tsx";
 import { SettingsDialog } from "./SettingsDialog.tsx";
 import { presetLabel } from "./settings-state.ts";
@@ -29,7 +32,9 @@ export function App({ bridge }: { bridge: DesktopBridge }) {
   const [askEachRead, setAskEachRead] = useState(false);
   const [draft, setDraft] = useState("");
   const [settingsOpen, setSettingsOpen] = useState(false);
+  const [permissionsOpen, setPermissionsOpen] = useState(false);
   const gate = useRef(createActionGate());
+  const composer = useRef<HTMLTextAreaElement>(null);
   const scrollArea = useRef<HTMLDivElement>(null);
   const followOutput = useRef(true);
   const mounted = useRef(true);
@@ -100,6 +105,7 @@ export function App({ bridge }: { bridge: DesktopBridge }) {
       state.run ||
       !state.connection.ready ||
       settingsOpen ||
+      permissionsOpen ||
       newSession ||
       !draft.trim()
     )
@@ -126,6 +132,18 @@ export function App({ bridge }: { bridge: DesktopBridge }) {
 
   function act(command: DesktopAction) {
     void perform(() => bridge.act(command));
+  }
+
+  function prepareDraft(text: string) {
+    if (!state?.activeSessionId || state.run || pending || state.status !== "ready") return;
+    const next = appendReviewDraft(draft, text);
+    if (next.length > 16_000) {
+      setViewError("当前草稿太长，请先整理内容后再准备新的请求。");
+      return;
+    }
+    setDraft(next);
+    setViewError(null);
+    composer.current?.focus();
   }
 
   async function artifactAction(artifact: DesktopArtifact, reveal: boolean) {
@@ -156,7 +174,12 @@ export function App({ bridge }: { bridge: DesktopBridge }) {
   const configuring = newSession || !state.activeSessionId;
   const error = viewError ?? state.error;
   const canSend =
-    !busy && !configuring && !settingsOpen && state.connection.ready && draft.trim().length > 0;
+    !busy &&
+    !configuring &&
+    !settingsOpen &&
+    !permissionsOpen &&
+    state.connection.ready &&
+    draft.trim().length > 0;
   const requestBudget =
     state.budgets.maxRequests === null
       ? "请求预算尚未加载"
@@ -194,6 +217,11 @@ export function App({ bridge }: { bridge: DesktopBridge }) {
             </p>
           </div>
           <div className="header-actions">
+            {!configuring ? (
+              <button type="button" disabled={busy} onClick={() => setPermissionsOpen(true)}>
+                会话权限
+              </button>
+            ) : null}
             <button type="button" disabled={busy} onClick={() => setSettingsOpen(true)}>
               模型设置
             </button>
@@ -208,9 +236,9 @@ export function App({ bridge }: { bridge: DesktopBridge }) {
           {presetLabel(state.settings.preset)} · low · {requestBudget} ·{" "}
           {state.settings.timeoutMs / 1000} 秒 · 输出 8192 tokens · 重试 0 次
           <br />
-          {!configuring && state.reportTarget
-            ? `可读工作目录；仅可审批创建报告：${state.reportTarget} · 不执行命令、不访问网页`
-            : "只读所选工作目录 · 不写入文件、不执行命令、不访问网页"}
+          {configuring
+            ? "只读所选工作目录 · 不写入文件、不执行命令、不访问网页"
+            : permissionLabel(state.permissions, state.reportTarget)}
           {!configuring ? ` · ${state.askEachRead ? "工具读取逐次审批" : "工具读取已授权"}` : ""}
         </p>
         {!state.connection.ready ? (
@@ -263,9 +291,16 @@ export function App({ bridge }: { bridge: DesktopBridge }) {
               </section>
             ) : (
               <>
+                {state.openedHistory ? (
+                  <p className="history-notice" role="status">
+                    已打开历史会话。打开时已关闭文件修改与命令检查权限，历史动作不会自动重放。
+                    当前权限以上方状态为准；已停止不代表已撤销，结果未知时需先检查。
+                  </p>
+                ) : null}
                 <MaterialsPanel
                   materials={state.materials}
                   reportTarget={state.reportTarget}
+                  permissions={state.permissions}
                   busy={busy}
                   running={state.run !== null}
                   onSelect={() =>
@@ -314,6 +349,31 @@ export function App({ bridge }: { bridge: DesktopBridge }) {
                     {outcomeLabel(state.outcome)}
                   </p>
                 ) : null}
+                <div className="check-entry">
+                  <button type="button" disabled={busy} onClick={() => prepareDraft(CHECK_DRAFT)}>
+                    准备检查
+                  </button>
+                  <span className="panel-note">
+                    只填入可编辑请求，发送后使用模型预算；命令检查需另行授权和批准。
+                  </span>
+                </div>
+                <EffectsPanel
+                  sessionId={state.activeSessionId as string}
+                  effects={state.effects}
+                  inspection={state.effectInspection}
+                  busy={busy}
+                  onPage={(offset) =>
+                    act({ type: "effects", sessionId: state.activeSessionId as string, offset })
+                  }
+                  onInspect={(effectId) =>
+                    act({
+                      type: "effect.inspect",
+                      sessionId: state.activeSessionId as string,
+                      effectId,
+                    })
+                  }
+                  onDraft={prepareDraft}
+                />
                 <ArtifactsPanel
                   artifacts={state.artifacts}
                   preview={state.artifactPreview}
@@ -339,6 +399,7 @@ export function App({ bridge }: { bridge: DesktopBridge }) {
           <div className="compose-column">
             <div className="composer-box">
               <textarea
+                ref={composer}
                 aria-label="任务内容"
                 placeholder={configuring ? "先选择工作目录" : "描述你想分析的问题…"}
                 value={draft}
@@ -376,7 +437,9 @@ export function App({ bridge }: { bridge: DesktopBridge }) {
                 )}
               </div>
             </div>
-            <p className="composer-footer">回答需结合来源核对；停止不会删除已经收到的内容。</p>
+            <p className="composer-footer">
+              回答需结合来源核对；停止保留记录，也不会撤销已经完成的修改。
+            </p>
           </div>
         </form>
       </main>
@@ -392,6 +455,26 @@ export function App({ bridge }: { bridge: DesktopBridge }) {
             return result;
           }}
           onClose={() => setSettingsOpen(false)}
+        />
+      ) : null}
+      {permissionsOpen && state.activeSessionId && state.workspaceRoot ? (
+        <PermissionsDialog
+          key={state.activeSessionId}
+          workspace={state.workspaceRoot}
+          permissions={state.permissions}
+          onConfigure={async (permissions) => {
+            const result = await perform(
+              () =>
+                bridge.configurePermissions({
+                  sessionId: state.activeSessionId as string,
+                  ...permissions,
+                }),
+              "未能确认权限变更，请核对当前状态。",
+            );
+            if (!result) throw Error("未能确认权限变更。");
+            return result.permissions;
+          }}
+          onClose={() => setPermissionsOpen(false)}
         />
       ) : null}
     </div>

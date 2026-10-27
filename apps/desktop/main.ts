@@ -134,7 +134,11 @@ else {
         trusted(event);
         const command = parseDesktopCommand(value);
         if (selecting) throw Error("请先完成或取消当前选择。 ");
-        if (["create", "close", "configure", "materials", "report.target"].includes(command.type))
+        if (
+          ["create", "close", "configure", "materials", "report.target", "permissions"].includes(
+            command.type,
+          )
+        )
           throw Error("此操作只能从原生入口发起。");
         return host.send(command);
       });
@@ -199,6 +203,46 @@ else {
         if (selecting) throw Error("请先完成或取消当前选择。 ");
         const command = parseDesktopCommand({ ...value, type: "configure" });
         return host.send(command);
+      });
+      ipcMain.handle("moyyi:permissions", async (event, value: unknown) => {
+        trusted(event);
+        if (
+          !value ||
+          typeof value !== "object" ||
+          Array.isArray(value) ||
+          Object.keys(value).some((key) => !["sessionId", "writes", "checks"].includes(key))
+        )
+          throw Error("Invalid workspace permissions");
+        const command = parseDesktopCommand({ ...value, type: "permissions" });
+        if (command.type !== "permissions") throw Error("Invalid workspace permissions");
+        const state = await currentSession(command.sessionId);
+        selecting = true;
+        try {
+          if (command.writes || command.checks) {
+            const result = await dialog.showMessageBox(ownedWindow, {
+              type: "question",
+              title: "确认当前工作目录的权限",
+              message: "只对当前打开的会话启用以下权限？",
+              detail: `${state.workspaceRoot}\n\n${command.writes ? "文件修改：可在整个工作目录内创建、编辑和撤销，每次操作都需审批。" : "文件修改：关闭。"}\n${command.checks ? "命令检查：使用原生沙箱和附带的 Node；工作目录只读，无网络，每次命令都需审批。命令不提供快照撤销。" : "命令检查：关闭。"}\n\n受保护文件仍不可访问。重开会话或修改模型设置会关闭这些权限；已有报告目标将清除。停止任务不会撤销已经完成的修改。`,
+              buttons: ["取消", "启用所选权限"],
+              defaultId: 0,
+              cancelId: 0,
+              noLink: true,
+            });
+            if (result.response !== 1) return host.getState();
+          }
+          const current = await host.getState();
+          if (
+            current.status !== "ready" ||
+            current.run ||
+            current.activeSessionId !== command.sessionId ||
+            current.workspaceRoot !== state.workspaceRoot
+          )
+            throw Error("会话已变化，请重新确认权限。");
+          return host.send(command);
+        } finally {
+          selecting = false;
+        }
       });
       ipcMain.handle("moyyi:documents", async (event, value: unknown) => {
         trusted(event);

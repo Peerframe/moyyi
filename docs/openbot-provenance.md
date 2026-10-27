@@ -41,7 +41,8 @@ write tools were synthetic; phase 2 introduces an explicit runtime write grant. 
 | `src/runtime/document-worker.ts` | `apps/server-python/src/openbot_server/parser_worker.ts` (`adaptPdf`, `adaptOffice`, input/output bounds and failure cases) | `010439bb9002fabb7e1facd8450ee85edbafa309` | Narrowly adapted parsing methods only; new runtime/plugin/sandbox/FD reader. MIT notice retained. |
 | `src/runtime/fixtures/{encrypted,image-only}.pdf` | `tests/oracles/legacy-server/src/__fixtures__/attachments/` | `010439bb9002fabb7e1facd8450ee85edbafa309` | Fixed synthetic binary inputs, newly exercised against moyyi; old test results are not evidence. |
 | `apps/desktop/renderer/ApprovalCard.tsx`, `styles.css` | `apps/web/src/components/ApprovalCard.tsx`, `apps/web/src/tokens.css`, `apps/web/src/styles.css` | `010439bb9002fabb7e1facd8450ee85edbafa309` | Narrow view/token adaptation; new authority and session bridge. MIT retained in app. |
-| `apps/desktop/renderer/ArtifactCard.tsx` | `apps/web/src/components/ArtifactCard.tsx`, `apps/web/src/artifact-shell-save.ts` | `010439bb9002fabb7e1facd8450ee85edbafa309` | Narrow presentation/pending/error and identity-only action adaptation. New moyyi receipt/hash checks and local plain-text/reveal actions replace Server downloads. MIT notice retained; M2 external bundle and native-UI live-task checks passed, final integration/install pending. |
+| `apps/desktop/renderer/ArtifactCard.tsx` | `apps/web/src/components/ArtifactCard.tsx`, `apps/web/src/artifact-shell-save.ts` | `010439bb9002fabb7e1facd8450ee85edbafa309` | Narrow presentation/pending/error and identity-only action adaptation. New moyyi receipt/hash checks and local plain-text/reveal actions replace Server downloads. MIT retained; M2 accepted and installed through PR #45. |
+| `apps/desktop/renderer/EffectsPanel.tsx`, `effects-state.ts` | `apps/web/src/components/TaskSteps.tsx` | `010439bb9002fabb7e1facd8450ee85edbafa309` | Narrow folded-list/row adaptation for actual effect history. No upstream fetch, Server/domain types or assumed completed stages. MIT retained; M3 candidate evidence is recorded below. |
 | `src/plugins/skills/parse.ts` | `packages/employee-publisher/src/agent-skills.ts` | `010439bb9002fabb7e1facd8450ee85edbafa309` | Adapted bounded YAML AST-validation approach (aliases, anchors/tags, scalar keys, node/depth caps); rewritten schema checks and moyyi plugin/port, no publisher or authority code. MIT notice in `THIRD_PARTY_NOTICES.md` |
 
 ## Desktop M1 adaptation
@@ -78,7 +79,30 @@ empty result pages, input clearing and action locking. Upstream tests were read,
 The external candidate and both original live document tasks passed through the native UI;
 actual report text and comparison-file Finder selection were observed. This is moyyi candidate
 evidence, not an upstream test result or a general reliability claim. Final rebuilt-app restart,
-CI, merge and owner installation remain in the M2 PR delivery receipt.
+CI, merge and owner installation are recorded in the accepted [M2 PR #45 receipt](https://github.com/Peerframe/moyyi/pull/45).
+
+## Desktop M3 adaptation
+
+`EffectsPanel.tsx` and `effects-state.ts` adapt the fixed revision's
+[`TaskSteps.tsx`](https://github.com/Peerframe/openbot/blob/010439bb9002fabb7e1facd8450ee85edbafa309/apps/web/src/components/TaskSteps.tsx)
+folded-list and row presentation: show short lists in full, otherwise the first three and last
+six, with an explicit middle expansion. moyyi corrects the upstream10–12-row omission, keys
+expansion by session/run/effect page identity, and displays recorded states rather than marking
+all rows done. Existing MIT comments/notices cover this adaptation.
+
+The fixed [`WorkTasksScreen.tsx`](https://github.com/Peerframe/openbot/blob/010439bb9002fabb7e1facd8450ee85edbafa309/apps/web/src/components/WorkTasksScreen.tsx)
+and [its tests](https://github.com/Peerframe/openbot/blob/010439bb9002fabb7e1facd8450ee85edbafa309/apps/web/src/components/WorkTasksScreen.test.tsx)
+informed unknown-result, lost-ACK and late-response handling. `WorkTasksEntry.tsx` informed
+explicit retry/read invalidation; its Bot/login/hash-routing implementation is not copied.
+moyyi retains its existing subscription receiver and action gate, not Server polling, revision
+storage or login recovery. The new permissions form is independently implemented over the native
+host bridge. Undo/check controls prepare editable drafts; source receipts do not authorize them.
+
+The four renderer test files passed32 tests, desktop typecheck and scoped Biome passed at this
+implementation checkpoint. Tests cover10–12-row retention, expansion identity, unknown/failed/
+cancelled effects, expected absence, escaped text and draft-only callbacks. These are component
+and pure-state checks, not native interaction or installed acceptance. Upstream tests were read,
+not run; M3 package, native UI and fixed workflow acceptance remain pending.
 
 ## Skills boundary experience
 
