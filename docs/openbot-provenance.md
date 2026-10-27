@@ -83,3 +83,25 @@ The install gate verifies original Node bytes, licenses and both actual PDF reso
 The new seven-format fixtures are independently generated in
 `src/runtime/fixtures/document-fixtures.ts`; only the two specifically listed PDF inputs come from
 OpenBot. Neither the OpenBot checkout's unrelated work nor its legacy runtime is imported.
+
+## Planned desktop reuse (not yet ported)
+
+The [current product plan](roadmap.md#openbot-reuse-within-this-sequence) moves a personal desktop
+client into the next delivery. The following candidates were read at fixed OpenBot commit
+`010439bb9002fabb7e1facd8450ee85edbafa309`, under its
+[MIT license](https://github.com/Peerframe/openbot/blob/010439bb9002fabb7e1facd8450ee85edbafa309/LICENSE).
+The owner's dirty checkout was not used as source. This is a candidate inventory: no UI source
+has been copied, upstream tests have not been run, and no desktop behavior is certified by it.
+Record actual adapted files/notices and moyyi verification when each port is implemented.
+
+| Candidate at the fixed revision | Reuse decision and dependency boundary | Planned slice |
+|---|---|---|
+| [ApprovalCard.tsx](https://github.com/Peerframe/openbot/blob/010439bb9002fabb7e1facd8450ee85edbafa309/apps/web/src/components/ApprovalCard.tsx) | First candidate for narrow view adaptation: pending/error/duplicate-click presentation. Replace Bot/channel/risk DTOs with moyyi's actual effect summary and exact digest-bound callbacks. The view cannot decide authority. | M1 |
+| [ArtifactCard.tsx](https://github.com/Peerframe/openbot/blob/010439bb9002fabb7e1facd8450ee85edbafa309/apps/web/src/components/ArtifactCard.tsx) | Adapt presentation and save/cancel/existing-file feedback; replace HTTP downloads and Desktop bridge with receipt-backed local actions. Existing PNG/Markdown distinctions do not establish arbitrary-file preview support. | M2 |
+| [ComposerAttachmentPicker.tsx](https://github.com/Peerframe/openbot/blob/010439bb9002fabb7e1facd8450ee85edbafa309/apps/web/src/components/ComposerAttachmentPicker.tsx) | Reimplement local selection/import using drag/drop, cancellation and late-response lessons. Do not port channel IDs, upload service, OCR/transcription or duplicate existing parsers. | M2 |
+| [ModelSelector.tsx](https://github.com/Peerframe/openbot/blob/010439bb9002fabb7e1facd8450ee85edbafa309/apps/web/src/components/ModelSelector.tsx), [ModelSettingsScreen.tsx](https://github.com/Peerframe/openbot/blob/010439bb9002fabb7e1facd8450ee85edbafa309/apps/web/src/components/ModelSettingsScreen.tsx) | Reimplement against explicit local host settings. Preserve unavailable selections and save feedback; no silent model change. Exclude Server catalogs, identity/revision and credential DTOs. | M2 |
+| [TaskSteps.tsx](https://github.com/Peerframe/openbot/blob/010439bb9002fabb7e1facd8450ee85edbafa309/apps/web/src/components/TaskSteps.tsx), [WorkTasksEntry.tsx](https://github.com/Peerframe/openbot/blob/010439bb9002fabb7e1facd8450ee85edbafa309/apps/web/src/components/WorkTasksEntry.tsx), [WorkTasksScreen.tsx](https://github.com/Peerframe/openbot/blob/010439bb9002fabb7e1facd8450ee85edbafa309/apps/web/src/components/WorkTasksScreen.tsx) | Reimplement bounded progress/history/late-response behavior from runtime events and session catalog. No Server polling, WorkSnapshot, Bot or database model. OpenBot local-session-recovery restores Server login, not moyyi task state; do not port it. | M1/M3 |
+
+The core, state, policy and result truth remain moyyi's. Reuse is judged by integration and
+maintenance cost for the defined user flow, not the number of old files copied. A selected view
+must adapt to the new contract; the old application architecture must not become a dependency.
