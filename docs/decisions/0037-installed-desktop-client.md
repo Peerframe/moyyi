@@ -66,3 +66,13 @@ Flash file-read task. Keep scripted transport evidence separate from live qualit
 existing checks and original task standards; M1 does not resolve the original source-task FAIL.
 Package size and startup are measured on the actual candidate. macOS arm64 is the only desktop
 target claimed by this slice. Updates remain manual, backed up and reversible.
+
+## Source tests versus installed export verification
+
+The first Linux CI attempt exposed a fresh-checkout defect in the source test setup: package
+self-references resolved to an absent `dist`, while a developer's existing build hid the issue.
+Vitest now aliases only the two exact public self-exports to their source entry points, following
+its [test alias contract](https://vitest.dev/config/alias.html). The layer allowlist is unchanged.
+A check run with `dist` absent validates this route. Actual installed exports remain independently
+covered by `verify:package` and `verify:desktop`, outside the checkout without test aliases.
+No production resolver, acceptance case, timeout or expected result was weakened.
