@@ -77,6 +77,7 @@ import type { WebHttpDependencies } from "./web-http.ts";
 import { NodeWorkspaceWrites } from "./writes.ts";
 
 export { FileRecordingSink, loadModelRecordings } from "./model-recording.ts";
+export { discoverNodeToolchain, type NodeToolchain } from "./node-toolchain.ts";
 export type { PluginEntry, PluginStatus } from "./plugins.ts";
 // Trusted installed hosts use the same bounded helpers as source checkouts, without reaching
 // into package-private module paths. These exports do not grant a runtime any capabilities.

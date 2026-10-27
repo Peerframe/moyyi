@@ -577,6 +577,95 @@ svg {
   padding-top: 16px;
   margin-top: 24px;
 }
+.effects-panel {
+  border-top: 1px solid var(--line);
+  margin-top: 18px;
+  padding-top: 16px;
+}
+.effect-list {
+  list-style: none;
+  padding: 0;
+  margin: 12px 0;
+}
+.effect-row {
+  border-left: 2px solid var(--line);
+  padding: 12px 14px;
+  margin: 8px 0;
+  background: var(--surface);
+  border-radius: 0 8px 8px 0;
+}
+.effect-unknown {
+  border-left-color: var(--attention);
+}
+.effect-row-heading,
+.check-entry {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+.effect-row-heading {
+  justify-content: space-between;
+  font-size: 12px;
+  overflow-wrap: anywhere;
+}
+.effect-row-heading span {
+  color: var(--muted);
+}
+.effect-row details {
+  margin-top: 10px;
+}
+.effect-row summary {
+  color: var(--muted);
+  font-size: 11px;
+  cursor: pointer;
+}
+.effect-fold {
+  padding: 8px 14px;
+}
+.check-entry {
+  margin-top: 20px;
+}
+.check-entry .panel-note {
+  flex: 1;
+  min-width: 180px;
+}
+.history-notice {
+  padding: 12px 14px;
+  margin: 0 0 18px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  color: var(--muted);
+  background: var(--fill);
+  font-size: 12px;
+  line-height: 1.7;
+}
+.permission-options {
+  border: 0;
+  margin: 20px 0;
+  padding: 0;
+  min-width: 0;
+}
+.permission-options label {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  margin: 18px 0;
+}
+.permission-options input {
+  flex: none;
+  margin-top: 3px;
+}
+.permission-options strong,
+.permission-options small {
+  display: block;
+  font-size: 12px;
+  line-height: 1.7;
+}
+.permission-options small {
+  font-size: 11px;
+  color: var(--muted);
+}
 .artifact-card {
   display: flex;
   align-items: flex-start;

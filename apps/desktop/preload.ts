@@ -15,6 +15,7 @@ const bridge: DesktopBridge = {
   configure: (options) => state(ipcRenderer.invoke("moyyi:configure", options)),
   selectDocuments: (options) => state(ipcRenderer.invoke("moyyi:documents", options)),
   selectReportTarget: (options) => state(ipcRenderer.invoke("moyyi:report-target", options)),
+  configurePermissions: (options) => state(ipcRenderer.invoke("moyyi:permissions", options)),
   revealArtifact: (options) => state(ipcRenderer.invoke("moyyi:reveal-artifact", options)),
   subscribe(listener: (snapshot: DesktopState) => void) {
     const handler = (_event: Electron.IpcRendererEvent, value: unknown) => {

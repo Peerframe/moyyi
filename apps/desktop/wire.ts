@@ -35,6 +35,10 @@ export function isDesktopState(s: unknown): s is DesktopState {
       "settings",
       "materials",
       "reportTarget",
+      "permissions",
+      "openedHistory",
+      "effects",
+      "effectInspection",
       "artifacts",
       "artifactPreview",
       "sessions",
@@ -72,6 +76,80 @@ export function isDesktopState(s: unknown): s is DesktopState {
   )
     return false;
   const hash = (value: unknown) => typeof value === "string" && /^[a-f0-9]{64}$/.test(value);
+  const nullableHash = (value: unknown) => value === null || hash(value);
+  if (
+    !object(s.permissions, ["writes", "checks"]) ||
+    typeof s.permissions.writes !== "boolean" ||
+    typeof s.permissions.checks !== "boolean" ||
+    typeof s.openedHistory !== "boolean"
+  )
+    return false;
+  const receipt = (v: unknown) =>
+    v === null ||
+    (object(v, ["kind", "path", "snapshotId", "beforeHash", "afterHash"]) &&
+      v.kind === "file" &&
+      string(v.path, 4096) &&
+      string(v.snapshotId, 128) &&
+      nullableHash(v.beforeHash) &&
+      nullableHash(v.afterHash)) ||
+    (object(v, ["kind", "exitCode", "termination", "outputTruncated"]) &&
+      v.kind === "process" &&
+      (v.exitCode === null || Number.isSafeInteger(v.exitCode)) &&
+      choice(v.termination, [
+        "exited",
+        "cancelled",
+        "timeout",
+        "output_limit",
+        "revoked",
+        "unknown",
+      ]) &&
+      typeof v.outputTruncated === "boolean");
+  if (
+    !object(s.effects, ["items", "offset", "hasMore"]) ||
+    !integer(s.effects.offset) ||
+    typeof s.effects.hasMore !== "boolean" ||
+    !Array.isArray(s.effects.items) ||
+    s.effects.items.length > 20 ||
+    !s.effects.items.every(
+      (v) =>
+        object(v, ["effectId", "runId", "tool", "state", "updatedAt", "receipt"]) &&
+        string(v.effectId, 128) &&
+        string(v.runId, 128) &&
+        string(v.tool, 256) &&
+        string(v.updatedAt, 128) &&
+        choice(v.state, [
+          "intended",
+          "awaiting_approval",
+          "approved",
+          "denied",
+          "started",
+          "succeeded",
+          "failed",
+          "cancelled",
+          "unknown",
+        ]) &&
+        receipt(v.receipt),
+    )
+  )
+    return false;
+  if (
+    s.effectInspection !== null &&
+    !(
+      object(s.effectInspection, ["effectId", "path", "state", "expectedHash", "actualHash"]) &&
+      string(s.effectInspection.effectId, 128) &&
+      string(s.effectInspection.path, 4096) &&
+      choice(s.effectInspection.state, [
+        "current",
+        "changed",
+        "missing",
+        "absent",
+        "unavailable",
+      ]) &&
+      nullableHash(s.effectInspection.expectedHash) &&
+      nullableHash(s.effectInspection.actualHash)
+    )
+  )
+    return false;
   if (
     !nullableString(s.reportTarget, 4096) ||
     !Array.isArray(s.materials) ||

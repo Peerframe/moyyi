@@ -1,12 +1,14 @@
 import { createElement } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it, vi } from "vitest";
-import { DEFAULT_DESKTOP_SETTINGS } from "../shared.ts";
+import { DEFAULT_DESKTOP_SETTINGS, type DesktopEffect } from "../shared.ts";
 import { ApprovalCard } from "./ApprovalCard.tsx";
 import { ArtifactCard } from "./ArtifactCard.tsx";
 import { ArtifactsPanel } from "./ArtifactsPanel.tsx";
+import { EffectsPanel } from "./EffectsPanel.tsx";
 import { MaterialsPanel } from "./MaterialsPanel.tsx";
 import { MessageList } from "./MessageList.tsx";
+import { PermissionsDialog } from "./PermissionsDialog.tsx";
 import { SettingsDialog } from "./SettingsDialog.tsx";
 
 describe("desktop untrusted content rendering", () => {
@@ -153,6 +155,146 @@ describe("desktop untrusted content rendering", () => {
     expect(html).toContain("保存不会产生模型费用");
     expect(html).toContain("8192 tokens");
     expect(html).toContain("自动重试 0 次");
+    expect(onConfigure).not.toHaveBeenCalled();
+  });
+
+  it.each([10, 11, 12])(
+    "renders all %i effects without silently folding middle records",
+    (count) => {
+      const html = renderToStaticMarkup(
+        createElement(EffectsPanel, {
+          sessionId: "session",
+          effects: {
+            items: Array.from({ length: count }, (_, index) => ({
+              effectId: `effect-${index}`,
+              runId: "run",
+              tool: "read",
+              state: "succeeded",
+              updatedAt: "2026-10-27",
+              receipt: null,
+            })),
+            offset: 0,
+            hasMore: false,
+          },
+          inspection: null,
+          busy: false,
+          onPage: vi.fn(),
+          onInspect: vi.fn(),
+          onDraft: vi.fn(),
+        }),
+      );
+      expect(html.match(/class="effect-row"/g)).toHaveLength(count);
+      expect(html).not.toContain("展开中间");
+    },
+  );
+
+  it("keeps unknown/failed/cancelled effects visible and treats process receipts as observations", () => {
+    const states = ["unknown", "failed", "cancelled"];
+    const onDraft = vi.fn();
+    const items: DesktopEffect[] = states.map((state, index) => ({
+      effectId: `effect-${index}`,
+      runId: "run",
+      tool: "<script>shell</script>",
+      state,
+      updatedAt: "2026-10-27",
+      receipt:
+        index === 1
+          ? {
+              kind: "process",
+              exitCode: 1,
+              termination: "exited",
+              outputTruncated: true,
+            }
+          : null,
+    }));
+    const html = renderToStaticMarkup(
+      createElement(EffectsPanel, {
+        sessionId: "session",
+        effects: { items, offset: 20, hasMore: true },
+        inspection: null,
+        busy: true,
+        onPage: vi.fn(),
+        onInspect: vi.fn(),
+        onDraft,
+      }),
+    );
+    expect(html).toContain("1 项结果未知，不能视为成功");
+    expect(html).toContain("后续修改可能被保护性阻止");
+    expect(html).toContain("重新授权也不会自动解锁");
+    expect(html).toContain("失败");
+    expect(html).toContain("已取消");
+    expect(html).toContain("退出码：1");
+    expect(html).toContain("输出已截断");
+    expect(html).toContain("&lt;script&gt;shell&lt;/script&gt;");
+    expect(html).not.toContain("<script>");
+    expect(html).not.toContain(">准备撤销</button>");
+    expect(html).toContain('disabled="">下一页操作');
+    expect(onDraft).not.toHaveBeenCalled();
+  });
+
+  it("binds inspection to the selected receipt and displays expected absence truthfully", () => {
+    const onInspect = vi.fn();
+    const onDraft = vi.fn();
+    const effect: DesktopEffect = {
+      effectId: "undo-1",
+      runId: "run",
+      tool: "undo",
+      state: "succeeded",
+      updatedAt: "2026-10-27",
+      receipt: {
+        kind: "file",
+        snapshotId: "snapshot",
+        path: "<b>report</b>.txt",
+        beforeHash: "a".repeat(64),
+        afterHash: null,
+      },
+    };
+    const props = {
+      sessionId: "session",
+      effects: { items: [effect], offset: 0, hasMore: false },
+      inspection: {
+        effectId: "undo-1",
+        path: effect.receipt?.kind === "file" ? effect.receipt.path : "",
+        state: "absent" as const,
+        expectedHash: null,
+        actualHash: null,
+      },
+      busy: false,
+      onPage: vi.fn(),
+      onInspect,
+      onDraft,
+    };
+    const html = renderToStaticMarkup(createElement(EffectsPanel, props));
+    expect(html).toContain("与撤销后的回执一致");
+    expect(html).toContain("&lt;b&gt;report&lt;/b&gt;.txt");
+    expect(html).toContain("只填入可编辑草稿，不执行操作");
+    expect(html).toContain(">准备撤销</button>");
+    const other = renderToStaticMarkup(
+      createElement(EffectsPanel, {
+        ...props,
+        inspection: { ...props.inspection, effectId: "other-session-effect" },
+      }),
+    );
+    expect(other).not.toContain("与撤销后的回执一致");
+    expect(onInspect).not.toHaveBeenCalled();
+    expect(onDraft).not.toHaveBeenCalled();
+  });
+
+  it("presents independent off-by-default permissions without submitting from rendering", () => {
+    const onConfigure = vi.fn();
+    const html = renderToStaticMarkup(
+      createElement(PermissionsDialog, {
+        workspace: "/workspace/<source>",
+        permissions: { writes: false, checks: false },
+        onConfigure,
+        onClose: vi.fn(),
+      }),
+    );
+    expect(html.match(/type="checkbox"/g)).toHaveLength(2);
+    expect(html).not.toContain('checked=""');
+    expect(html).toContain("&lt;source&gt;");
+    expect(html).toContain("工作目录只读、无网络");
+    expect(html).toContain("每次实际操作仍需审阅预览并批准");
     expect(onConfigure).not.toHaveBeenCalled();
   });
 });

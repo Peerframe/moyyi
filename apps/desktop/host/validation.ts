@@ -96,6 +96,15 @@ export function parseDesktopCommand(value: unknown): DesktopCommand {
       )
         throw invalid();
       return { type: "materials", sessionId: input.sessionId, paths: [...input.paths] };
+    case "permissions":
+      exact(["type", "sessionId", "writes", "checks"]);
+      if (
+        !identifier(input.sessionId) ||
+        typeof input.writes !== "boolean" ||
+        typeof input.checks !== "boolean"
+      )
+        throw invalid();
+      break;
     case "material.remove":
       exact(["type", "sessionId", "path"]);
       if (!identifier(input.sessionId) || !path(input.path)) throw invalid();
@@ -110,10 +119,12 @@ export function parseDesktopCommand(value: unknown): DesktopCommand {
       if (!identifier(input.sessionId)) throw invalid();
       break;
     case "artifacts":
+    case "effects":
       exact(["type", "sessionId", "offset"]);
       if (!identifier(input.sessionId) || !page(input.offset)) throw invalid();
       break;
     case "artifact.open":
+    case "effect.inspect":
       exact(["type", "sessionId", "effectId"]);
       if (!identifier(input.sessionId) || !identifier(input.effectId)) throw invalid();
       break;
