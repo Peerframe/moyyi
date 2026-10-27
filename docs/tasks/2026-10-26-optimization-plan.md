@@ -42,7 +42,15 @@ Owner要求修复剩余问题。本轮先复核原题、原评分和已送达的
 独立审查未发现产品阻断，额外历史加载4项通过；同步architecture中旧的final-request分类说明。
 首次独立安装验收发现总计数断言仍写12而CLI已实际通过13项；将精确清单更新为13，原12项保留，
 新增最后一请求reasoning-only截断用例，未减少断言或跳过测试。首次失败日志保留。
-双平台CI、修正后的外部安装及本机更新证据在本节后续记录，不提前记为通过。
+修正后的外部`verify:package -- --offline`通过：clean `6f63518`、394文件，CLI13/client13/Kimi3/
+documents9、原生containment、strict types、PTY7；包SHA256
+`76efa10a1b6f07cf575a3cbcfcb68c1d777255125b1460b6474206960b21731e`。
+[PR #41](https://github.com/Peerframe/moyyi/pull/41)按固定head独审无阻断。
+首轮[CI](https://github.com/Peerframe/moyyi/actions/runs/40462489084)macOS通过，Linux在既有
+Office vendor测试中对1.2MB Buffer做框架深比较耗时6.283秒，超过原5秒门槛。保留全部84文件、
+逐字节相等、SHA256、metadata/license断言与超时，只将字节断言改为Node原生`Buffer.equals`；
+未增加重试、减少用例或更改worker数。本地原focused耗时2.38秒（总进程），修改后302ms；最终再次`npm run check`118文件/2553测试、typecheck/lint通过（76.90秒）。
+最终CI及本机安装/备份/启动结果统一维护在PR #41交付回执；不会把“准备好安装”写成已安装。
 
 ### 上次交付：Kimi 官方接口与同题独立对照（2026-10-27）
 

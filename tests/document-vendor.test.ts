@@ -40,7 +40,8 @@ describe("reviewed Office distribution packaging", () => {
     expect(files.some((path) => path.includes("browser") || path.includes("sbom"))).toBe(false);
     for (const path of files) {
       const bytes = readFileSync(join(shipped, path));
-      expect(bytes).toEqual(readFileSync(join(upstream, path)));
+      // Native byte equality avoids a deep assertion walking every numeric Buffer property.
+      expect(bytes.equals(readFileSync(join(upstream, path))), path).toBe(true);
       expect(createHash("sha256").update(bytes).digest("hex")).toBe(source.copiedFiles[path]);
     }
     expect(
