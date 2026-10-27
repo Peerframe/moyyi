@@ -68,7 +68,19 @@ const plugin = {
           assert(requests.length < 12, "Synthetic native fixture limit");
           requests.push(request);
           writeFileSync(ledgerPath, JSON.stringify(requests, null, 2), { mode: 0o600 });
-          const at = request.messages.findLastIndex((m) => m.role === "user");
+          // Tool results also use user-role messages in this model-neutral profile. Locate the
+          // actual fixture task, not the last result/budget notice, before counting its results.
+          const at = request.messages.findLastIndex(
+            (m) =>
+              m.role === "user" &&
+              m.content.some(
+                (p) =>
+                  p.type === "text" &&
+                  (p.text.includes("QA deny") ||
+                    p.text.includes("QA edit and check") ||
+                    p.text.includes('"snapshotId"')),
+              ),
+          );
           assert(at >= 0);
           const input = request.messages[at].content
             .filter((p) => p.type === "text")

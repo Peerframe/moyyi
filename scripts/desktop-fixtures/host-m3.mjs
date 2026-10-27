@@ -149,6 +149,16 @@ async function start(name, args, tail = true) {
     text: `Perform the requested ${name} operation`,
   });
 }
+function latestToolResult(name) {
+  const content = requests.at(-1).messages.flatMap((message) => message.content);
+  const call = content.findLast((part) => part.type === "tool_call" && part.name === name);
+  assert(call, `Missing actual ${name} call`);
+  const results = content.filter(
+    (part) => part.type === "tool_result" && part.callId === call.callId,
+  );
+  assert.equal(results.length, 1, "Exactly one matching tool result must reach the next request");
+  return results[0];
+}
 async function approve(decision = "approve", stale = false) {
   const pending = (await waitFor((s) => !!s.pendingApproval)).pendingApproval;
   if (stale) {
@@ -188,7 +198,15 @@ try {
   ]) {
     await start(name, args);
     await finish();
-    assert(host.getState().effects.items.some((e) => e.tool === name && e.state === "denied"));
+    // beforePrepare denial records a tool result without inventing a prepared effect.
+    assert.equal(latestToolResult(name).status, "denied");
+    assert.equal(
+      host.getState().messages.findLast((message) => message.tool === name)?.state,
+      "denied",
+    );
+    assert.equal(host.getState().pendingApproval, null);
+    assert.deepEqual(host.getState().effects.items, []);
+    assert.equal(readFileSync(path, "utf8"), original);
   }
   assert.equal(readFileSync(path, "utf8"), original);
   cases.push("default read-only host denies edits and checks without key/model fallback");
@@ -264,10 +282,17 @@ try {
   writeFileSync(path, "EXTERNAL");
   await host.dispatch({ type: "effect.inspect", sessionId, effectId: snapshots[1] });
   assert.equal(host.getState().effectInspection.state, "changed");
+  const beforeConflict = host.getState().effects;
   await start("undo", { snapshotId: snapshots[1] });
   await finish();
   assert.equal(readFileSync(path, "utf8"), "EXTERNAL");
-  assert(host.getState().effects.items.some((e) => e.tool === "undo" && e.state === "failed"));
+  assert.equal(latestToolResult("undo").status, "failed");
+  assert.equal(
+    host.getState().messages.findLast((message) => message.tool === "undo")?.state,
+    "failed",
+  );
+  assert.equal(host.getState().pendingApproval, null);
+  assert.deepEqual(host.getState().effects, beforeConflict);
   unlinkSync(path);
   await host.dispatch({ type: "effect.inspect", sessionId, effectId: snapshots[1] });
   assert.equal(host.getState().effectInspection.state, "missing");
@@ -376,6 +401,28 @@ try {
       liveModel: false,
     }),
   );
+} catch (error) {
+  const state = host?.getState();
+  console.error(
+    JSON.stringify({
+      phase: "installed-m3-failure",
+      completedCases: cases.length,
+      syntheticRequests: requests.length,
+      remainingSteps: steps.length,
+      credentialReads,
+      networkAttempts,
+      outcome: state?.outcome,
+      run: state?.run,
+      effects: state?.effects,
+      pendingApproval: state?.pendingApproval
+        ? { effectId: state.pendingApproval.effectId, digest: state.pendingApproval.digest }
+        : null,
+      messages: state?.messages
+        .slice(-8)
+        .map((message) => ({ ...message, text: message.text.slice(0, 2000) })),
+    }),
+  );
+  throw error;
 } finally {
   await host?.close();
   globalThis.fetch = originalFetch;
