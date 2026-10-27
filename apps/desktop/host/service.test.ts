@@ -816,7 +816,7 @@ describe("desktop M3 explicit grants and recorded effects", () => {
   });
 });
 
-it("runs a separately approved Node check read-only and retains uncertain cancellation without replay", async () => {
+it("runs a separately approved Node check with a read-only workspace and denied network", async () => {
   const steps: Step[] = [];
   const f = await fixture(steps);
   await f.host.dispatch({ type: "create", workspaceRoot: f.workspace, askEachRead: false });
@@ -828,7 +828,7 @@ it("runs a separately approved Node check read-only and retains uncertain cancel
     'const fs=require("node:fs");console.log(fs.readFileSync("note.txt","utf8"));try{fs.writeFileSync("should-not-exist","bad");process.exitCode=9}catch{console.log("READ_ONLY_CONFIRMED")}';
   steps.push(call("shell", { command: `node -e ${quote(code)}` }), answer("Check observed"));
   await f.host.dispatch({ type: "start", sessionId, text: "Run the Node check" });
-  let pending = required((await waitFor(f.host, (s) => !!s.pendingApproval)).pendingApproval);
+  const pending = required((await waitFor(f.host, (s) => !!s.pendingApproval)).pendingApproval);
   expect(pending.preview).toContain('"workspaceAccess":"read-only"');
   expect(pending.preview).toContain('"network":"denied"');
   await f.host.dispatch({
@@ -845,9 +845,18 @@ it("runs a separately approved Node check read-only and retains uncertain cancel
   expect(JSON.stringify(f.requests.at(-1))).toContain("READ_ONLY_CONFIRMED");
   expect(existsSync(join(f.workspace, "should-not-exist"))).toBe(false);
   expect(readFileSync(join(f.workspace, "note.txt"), "utf8")).toBe("ORIGINAL");
+});
+
+it("retains a cancelled started process as unknown across reopen and blocks writes without replay", async () => {
+  const steps: Step[] = [];
+  const f = await fixture(steps);
+  await f.host.dispatch({ type: "create", workspaceRoot: f.workspace, askEachRead: false });
+  const sessionId = f.host.getState().activeSessionId;
+  await f.host.dispatch({ type: "permissions", sessionId, writes: false, checks: true });
+  expect(f.requests).toHaveLength(0);
   steps.push(call("shell", { command: "node -e 'setInterval(()=>{},1000)'" }));
   await f.host.dispatch({ type: "start", sessionId, text: "Run until cancelled" });
-  pending = required((await waitFor(f.host, (s) => !!s.pendingApproval)).pendingApproval);
+  const pending = required((await waitFor(f.host, (s) => !!s.pendingApproval)).pendingApproval);
   await f.host.dispatch({
     type: "approve",
     effectId: pending.effectId,
