@@ -77,6 +77,14 @@ const plugin = {
           const tail = request.messages.slice(at + 1).flatMap((m) => m.content);
           const results = tail.filter((p) => p.type === "tool_result");
           if (input.includes("QA deny")) {
+            if (results.length) {
+              assert.equal(results.length, 1);
+              assert.equal(
+                results[0].status,
+                "denied",
+                "The native deny control must deny execution",
+              );
+            }
             yield* results.length
               ? answer("离线验收：操作被拒绝，文件未修改。")
               : tool("edit", { path: "note.txt", oldText: "OLD", newText: "NEW" });

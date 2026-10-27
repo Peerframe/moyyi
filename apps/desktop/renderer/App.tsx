@@ -300,6 +300,7 @@ export function App({ bridge }: { bridge: DesktopBridge }) {
                 <MaterialsPanel
                   materials={state.materials}
                   reportTarget={state.reportTarget}
+                  permissions={state.permissions}
                   busy={busy}
                   running={state.run !== null}
                   onSelect={() =>

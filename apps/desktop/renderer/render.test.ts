@@ -122,6 +122,7 @@ describe("desktop untrusted content rendering", () => {
           },
         ],
         reportTarget: "reports/result.md",
+        permissions: { writes: false, checks: false },
         busy: true,
         running: true,
         onSelect: vi.fn(),
@@ -139,6 +140,51 @@ describe("desktop untrusted content rendering", () => {
     expect(html).toContain("实际创建仍需逐次批准");
     expect(html).toContain("运行中需先停止");
     expect(html).toMatch(/<button type="button" disabled="">撤销报告授权<\/button>/);
+  });
+
+  it.each([
+    [{ writes: true, checks: false }, "当前已允许提议文件修改"],
+    [{ writes: false, checks: true }, "当前已允许提议Node 命令检查"],
+    [{ writes: true, checks: true }, "当前已允许提议文件修改和Node 命令检查"],
+  ] as const)(
+    "shows the actual material-panel grants %j without claiming read-only",
+    (permissions, label) => {
+      const html = renderToStaticMarkup(
+        createElement(MaterialsPanel, {
+          materials: [],
+          reportTarget: null,
+          permissions,
+          busy: false,
+          running: false,
+          onSelect: vi.fn(),
+          onRemove: vi.fn(),
+          onSelectReport: vi.fn(),
+          onClearReport: vi.fn(),
+        }),
+      );
+      expect(html).toContain(label);
+      expect(html).not.toContain("当前为只读任务");
+      expect(html).toContain("每次操作仍需批准");
+      expect(html).toContain("选定报告位置后，会关闭文件修改与命令检查的会话授权");
+    },
+  );
+
+  it("retains the read-only material-panel message when both grants are off", () => {
+    const html = renderToStaticMarkup(
+      createElement(MaterialsPanel, {
+        materials: [],
+        reportTarget: null,
+        permissions: { writes: false, checks: false },
+        busy: false,
+        running: false,
+        onSelect: vi.fn(),
+        onRemove: vi.fn(),
+        onSelectReport: vi.fn(),
+        onClearReport: vi.fn(),
+      }),
+    );
+    expect(html).toContain("当前为只读任务。需要生成报告时，先选择一个新的");
+    expect(html).not.toContain("当前已允许提议");
   });
 
   it("starts settings with an empty masked key and describes local save without a paid probe", () => {
