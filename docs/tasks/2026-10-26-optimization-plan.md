@@ -34,8 +34,8 @@ context profile不同，不能声称只比较模型权重。原Flash失败保留
 6对raw request/response hash、流完整结束、before/after/final源码快照；未只相信runner完成标记。
 答案SHA256 `832c12b43374ec97413130048d304ac2357008b8ce272d0fc3d5936b0b766ebf`。
 1/2/3/5满足；4虽说明选择复制冻结与原文刷新，未明确改变启用列表需重建runtime；6说明12/48KiB与不截断，
-仍未说明不自动加载引用/运行脚本。两处与原Flash同属必需漏项，不能因为读得多或正常结束改判通过。另有两处细节不准：JSON字段实际为
-`text`而非`markdown`，48KiB内部错误会经catch脱敏，不能当作对外错误原样引用。原答案不手改。
+仍未说明不自动加载引用/运行脚本。两处与原Flash同属必需漏项，不能因为读得多或正常结束改判通过。另有两处措辞欠精确：JSON列表中的“markdown”容易与实际
+字段`text`混淆；48KiB内部错误会经catch脱敏，答案未说明该层处理。原答案不手改。
 
 用量input211662/output6177；观测cacheRead141824/cacheWrite69120/reasoning1970是子集，首次缺失cacheRead
 保持unknown，合计不二次累加。未核对账户账单。仅这一固定样本，不代表一般准确率；不据此切换默认。
@@ -47,7 +47,20 @@ Owner可在`~/moyyi-demo/kimi-comparison-2026-10-27/`查看两份未修改原答
 I/O竞争。没有增加timeout或跳过用例：按[ADR0011](../decisions/0011-interactive-cli-and-development-reload.md)
 补仅显式entry的250ms指纹重核及3个确定性漏事件/关闭测试，原10项保留；worker上限4，原测试集/断言/
 超时不变。该开发模式缺陷与Kimi对照无关，固定旧runtime及封存provider不变。最终`npm run check`118文件/2548测试、typecheck/lint通过，耗时78.59秒；未跳过、重试或增加超时。
-最终CI、PR与本机安装坐标记录在本次PR；不能将早期失败改写为已通过。
+不能将早期失败改写为已通过。
+
+[PR #40](https://github.com/Peerframe/moyyi/pull/40)产品提交`c2f894f31915c40332eb43063b23b675433b237b`
+完成独立固定head审查，无阻断；[Linux/macOS CI](https://github.com/Peerframe/moyyi/actions/runs/40456494675)
+全部通过。该clean提交的`npm run verify:package -- --offline`通过：394文件、CLI12/client13/Kimi3/documents9、
+原生containment、strict consumer types、PTY7。包SHA256
+`b437ed5deb4e9468566714776665d307b0933b20456dce8d2164f9ac05d673bd`。
+
+按既有授权已安装本机：先备份demo/DeepSeek SQLite、配置及新Kimi host/连接元数据至
+`~/.moyyi/backups/pre-pr40-2026-10-27T05-42-46.215Z/`，保留PR #37旧包回退；全部394安装文件逐字匹配，
+Flash host与两启动器hash未变。实际安装版Kimi consumer3项通过；真实Kimi host进入CLI并完成/help、/exit，
+旧Flash会话通过实际新包读取（密钥getter硬拒探针，调用0次）。安装验收0付费调用、0密钥读取。
+新的显式入口为`~/.moyyi/kimi/host.mjs`，独立会话目录、只读、8请求/300秒/零重试；不替换Flash默认。
+后续仅两份非打包交付文档更新，最终合并/主分支CI坐标在PR回执，程序无需重复安装。
 
 ### 上次验收：通讯录合并与自主核对（2026-10-27）
 

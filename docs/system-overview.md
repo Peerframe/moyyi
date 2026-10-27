@@ -22,11 +22,11 @@ read-only until explicitly enabled. Original tasks and acceptance standards stay
 
 | Coordinate | Current evidence |
 |---|---|
-| Latest product delivery | [PR #37](https://github.com/Peerframe/moyyi/pull/37), product `6a3da0b35b344a613a4010cf6d63abb1376a277c`: read-authorized verified write observations. [Product Linux/macOS CI](https://github.com/Peerframe/moyyi/actions/runs/40427690752) passed. Merged `5835aac`; [main CI](https://github.com/Peerframe/moyyi/actions/runs/40428913450) passed. Verify Git before editing. |
-| Installed product | `6a3da0b35b344a613a4010cf6d63abb1376a277c`; all375 files match tar SHA256 `78469e6d03adf87bb39af6d1f410391c9ec0cd02c7b5c26a517930c3ab68954c`. Later nonpackaged evidence-only edits do not require reinstalling the same program. |
-| Product acceptance | Check2,465 tests, writes8/8 with six exact next-request observations, external CLI12/client13/documents9, containment/strict types/PTY7 and product CI passed. Actual owner client13/CLI12 and old-session resume/help/exit passed without a model call. Sessions/config backed up and PR #35 package retained. |
+| Latest product delivery | [PR #40](https://github.com/Peerframe/moyyi/pull/40), product `c2f894f31915c40332eb43063b23b675433b237b`: optional Kimi Chat and missed development-notification recovery. [Product Linux/macOS CI](https://github.com/Peerframe/moyyi/actions/runs/40456494675) passed; fixed-head independent review found no blockers. Final integration coordinates are in the PR; verify Git before editing. |
+| Installed product | `c2f894f31915c40332eb43063b23b675433b237b`; all394 files match tar SHA256 `b437ed5deb4e9468566714776665d307b0933b20456dce8d2164f9ac05d673bd`. Later nonpackaged evidence-only edits do not require reinstalling the same program. |
+| Product acceptance | Check2,548 tests, Kimi4/4 offline scenarios; external CLI12/client13/Kimi3/documents9, containment/strict types/PTY7 and product CI passed. Actual owner installation matches the accepted tar; Kimi3 installed-consumer cases, real host startup/help/exit and old Flash session load passed without model calls. Sessions/config backed up, old package retained, Flash host/launchers unchanged. |
 | Previous evidence-only delivery | [PR #36](https://github.com/Peerframe/moyyi/pull/36), merged `ae960de` with [main CI passed](https://github.com/Peerframe/moyyi/actions/runs/40421088168): user-requested source-derived check, controlled report repair and readback. Offline check2,433 passed; actual installed workflow passed once in5 requests. Its original task failures remain separate. |
-| Kimi candidate | Opt-in `kimi-k3.1-pro` Chat provider, low/high/max, preserving visible reasoning and final-request tool prohibition. Two-request Chat connection probe passed; Responses rejected final `none`. Original-task independent comparison: six HTTP200, zero retries; strict FAIL, items1/2/3/5 met and4/6 partial. Candidate delivery/installation evidence follows in the current PR. |
+| Optional Kimi | Installed opt-in `kimi-k3.1-pro` Chat provider, low/high/max, preserving visible reasoning and final-request tool prohibition. Two-request Chat connection probe passed; Responses rejected final `none`. Original-task independent comparison: six HTTP200, zero retries; strict FAIL, items1/2/3/5 met and4/6 partial. Installation is verified; the six-item task FAIL remains separate. |
 | Public version | None; local candidate installation and public source PRs are not a version release. |
 
 ## What the user can do
@@ -123,9 +123,9 @@ state differ, so this is not an isolated model-weight comparison or a reliabilit
 Kimi explains the main collection/permission/render chain, inert allowed-tools and size/failure
 handling. It still omits the explicit requirement to rebuild runtime when changing the enabled
 selection and the prohibition on automatic reference/script loading. Items1/2/3/5 meet the old
-standard;4/6 remain partial: strict overall FAIL. Two secondary inaccuracies remain: the JSON
-field is `text`, not `markdown`, and the internal combined-budget error is sanitized before it
-escapes. Do not count a longer answer or more retrieved
+standard;4/6 remain partial: strict overall FAIL. Two secondary wording limits remain: the JSON
+field is `text` (the answer ambiguously lists markdown), and the internal combined-budget error
+is sanitized before it escapes, a detail the answer does not explain. Do not count a longer answer or more retrieved
 files as improvement in the acceptance result. No additional retry, follow-up prompt or hidden
 rubric was supplied. The next quality work concerns answer coverage/interpretation, not wider
 retrieval or more grants. This result does not justify changing the default model.
