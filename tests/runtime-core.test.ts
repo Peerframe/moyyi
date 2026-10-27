@@ -636,23 +636,39 @@ describe("runtime core with real SQLite persistence", () => {
     expect((await test.snapshot()).runs[0]?.status).toBe("interrupted");
   });
 
-  it("pairs but never executes a tool requested during the reserved final attempt", async () => {
-    const selected = syntheticTool();
-    const test = await harness([toolTurn(call()), finalTurn()], [selected], {
-      limits: { maxModelRequests: 1 },
-    });
-    await test.start();
-    expect(await test.finish()).toEqual({ kind: "budget_exhausted", budget: "model_requests" });
-    expect(test.client.requests).toHaveLength(1);
-    const snapshot = await test.snapshot();
-    expect(results(snapshot)[0]?.status).toBe("denied");
-    expect(selected.prepare).not.toHaveBeenCalled();
-    expect(selected.execute).not.toHaveBeenCalled();
-    expect(snapshot.effects).toHaveLength(0);
-    expect(test.client.requests[0]?.toolChoice).toBe("none");
-    expect(test.events.some((event) => event.type === "approval.requested")).toBe(false);
-    expect(snapshot.runs[0]?.status).toBe("interrupted");
-  });
+  it.each(["tool_use", "max_tokens"] as const)(
+    "never executes a final-attempt tool (%s)",
+    async (stopReason) => {
+      const selected = syntheticTool();
+      const test = await harness(
+        [
+          [
+            { type: "part_completed", index: 0, part: call() },
+            { ...done, stopReason },
+          ],
+          finalTurn(),
+        ],
+        [selected],
+        {
+          limits: { maxModelRequests: 1 },
+        },
+      );
+      await test.start();
+      expect(await test.finish()).toEqual({
+        kind: "budget_exhausted",
+        budget: stopReason === "max_tokens" ? "model_output_tokens" : "model_requests",
+      });
+      expect(test.client.requests).toHaveLength(1);
+      const snapshot = await test.snapshot();
+      expect(results(snapshot)[0]?.status).toBe("denied");
+      expect(selected.prepare).not.toHaveBeenCalled();
+      expect(selected.execute).not.toHaveBeenCalled();
+      expect(snapshot.effects).toHaveLength(0);
+      expect(test.client.requests[0]?.toolChoice).toBe("none");
+      expect(test.events.some((event) => event.type === "approval.requested")).toBe(false);
+      expect(snapshot.runs[0]?.status).toBe("interrupted");
+    },
+  );
 
   it("counts down, preserves evidence and records the reserved final request exactly", async () => {
     const selected = syntheticTool();
@@ -742,7 +758,10 @@ describe("runtime core with real SQLite persistence", () => {
       { limits: { maxModelRequests: 1 } },
     );
     await test.start();
-    expect(await test.finish()).toEqual({ kind: "budget_exhausted", budget: "model_requests" });
+    expect(await test.finish()).toEqual({
+      kind: "budget_exhausted",
+      budget: stopReason === "max_tokens" ? "model_output_tokens" : "model_requests",
+    });
     expect(test.client.requests).toHaveLength(1);
   });
 
@@ -750,74 +769,77 @@ describe("runtime core with real SQLite persistence", () => {
     { label: "empty", text: "", stopReason: "end_turn" as const },
     { label: "whitespace", text: " \n\t", stopReason: "end_turn" as const },
     { label: "reasoning-only", text: "Unfinished reasoning", stopReason: "end_turn" as const },
+    {
+      label: "reasoning-only-final",
+      text: "Unfinished reasoning",
+      stopReason: "max_tokens" as const,
+    },
     { label: "truncated", text: "Unfinished answer", stopReason: "max_tokens" as const },
     { label: "unknown stop", text: "Unproven answer", stopReason: "other" as const },
     { label: "interrupted stop", text: "Partial answer", stopReason: "interrupted" as const },
-  ])(
-    "does not report a $label pre-final response as completed",
-    async ({ label, text, stopReason }) => {
-      const usage = {
-        status: "final" as const,
-        inputTokens: 17,
-        outputTokens: 9,
-        cacheReadTokens: 3,
-        cacheWriteTokens: null,
-        reasoningTokens: label === "reasoning-only" ? 9 : 0,
-      };
-      const part =
-        label === "reasoning-only"
-          ? { type: "reasoning" as const, kind: "visible" as const, text }
-          : { type: "text" as const, text };
-      const providerStopReason = { status: stopReason, source: "synthetic-terminal" };
-      const selected = syntheticTool();
-      const test = await harness(
+  ])("does not report a $label response as completed", async ({ label, text, stopReason }) => {
+    const usage = {
+      status: "final" as const,
+      inputTokens: 17,
+      outputTokens: 9,
+      cacheReadTokens: 3,
+      cacheWriteTokens: null,
+      reasoningTokens: label.startsWith("reasoning-only") ? 9 : 0,
+    };
+    const part = label.startsWith("reasoning-only")
+      ? { type: "reasoning" as const, kind: "visible" as const, text }
+      : { type: "text" as const, text };
+    const providerStopReason = { status: stopReason, source: "synthetic-terminal" };
+    const selected = syntheticTool();
+    const test = await harness(
+      [
         [
-          [
-            { type: "part_completed", index: 0, part },
-            { ...done, stopReason, providerStopReason, usage },
-          ],
-          finalTurn("Must remain unused"),
+          { type: "part_completed", index: 0, part },
+          { ...done, stopReason, providerStopReason, usage },
         ],
-        [selected],
-        { limits: { maxModelRequests: 3, maxRetries: 2 } },
-      );
-      await test.start();
-      expect(await test.finish()).toEqual(
-        stopReason === "max_tokens"
-          ? { kind: "budget_exhausted", budget: "model_output_tokens" }
-          : {
-              kind: "failed",
-              reason:
-                stopReason === "end_turn"
-                  ? "Model response contained no answer text"
-                  : `Model response did not complete (stop reason: ${stopReason})`,
-            },
-      );
-      expect(test.client.requests).toHaveLength(1);
-      expect(test.client.requests[0]?.toolChoice).toBeUndefined();
-      expect(test.client.remaining).toBe(1);
-      expect(test.scheduler.sleep).not.toHaveBeenCalled();
-      expect(selected.prepare).not.toHaveBeenCalled();
-      expect(selected.execute).not.toHaveBeenCalled();
-      const snapshot = await test.snapshot();
-      expect(snapshot.runs[0]?.status).toBe("interrupted");
-      expect(snapshot.effects).toEqual([]);
-      expect(results(snapshot)).toEqual([]);
-      const assistant = snapshot.entries.filter((entry) => entry.body.kind === "assistant_message");
-      expect(assistant).toHaveLength(1);
-      expect(assistant[0]?.body).toMatchObject({
-        content: [part],
-        stopReason,
-        providerStopReason,
-        usage,
-      });
-      expect(
-        snapshot.entries.some(
-          (entry) => entry.body.kind === "notice" && entry.body.code === "model_retry",
-        ),
-      ).toBe(false);
-    },
-  );
+        finalTurn("Must remain unused"),
+      ],
+      [selected],
+      { limits: { maxModelRequests: label === "reasoning-only-final" ? 1 : 3, maxRetries: 2 } },
+    );
+    await test.start();
+    expect(await test.finish()).toEqual(
+      stopReason === "max_tokens"
+        ? { kind: "budget_exhausted", budget: "model_output_tokens" }
+        : {
+            kind: "failed",
+            reason:
+              stopReason === "end_turn"
+                ? "Model response contained no answer text"
+                : `Model response did not complete (stop reason: ${stopReason})`,
+          },
+    );
+    expect(test.client.requests).toHaveLength(1);
+    expect(test.client.requests[0]?.toolChoice).toBe(
+      label === "reasoning-only-final" ? "none" : undefined,
+    );
+    expect(test.client.remaining).toBe(1);
+    expect(test.scheduler.sleep).not.toHaveBeenCalled();
+    expect(selected.prepare).not.toHaveBeenCalled();
+    expect(selected.execute).not.toHaveBeenCalled();
+    const snapshot = await test.snapshot();
+    expect(snapshot.runs[0]?.status).toBe("interrupted");
+    expect(snapshot.effects).toEqual([]);
+    expect(results(snapshot)).toEqual([]);
+    const assistant = snapshot.entries.filter((entry) => entry.body.kind === "assistant_message");
+    expect(assistant).toHaveLength(1);
+    expect(assistant[0]?.body).toMatchObject({
+      content: [part],
+      stopReason,
+      providerStopReason,
+      usage,
+    });
+    expect(
+      snapshot.entries.some(
+        (entry) => entry.body.kind === "notice" && entry.body.code === "model_retry",
+      ),
+    ).toBe(false);
+  });
 
   it("fails a pre-final end_turn with proposed calls without executing them", async () => {
     const selected = syntheticTool();

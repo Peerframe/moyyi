@@ -263,6 +263,21 @@ export function createCliSession(runtime: Runtime, options: CliSessionOptions): 
       else if (text) output("assistant saved", text);
       endStreamLine();
       streamedText = "";
+      if (body.stopReason === "max_tokens") {
+        output(
+          "response incomplete",
+          text.trim()
+            ? "The model reached its output limit. The text above is partial, not a completed answer."
+            : "The model reached its output limit without producing an answer.",
+        );
+        const { outputTokens, reasoningTokens, status } = body.usage;
+        if (status === "final" && outputTokens !== null && reasoningTokens !== null)
+          output(
+            "reported usage",
+            `${outputTokens} output tokens, including ${reasoningTokens} reasoning tokens.`,
+          );
+        output("moyyi", "This output limit is separate from the number of allowed requests.");
+      }
       for (const part of body.content)
         if (part.type === "tool_call") output("tool call", `${part.name} (${part.callId})`);
     } else if (body.kind === "user_message") {

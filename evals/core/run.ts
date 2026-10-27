@@ -344,7 +344,16 @@ const scenarios: readonly Scenario[] = [
       ],
     ],
     limits: { maxModelRequests: 1 },
-    check: checkNoFinalAnswer,
+    check(observation) {
+      noExecution(observation);
+      assert.equal(observation.evidence.modelRequests, 1);
+      assert.deepEqual(observation.evidence.outcome, {
+        kind: "budget_exhausted",
+        budget: "model_output_tokens",
+      });
+      assert.deepEqual(observation.retryDelays, []);
+      checkBudgetPrompts(observation, 1);
+    },
   },
   {
     id: "last-request-other-stop-is-not-completion",

@@ -718,6 +718,71 @@ describe("CLI protocol session", () => {
       expect(await host.cli.done).toBe(kind === "cancelled" ? 130 : 1);
     },
   );
+  it.each([false, true])(
+    "explains capped output without exposing reasoning (partial text: %s)",
+    async (partial) => {
+      const host = setup({ interactive: false, initialPrompt: "Inspect" });
+      await host.cli.start();
+      const entry = assistant(partial ? "Unfinished explanation" : "");
+      if (entry.body.kind !== "assistant_message") throw Error("Wrong fixture");
+      host.emit({
+        type: "entry.appended",
+        entry: {
+          ...entry,
+          body: {
+            ...entry.body,
+            stopReason: "max_tokens",
+            content: [
+              { type: "reasoning", kind: "visible", text: "PRIVATE_REASONING_NOT_FOR_TERMINAL" },
+              ...entry.body.content,
+            ],
+            usage: {
+              ...entry.body.usage,
+              status: "final",
+              outputTokens: 100,
+              reasoningTokens: partial ? 75 : 100,
+            },
+          },
+        },
+      });
+      host.emit({
+        type: "run.finished",
+        runId,
+        outcome: { kind: "budget_exhausted", budget: "model_output_tokens" },
+      });
+      expect(await host.cli.done).toBe(1);
+      expect(host.output()).toContain(
+        partial ? "text above is partial" : "without producing an answer",
+      );
+      expect(host.output()).toContain(
+        `100 output tokens, including ${partial ? 75 : 100} reasoning tokens`,
+      );
+      expect(host.output()).toContain("separate from the number of allowed requests");
+      expect(host.output()).not.toContain("PRIVATE_REASONING_NOT_FOR_TERMINAL");
+      expect(host.sent.filter((command) => command.type === "run.start")).toHaveLength(1);
+    },
+  );
+
+  it("does not turn unknown or partial usage into a final token count", async () => {
+    const host = setup();
+    await host.cli.start();
+    const entry = assistant("");
+    if (entry.body.kind !== "assistant_message") throw Error("Wrong fixture");
+    for (const status of ["unknown", "partial"] as const) {
+      host.emit({
+        type: "entry.appended",
+        entry: {
+          ...entry,
+          id: `entry_${status}` as EntryId,
+          body: { ...entry.body, stopReason: "max_tokens", usage: { ...entry.body.usage, status } },
+        },
+      });
+    }
+    expect(host.output()).toContain("without producing an answer");
+    expect(host.output()).not.toContain("reported usage");
+    expect(host.output()).not.toContain("0 output tokens");
+    await host.cli.end();
+  });
   it("loads a requested session and displays history without starting a model", async () => {
     const host = setup({ sessionId });
     host.setHook((command) => {

@@ -7,7 +7,41 @@ Owner 已授权先做整体计划，再针对已证实的缺口优化。本计�
 
 ## 持续交付：日常任务闭环（当前）
 
-### 当前交付：Kimi 官方接口与同题独立对照（2026-10-27）
+### 当前交付：输出耗尽的准确诊断与答案复核边界（2026-10-27）
+
+Owner要求修复剩余问题。本轮先复核原题、原评分和已送达的证据，保留两项遗漏及旧FAIL。
+重新查阅Codex/OpenCode任务状态工具和OpenHands独立judge，未发现能自动保证事实完整性的
+现成组件；已有泛化提示词曾失败撤回，不能再加同类句子当修复。
+
+两次不同机制的单请求诊断均单独冻结、先离线22/22再真实请求，零重试/零工具，不提供rubric或
+正确答案、不修改旧账本：
+
+- Flash/Responses/low续接原完整证据+原完整草稿/可见推理，要求通用复核并给出修订全文。
+  1次HTTP200，52.347秒，input35,278/cacheRead31,232/output8,192/reasoning8,192；没有正文，
+  raw SSE独立证实`incomplete/max_output_tokens`，不是保存或codec漏字。结果INCOMPLETE。
+  私有`~/.moyyi/reviews/answer-coverage-revision-2026-10-27/`，manifest
+  `e48ee743303e0bfd3dc0894dca744d25a127f4ddcd50c99f1a99962e1d87a330`。
+- Kimi/Chat/low fresh紧凑缺陷审查：原问题、原草稿和全部32个完整工具观察作为新JSON数据，
+  无旧assistant推理/倒计时/检索叙述，只要求有证据的简短缺陷与纠正。1次HTTP429，36.129秒，
+  原始类型`engine_overloaded_error`，无答复，用量unknown。独审逐项确认32结果及5个历史文件hash。
+  私有`~/.moyyi/reviews/answer-coverage-kimi-audit-2026-10-27/`，manifest
+  `05eccc8980a09baa6fcbdf7f3898c7dbeea61d5abd308d6ccece337ac93325ab`。不是语义FAIL或PASS。
+
+本轮共2次真实请求，均封存，未核对账户账单。两家公开接口都没有独立推理硬预算或正文预留参数，
+现有codec未漏传；保持low、8192与既有上限，不自动扩大。关闭本轮复核路线，不追加同题提示版本，
+也不加入未经证实的自动review阶段。原题4/6仍partial，其余1/2/3/5满足；旧标准和分数不动。
+
+**已确定的产品修复**：同样的`max_tokens`在早期请求会报输出额度耗尽，最后一请求却被报成请求数
+耗尽。先用2个真实runtime/SQLite回归复现错误，再修正cause优先级，包括最后一轮违规工具提议仍
+拒绝且不执行。CLI明确正文缺失/仅有部分文字；仅在最终用量已知时显示output及其中的reasoning数，
+不泄露推理正文、不把未知用量写成0。不会追加请求或重试。见[ADR0034](../decisions/0034-incomplete-response-outcomes.md#correct-the-final-request-cause-2026-10-27)。
+这修复运行诊断，**不声称修复原题事实遗漏**。分支`codex/answer-coverage-review`，独立PR交付。
+修复前定向复现2失败/9通过；首次修复后runtime/CLI定向97/97通过，随后加入最后一轮截断工具提议
+保留拒绝的用例。最终`npm run check`118文件/2553测试、typecheck/lint全部通过（85.37秒）；
+原core eval25/25通过。原六项标准、权限、超时、请求数、8192输出及零重试均未放宽。
+双平台CI、外部安装及本机更新证据在本节后续记录，不提前记为通过。
+
+### 上次交付：Kimi 官方接口与同题独立对照（2026-10-27）
 
 Owner保存区域密钥后授权接口验证、原题/原标准对照；Flash + Responses + low日常默认保留，不公开发布。
 先验证路线：Responses合成工具探针2请求中首个HTTP200、第二个HTTP400明确拒绝`tool_choice:none`；

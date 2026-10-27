@@ -106,7 +106,24 @@ model interpretation. This is not evidence to broaden the default grants silentl
 
 ## Current delivery and next boundary
 
-**Current bounded result: Kimi connects correctly, but does not pass the unchanged source rubric.**
+
+**Current bounded work: accurate output-limit diagnostics; source-answer omissions remain open.**
+One sealed Flash revision diagnostic exhausted all8,192 output tokens in reasoning without an
+answer. One separate fresh Kimi compact defect audit received429 engine overload and supplied no
+semantic evidence. Both stopped after one request with no retries or tools; old task scores remain
+unchanged. The [research record](research/2026-10-26-agent-navigation.md#answer-coverage-after-evidence-delivery-2026-10-27)
+records the mechanism changes, official budget controls and why no automatic review stage is adopted.
+
+The concrete residual defect is final-request classification: explicit output exhaustion was
+reported as request exhaustion. [ADR0034](decisions/0034-incomplete-response-outcomes.md#correct-the-final-request-cause-2026-10-27)
+corrects that cause and adds clear CLI partial/no-answer diagnostics with known final usage.
+This does not alter limits, authority, default Flash/Responses/low or the original answer rubric.
+Current branch acceptance and installation coordinates are in the delivery record; do not infer
+that the installed program has changed until its package is verified. A future source-answer
+quality change needs a distinct, justified mechanism and evidence within its accepted task budget;
+no further same-question prompt variant or automatic review framework is pending from these trials.
+
+**Previous bounded result: Kimi connects correctly, but does not pass the unchanged source rubric.**
 The owner selected official Kimi Open Platform and saved the regional key. A separate synthetic
 Responses probe returned HTTP200 then HTTP400 for final `tool_choice:none`; Chat completed the
 tool/result/final-none flow in two HTTP200 requests. [ADR 0036](decisions/0036-kimi-chat-provider.md)
