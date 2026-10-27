@@ -22,10 +22,10 @@ read-only until explicitly enabled. Original tasks and acceptance standards stay
 
 | Coordinate | Current evidence |
 |---|---|
-| Last merged product change | [PR #35](https://github.com/Peerframe/moyyi/pull/35), `8ab4054eac2607ae9e35129951de5abcdc2b605f`; [merged main Linux/macOS CI](https://github.com/Peerframe/moyyi/actions/runs/40416058220) passed. Verify Git before editing. |
-| Installed product | `4e3cddb1a8243c925a469edf73f17121b20dfa92`; all372 files match tar SHA256 `4d7bb7122b1a6cd758e3010a374befc0f455675d29bb3e96e867c17a93896278`. Packaged inputs match merged main; nonpackaged evidence/eval updates do not require reinstalling the same program. |
-| Product acceptance | Check2,407 tests, files19/19, external CLI12/client13/documents9, isolation/strict types/PTY7 and product/final-head CI passed. Actual owner client13/CLI12 and old-session resume/help/exit passed without a model call. Sessions/config backed up and PR #34 package retained. |
-| Last evidence delivery | [PR #36](https://github.com/Peerframe/moyyi/pull/36), merged `ae960de` with [main CI passed](https://github.com/Peerframe/moyyi/actions/runs/40421088168): a user-requested source-derived check, controlled report repair and readback using existing capabilities. No core/provider/default-guidance change. Offline check2,433 tests passed; one actual installed workflow passed in5 requests, zero retries. Original failures remain separate. |
+| Latest product delivery | [PR #37](https://github.com/Peerframe/moyyi/pull/37), product `6a3da0b35b344a613a4010cf6d63abb1376a277c`: read-authorized verified write observations. [Product Linux/macOS CI](https://github.com/Peerframe/moyyi/actions/runs/40427690752) passed. Final merge/CI coordinates are in the PR; verify Git before editing. |
+| Installed product | `6a3da0b35b344a613a4010cf6d63abb1376a277c`; all375 files match tar SHA256 `78469e6d03adf87bb39af6d1f410391c9ec0cd02c7b5c26a517930c3ab68954c`. Later nonpackaged evidence-only edits do not require reinstalling the same program. |
+| Product acceptance | Check2,465 tests, writes8/8 with six exact next-request observations, external CLI12/client13/documents9, containment/strict types/PTY7 and product CI passed. Actual owner client13/CLI12 and old-session resume/help/exit passed without a model call. Sessions/config backed up and PR #35 package retained. |
+| Previous evidence-only delivery | [PR #36](https://github.com/Peerframe/moyyi/pull/36), merged `ae960de` with [main CI passed](https://github.com/Peerframe/moyyi/actions/runs/40421088168): user-requested source-derived check, controlled report repair and readback. Offline check2,433 passed; actual installed workflow passed once in5 requests. Its original task failures remain separate. |
 | Public version | None; local candidate installation and public source PRs are not a version release. |
 
 ## What the user can do
@@ -39,7 +39,7 @@ failures, later corrections and private evidence coordinates.
 | Start, find work and resume | [CLI](cli.md), cross-workspace catalog/receipts, actual installed startup and reopen passed | Live credentials come from an explicit trusted host; old session state does not grant current authority. |
 | Read files and explain a project | Guarded path discovery/search/ranges (navigation enabled in the daily host), readable numbered source, complete next-request delivery; original public report task passed | Complex Skills explanation still fails the original rubric. More available text is not a factual verifier. |
 | Read PDF/DOCX/XLSX/PPTX/ODT/ODS/ODP | [Native parser](documents.md), actual installation/containment on Linux/macOS, two fixed live comparison/report tasks passed | Body text only; no OCR, legacy/macro files, formula calculation or visual-layout claim. Larger/repeated tasks unmeasured. |
-| Modify, check and undo | [Controlled writes](writes.md) plus [read-only Node commands](shell.md); one live repair/check/undo restored original bytes/mode/failure; actual everyday CLI repair/check/readback passed | Independent source/test checks are needed for meaning. A write postcheck verifies bytes, not task correctness. |
+| Modify, check and undo | [Controlled writes](writes.md) plus [read-only Node commands](shell.md); one live repair/check/undo restored original bytes/mode/failure; actual everyday CLI repair/check/readback passed | Independent source/test checks are needed for meaning. Read-authorized bounded postcheck text now reaches the next request; it verifies bytes, not task correctness. |
 | Continue longer work | [SQLite and compaction](long-sessions.md); real eight-turn conversation across process reopen/summary/reopen preserved all ten checked facts/constraints | One bounded semantic case, not general long-session reliability. |
 | Read actual websites | [Web](web.md) fetched full RFC8259 and produced/read a report with five required correct facts | Two incidental claims needed revision; corrected file was independently checked but the model omitted final revision readback. Search-service/Anthropic live use remains unverified. |
 | Transform ordinary data/documents | Exact quoted CSV transformation and formatting-preserving worksheet edit passed with actual outputs/readback | A ledger report still associated a delivered amount with the wrong invoice. The new explicit verification workflow detected and repaired that type of error once; autonomous verification remains unproven. |
@@ -105,13 +105,14 @@ model interpretation. This is not evidence to broaden the default grants silentl
 
 ## Current delivery and next boundary
 
-**Current implementation: verified write observations.**
+**Delivered implementation: verified write observations.**
 The runtime already checks actual disk bytes after a controlled edit; the fs tool previously
 returned only hashes and a snapshot. [ADR 0035](decisions/0035-verified-write-observations.md)
 returns that existing observation with independent read authority, bounded content and explicit
 availability/truncation. It adds no model request or file read and does not certify facts.
-Original web revision readback and source-question failures are not rescored. Source/package
-verification and installation evidence will be recorded before declaring delivery.
+Original web revision readback and source-question failures are not rescored. Source, external package and actual owner installation verification passed; product CI and fixed
+code review passed. Final integration coordinates are recorded in PR #37. No live semantic
+retest of this new observation feature has been performed.
 
 **Closed trial: the original question with its restored eight-request ceiling.**
 The owner explicitly approved one trial on2026-10-27; it used8 HTTP200, zero retries and no

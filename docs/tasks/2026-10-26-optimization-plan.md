@@ -48,7 +48,15 @@ PR #36 已合并到`ae960de`，分支与main双平台CI通过，安装产品仍�
 首轮全量暴露新增重复说明挤爆原10000上下文上限（10725）的回归，保留失败；两次局部压缩仍超限、
 其中最后差1字节。随后删去重复回执说明，总说明短于旧版，原断言/容量未改即通过。
 一次在仍失败时误启动的全量重跑已主动中止，不能计作通过。完整最终check为独立成功执行。
-当前分支`codex/verified-write-observations`；待实际包与CI后按授权合并安装，不公开发布。
+[PR #37](https://github.com/Peerframe/moyyi/pull/37)产品`6a3da0b`已固定审查无阻断；
+[Linux/macOS产品CI](https://github.com/Peerframe/moyyi/actions/runs/40427690752)通过。
+`npm run verify:package -- --offline`外部安装CLI12/client13/documents9、原生隔离/严格类型/PTY7通过。
+实际包375文件，SHA256 `78469e6d03adf87bb39af6d1f410391c9ec0cd02c7b5c26a517930c3ab68954c`；
+安装前备份会话/配置，保留PR #35旧包。新安装逐文件哈希一致；实际client13/CLI12及旧会话resume/help/exit通过。
+host/管理器/两个启动器字节未变，安装不读Key、不发模型请求；新增正文确实进入实际安装client下一请求，
+原/results仍能提取回执。没有新增真实语义试验，也不把合成模型结果计作事实准确性提高。
+私有安装/回退与日志在`~/.moyyi/reviews/verified-write-observations/`，原题回答与审查摘要已交付
+`~/moyyi-demo/source-investigation-2026-10-27/`。最终证据提交CI与合并后main结果在PR记录；不公开发布。
 
 
 ### 上次交付：独立来源核对与报告修复（2026-10-27）
