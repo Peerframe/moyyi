@@ -156,12 +156,12 @@ try {
       },
     ]);
     assert.equal(recording.request.maxOutputTokens, 8192);
-    assert.equal(
+    assert.deepEqual(
       recording.request.messages
         .filter((message) => message.role === "user")
         .flatMap((message) => message.content)
-        .filter((part) => JSON.stringify(part) === JSON.stringify(input[0])).length,
-      1,
+        .filter((part) => part.type === "text" && part.text === question),
+      input,
     );
     assert.equal(requests[0].reasoning_effort, "high");
     assert.equal(requests[0].max_completion_tokens, 8192);
@@ -200,10 +200,12 @@ try {
       reopened.filter((event) => event.type === "entry.appended").map((event) => event.entry),
       entries,
     );
-    for (const reference of assistants[0].body.request.messages) {
+    const persistedMessages = assistants[0].body.request.messages.map((reference) => {
       const bytes = readFileSync(join(dataDirectory, "blobs", reference.slice(7)));
       assert.equal(`sha256:${createHash("sha256").update(bytes).digest("hex")}`, reference);
-    }
+      return JSON.parse(bytes);
+    });
+    assert.deepEqual(persistedMessages, recording.request.messages);
     assert.equal(requests.length, 1, "Reopening history must not replay the failed request");
     assert.equal(recordings.size, 1);
     assert.equal(readFileSync(join(workspace, "note.txt"), "utf8"), note);
