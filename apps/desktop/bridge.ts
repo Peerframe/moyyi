@@ -88,6 +88,7 @@ export class DesktopProcess {
         run: null,
         pendingApproval: null,
         permissions: { writes: false, checks: false },
+        webAccess: { allowedOrigins: [], dns: "system" },
         reportTarget: null,
         artifactPreview: null,
         effectInspection: null,

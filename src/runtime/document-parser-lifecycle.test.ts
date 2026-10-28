@@ -25,10 +25,11 @@ vi.mock("./document-sandbox.ts", async (original) => {
       const args = [...plan.args];
       args.pop();
       // Fixed test worker proves a live process is stopped, including TERM resistance.
+      // Publish only a complete PID: file existence must not expose writeFileSync's empty-file window.
       args.push(
         "--input-type=module",
         "-e",
-        "import{writeFileSync}from'node:fs';process.on('SIGTERM',()=>{});writeFileSync(process.env.HOME+'/ready',String(process.pid));setInterval(()=>{},1000)",
+        "import{writeFileSync,renameSync}from'node:fs';process.on('SIGTERM',()=>{});const ready=process.env.HOME+'/ready';writeFileSync(ready+'.tmp',String(process.pid));renameSync(ready+'.tmp',ready);setInterval(()=>{},1000)",
       );
       return { ...plan, args };
     },

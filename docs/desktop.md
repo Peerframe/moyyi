@@ -4,14 +4,15 @@ The macOS arm64 desktop opens the existing moyyi runtime. M1's workspace selecti
 conversation, approval, cancellation and history loop is accepted. M2's settings, document
 selection and delivered-report controls passed the external bundle checks and two fixed live
 tasks through the native UI. M2 was merged and installed; the [PR #45 delivery receipt](https://github.com/Peerframe/moyyi/pull/45)
-records its final coordinates. M3 adds controlled changes/checks and operation history. It is
-installed at source `6eb2993`, merged main `85873c7`: external-copy/native gates and an independently
-authorized live repair/check/reopen/undo passed. The first live failure and an incorrect extra
-explanation remain recorded below. [PR #46](https://github.com/Peerframe/moyyi/pull/46) and the local
-installation receipt record native launch and history reopen verification. M4's optional high
-setting, local help and maintenance controls passed isolated bundle/native maintenance acceptance;
-they do not yet update this M3 installation. The complex source-analysis task still fails its
-original standard. This is not a public release or M4 completion claim.
+records its final coordinates. M3 adds controlled changes/checks and operation history. M4 was installed from
+source `3e33ff9`, merged main `3f6eeb9`, after owner acceptance with the original source-answer
+quality limitation retained. It includes local help, explicit experimental Kimi high and guarded
+backup/restore/rollback. Native launch/history reopening and unchanged owner data/settings were
+verified after backup. Old failures are not rescored. This is a local candidate, not a public release.
+M5's specified-page/source/report workflow has completed bounded acceptance in the verified
+`dd897834` bundle. The [PR48 receipt](https://github.com/Peerframe/moyyi/pull/48) records final
+merge/installation; the [M5 task record](tasks/2026-10-28-desktop-m5.md) separates its one live
+trial, initial source-panel defect and corrected zero-call history reopening.
 See [ADR 0037](decisions/0037-installed-desktop-client.md),
 [ADR 0038](decisions/0038-desktop-materials-and-reports.md),
 [ADR 0039](decisions/0039-desktop-controlled-workflows.md),
@@ -24,7 +25,7 @@ Open `Moyyi.app`, choose **新会话 → 选择工作目录**, and describe the 
 the button or Command+Enter. The selected directory is the read scope, including supported
 document body text. New and reopened sessions are read-only. Report creation requires the
 separate explicit selection described below. M3 file changes and Node checks require their own
-explicit grants; web access remains unavailable.
+explicit grants. M5 adds a separate temporary web grant; it is disabled initially.
 The default is DeepSeek Flash through Responses, reasoning low, at most3 requests per turn,
 120 seconds,8192 output tokens and zero automatic retries. Reopening, selecting a directory
 and loading history make no model request.
@@ -296,3 +297,30 @@ verified previous app only after checking current settings/store compatibility. 
 the existing CLI package remains separate. Restore database backups only deliberately because
 doing so replaces the active history; first preserve the current store as a rescue backup.
 No automatic updater or additional desktop platform is claimed.
+
+## Web pages and recorded sources (M5)
+
+From an idle selected session, choose **网页访问**. Enter at most eight exact HTTPS origins,
+one per line (for example `https://www.iana.org`), without paths, queries or wildcards. Choose
+system DNS, or explicitly select Cloudflare DoH if needed; the dialog explains its hostname
+disclosure. Confirm the native destination list. This does not fetch anything or call a model.
+
+Give the complete page URLs in your task. Approve each proposed GET only after reviewing its
+URL/path/query. Remote pages and their text cannot grant file or command permissions. Choose
+**选择报告位置** separately if you want a new report; it retains confirmed web access but
+still requires the exact file-create approval. Ask for a readback and inspect the actual report
+in **报告成果**. A successful write or readback does not certify its facts.
+
+**网页来源** shows recorded successful fetch observations, never links invented in an answer.
+Expand a source to compare its returned text with the report. It shows the URL, HTTP status,
+media type, record time and the full observed text's SHA256. Select/copy its URL when independently
+checking it. Record time is not publication time. A tool prefix and a display-only prefix are
+labelled separately; source history is bounded and omissions are marked. Failed, denied and
+uncertain requests stay in operation/tool history without an invented source card.
+
+Grants clear on new/reopened sessions, model-setting changes and close. Reopening sources does
+not refetch them. Use **关闭网页访问** while idle to remove the grant. During a run, cancel and
+wait for it to settle first; an already sent GET cannot be recalled. There is no desktop search,
+login state, JavaScript execution, automatic redirect/following, cookies or file downloads.
+The original network limits in [web.md](web.md) remain. M5 acceptance is recorded separately in
+[the delivery receipt](tasks/2026-10-28-desktop-m5.md); original M4 answer failures remain retained.

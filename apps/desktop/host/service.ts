@@ -14,6 +14,7 @@ import {
   discoverNodeToolchain,
   type Runtime,
   type RuntimeOptions,
+  WebPolicy,
 } from "moyyi/runtime";
 import {
   DEFAULT_DESKTOP_SETTINGS,
@@ -24,12 +25,19 @@ import {
   type DesktopSessionSummary,
   type DesktopSettings,
   type DesktopState,
+  type DesktopWebAccess,
 } from "../shared.ts";
 import { inspectEffectFile } from "./effects.ts";
 import { FileBoundaryError, inspectMaterials } from "./materials.ts";
 import { DesktopPolicy } from "./permissions.ts";
 import { inspectReport, reportTarget } from "./reports.ts";
 import { parseDesktopCommand } from "./validation.ts";
+import {
+  appendWebSource,
+  EMPTY_WEB_ACCESS,
+  normalizeDesktopWebAccess,
+  projectWebSource,
+} from "./web.ts";
 
 export interface DesktopHostOptions {
   readonly runtimeOptions: () => RuntimeOptions | Promise<RuntimeOptions>;
@@ -96,6 +104,8 @@ class Host implements DesktopHost {
       materials: [],
       reportTarget: null,
       permissions: { writes: false, checks: false },
+      webAccess: EMPTY_WEB_ACCESS,
+      sources: { items: [], truncated: false },
       openedHistory: false,
       effects: { items: [], offset: 0, hasMore: false },
       effectInspection: null,
@@ -155,7 +165,10 @@ class Host implements DesktopHost {
     askEachRead: boolean,
     target: string | null = null,
     permissions: DesktopPermissions = { writes: false, checks: false },
+    webAccess: DesktopWebAccess = EMPTY_WEB_ACCESS,
   ): Promise<void> {
+    const access = normalizeDesktopWebAccess(webAccess);
+    this.update({ webAccess: EMPTY_WEB_ACCESS });
     if (this.runtime) {
       await this.runtime.close();
       this.unsubscribe?.();
@@ -186,7 +199,14 @@ class Host implements DesktopHost {
             },
           }
         : {}),
-      policy: new DesktopPolicy(permissions, askEachRead, target),
+      ...(access.allowedOrigins.length ? { web: { ...access, approval: "ask" as const } } : {}),
+      policy: access.allowedOrigins.length
+        ? new WebPolicy({
+            previous: new DesktopPolicy(permissions, askEachRead, target),
+            fetch: true,
+            approval: "ask",
+          })
+        : new DesktopPolicy(permissions, askEachRead, target),
     });
     if (this.state.status !== "ready") {
       await runtime.close();
@@ -201,6 +221,7 @@ class Host implements DesktopHost {
       askEachRead,
       reportTarget: target,
       permissions,
+      webAccess: access,
       error: this.pluginWarning,
     });
   }
@@ -318,6 +339,7 @@ class Host implements DesktopHost {
     this.expectedSession = sessionId;
     this.update({
       messages: [],
+      sources: { items: [], truncated: false },
       streamText: "",
       historyTruncated: false,
       artifactPreview: null,
@@ -335,7 +357,12 @@ class Host implements DesktopHost {
 
   private async changeReport(target: string | null): Promise<void> {
     try {
-      await this.open(this.state.askEachRead, target);
+      await this.open(
+        this.state.askEachRead,
+        target,
+        { writes: false, checks: false },
+        this.state.webAccess,
+      );
       await this.reloadSelected();
     } catch {
       this.update({ reportTarget: null });
@@ -379,7 +406,9 @@ class Host implements DesktopHost {
         command.askEachRead !== this.state.askEachRead ||
         this.state.reportTarget !== null ||
         this.state.permissions.writes ||
-        this.state.permissions.checks
+        this.state.permissions.checks ||
+        this.state.webAccess.allowedOrigins.length > 0 ||
+        this.state.webAccess.dns !== "system"
       )
         await this.open(command.askEachRead);
       this.approvals.clear();
@@ -397,6 +426,8 @@ class Host implements DesktopHost {
         materials: [],
         reportTarget: null,
         permissions: { writes: false, checks: false },
+        webAccess: EMPTY_WEB_ACCESS,
+        sources: { items: [], truncated: false },
         openedHistory: command.type === "load",
         effects: { items: [], offset: 0, hasMore: false },
         effectInspection: null,
@@ -432,6 +463,7 @@ class Host implements DesktopHost {
         artifactPreview: null,
         effectInspection: null,
       });
+      this.update({ webAccess: EMPTY_WEB_ACCESS });
       let saved = false;
       try {
         const configured = await this.configure(command.settings, command.apiKey);
@@ -504,10 +536,15 @@ class Host implements DesktopHost {
         effectInspection: null,
       });
       try {
-        await this.open(this.state.askEachRead, null, {
-          writes: command.writes,
-          checks: command.checks,
-        });
+        await this.open(
+          this.state.askEachRead,
+          null,
+          {
+            writes: command.writes,
+            checks: command.checks,
+          },
+          this.state.webAccess,
+        );
         await this.reloadSelected();
       } catch {
         this.update({ permissions: { writes: false, checks: false } });
@@ -517,6 +554,30 @@ class Host implements DesktopHost {
         }
         throw new BoundaryError(
           "Desktop permissions could not be enabled; no effect permissions were retained",
+        );
+      }
+      return;
+    }
+    if (command.type === "web.permissions") {
+      this.selected(command.sessionId);
+      const access = normalizeDesktopWebAccess({
+        allowedOrigins: command.allowedOrigins,
+        dns: command.dns,
+      });
+      const target = this.state.reportTarget;
+      const permissions = this.state.permissions;
+      this.update({ webAccess: EMPTY_WEB_ACCESS, pendingApproval: null });
+      try {
+        await this.open(this.state.askEachRead, target, permissions, access);
+        await this.reloadSelected();
+      } catch {
+        this.update({ webAccess: EMPTY_WEB_ACCESS });
+        if (this.state.status === "ready") {
+          await this.open(this.state.askEachRead, target, permissions);
+          await this.reloadSelected();
+        }
+        throw new BoundaryError(
+          "Web access could not be changed; no network permission was retained",
         );
       }
       return;
@@ -726,6 +787,17 @@ class Host implements DesktopHost {
           });
       }
     } else if (body.kind === "tool_results") {
+      for (const result of body.results) {
+        const source = projectWebSource(
+          entry.id,
+          entry.createdAt,
+          result,
+          this.toolNames.get(result.callId),
+        );
+        if (source) this.update({ sources: appendWebSource(this.state.sources, source) });
+        else if (this.toolNames.get(result.callId) === "web_fetch" && result.status === "succeeded")
+          this.update({ sources: { ...this.state.sources, truncated: true } });
+      }
       for (const [index, result] of body.results.entries())
         this.add({
           id: `${entry.id}:${index}`,
@@ -940,7 +1012,7 @@ class Host implements DesktopHost {
 
   close(): Promise<void> {
     if (this.closing) return this.closing;
-    this.update({ status: "closing" });
+    this.update({ status: "closing", webAccess: EMPTY_WEB_ACCESS });
     this.closing = (async () => {
       try {
         await this.operation?.catch(() => {});

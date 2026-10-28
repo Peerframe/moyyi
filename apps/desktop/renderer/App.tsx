@@ -16,6 +16,7 @@ import { MessageList } from "./MessageList.tsx";
 import { PermissionsDialog } from "./PermissionsDialog.tsx";
 import { SessionSidebar } from "./SessionSidebar.tsx";
 import { SettingsDialog } from "./SettingsDialog.tsx";
+import { SourcesPanel } from "./SourcesPanel.tsx";
 import { presetLabel } from "./settings-state.ts";
 import { UsageGuide } from "./UsageGuide.tsx";
 import {
@@ -25,6 +26,7 @@ import {
   outcomeLabel,
   workspaceName,
 } from "./view-state.ts";
+import { WebAccessDialog } from "./WebAccessDialog.tsx";
 
 export function App({ bridge }: { bridge: DesktopBridge }) {
   const [state, setState] = useState<DesktopState | null>(null);
@@ -37,6 +39,7 @@ export function App({ bridge }: { bridge: DesktopBridge }) {
   const [helpOpen, setHelpOpen] = useState(false);
   const [maintenanceOpen, setMaintenanceOpen] = useState(false);
   const [permissionsOpen, setPermissionsOpen] = useState(false);
+  const [webAccessOpen, setWebAccessOpen] = useState(false);
   const gate = useRef(createActionGate());
   const composer = useRef<HTMLTextAreaElement>(null);
   const scrollArea = useRef<HTMLDivElement>(null);
@@ -112,6 +115,7 @@ export function App({ bridge }: { bridge: DesktopBridge }) {
       helpOpen ||
       maintenanceOpen ||
       permissionsOpen ||
+      webAccessOpen ||
       newSession ||
       !draft.trim()
     )
@@ -186,6 +190,7 @@ export function App({ bridge }: { bridge: DesktopBridge }) {
     !helpOpen &&
     !maintenanceOpen &&
     !permissionsOpen &&
+    !webAccessOpen &&
     state.connection.ready &&
     draft.trim().length > 0;
   const requestBudget =
@@ -229,6 +234,11 @@ export function App({ bridge }: { bridge: DesktopBridge }) {
               使用帮助
             </button>
             {!configuring ? (
+              <button type="button" disabled={busy} onClick={() => setWebAccessOpen(true)}>
+                网页访问
+              </button>
+            ) : null}
+            {!configuring ? (
               <button type="button" disabled={busy} onClick={() => setPermissionsOpen(true)}>
                 会话权限
               </button>
@@ -253,7 +263,7 @@ export function App({ bridge }: { bridge: DesktopBridge }) {
           <br />
           {configuring
             ? "只读所选工作目录 · 不写入文件、不执行命令、不访问网页"
-            : permissionLabel(state.permissions, state.reportTarget)}
+            : permissionLabel(state.permissions, state.reportTarget, state.webAccess)}
           {!configuring ? ` · ${state.askEachRead ? "工具读取逐次审批" : "工具读取已授权"}` : ""}
         </p>
         {!state.connection.ready ? (
@@ -308,7 +318,7 @@ export function App({ bridge }: { bridge: DesktopBridge }) {
               <>
                 {state.openedHistory ? (
                   <p className="history-notice" role="status">
-                    已打开历史会话。打开时已关闭文件修改与命令检查权限，历史动作不会自动重放。
+                    已打开历史会话。打开时已关闭文件修改、命令检查与网页访问权限，历史动作不会自动重放。
                     当前权限以上方状态为准；已停止不代表已撤销，结果未知时需先检查。
                   </p>
                 ) : null}
@@ -372,6 +382,7 @@ export function App({ bridge }: { bridge: DesktopBridge }) {
                     只填入可编辑请求，发送后使用模型预算；命令检查需另行授权和批准。
                   </span>
                 </div>
+                <SourcesPanel sources={state.sources} />
                 <EffectsPanel
                   sessionId={state.activeSessionId as string}
                   effects={state.effects}
@@ -506,6 +517,26 @@ export function App({ bridge }: { bridge: DesktopBridge }) {
             return result.permissions;
           }}
           onClose={() => setPermissionsOpen(false)}
+        />
+      ) : null}
+      {webAccessOpen && state.activeSessionId && state.workspaceRoot ? (
+        <WebAccessDialog
+          key={state.activeSessionId}
+          workspace={state.workspaceRoot}
+          webAccess={state.webAccess}
+          onConfigure={async (webAccess) => {
+            const result = await perform(
+              () =>
+                bridge.configureWebAccess({
+                  sessionId: state.activeSessionId as string,
+                  ...webAccess,
+                }),
+              "未能确认网页访问变更，请核对当前状态。",
+            );
+            if (!result) throw Error("未能确认网页访问变更。");
+            return result.webAccess;
+          }}
+          onClose={() => setWebAccessOpen(false)}
         />
       ) : null}
     </div>

@@ -513,7 +513,8 @@ svg {
   line-height: 1.65;
   overflow-wrap: anywhere;
 }
-.materials-panel {
+.materials-panel,
+.sources-panel {
   padding: 14px;
   margin-bottom: 24px;
   border: 1px solid var(--line);
@@ -749,6 +750,66 @@ svg {
 }
 .settings-dialog::backdrop {
   background: rgb(0 0 0 / 28%);
+}
+.web-options {
+  display: grid;
+  gap: 10px;
+  margin: 18px 0;
+  padding: 0;
+  border: 0;
+  min-width: 0;
+}
+.web-options label {
+  font-size: 12px;
+}
+.web-options textarea,
+.web-options select {
+  width: 100%;
+  padding: 10px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--surface);
+  color: var(--text);
+}
+.web-options textarea {
+  resize: vertical;
+}
+.source-record {
+  border-top: 1px solid var(--line);
+  padding: 12px 0;
+  font-size: 12px;
+  overflow-wrap: anywhere;
+}
+.source-record summary {
+  cursor: pointer;
+  line-height: 1.6;
+}
+.source-url {
+  user-select: text;
+}
+.source-metadata {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  gap: 6px 12px;
+  font-size: 11px;
+  line-height: 1.6;
+}
+.source-metadata dt {
+  color: var(--muted);
+}
+.source-metadata dd {
+  margin: 0;
+}
+.source-text {
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  max-height: 420px;
+  overflow-y: auto;
+  padding: 12px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  font-size: 12px;
+  line-height: 1.7;
 }
 .settings-dialog h2 {
   font-size: 18px;

@@ -126,6 +126,134 @@ beforeEach(async () => {
   expect(native.error).not.toHaveBeenCalled();
 });
 
+describe("native web permission entry", () => {
+  const web = {
+    sessionId: "session_current",
+    allowedOrigins: ["https://www.iana.org", "https://www.rfc-editor.org"],
+    dns: "cloudflare-doh",
+  };
+  it("confirms exact origins and DNS disclosure before granting, independently from file/report permissions", async () => {
+    await call("moyyi:web-permissions", web);
+    const prompt = native.confirm.mock.calls[0]?.[1];
+    expect(prompt.detail).toContain(web.allowedOrigins.join("\n"));
+    expect(prompt.detail).toContain("将网页主机名发送给 Cloudflare");
+    expect(prompt.detail).toContain("每次 GET 仍需单独批准");
+    expect(prompt.detail).toContain("与报告位置及文件权限独立");
+    expect(prompt).toMatchObject({ defaultId: 0, cancelId: 0 });
+    expect(native.send).toHaveBeenCalledWith({ type: "web.permissions", ...web });
+  });
+  it("keeps dismissed confirmation inert and clears without a grant prompt", async () => {
+    native.confirm.mockResolvedValueOnce({ response: 0 });
+    await call("moyyi:web-permissions", web);
+    expect(native.send).not.toHaveBeenCalled();
+    await call("moyyi:web-permissions", { ...web, allowedOrigins: [], dns: "system" });
+    expect(native.confirm).toHaveBeenCalledOnce();
+    expect(native.send).toHaveBeenCalledWith({
+      type: "web.permissions",
+      ...web,
+      allowedOrigins: [],
+      dns: "system",
+    });
+  });
+  it("rejects generic actions, foreign frames, forged fields, invalid origins and active runs", async () => {
+    await expect(call("moyyi:act", { type: "web.permissions", ...web })).rejects.toThrow(
+      "原生入口",
+    );
+    await expect(
+      call("moyyi:web-permissions", web, {
+        ...event(),
+        senderFrame: { url: "file:///installed/app/index.html" },
+      }),
+    ).rejects.toThrow("非当前窗口");
+    for (const changed of [
+      { type: "permissions" },
+      { workspaceRoot: "/" },
+      { dns: "custom" },
+      { allowedOrigins: ["https://example.com/path"] },
+      { allowedOrigins: ["https://127.0.0.1"] },
+    ])
+      await expect(call("moyyi:web-permissions", { ...web, ...changed })).rejects.toThrow();
+    native.state.run = { id: "active" };
+    await expect(call("moyyi:web-permissions", web)).rejects.toThrow("结束当前任务");
+    expect(native.confirm).not.toHaveBeenCalled();
+    expect(native.send).not.toHaveBeenCalled();
+  });
+  it.each([
+    { activeSessionId: "session_other" },
+    { workspaceRoot: "/other" },
+    { status: "closed" },
+    { run: { id: "late" } },
+  ])("rejects stale confirmation after %j", async (changed) => {
+    native.confirm.mockImplementationOnce(async () => {
+      Object.assign(native.state, changed);
+      return { response: 1 };
+    });
+    await expect(call("moyyi:web-permissions", web)).rejects.toThrow("会话已变化");
+    expect(native.send).not.toHaveBeenCalled();
+  });
+  it("holds the selection gate through the native dialog and releases after cancellation", async () => {
+    let resolve: ((value: { response: number }) => void) | undefined;
+    native.confirm.mockImplementationOnce(
+      () =>
+        new Promise((r) => {
+          resolve = r;
+        }),
+    );
+    const saving = call("moyyi:web-permissions", web);
+    await vi.waitFor(() => expect(resolve).toBeTypeOf("function"));
+    await expect(
+      call("moyyi:act", { type: "start", sessionId: web.sessionId, text: "run" }),
+    ).rejects.toThrow("当前选择");
+    await expect(call("moyyi:permissions", request)).rejects.toThrow();
+    resolve?.({ response: 0 });
+    await saving;
+    await call("moyyi:act", { type: "list", offset: 0 });
+    expect(native.send).toHaveBeenCalledWith({ type: "list", offset: 0 });
+  });
+  it("claims one native confirmation atomically for simultaneous web requests", async () => {
+    let resolve: ((value: { response: number }) => void) | undefined;
+    native.confirm.mockImplementation(
+      () =>
+        new Promise((r) => {
+          resolve = r;
+        }),
+    );
+    const first = call("moyyi:web-permissions", web);
+    const second = call("moyyi:web-permissions", web);
+    const rejection = expect(second).rejects.toThrow("当前选择");
+    await vi.waitFor(() => expect(native.confirm).toHaveBeenCalledOnce());
+    resolve?.({ response: 0 });
+    await Promise.all([first, rejection]);
+    expect(native.send).not.toHaveBeenCalled();
+  });
+  it.each([
+    ["moyyi:permissions", true],
+    ["moyyi:permissions", false],
+    ["moyyi:documents", true],
+    ["moyyi:documents", false],
+    ["moyyi:report-target", true],
+    ["moyyi:report-target", false],
+  ] as const)("shares the gate with %s, web first=%s", async (other, webFirst) => {
+    let resolve: ((value: { response: number; canceled: boolean }) => void) | undefined;
+    const hold = () =>
+      new Promise((r) => {
+        resolve = r;
+      });
+    native.confirm.mockImplementation(hold);
+    native.picker.mockImplementation(hold);
+    const otherRequest = other === "moyyi:permissions" ? request : { sessionId: web.sessionId };
+    const first = webFirst ? call("moyyi:web-permissions", web) : call(other, otherRequest);
+    const second = webFirst ? call(other, otherRequest) : call("moyyi:web-permissions", web);
+    const rejection = expect(second).rejects.toThrow("当前选择");
+    await vi.waitFor(() =>
+      expect(native.confirm.mock.calls.length + native.picker.mock.calls.length).toBe(1),
+    );
+    resolve?.({ response: 0, canceled: true });
+    await Promise.all([first, rejection]);
+    expect(native.send).not.toHaveBeenCalled();
+  });
+});
+
 describe("native maintenance entry", () => {
   it("rejects forged paths, active tasks and queued commands before showing a picker", async () => {
     await expect(call("moyyi:backup", { destination: "/" })).rejects.toThrow("自定义");

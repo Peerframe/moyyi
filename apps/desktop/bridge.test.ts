@@ -29,6 +29,8 @@ const initial: DesktopState = {
   materials: [],
   reportTarget: null,
   permissions: { writes: false, checks: false },
+  webAccess: { allowedOrigins: [], dns: "system" },
+  sources: { items: [], truncated: false },
   openedHistory: false,
   effects: { items: [], offset: 0, hasMore: false },
   effectInspection: null,
@@ -72,6 +74,28 @@ async function sentCommand() {
 }
 
 describe("desktop inherited process pipe", () => {
+  it("round-trips web grants and revokes them on process failure without replaying sources", async () => {
+    const { process, onState } = start();
+    const granted = {
+      ...initial,
+      webAccess: { allowedOrigins: ["https://example.com"], dns: "cloudflare-doh" as const },
+    };
+    const saving = process.send({
+      type: "web.permissions",
+      sessionId: "session_current",
+      ...granted.webAccess,
+    });
+    const sent = await sentCommand();
+    expect(sent.command.type).toBe("web.permissions");
+    child.emit("message", { type: "state", state: structuredClone(granted) });
+    child.emit("message", { type: "ack", id: sent.id });
+    expect((await saving).webAccess).toEqual(granted.webAccess);
+    child.emit("message", { type: "fatal", message: "Local worker stopped" });
+    expect(onState.mock.lastCall?.[0].webAccess).toEqual(initial.webAccess);
+    expect(child.send).toHaveBeenCalledOnce();
+    child.exit();
+    await process.close();
+  });
   it.each(["kimi-cn", "kimi-global"] as const)(
     "accepts existing %s high settings in startup and configure state",
     async (preset) => {

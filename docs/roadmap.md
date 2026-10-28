@@ -32,14 +32,37 @@ checked outcomes from the installed application. This is a local product candida
 release or a claim of general model reliability.
 
 The owner requested this whole-product plan on2026-10-27. This supersedes GUI's former deferred
-priority. The accepted self-owned core, single-agent scope and D1–D6 remain. M1–M3 are now the
-installed baseline at this checkpoint; on2026-10-28 the owner accepted M4 for local delivery
+priority. The accepted self-owned core, single-agent scope and D1–D6 remain. M1–M3 established the
+accepted baseline; on2026-10-28 the owner accepted M4 for local delivery
 with the source-answer quality gap explicitly retained. Integration/installation coordinates
 are tracked in the system overview. The original planning delivery itself
 did not implement a shell or trigger model calls. Current implementation/live evidence remains
 in the [system overview](system-overview.md); the Chinese
 owner-facing brief is in the existing [delivery record](tasks/2026-10-26-optimization-plan.md).
 This roadmap is the implementation sequence, not another task queue alongside those records.
+
+### M5: specified web pages and recorded sources
+
+Selected by the owner on2026-10-28. Build one complete desktop flow on merged M4: authorize
+exact HTTPS sites for the current session, approve each request, inspect actual recorded text,
+then create/read back and open a separately approved report. Keep web grants ephemeral and
+independent of model, file and command grants. Show source URLs, HTTP status, record times and
+truncation without claiming automatic fact verification. Reuse the current web transport and
+OpenBot-adapted approval/result components. Search services, authenticated browsing and link
+crawling remain outside this delivery.
+
+Completion requires focused authority/lifecycle tests, unchanged full checks and CI, actual
+external-package verification, native interaction acceptance and the frozen public-source report
+task in the [M5 record](tasks/2026-10-28-desktop-m5.md). M4's owner exception does not waive M5
+checks or regrade the original source task. See [ADR0043](decisions/0043-desktop-web-sources.md).
+
+M5's bounded acceptance is complete on `dd897834`: full check144/2884, original web eval9/9,
+three CI lanes and actual external-package checks passed. One native Flash task used4 requests
+with zero retries and produced a fully read-back8808-byte report; six core facts passed independent
+review. Its source-panel ID failure is preserved and fixed through zero-call reopening of the same
+record. One source-attribution extension remains noted, without a general fact-verification claim.
+[PR48](https://github.com/Peerframe/moyyi/pull/48) tracks merge and backed-up daily installation.
+
 
 ### What counts as the product
 

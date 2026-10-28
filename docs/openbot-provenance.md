@@ -171,3 +171,11 @@ Record actual adapted files/notices and moyyi verification when each port is imp
 The core, state, policy and result truth remain moyyi's. Reuse is judged by integration and
 maintenance cost for the defined user flow, not the number of old files copied. A selected view
 must adapt to the new contract; the old application architecture must not become a dependency.
+
+## Desktop M5 reuse
+
+M5 reuses the already adapted approval and artifact components from M1–M3 and the bounded HTML
+reader described above. No new OpenBot files are copied or substantially adapted. The ephemeral
+web grant, validated bridge and recorded-source projection are original moyyi code connected to
+the existing public runtime. The old control plane, login/session system and browser authority
+remain excluded. See [ADR0043](decisions/0043-desktop-web-sources.md).

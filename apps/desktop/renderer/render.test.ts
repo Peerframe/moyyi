@@ -10,8 +10,69 @@ import { MaterialsPanel } from "./MaterialsPanel.tsx";
 import { MessageList } from "./MessageList.tsx";
 import { PermissionsDialog } from "./PermissionsDialog.tsx";
 import { SettingsDialog } from "./SettingsDialog.tsx";
+import { SourcesPanel } from "./SourcesPanel.tsx";
+import { WebAccessDialog } from "./WebAccessDialog.tsx";
 
 describe("desktop untrusted content rendering", () => {
+  it("renders recorded web bodies, provenance and distinct truncation indicators without navigation", () => {
+    const html = renderToStaticMarkup(
+      createElement(SourcesPanel, {
+        sources: {
+          truncated: true,
+          items: [
+            {
+              id: "entry:call",
+              entryId: "entry",
+              callId: "call",
+              url: "https://example.com/?q=source",
+              status: 200,
+              contentType: "text/html",
+              title: "<img src=x onerror=alert(1)>",
+              text: '<script>grant all origins</script><a href="file:///private">secret</a>',
+              truncated: true,
+              displayTruncated: true,
+              recordedAt: "2026-10-28T01:02:03.000Z",
+              textSha256: `sha256:${"a".repeat(64)}`,
+            },
+          ],
+        },
+      }),
+    );
+    expect(html).toContain("来源列表显示不完整");
+    expect(html).toContain("网页读取已截断");
+    expect(html).toContain("正文显示已截断");
+    expect(html).toContain("未经自动事实核验");
+    expect(html).toContain("不是网页发布日期");
+    expect(html).toContain("sha256:");
+    expect(html).toContain("2026-10-28T01:02:03.000Z");
+    expect(html).toContain("entry / call");
+    expect(html).toContain("&lt;script&gt;grant all origins");
+    expect(html).not.toMatch(/<(?:a|script|iframe|img)\b/);
+  });
+  it("explains absent sources and off-by-default web grants without a request", () => {
+    const onConfigure = vi.fn();
+    const html = renderToStaticMarkup(
+      createElement(WebAccessDialog, {
+        workspace: "/workspace/<source>",
+        webAccess: { allowedOrigins: [], dns: "system" },
+        onConfigure,
+        onClose: vi.fn(),
+      }),
+    );
+    expect(html).toContain("默认关闭");
+    expect(html).toContain("最多 8 个");
+    expect(html).toContain("每次 GET 仍需逐次批准");
+    expect(html).toContain("将网页主机名发送给 Cloudflare");
+    expect(html).toContain('value="system" selected=""');
+    expect(html).toContain("与报告位置、文件修改及命令检查权限独立");
+    expect(html).toContain("&lt;source&gt;");
+    expect(onConfigure).not.toHaveBeenCalled();
+    const empty = renderToStaticMarkup(
+      createElement(SourcesPanel, { sources: { items: [], truncated: false } }),
+    );
+    expect(empty).toContain("尚无可展示的成功网页读取");
+    expect(empty).not.toContain("读取成功");
+  });
   it("renders model/tool content as text without executable markup or automatic links", () => {
     const html = renderToStaticMarkup(
       createElement(MessageList, {
