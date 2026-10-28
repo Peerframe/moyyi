@@ -4,12 +4,15 @@ The macOS arm64 desktop opens the existing moyyi runtime. M1's workspace selecti
 conversation, approval, cancellation and history loop is accepted. M2's settings, document
 selection and delivered-report controls passed the external bundle checks and two fixed live
 tasks through the native UI. M2 was merged and installed; the [PR #45 delivery receipt](https://github.com/Peerframe/moyyi/pull/45)
-records its final coordinates. M3 adds controlled changes/checks and operation history. M4 is now installed from
+records its final coordinates. M3 adds controlled changes/checks and operation history. M4 was installed from
 source `3e33ff9`, merged main `3f6eeb9`, after owner acceptance with the original source-answer
 quality limitation retained. It includes local help, explicit experimental Kimi high and guarded
 backup/restore/rollback. Native launch/history reopening and unchanged owner data/settings were
 verified after backup. Old failures are not rescored. This is a local candidate, not a public release.
-M5's specified-page/source/report workflow is under development; its evidence is separate.
+M5's specified-page/source/report workflow has completed bounded acceptance in the verified
+`dd897834` bundle. The [PR48 receipt](https://github.com/Peerframe/moyyi/pull/48) records final
+merge/installation; the [M5 task record](tasks/2026-10-28-desktop-m5.md) separates its one live
+trial, initial source-panel defect and corrected zero-call history reopening.
 See [ADR 0037](decisions/0037-installed-desktop-client.md),
 [ADR 0038](decisions/0038-desktop-materials-and-reports.md),
 [ADR 0039](decisions/0039-desktop-controlled-workflows.md),

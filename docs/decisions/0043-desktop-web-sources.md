@@ -1,6 +1,6 @@
 # ADR 0043: Desktop web access and recorded sources
 
-Status: accepted scope; implementation and acceptance tracked in the M5 delivery record.
+Status: implemented; bounded package/native/live acceptance recorded in the M5 delivery record.
 
 ## Decision
 
