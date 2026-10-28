@@ -1,6 +1,6 @@
 # ADR 0041: Bounded isolated evidence review
 
-Status: experimental candidate2026-10-28; semantic acceptance pending. The owner's next M4
+Status: experimental candidate 2026-10-28; semantic acceptance pending. The owner's next M4
 instruction authorizes investigating and testing a new mechanism under the original limits.
 This does not reopen the previous sealed trial, change Flash defaults, or accept M4.
 

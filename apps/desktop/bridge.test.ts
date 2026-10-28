@@ -72,6 +72,49 @@ async function sentCommand() {
 }
 
 describe("desktop inherited process pipe", () => {
+  it.each([false, true])(
+    "accepts answerReview=%s in startup and configure state",
+    async (answerReview) => {
+      const onState = vi.fn();
+      const process = new DesktopProcess("/installed/app", "/installed/node/bin/node", onState);
+      const reviewed: DesktopState = {
+        ...initial,
+        settings: {
+          preset: "kimi-cn",
+          kimiReasoningEffort: "high",
+          maxRequests: 8,
+          timeoutMs: 300_000,
+          answerReview,
+        },
+      };
+      child.emit("message", { type: "state", state: structuredClone(reviewed) });
+      expect((await process.getState()).settings).toEqual(reviewed.settings);
+      const saving = process.send({ type: "configure", settings: reviewed.settings });
+      const sent = await sentCommand();
+      child.emit("message", { type: "state", state: structuredClone(reviewed) });
+      child.emit("message", { type: "ack", id: sent.id });
+      expect((await saving).settings).toEqual(reviewed.settings);
+      expect(child.disconnect).not.toHaveBeenCalled();
+      child.exit();
+      await process.close();
+    },
+  );
+
+  it.each(["true", null, 1])(
+    "disconnects a state with nonboolean answerReview=%s",
+    async (answerReview) => {
+      const { process } = start();
+      child.emit("message", {
+        type: "state",
+        state: { ...initial, settings: { ...initial.settings, maxRequests: 8, answerReview } },
+      });
+      expect(child.disconnect).toHaveBeenCalledOnce();
+      await expect(process.getState()).rejects.toThrow("无效数据");
+      child.exit();
+      await process.close();
+    },
+  );
+
   it("uses the packaged Node and fixed worker without inherited Node injection options", async () => {
     const { process } = start();
     const [module, args, options] = pipe.fork.mock.calls[0] as [

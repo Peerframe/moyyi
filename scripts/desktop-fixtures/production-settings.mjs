@@ -114,75 +114,60 @@ async function verify() {
       clearTimeout(timer);
     }
   }
-  // Same command/state/ACK lifecycle as the existing M1 production-worker acceptance case.
+  assert(
+    readFileSync(join(appDirectory, "main.mjs"), "utf8").includes("./bridge.mjs"),
+    "The native main and this probe must import the same production DesktopProcess boundary",
+  );
+  const { DesktopProcess } = await import(new URL("../bridge.mjs", import.meta.url));
   async function launch() {
-    const child = childProcess.fork(join(appDirectory, "worker.mjs"), [], {
-      execPath: process.execPath,
-      execArgv: ["--no-experimental-strip-types", "--import", self],
-      cwd: appDirectory,
-      env: { HOME: home, PATH: "/usr/bin:/bin:/usr/sbin:/sbin", LANG: "en_US.UTF-8" },
-      stdio: ["ignore", "ignore", "pipe", "ipc"],
-      serialization: "json",
-    });
-    let state, failure, counters;
-    let sequence = 0;
+    let child, state, counters;
     let stderr = "";
-    const pending = new Map();
-    const observers = new Set();
-    child.stderr.on("data", (chunk) => {
-      stderr = (stderr + chunk).slice(-4096);
-    });
-    child.on("error", (error) => {
-      failure = error;
-      for (const observer of observers) observer();
-    });
-    child.on("message", (message) => {
-      if (message.type === "state") state = message.state;
-      else if (message.type === "probe.guard") counters = message.counts;
-      else if (message.type === "fatal") failure = Error(message.message);
-      else if (message.type === "ack") {
-        const request = pending.get(message.id);
-        if (!request) return;
-        pending.delete(message.id);
-        message.error ? request.reject(Error(message.error)) : request.resolve(state);
-      }
-      for (const observer of observers) observer();
-    });
-    const exited = new Promise((resolve) =>
-      child.once("exit", (code, signal) => {
-        failure ??= Error(`Worker exited: ${code}/${signal} ${stderr}`);
-        for (const request of pending.values()) request.reject(failure);
-        pending.clear();
-        for (const observer of observers) observer();
-        resolve({ code, signal });
-      }),
-    );
-    async function request(command) {
-      assert(child.connected);
-      return bounded(
-        new Promise((resolve, reject) => {
-          const id = ++sequence;
-          pending.set(id, { resolve, reject });
-          child.send({ type: "command", id, command }, (error) => {
-            if (error) {
-              pending.delete(id);
-              reject(error);
-            }
-          });
-        }),
-        command.type,
-      );
+    const originalFork = childProcess.fork;
+    // Instrument only process launch and the guard's out-of-band counters. Every production
+    // state/ACK/fatal message passes through the actual DesktopProcess validator and lifecycle.
+    childProcess.fork = (module, args, options) => {
+      assert.equal(module, join(appDirectory, "worker.mjs"));
+      assert.deepEqual(args, []);
+      assert.equal(options.execPath, process.execPath);
+      assert.deepEqual(options.execArgv, []);
+      child = originalFork(module, args, {
+        ...options,
+        execArgv: ["--no-experimental-strip-types", "--import", self],
+        env: { ...options.env, HOME: home },
+        stdio: ["ignore", "ignore", "pipe", "ipc"],
+      });
+      const emit = child.emit;
+      child.emit = function (event, ...values) {
+        if (event === "message" && values[0]?.type === "probe.guard") {
+          counters = values[0].counts;
+          return true;
+        }
+        return emit.call(this, event, ...values);
+      };
+      child.stderr.on("data", (chunk) => {
+        stderr = (stderr + chunk).slice(-4096);
+      });
+      return child;
+    };
+    syncBuiltinESMExports();
+    let desktop;
+    try {
+      desktop = new DesktopProcess(appDirectory, process.execPath, (next) => {
+        state = next;
+      });
+    } finally {
+      childProcess.fork = originalFork;
+      syncBuiltinESMExports();
     }
+    assert(child, "DesktopProcess must launch the actual installed worker");
+    const exited = new Promise((resolve) =>
+      child.once("exit", (code, signal) => resolve({ code, signal })),
+    );
     async function close() {
-      let acknowledgementError;
       try {
-        if (child.connected && !failure) await request({ type: "close" });
-      } catch (error) {
-        acknowledgementError = error;
-      }
-      if (child.connected) child.disconnect();
-      try {
-        assert.equal((await bounded(exited, "exit")).code, 0);
+        await bounded(desktop.close(), "DesktopProcess close");
+        const result = await bounded(exited, "worker exit");
+        assert.equal(result.code, 0, stderr);
       } catch (error) {
         child.kill("SIGKILL");
         await exited;
@@ -190,32 +175,23 @@ async function verify() {
       }
       assert(counters, "The no-secret/network guard must initialize before the worker");
       for (const key of Object.keys(totals)) totals[key] += counters[key];
-      if (acknowledgementError) throw acknowledgementError;
     }
     try {
-      await bounded(
-        new Promise((resolve, reject) => {
-          const check = () => {
-            if (failure) {
-              observers.delete(check);
-              reject(failure);
-            } else if (state && counters) {
-              observers.delete(check);
-              resolve();
-            }
-          };
-          observers.add(check);
-          check();
-        }),
-        "initial state",
-      );
+      await bounded(desktop.getState(), "DesktopProcess initial state");
+      assert(counters, "Guard initialization must precede initial production state");
     } catch (error) {
       if (child.connected) child.disconnect();
       child.kill("SIGKILL");
       await exited;
       throw error;
     }
-    return { state: () => state, request, close };
+    return {
+      state: () => state,
+      request: (command) => bounded(desktop.send(command), command.type),
+      getState: () => desktop.getState(),
+      injectState: (next) => child.emit("message", { type: "state", state: next }),
+      close,
+    };
   }
   let worker = await launch();
   let sessionId;
@@ -328,6 +304,19 @@ async function verify() {
     assert.deepEqual(JSON.parse(readFileSync(savedPath, "utf8")).settings, reviewed);
     cases.push(
       "explicit evidence review persists without new requests, rejects insufficient total budget, and grants no authority",
+    );
+    const validState = await worker.getState();
+    worker.injectState({
+      ...validState,
+      settings: { ...validState.settings, answerReview: "true" },
+    });
+    await assert.rejects(worker.getState(), /无效数据|意外停止/);
+    await worker.close();
+    worker = await launch();
+    assert.deepEqual(worker.state().settings, reviewed);
+    assert.equal(worker.state().connection.ready, false);
+    cases.push(
+      "actual DesktopProcess accepts review-enabled save/restart state and rejects nonboolean worker settings before forwarding",
     );
     await worker.request({
       type: "configure",

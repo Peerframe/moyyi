@@ -29,6 +29,39 @@ const state: DesktopState = {
   error: null,
 };
 describe("desktop wire data", () => {
+  it("accepts review settings on saved and restarted state without relaxing the settings schema", () => {
+    const settings = {
+      preset: "kimi-cn",
+      maxRequests: 8,
+      timeoutMs: 300_000,
+      kimiReasoningEffort: "high",
+    };
+    for (const answerReview of [undefined, false, true]) {
+      const candidate = {
+        ...state,
+        settings: { ...settings, ...(answerReview === undefined ? {} : { answerReview }) },
+      };
+      expect(isDesktopState(candidate)).toBe(true);
+      expect(isWorkerMessage(JSON.parse(JSON.stringify({ type: "state", state: candidate })))).toBe(
+        true,
+      );
+    }
+    for (const changed of [
+      ...["true", null, 0, 1, {}, []].map((answerReview) => ({ answerReview })),
+      { answerReview: true, maxRequests: 3 },
+      { answerReview: true, apiKey: "must-not-cross" },
+    ])
+      expect(
+        isWorkerMessage({
+          type: "state",
+          state: { ...state, settings: { ...settings, ...changed } },
+        }),
+      ).toBe(false);
+    expect(isDesktopState({ ...state, settings: { ...state.settings, answerReview: false } })).toBe(
+      true,
+    );
+  });
+
   it("preserves unknown effects, exact receipts and expected absence without accepting authority", () => {
     const effect = {
       effectId: "effect_1",
