@@ -1,3 +1,48 @@
+/** Renderer DTOs deliberately do not import runtime/contracts or expose stored payloads. */
+export interface DesktopSessionMetadata {
+  readonly title: string | null;
+  readonly group: string | null;
+  readonly pinned: boolean;
+  readonly muted: boolean;
+  readonly removedAt: string | null;
+  readonly revision: number;
+}
+export interface DesktopSessionQuery {
+  readonly search?: string;
+  readonly group?: string | null;
+  readonly removed?: "active" | "removed" | "all";
+  readonly cursor?: string;
+  readonly limit?: number;
+}
+export interface DesktopSessionUpdate {
+  readonly sessionId: string;
+  readonly expectedRevision: number;
+  readonly patch: {
+    readonly title?: string | null;
+    readonly group?: string | null;
+    readonly pinned?: boolean;
+    readonly muted?: boolean;
+    readonly removed?: boolean;
+  };
+}
+export interface DesktopHistoryPage {
+  readonly sessionId: string;
+  readonly workspaceRoot: string;
+  readonly items: readonly (DesktopMessage & {
+    readonly entryId: string;
+    readonly recordedAt: string;
+    readonly textLength: number;
+    readonly truncated: boolean;
+  })[];
+  readonly nextCursor: string | null;
+}
+export interface DesktopMessageChunk {
+  readonly messageId: string;
+  readonly offset: number;
+  readonly text: string;
+  readonly totalLength: number;
+  readonly nextOffset: number | null;
+}
 /** Non-executable desktop settings; model/provider endpoints are fixed reviewed presets. */
 export interface DesktopSettings {
   readonly preset: "flash" | "kimi-cn" | "kimi-global";
@@ -17,6 +62,15 @@ export interface DesktopMaterial {
   readonly sourceBytes: number;
   readonly sha256: string;
 }
+export interface DesktopManagedMaterial extends DesktopMaterial {
+  readonly id: string;
+  readonly name: string;
+  readonly createdAt: string;
+  readonly state: "pending" | "active" | "recycled" | "purged";
+  readonly revision: number;
+  readonly recycledAt: string | null;
+  readonly referenceCount: number;
+}
 export interface DesktopArtifact {
   readonly effectId: string;
   readonly path: string;
@@ -30,6 +84,12 @@ export interface DesktopArtifactPreview {
   readonly text: string;
   readonly sourceBytes: number;
   readonly truncated: boolean;
+  readonly image?: {
+    readonly mime: "image/png" | "image/jpeg";
+    readonly width: number;
+    readonly height: number;
+    readonly dataUrl: string;
+  };
 }
 
 /** Ephemeral host grants; opening history never restores these permissions. */
@@ -100,6 +160,7 @@ export interface DesktopSessionSummary {
   readonly workspaceRoot: string;
   readonly lastActivityAt: string | null;
   readonly promptPreview: string | null;
+  readonly metadata?: DesktopSessionMetadata;
 }
 
 export interface DesktopApproval {
@@ -110,6 +171,19 @@ export interface DesktopApproval {
 }
 
 export interface DesktopState {
+  readonly activeMetadata?: DesktopSessionMetadata | null;
+  readonly importing?: boolean;
+  readonly library?: {
+    readonly items: readonly DesktopManagedMaterial[];
+    readonly offset: number;
+    readonly hasMore: boolean;
+    readonly housekeeping: boolean;
+  };
+  readonly materialPreview?: DesktopArtifactPreview | null;
+  readonly catalog?: { readonly query: DesktopSessionQuery; readonly nextCursor: string | null };
+  readonly history?: DesktopHistoryPage | null;
+  readonly messageDetail?: DesktopMessageChunk | null;
+  readonly historyOnly?: boolean;
   readonly status: "ready" | "closing" | "closed";
   readonly connection: { readonly ready: boolean; readonly message?: string };
   readonly settings: DesktopSettings;
@@ -160,9 +234,20 @@ export interface DesktopState {
 
 /** Trusted main/worker commands. Only the native picker may supply create.workspaceRoot. */
 export type DesktopCommand =
+  | { readonly type: "material.cancel"; readonly sessionId: string }
   | { readonly type: "create"; readonly workspaceRoot: string; readonly askEachRead: boolean }
   | { readonly type: "load"; readonly sessionId: string; readonly askEachRead: boolean }
   | { readonly type: "list"; readonly offset: number }
+  | { readonly type: "catalog"; readonly query: DesktopSessionQuery }
+  | { readonly type: "session.update"; readonly update: DesktopSessionUpdate }
+  | { readonly type: "history"; readonly sessionId: string; readonly cursor?: string }
+  | {
+      readonly type: "history.message";
+      readonly sessionId: string;
+      readonly messageId: string;
+      readonly offset: number;
+    }
+  | { readonly type: "history.close" }
   | { readonly type: "start"; readonly sessionId: string; readonly text: string }
   | { readonly type: "cancel"; readonly runId: string }
   | {
@@ -181,6 +266,32 @@ export type DesktopCommand =
   | ({ readonly type: "web.permissions"; readonly sessionId: string } & DesktopWebAccess)
   | { readonly type: "effects"; readonly sessionId: string; readonly offset: number }
   | { readonly type: "effect.inspect"; readonly sessionId: string; readonly effectId: string }
+  | {
+      readonly type: "materials.import";
+      readonly sessionId: string;
+      readonly paths: readonly string[];
+    }
+  | { readonly type: "library"; readonly sessionId: string; readonly offset: number }
+  | {
+      readonly type: "material.select";
+      readonly sessionId: string;
+      readonly ids: readonly string[];
+    }
+  | {
+      readonly type:
+        | "material.recycle"
+        | "material.restore"
+        | "material.purge"
+        | "material.preview";
+      readonly sessionId: string;
+      readonly id: string;
+      readonly revision: number;
+    }
+  | {
+      readonly type: "material.housekeeping";
+      readonly sessionId: string;
+      readonly enabled: boolean;
+    }
   | { readonly type: "materials"; readonly sessionId: string; readonly paths: readonly string[] }
   | { readonly type: "material.remove"; readonly sessionId: string; readonly path: string }
   | { readonly type: "report.target"; readonly sessionId: string; readonly path: string | null }
@@ -198,6 +309,7 @@ export type DesktopAction = Exclude<
       | "close"
       | "configure"
       | "materials"
+      | "materials.import"
       | "report.target"
       | "permissions"
       | "web.permissions";
@@ -238,6 +350,15 @@ export interface DesktopBridge {
   configureWebAccess(
     options: DesktopWebAccess & { readonly sessionId: string },
   ): Promise<DesktopState>;
+  saveArtifact(options: {
+    readonly sessionId: string;
+    readonly effectId: string;
+  }): Promise<DesktopState>;
+  importFiles(options: {
+    readonly sessionId: string;
+    readonly files: readonly File[];
+  }): Promise<DesktopState>;
+  pasteImage(options: { readonly sessionId: string }): Promise<DesktopState>;
   revealArtifact(options: {
     readonly sessionId: string;
     readonly effectId: string;

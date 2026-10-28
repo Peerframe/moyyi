@@ -43,8 +43,10 @@ import {
   prepareDataDirectory,
   syncDirectory,
 } from "./files.ts";
+import { type MaterialStore, SqliteMaterialStore } from "./materials.ts";
 import { encodeEffect, encodeEntry, entryBlobRefs } from "./records.ts";
 import { migrate, SCHEMA_VERSION } from "./schema.ts";
+import { SqliteSessionManagement } from "./session-management.ts";
 import { encodeSnapshot } from "./snapshots.ts";
 
 export type StoreCheckpoint =
@@ -93,6 +95,8 @@ function inside(parent: string, child: string): boolean {
 /** Local single-writer store. Opening it never resumes a run or executes an effect. */
 export class SqliteSessionStore implements SessionStore, WorkspaceSnapshotStore {
   readonly directory: string;
+  readonly sessionManagement: SqliteSessionManagement;
+  readonly materials: MaterialStore;
   readonly #db: DatabaseSync;
   readonly #blobs: BlobStore;
   readonly #releaseLock: () => void;
@@ -128,6 +132,8 @@ export class SqliteSessionStore implements SessionStore, WorkspaceSnapshotStore 
         throw new Error("FULL durability is unavailable");
       this.#db = db;
       this.#blobs = new BlobStore(this.directory, options.maxBlobBytes);
+      this.sessionManagement = new SqliteSessionManagement(db, () => this.#ready());
+      this.materials = new SqliteMaterialStore(db, this.#blobs, () => this.#ready());
       syncDirectory(this.directory);
     } catch (error) {
       db?.close();
@@ -575,6 +581,16 @@ export class SqliteSessionStore implements SessionStore, WorkspaceSnapshotStore 
       .map((row) => row.id as SessionId);
   }
 
+  isSessionRemoved(sessionId: SessionId): boolean {
+    this.#ready();
+    id(sessionId);
+    return (
+      this.#db
+        .prepare("SELECT 1 FROM session_metadata WHERE session_id=? AND removed_at IS NOT NULL")
+        .get(sessionId) !== undefined
+    );
+  }
+
   /** Catalog reads use recorded order, not mutable heads or caller-supplied timestamps. */
   async listSessionSummaries(page: HistoryPage): Promise<SessionListPage> {
     this.#ready();
@@ -735,6 +751,13 @@ export class SqliteSessionStore implements SessionStore, WorkspaceSnapshotStore 
         const snapshot = this.#snapshot(row.id as string);
         if (snapshot?.beforeBlob !== null && snapshot?.beforeBlob !== undefined)
           refs.add(snapshot.beforeBlob);
+      }
+      // Managed originals may have no transcript image part. Keep their immutable bytes in
+      // every self-contained backup, including recycled records and conservative references.
+      for (const row of this.#db.prepare("SELECT blob_ref FROM material_assets").all()) {
+        if (typeof row.blob_ref !== "string" || !/^sha256:[a-f0-9]{64}$/.test(row.blob_ref))
+          throw new Error("Invalid material blob reference");
+        refs.add(row.blob_ref as BlobRef);
       }
       for (const ref of refs) {
         const bytes = this.#blobs.get(ref);

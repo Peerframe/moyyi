@@ -501,3 +501,150 @@ it("rejects inspection while an accepted session load is pending", async () => {
   await h.runtime.send({ type: "session.list" });
   expect(h.events.at(-1)?.type).toBe("session.listed");
 });
+
+it("manages removed sessions and complete history through the host port without model calls", async () => {
+  const h = await harness([
+    [{ type: "part_completed", index: 0, part: { type: "text", text: "answer" } }, done],
+  ]);
+  const sessionId = await h.session();
+  await h.store.commit({
+    entries: [
+      {
+        id: "management-entry" as EntryId,
+        sessionId,
+        parentId: null,
+        runId: null,
+        createdAt: at,
+        body: {
+          kind: "user_message",
+          steering: false,
+          content: [{ type: "text", text: "history" }],
+        },
+      },
+    ],
+    effects: [],
+    durability: "normal",
+  });
+  rmSync(h.workspace, { recursive: true });
+  const list = await h.runtime.sessions.list();
+  expect(list.items[0]?.sessionId).toBe(sessionId);
+  const history = await h.runtime.sessions.history({ sessionId });
+  expect(history.items[0]?.text).toBe("history");
+  expect(
+    await h.runtime.sessions.readMessage({ sessionId, messageId: history.items[0]?.id ?? "" }),
+  ).toEqual({ text: "history", totalLength: 7, nextOffset: null });
+  const removed = await h.runtime.sessions.update({
+    sessionId,
+    expectedRevision: 0,
+    patch: { removed: true, title: "Retained" },
+  });
+  expect(removed.metadata.removedAt).not.toBeNull();
+  await h.runtime.send({
+    type: "run.start",
+    sessionId,
+    input: [{ type: "text", text: "must not run" }],
+  });
+  expect(h.events.at(-1)).toMatchObject({
+    type: "command.rejected",
+    reason: "Restore this session before starting new work",
+  });
+  expect(h.provider.client.requests).toHaveLength(0);
+  await h.runtime.sessions.update({ sessionId, expectedRevision: 1, patch: { removed: false } });
+  mkdirSync(h.workspace);
+  await h.runtime.send({
+    type: "run.start",
+    sessionId,
+    input: [{ type: "text", text: "continue" }],
+  });
+  await h.runtime.idle();
+  expect(h.provider.client.requests).toHaveLength(1);
+});
+
+it("claims management admission before awaiting a store and rejects run/load/reload overlap", async () => {
+  const h = await harness();
+  const sessionId = await h.session();
+  const gate = deferred();
+  const original = h.store.sessionManagement.list.bind(h.store.sessionManagement);
+  vi.spyOn(h.store.sessionManagement, "list").mockImplementation(async (...args) => {
+    await gate.promise;
+    return original(...args);
+  });
+  const pending = h.runtime.sessions.list();
+  await expect(
+    h.runtime.sessions.update({ sessionId, expectedRevision: 0, patch: { title: "race" } }),
+  ).rejects.toThrow("idle runtime");
+  for (const command of [
+    { type: "session.load", sessionId },
+    { type: "run.start", sessionId, input: [{ type: "text", text: "do not run" }] },
+    { type: "plugin.reload", name: "anything" },
+  ] as const) {
+    await h.runtime.send(command);
+    expect(h.events.at(-1)).toMatchObject({
+      type: "command.rejected",
+      reason: "Session inspection is in progress",
+    });
+  }
+  gate.resolve();
+  expect((await pending).items).toHaveLength(1);
+  expect(h.provider.client.requests).toHaveLength(0);
+});
+
+it("suppresses late management results on close and closes only after the accepted operation settles", async () => {
+  const h = await harness();
+  await h.session();
+  const gate = deferred(),
+    entered = deferred();
+  const original = h.store.sessionManagement.list.bind(h.store.sessionManagement);
+  vi.spyOn(h.store.sessionManagement, "list").mockImplementation(async (...args) => {
+    entered.resolve();
+    await gate.promise;
+    return original(...args);
+  });
+  const pending = h.runtime.sessions.list();
+  await entered.promise;
+  const closing = h.runtime.close();
+  const rejected = expect(pending).rejects.toThrow("Runtime is closed");
+  gate.resolve();
+  await rejected;
+  await closing;
+  await expect(h.runtime.sessions.list()).rejects.toThrow("closed");
+});
+
+it("redacts store management failures and retains usable idle/close after rejected edits", async () => {
+  const h = await harness();
+  const sessionId = await h.session();
+  await expect(
+    h.runtime.sessions.update({ sessionId, expectedRevision: 9, patch: { title: "stale" } }),
+  ).rejects.toThrow("refresh before editing");
+  vi.spyOn(h.store.sessionManagement, "history").mockRejectedValue(
+    Error("PRIVATE_DATA /private/secret"),
+  );
+  await expect(h.runtime.sessions.history({ sessionId })).rejects.toThrow(
+    "Session management could not be completed",
+  );
+  await h.runtime.idle();
+  expect(h.provider.client.requests).toHaveLength(0);
+});
+
+it("rejects unsupported custom management without changing the original session protocol", async () => {
+  const h = await harness([], { store: emptyStore(snapshot([], [])) });
+  await expect(h.runtime.sessions.list()).rejects.toThrow("does not support session management");
+  await h.runtime.send({ type: "session.load", sessionId: sid });
+  expect(h.events.some((event) => event.type === "session.ready")).toBe(true);
+});
+
+it("fully releases management admission before each awaited method returns", async () => {
+  const h = await harness();
+  const sessionId = await h.session();
+  for (let revision = 0; revision < 5; revision++) {
+    await h.runtime.sessions.list();
+    await h.runtime.sessions.history({ sessionId });
+    await h.runtime.sessions.update({
+      sessionId,
+      expectedRevision: revision,
+      patch: { title: `revision ${revision}` },
+    });
+  }
+  await h.runtime.send({ type: "session.list" });
+  expect(h.events.at(-1)?.type).toBe("session.listed");
+});

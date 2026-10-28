@@ -9,7 +9,7 @@ import {
   realpathSync,
   type Stats,
 } from "node:fs";
-import { extname, isAbsolute, relative, resolve, sep } from "node:path";
+import { basename, dirname, extname, isAbsolute, relative, resolve, sep } from "node:path";
 import type { DesktopMaterial } from "../shared.ts";
 
 export class FileBoundaryError extends Error {
@@ -37,7 +37,23 @@ const protectedNames = new Set([
   "id_ecdsa",
   "id_ed25519",
 ]);
-const formats = new Set(["pdf", "docx", "xlsx", "pptx", "odt", "ods", "odp"]);
+const formats = new Set([
+  "pdf",
+  "docx",
+  "xlsx",
+  "pptx",
+  "odt",
+  "ods",
+  "odp",
+  "txt",
+  "text",
+  "md",
+  "csv",
+  "json",
+  "png",
+  "jpg",
+  "jpeg",
+]);
 const within = (root: string, path: string) => {
   const child = relative(root, path);
   return child !== ".." && !child.startsWith(`..${sep}`) && !isAbsolute(child);
@@ -133,7 +149,9 @@ export function readWorkspaceFile(
   excluded: readonly string[],
   maximum: number,
   collect = false,
+  check: () => void = () => {},
 ) {
+  check();
   const target = locateWorkspaceFile(workspace, input, excluded);
   const regular = (stat: Stats | null) => {
     if (!stat?.isFile() || stat.nlink !== 1 || stat.size > maximum)
@@ -157,6 +175,7 @@ export function readWorkspaceFile(
     const chunks: Buffer[] = [];
     let bytes = 0;
     while (true) {
+      check();
       const count = readSync(fd, buffer, 0, Math.min(buffer.length, maximum + 1 - bytes), null);
       if (!count) break;
       bytes += count;
@@ -165,6 +184,7 @@ export function readWorkspaceFile(
       if (collect) chunks.push(Buffer.from(buffer.subarray(0, count)));
     }
     const after = fstatSync(fd);
+    check();
     const current = locateWorkspaceFile(workspace, input, excluded);
     if (
       !current.stat ||
@@ -189,6 +209,44 @@ export function readWorkspaceFile(
   } finally {
     if (fd !== undefined) closeSync(fd);
   }
+}
+
+/** The native host supplies the exact approved source; this never grants its parent directory. */
+export function snapshotExternalMaterial(
+  source: string,
+  excluded: readonly string[],
+  check: () => void = () => {},
+) {
+  if (typeof source !== "string" || !isAbsolute(source) || source.length > 4096)
+    throw new FileBoundaryError("An explicit absolute source file is required");
+  protectedPath(source, excluded);
+  const parent = realpathSync(dirname(source));
+  const path = resolve(parent, basename(source));
+  protectedPath(path, excluded);
+  const format = extname(path).slice(1).toLowerCase();
+  if (!formats.has(format)) throw new FileBoundaryError("Select a supported material format");
+  const name = basename(source);
+  if (
+    !name ||
+    name.length > 160 ||
+    !name.isWellFormed() ||
+    [...name].some((c) => c.charCodeAt(0) < 32 || c.charCodeAt(0) === 127)
+  )
+    throw new FileBoundaryError("The material name is unavailable");
+  const before = lstatSync(path);
+  const result = readWorkspaceFile(parent, path, excluded, 10 * 1024 * 1024, true, check);
+  const after = lstatSync(path);
+  if (!unchanged(before, after))
+    throw new FileBoundaryError("The source file changed during import");
+  const bytes = result.bytes as Buffer;
+  if (["txt", "text", "md", "csv", "json"].includes(format)) {
+    try {
+      if (new TextDecoder("utf-8", { fatal: true }).decode(bytes).includes("\0")) throw Error();
+    } catch {
+      throw new FileBoundaryError("Text materials require valid UTF-8 without NUL bytes");
+    }
+  }
+  return { name, format, sourceBytes: result.sourceBytes, sha256: result.sha256, bytes };
 }
 
 export function inspectMaterials(

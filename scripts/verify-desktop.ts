@@ -100,6 +100,8 @@ try {
     "host-m2.mjs",
     "host-m3.mjs",
     "host-m5.mjs",
+    "host-m6.mjs",
+    "material-cancel.mjs",
     "production-settings.mjs",
     "kimi-errors.mjs",
     "phase-deadline.mjs",
@@ -157,6 +159,64 @@ try {
   assert.equal(materialsAndReports.syntheticRequests, 7);
   assert.equal(materialsAndReports.credentialReads, 0);
   assert.equal(materialsAndReports.liveModel, false);
+  const externalMaterials = join(temporary, "external-materials");
+  const importedWorkspace = join(temporary, "imported-workspace");
+  mkdirSync(externalMaterials);
+  mkdirSync(importedWorkspace);
+  for (const name of [
+    "aster.pdf",
+    "birch.docx",
+    "cedar.xlsx",
+    "dahlia.pptx",
+    "elm.odt",
+    "fir.ods",
+    "ginkgo.odp",
+  ])
+    copyFileSync(
+      join(repository, "src/runtime/fixtures/documents/standard/eval", name),
+      join(externalMaterials, name),
+    );
+  const importedMaterialsAndHistory = JSON.parse(
+    run(node, [
+      "--no-experimental-strip-types",
+      join(fixture, "host-m6.mjs"),
+      externalMaterials,
+      importedWorkspace,
+      join(temporary, "m6-private"),
+    ]),
+  );
+  assert.equal(importedMaterialsAndHistory.passed, true);
+  assert.equal(importedMaterialsAndHistory.count, 7);
+  assert.equal(importedMaterialsAndHistory.cases.length, importedMaterialsAndHistory.count);
+  assert.equal(importedMaterialsAndHistory.syntheticRequests, 4);
+  assert.equal(importedMaterialsAndHistory.automaticRetries, 0);
+  assert.equal(importedMaterialsAndHistory.timeoutMs, 120_000);
+  assert.equal(importedMaterialsAndHistory.maxOutputTokens, 8192);
+  assert.equal(importedMaterialsAndHistory.credentialReads, 0);
+  assert.equal(importedMaterialsAndHistory.networkAttempts, 0);
+  assert.equal(importedMaterialsAndHistory.liveModel, false);
+  const cancelWorkspace = join(temporary, "cancel-workspace");
+  const cancelSources = join(temporary, "cancel-sources");
+  mkdirSync(cancelWorkspace);
+  mkdirSync(cancelSources);
+  const materialCancellation = JSON.parse(
+    run(node, [
+      "--no-experimental-strip-types",
+      join(fixture, "material-cancel.mjs"),
+      cancelWorkspace,
+      cancelSources,
+      join(temporary, "cancel-worker-home"),
+    ]),
+  );
+  assert.equal(materialCancellation.passed, true);
+  assert.equal(materialCancellation.actualProductionWorker, true);
+  assert.equal(materialCancellation.actualDesktopProcess, true);
+  assert.equal(materialCancellation.cancelled, true);
+  assert.equal(materialCancellation.modelRequests, 0);
+  assert.equal(materialCancellation.credentialReads, 0);
+  assert.equal(materialCancellation.credentialWrites, 0);
+  assert.equal(materialCancellation.networkAttempts, 0);
+  assert.equal(materialCancellation.liveModel, false);
   const changesWorkspace = join(temporary, "changes-workspace");
   mkdirSync(changesWorkspace);
   const editsAndRecovery = JSON.parse(
@@ -273,6 +333,8 @@ try {
         runtime: manifest.runtime,
         host,
         materialsAndReports,
+        importedMaterialsAndHistory,
+        materialCancellation,
         editsAndRecovery,
         productionSettings,
         webSources,

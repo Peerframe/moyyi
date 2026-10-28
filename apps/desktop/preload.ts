@@ -1,4 +1,4 @@
-import { contextBridge, ipcRenderer } from "electron";
+import { contextBridge, ipcRenderer, webUtils } from "electron";
 import type {
   DesktopAction,
   DesktopBridge,
@@ -31,6 +31,15 @@ const bridge: DesktopBridge = {
   selectReportTarget: (options) => state(ipcRenderer.invoke("moyyi:report-target", options)),
   configurePermissions: (options) => state(ipcRenderer.invoke("moyyi:permissions", options)),
   configureWebAccess: (options) => state(ipcRenderer.invoke("moyyi:web-permissions", options)),
+  importFiles: (options) => {
+    if (!Array.isArray(options.files) || options.files.length < 1 || options.files.length > 8)
+      return Promise.reject(Error("最多导入8份文件。"));
+    const paths = options.files.map((file) => webUtils.getPathForFile(file));
+    if (paths.some((path) => !path)) return Promise.reject(Error("请拖放本机实际文件。"));
+    return state(ipcRenderer.invoke("moyyi:import-files", { sessionId: options.sessionId, paths }));
+  },
+  pasteImage: (options) => state(ipcRenderer.invoke("moyyi:paste-image", options)),
+  saveArtifact: (options) => state(ipcRenderer.invoke("moyyi:save-artifact", options)),
   revealArtifact: (options) => state(ipcRenderer.invoke("moyyi:reveal-artifact", options)),
   subscribe(listener: (snapshot: DesktopState) => void) {
     const handler = (_event: Electron.IpcRendererEvent, value: unknown) => {

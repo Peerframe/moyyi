@@ -31,6 +31,193 @@ const state: DesktopState = {
   error: null,
 };
 describe("desktop wire data", () => {
+  const m6 = () => ({
+    ...state,
+    activeSessionId: "session_current",
+    workspaceRoot: "/workspace",
+    historyOnly: false,
+    importing: false,
+    catalog: {
+      query: { search: "notes", group: "Work", removed: "active", limit: 20 },
+      nextCursor: null,
+    },
+    library: {
+      items: [
+        {
+          id: "material_00000000-0000-4000-8000-000000000000",
+          path: "moyyi-materials/source.png",
+          name: "source.png",
+          format: "png",
+          sourceBytes: 68,
+          sha256: "a".repeat(64),
+          createdAt: "2026-10-28T01:00:00.000Z",
+          state: "active",
+          revision: 2,
+          recycledAt: null,
+          referenceCount: 1,
+        },
+      ],
+      offset: 0,
+      hasMore: false,
+      housekeeping: false,
+    },
+    history: {
+      sessionId: "session_current",
+      workspaceRoot: "/workspace",
+      items: [
+        {
+          id: "entry_a:0",
+          entryId: "entry_a",
+          role: "assistant",
+          text: "retained visible answer",
+          recordedAt: "2026-10-28T01:00:00.000Z",
+          textLength: 22,
+          truncated: false,
+        },
+      ],
+      nextCursor: "opaque-next-page",
+    },
+    messageDetail: {
+      messageId: "entry_a:0",
+      offset: 0,
+      text: "retained visible answer",
+      totalLength: 22,
+      nextOffset: null,
+    },
+    materialPreview: {
+      effectId: "material_00000000-0000-4000-8000-000000000000",
+      path: "moyyi-materials/source.png",
+      sha256: "a".repeat(64),
+      sourceBytes: 68,
+      text: "",
+      truncated: false,
+      image: {
+        mime: "image/png",
+        width: 1,
+        height: 1,
+        dataUrl:
+          "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAusB9Y9ZC8sAAAAASUVORK5CYII=",
+      },
+    },
+  });
+  it("round-trips M6 catalog, library, history, message detail and local material preview at the top level", () => {
+    const candidate = m6();
+    expect(isDesktopState(candidate)).toBe(true);
+    expect(isWorkerMessage(JSON.parse(JSON.stringify({ type: "state", state: candidate })))).toBe(
+      true,
+    );
+    expect(
+      isDesktopState({ ...candidate, history: null, messageDetail: null, materialPreview: null }),
+    ).toBe(true);
+    for (const changed of [
+      { importing: "true" },
+      { historyOnly: "false" },
+      { catalog: { ...candidate.catalog, query: { search: "x".repeat(161) } } },
+      { catalog: { ...candidate.catalog, query: { authority: true } } },
+      { library: { ...candidate.library, items: Array(21).fill(candidate.library.items[0]) } },
+      {
+        library: {
+          ...candidate.library,
+          items: [{ ...candidate.library.items[0], sourceBytes: 10485761 }],
+        },
+      },
+      {
+        library: {
+          ...candidate.library,
+          items: [{ ...candidate.library.items[0], workspaceRoot: "/private" }],
+        },
+      },
+      { history: { ...candidate.history, items: Array(51).fill(candidate.history.items[0]) } },
+      {
+        history: {
+          ...candidate.history,
+          items: [{ ...candidate.history.items[0], reasoning: "private" }],
+        },
+      },
+      { messageDetail: { ...candidate.messageDetail, text: "x".repeat(16385) } },
+      { materialPreview: { ...candidate.materialPreview, rawBytes: "not a display projection" } },
+    ])
+      expect(isDesktopState({ ...candidate, ...changed })).toBe(false);
+  });
+  it("rejects stale history identity from another session or workspace", () => {
+    const candidate = m6();
+    for (const changed of [{ sessionId: "session_other" }, { workspaceRoot: "/other-workspace" }])
+      expect(isDesktopState({ ...candidate, history: { ...candidate.history, ...changed } })).toBe(
+        false,
+      );
+    expect(isDesktopState({ ...candidate, activeSessionId: null, workspaceRoot: null })).toBe(
+      false,
+    );
+  });
+  it("rejects remote, excessive and malformed images without losing the valid inline preview", () => {
+    const candidate = m6();
+    const image = candidate.materialPreview.image;
+    for (const changed of [
+      { dataUrl: "https://example.com/tracker.png" },
+      { dataUrl: "file:///private/image.png" },
+      { mime: "image/svg+xml", dataUrl: "data:image/svg+xml;base64,PHN2Zz4=" },
+      { dataUrl: "data:image/jpeg;base64,AAAA" },
+      { dataUrl: `data:image/png;base64,${Buffer.alloc(524289).toString("base64")}` },
+      { width: 4097 },
+      { width: 4096, height: 4096 },
+      { width: 0 },
+      { onload: "execute()" },
+    ])
+      expect(
+        isDesktopState({
+          ...candidate,
+          materialPreview: { ...candidate.materialPreview, image: { ...image, ...changed } },
+        }),
+      ).toBe(false);
+    expect(
+      isDesktopState({
+        ...candidate,
+        materialPreview: {
+          ...candidate.materialPreview,
+          image: {
+            ...image,
+            dataUrl: `data:image/png;base64,${Buffer.alloc(524288).toString("base64")}`,
+          },
+        },
+      }),
+    ).toBe(true);
+  });
+  it("does not allow new top-level M6 fields to be smuggled into source objects", () => {
+    const candidate = m6();
+    const source = {
+      id: "entry:call",
+      entryId: "entry",
+      callId: "call",
+      url: "https://example.com/source",
+      status: 200,
+      contentType: "text/plain",
+      title: null,
+      text: "recorded source",
+      truncated: false,
+      displayTruncated: false,
+      recordedAt: "2026-10-28T01:00:00.000Z",
+      textSha256: `sha256:${"a".repeat(64)}`,
+    };
+    expect(isDesktopState({ ...candidate, sources: { items: [source], truncated: false } })).toBe(
+      true,
+    );
+    for (const key of [
+      "catalog",
+      "library",
+      "history",
+      "messageDetail",
+      "materialPreview",
+      "historyOnly",
+      "importing",
+    ]) {
+      expect(
+        isDesktopState({
+          ...candidate,
+          sources: { items: [{ ...source, [key]: null }], truncated: false },
+        }),
+      ).toBe(false);
+    }
+  });
   it("accepts bounded recorded web sources while rejecting malformed permissions and projections", () => {
     const source = {
       id: "entry:call",

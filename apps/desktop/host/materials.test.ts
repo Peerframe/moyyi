@@ -4,6 +4,7 @@ import {
   mkdirSync,
   mkdtempSync,
   realpathSync,
+  renameSync,
   rmSync,
   symlinkSync,
   writeFileSync,
@@ -11,7 +12,7 @@ import {
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
-import { inspectMaterials } from "./materials.ts";
+import { inspectMaterials, snapshotExternalMaterial } from "./materials.ts";
 
 const temporary: string[] = [];
 afterEach(() => {
@@ -53,7 +54,7 @@ describe("desktop material identity", () => {
     const { root, selected } = workspace();
     writeFileSync(join(root, "outside.pdf"), "PRIVATE");
     writeFileSync(join(selected, "ok.pdf"), "SAFE");
-    writeFileSync(join(selected, "bad.txt"), "TEXT");
+    writeFileSync(join(selected, "bad.exe"), "TEXT");
     writeFileSync(join(selected, "large.pdf"), Buffer.alloc(10 * 1024 * 1024 + 1));
     symlinkSync(join(root, "outside.pdf"), join(selected, "link.pdf"));
     symlinkSync(root, join(selected, "linked"));
@@ -63,7 +64,7 @@ describe("desktop material identity", () => {
     mkdirSync(join(selected, "private"));
     writeFileSync(join(selected, "private/key.pdf"), "PRIVATE");
     for (const path of [
-      "bad.txt",
+      "bad.exe",
       "../outside.pdf",
       "link.pdf",
       "linked/outside.pdf",
@@ -75,5 +76,34 @@ describe("desktop material identity", () => {
     ])
       expect(() => inspectMaterials(selected, [path], [join(selected, "private")])).toThrow();
     expect(() => inspectMaterials(selected, Array(9).fill("missing.pdf"), [])).toThrow("eight");
+  });
+  it("rejects an external file replaced during its bounded read and honors source cancellation", () => {
+    const { selected } = workspace();
+    const source = join(selected, "source.txt");
+    writeFileSync(source, "original");
+    let checks = 0;
+    expect(() =>
+      snapshotExternalMaterial(source, [], () => {
+        if (++checks === 2) {
+          renameSync(source, join(selected, "previous.txt"));
+          writeFileSync(source, "replacement");
+        }
+      }),
+    ).toThrow("changed");
+    const controller = new AbortController();
+    controller.abort();
+    expect(() =>
+      snapshotExternalMaterial(source, [], () => controller.signal.throwIfAborted()),
+    ).toThrow();
+  });
+  it("accepts exactly ten MiB and checks exclusions after resolving an external parent alias", () => {
+    const { root, selected } = workspace();
+    const source = join(selected, "limit.pdf");
+    writeFileSync(source, Buffer.alloc(10 * 1024 * 1024, 0xa5));
+    expect(snapshotExternalMaterial(source, []).sourceBytes).toBe(10 * 1024 * 1024);
+    symlinkSync(selected, join(root, "alias"));
+    expect(() => snapshotExternalMaterial(join(root, "alias", "limit.pdf"), [selected])).toThrow(
+      "Protected",
+    );
   });
 });

@@ -235,7 +235,7 @@ function validateBackup(root: string): Manifest {
     value.format !== 1 ||
     value.kind !== "moyyi-local-backup" ||
     value.credentialsExported !== false ||
-    value.schemaVersion !== 2 ||
+    ![2, 3].includes(value.schemaVersion) ||
     value.persistedFormat !== 1 ||
     !Number.isSafeInteger(value.sessionCount) ||
     value.sessionCount < 0 ||

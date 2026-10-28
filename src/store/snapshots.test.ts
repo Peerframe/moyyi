@@ -180,7 +180,7 @@ describe("durable workspace snapshots", () => {
     const reopened = open(f.directory);
     expect(await reopened.getSnapshot(value.id)).toEqual(value);
     expect(reopened.diagnostics()).toMatchObject({
-      schemaVersion: 2,
+      schemaVersion: 3,
       persistedFormat: 1,
       synchronous: 2,
     });

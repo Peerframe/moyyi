@@ -226,8 +226,10 @@ The system overview and installation receipt identify the actual daily version.
 
 The owner requested a plan on2026-10-28 to transfer **all applicable OpenBot capabilities**.
 This expands the earlier M1–M5 selection; it does not authorize replacing moyyi's self-owned
-core with OpenBot's runtime. This is a planning delivery only: no new capability, provider,
-background task or permission is enabled by this document.
+core with OpenBot's runtime. The original delivery was a plan; the owner subsequently authorized
+M6 implementation. M6 now has **bounded material/result/history acceptance evidence** under [ADR0044](decisions/0044-desktop-material-library-and-history.md) and the
+[M6 receipt](tasks/2026-10-28-desktop-m6.md); PR50 records final integration and installation. This
+document itself enables no provider, background task or permission; M7–M13 remain planned.
 
 The scope is every implemented capability in fixed OpenBot
 `010439bb9002fabb7e1facd8450ee85edbafa309` that is useful to one personal local agent, plus a
@@ -272,7 +274,7 @@ fixtures or contract-only support as native or live acceptance.
 
 | Stage | User-visible delivery and reuse | Dependencies / finite completion evidence |
 |---|---|---|
-| **M6 — Materials, results and complete history** | Import selected external files through picker/drop/paste; keep originals and content hashes, manage references and recoverable removal, with age-based housekeeping disabled unless explicitly enabled. Render safe Markdown tables/lists and bounded PNG/JPEG previews; open/save receipt-backed results. Add complete paged history, name search, pin/group/mute/rename and recoverable session removal. Adapt attachment/message/result views and local saving patterns. | First vertical slice: select an external document, import a bounded snapshot into the chosen workspace, read it with existing parsers, produce/open a report and restore after restart. Source bytes unchanged; collision, cancel, replacement, denied import, referenced-file removal and restore covered. No raw HTML execution, remote image load or path/permission expansion. Delivered preview must be usable in normal/narrow supported windows. |
+| **M6 — Materials, results and complete history** — bounded workflow verified, delivery pending | Import selected external files through picker/drop/paste; keep originals and content hashes, manage references and recoverable removal, with age-based housekeeping disabled unless explicitly enabled. Render safe Markdown tables/lists and bounded PNG/JPEG previews; open/save receipt-backed results. Add complete paged history, name search, pin/group/mute/rename and recoverable session removal. Adapt attachment/message/result views and local saving patterns. | Clean `e0c26bd7` passed all three CI lanes and the installed-copy seven-format/history/organization/restart gates. Actual native PDF/DOCX import → approved report → complete readback → Markdown preview/save and PNG preview were observed; normal1120×800/narrow780×560 remained scrollable. One independent Flash task used4 requests/93.743s, zero retry, six frozen criteria confirmed; first4-request failure remains sealed. Native organization/history reopen and final review/merge/paired backup/install remain pending in [M6 receipt](tasks/2026-10-28-desktop-m6.md)/[PR50](https://github.com/Peerframe/moyyi/pull/50). Office/PDF preview stays identity-only; images have no OCR/model input; HTML/links/remote images stay inert. |
 | **M7 — Personal setup, Skills and safe templates** | Connection management with explicit supported model/API/capability settings; personal role/preferences without multiple Bot identities. A desktop skill library supports import, complete review, version/digest, enable/disable/revoke, discovery and on-demand bounded reads. Safe template export/import carries reviewed reusable instructions with license and digest. | Build on M6 input/preview. Restart and switch connections without implicit key/model changes. One task discovers and reads an enabled skill; disabled/revoked/changed/unreviewed versions cannot be used and allowed-tools grants no authority. Import/export has a readable diff, no credentials/private history/permissions, disabled defaults and explicit local review. Upstream v1 metadata-only and explicit v2 single-file content differ; no arbitrary skill directory/script execution is inferred. |
 | **M8 — Images, OCR and voice** | Adapt local image OCR, recording/cancel UI and explicit media-transcription transport; allow transient encrypted-PDF input through a trusted native secret field where support is verified. Add optional compatible image/PDF model input only for an explicitly configured and tested provider. | Uses M6 assets and M7 explicit connections. Real local PNG/JPEG OCR with pinned offline languages; record/cancel and one selected synthetic recording transcribed through an explicitly enabled service. Passwords never enter tool arguments, transcript or logs. Cancel/failure preserves originals and prior valid output; missing language/key/provider is explicit. No upload on selection/view, automatic external fallback, OCR accuracy guarantee, scan-PDF rasterization or legacy Office support inherited from upstream. |
 | **M9 — Web research and controlled browser** | Extend existing desktop web settings to a selected search backend; integrate browser observation, navigation, bounded actions and user takeover using the useful OpenBot approval/observation patterns. Keep M5's source records and report path. | Separately verify the configured search backend returns results that map to actual sources. Prove the actual local browser/driver and containment outside the checkout, then finish observe→approved action→result artifact in one disposable public test site. Bind decisions to current observation/session, reject stale approvals, prevent agent input during takeover, and preserve unknown after interruption. Login requires a separate explicit user flow; no copying the owner's normal browser profile. OpenBot's Linux qualification fixture is not a production installer; macOS/native execution must be independently established. |
@@ -281,9 +283,15 @@ fixtures or contract-only support as native or live acceptance.
 | **M12 — Scheduled work and notifications** | Personal schedules, pause/resume/delete, next/last outcome, non-overlap and notifications opening the actual run. Reuse interval/coalescing/status behavior and desktop notification patterns. | Build on persisted runtime and the earlier capability grants. A real local scheduler creates one run, survives restart, skips overlap, coalesces missed occurrences and respects pause/revoke. It submits through the same protocol/policy; no second agent loop or implied approval. Explicitly show whether the app must stay running; background startup is opt-in. Fixed elapsed intervals are not calendar/DST-aware cron; unknown submissions are reconciled without blind retry. |
 | **M13 — Daily integration and transfer closure** | Finish remaining reusable desktop preferences/navigation, original/result saving and content-controlled audit export; qualify maintenance against the new stored assets, Skills, memories and schedules. Reconcile every inventory row and verify combined daily flows. | New store backup/restore/software rollback plus complete existing session compatibility. Independent tasks cover external document→report, Skills+memory→new session, browser/MCP→artifact, and scheduled read→notification; inspect real facts/files/forbidden effects. Every applicable row has installed evidence. An unresolved blocker keeps that row and overall transfer closure incomplete; record it and continue independent rows. M4's original quality gap remains visible and is not waived by migration success. No public release or unsupported-platform claim. |
 
-**M6 is the first implementation checkpoint.** It must deliver one ordinary external-document
-workflow before adding the rest of its library/preview refinements. Later stage research should
-settle its current dependency/authority decision, not delay that first product improvement.
+**M6 is closing its current delivery checkpoint.** Bounded import/report/preview acceptance
+is recorded separately from offline history/organization coverage. Native clipboard and session
+organization/recycle/restore/restart also passed without new model requests; PR50 records final
+review/merge/paired-backup/installation against that qualified artifact.
+The first failed group and earlier M4 scores remain unchanged. The live conversation stays bounded at100
+messages; explicit older pages and long-message chunks remove that former browsing limit without
+exposing reasoning or request blobs. Result saving is implemented; arbitrary-original/template
+saving remains planned for M13; message copy/quoted reply remains an explicit M6/M13 inventory gap. Later stage research should
+settle its own dependency/authority decision, not delay this bounded product acceptance.
 M8 can proceed once M6/M7 are accepted; M9–M11 share existing ports but each has independent
 permissions and acceptance. Scheduling is last because it must reuse already verified foreground
 capabilities. M13 is not permission to postpone integration or regressions until the end.
@@ -310,8 +318,9 @@ quality, but a map, checklist, another model critique or successful readback is 
 correct answer. Apply a bounded hypothesis to the demonstrated failure layer, keep the original
 budget, and stop/research a different route when it fails rather than reroll the same prompt.
 
-Planning does not start implementation, run paid calls or change the installed app. When
-implementation starts, apply the existing owner authorization for necessary bounded live validation
+The original planning request did not start implementation, run paid calls or change the installed
+app. M6 implementation follows the later explicit authorization; apply the existing owner
+authorization for necessary bounded live validation
 and review/CI-gated sequential merge/install within its scope; the planning request itself adds
 no new external-service, credential or private-data permissions. Freeze each new task/config/request/time/cost envelope before execution and retain
 failed trials; sealed allowances are never reused. Missing external service credentials may block

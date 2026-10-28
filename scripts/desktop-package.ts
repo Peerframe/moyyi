@@ -12,6 +12,7 @@ import {
   writeFileSync,
 } from "node:fs";
 import { join } from "node:path";
+import { SCHEMA_VERSION } from "../src/store/schema.ts";
 import { buildCandidate, command, repository } from "./packaging.ts";
 
 assert(
@@ -139,7 +140,7 @@ const manifest = {
   version: "0.0.0",
   publicRelease: false,
   maintenanceCompatibility: {
-    schemaVersion: 2,
+    schemaVersion: SCHEMA_VERSION,
     persistedFormat: 1,
     settingsFormat: 1,
     settingsKeys: ["preset", "maxRequests", "timeoutMs", "kimiReasoningEffort", "evidenceAnswer"],

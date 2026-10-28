@@ -7,6 +7,7 @@ import type {
   RunId,
   RuntimeEvent,
   SessionId,
+  SessionQuery,
   TranscriptEntry,
 } from "moyyi/contracts";
 import {
@@ -28,6 +29,8 @@ import {
   type DesktopWebAccess,
 } from "../shared.ts";
 import { inspectEffectFile } from "./effects.ts";
+import { imagePreview } from "./image-preview.ts";
+import { ManagedMaterials } from "./managed-materials.ts";
 import { FileBoundaryError, inspectMaterials } from "./materials.ts";
 import { DesktopPolicy } from "./permissions.ts";
 import { inspectReport, reportTarget } from "./reports.ts";
@@ -71,6 +74,7 @@ const clip = (text: string, maximum = DISPLAY_TEXT) =>
 
 class Host implements DesktopHost {
   private runtime: Runtime | undefined;
+  private materialAbort: AbortController | undefined;
   private unsubscribe: (() => void) | undefined;
   private readonly listeners = new Set<(state: DesktopState) => void>();
   private readonly knownSessions = new Map<string, DesktopSessionSummary>();
@@ -134,6 +138,7 @@ class Host implements DesktopHost {
   async initialize(): Promise<void> {
     await this.open(false);
     await this.send({ type: "session.list", offset: 0, limit: 20 });
+    await this.catalog();
   }
 
   getState(): DesktopState {
@@ -240,6 +245,11 @@ class Host implements DesktopHost {
       command = parseDesktopCommand(value);
     } catch {
       return this.fail("Invalid desktop command");
+    }
+    if (command.type === "material.cancel") {
+      this.selected(command.sessionId);
+      this.materialAbort?.abort();
+      return this.getState();
     }
     if (command.type === "close") {
       await this.close();
@@ -376,6 +386,49 @@ class Host implements DesktopHost {
     }
   }
 
+  private materialManager(): ManagedMaterials {
+    if (!this.runtime?.materials) throw new FileBoundaryError("Managed materials are unavailable");
+    return new ManagedMaterials(this.runtime.materials, { excluded: this.excluded() });
+  }
+  private async refreshMaterials(offset = 0): Promise<void> {
+    const sessionId = this.state.activeSessionId,
+      workspaceRoot = this.state.workspaceRoot;
+    if (!sessionId || !workspaceRoot || !this.runtime?.materials) return;
+    const manager = this.materialManager();
+    await manager.housekeeping({ workspaceRoot });
+    const rows = await manager.list(workspaceRoot);
+    const project = ({
+      workspaceRoot: _workspace,
+      ...row
+    }: Awaited<ReturnType<typeof manager.list>>[number]) => row;
+    const selected = await manager.selected({ sessionId, workspaceRoot });
+    this.update({
+      library: {
+        items: rows.slice(offset, offset + 20).map(project),
+        offset,
+        hasMore: rows.length > offset + 20,
+        housekeeping: await this.runtime.materials.housekeeping(workspaceRoot),
+      },
+      materials: selected.map(({ path, format, sourceBytes, sha256 }) => ({
+        path,
+        format,
+        sourceBytes,
+        sha256,
+      })),
+    });
+  }
+
+  private async catalog(query: SessionQuery = {}): Promise<void> {
+    if (!this.runtime) throw new BoundaryError("Session store is unavailable");
+    const page = await this.runtime.sessions.list(query);
+    this.knownSessions.clear();
+    for (const item of page.items) this.knownSessions.set(item.sessionId, item);
+    this.update({
+      sessions: { items: page.items, offset: 0, hasMore: page.nextCursor !== null },
+      catalog: { query, nextCursor: page.nextCursor },
+    });
+  }
+
   private async perform(command: Exclude<DesktopCommand, { type: "close" }>): Promise<void> {
     if (command.type !== "approve" && command.type !== "cancel") {
       await this.refresh;
@@ -383,9 +436,101 @@ class Host implements DesktopHost {
       await this.runtime?.idle();
       if (this.state.status !== "ready") throw new BoundaryError("Desktop host is closing");
     }
+    if (command.type === "catalog") {
+      await this.catalog(command.query);
+      return;
+    }
+    if (command.type === "session.update") {
+      if (!this.runtime || !this.knownSessions.has(command.update.sessionId))
+        throw new BoundaryError("Select a listed session first");
+      const changed = await this.runtime.sessions.update({
+        ...command.update,
+        sessionId: command.update.sessionId as SessionId,
+      });
+      if (changed.sessionId === this.state.activeSessionId)
+        this.update({ activeMetadata: changed.metadata });
+      if (changed.sessionId === this.state.activeSessionId && changed.metadata.removedAt) {
+        await this.open(this.state.askEachRead);
+        this.update({
+          activeSessionId: null,
+          activeMetadata: null,
+          workspaceRoot: null,
+          messages: [],
+          materials: [],
+          history: null,
+          messageDetail: null,
+          historyOnly: false,
+          library: { items: [], offset: 0, hasMore: false, housekeeping: false },
+          materialPreview: null,
+          artifactPreview: null,
+          effects: { items: [], offset: 0, hasMore: false },
+          artifacts: { items: [], offset: 0, hasMore: false },
+          sources: { items: [], truncated: false },
+          outcome: null,
+        });
+      }
+      const { cursor: _cursor, ...query } = this.state.catalog?.query ?? {};
+      await this.catalog(query);
+      return;
+    }
+    if (command.type === "history.close") {
+      this.update({ history: null, messageDetail: null });
+      return;
+    }
+    if (command.type === "history" || command.type === "history.message") {
+      this.selected(command.sessionId);
+      if (!this.runtime) throw new BoundaryError("Session history is unavailable");
+      if (command.type === "history")
+        this.update({
+          history: await this.runtime.sessions.history({
+            sessionId: command.sessionId as SessionId,
+            ...(command.cursor ? { cursor: command.cursor } : {}),
+            limit: 20,
+          }),
+          messageDetail: null,
+        });
+      else {
+        this.update({ messageDetail: null });
+        const chunk = await this.runtime.sessions.readMessage({
+          sessionId: command.sessionId as SessionId,
+          messageId: command.messageId,
+          offset: command.offset,
+        });
+        this.update({
+          messageDetail: { ...chunk, messageId: command.messageId, offset: command.offset },
+        });
+      }
+      return;
+    }
     if (command.type === "create" || command.type === "load") {
       const record =
         command.type === "load" ? this.knownSessions.get(command.sessionId) : undefined;
+      if (command.type === "load" && record?.metadata?.removedAt && this.runtime) {
+        await this.open(command.askEachRead);
+        this.update({
+          activeSessionId: command.sessionId,
+          activeMetadata: record?.metadata ?? null,
+          workspaceRoot: record.workspaceRoot,
+          historyOnly: true,
+          history: await this.runtime.sessions.history({
+            sessionId: command.sessionId as SessionId,
+          }),
+          messageDetail: null,
+          messages: [],
+          streamText: "",
+          materials: [],
+          library: { items: [], offset: 0, hasMore: false, housekeeping: false },
+          materialPreview: null,
+          outcome: null,
+          openedHistory: true,
+          effects: { items: [], offset: 0, hasMore: false },
+          artifacts: { items: [], offset: 0, hasMore: false },
+          artifactPreview: null,
+          effectInspection: null,
+          sources: { items: [], truncated: false },
+        });
+        return;
+      }
       if (command.type === "load" && !record)
         throw new BoundaryError("Select a listed session first");
       const selected =
@@ -398,7 +543,38 @@ class Host implements DesktopHost {
         if (!(await stat(workspace)).isDirectory()) throw Error();
         if (command.type === "load" && workspace !== selected) throw Error();
       } catch {
-        throw new BoundaryError("The selected workspace is missing or has changed");
+        if (command.type !== "load" || !this.runtime)
+          throw new BoundaryError("The selected workspace is missing or has changed");
+        await this.open(command.askEachRead);
+        const history = await this.runtime.sessions.history({
+          sessionId: command.sessionId as SessionId,
+          limit: 20,
+        });
+        this.update({
+          activeSessionId: command.sessionId,
+          activeMetadata: record?.metadata ?? null,
+          workspaceRoot: selected,
+          historyOnly: true,
+          library: { items: [], offset: 0, hasMore: false, housekeeping: false },
+          materialPreview: null,
+          history,
+          messageDetail: null,
+          messages: [],
+          streamText: "",
+          materials: [],
+          reportTarget: null,
+          permissions: { writes: false, checks: false },
+          webAccess: EMPTY_WEB_ACCESS,
+          sources: { items: [], truncated: false },
+          openedHistory: true,
+          effects: { items: [], offset: 0, hasMore: false },
+          effectInspection: null,
+          artifacts: { items: [], offset: 0, hasMore: false },
+          artifactPreview: null,
+          pendingApproval: null,
+          outcome: null,
+        });
+        return;
       }
       if (this.state.status !== "ready") throw new BoundaryError("Desktop host is closing");
       if (
@@ -428,6 +604,11 @@ class Host implements DesktopHost {
         permissions: { writes: false, checks: false },
         webAccess: EMPTY_WEB_ACCESS,
         sources: { items: [], truncated: false },
+        library: { items: [], offset: 0, hasMore: false, housekeeping: false },
+        materialPreview: null,
+        history: null,
+        messageDetail: null,
+        historyOnly: false,
         openedHistory: command.type === "load",
         effects: { items: [], offset: 0, hasMore: false },
         effectInspection: null,
@@ -445,8 +626,22 @@ class Host implements DesktopHost {
         this.expectedSession = undefined;
       }
       await this.refreshArtifacts(0);
+      if (command.type === "load" && this.state.catalog) {
+        const { cursor: _cursor, ...query } = this.state.catalog.query;
+        await this.catalog(query);
+      }
+      await this.refreshMaterials();
       return;
     }
+    if (
+      this.state.historyOnly &&
+      ["permissions", "web.permissions", "report.target", "report.clear", "materials"].includes(
+        command.type,
+      )
+    )
+      throw new BoundaryError(
+        "This session is open for history only; restore it and reopen an available workspace first",
+      );
     if (command.type === "configure") {
       if (!this.configure)
         throw new BoundaryError("Desktop settings cannot be changed by this host");
@@ -595,6 +790,88 @@ class Host implements DesktopHost {
       this.update({ effectInspection: inspectEffectFile(workspace, effect, this.excluded()) });
       return;
     }
+    if (
+      command.type === "materials.import" ||
+      command.type === "library" ||
+      command.type === "material.select" ||
+      command.type === "material.recycle" ||
+      command.type === "material.restore" ||
+      command.type === "material.purge" ||
+      command.type === "material.preview" ||
+      command.type === "material.housekeeping"
+    ) {
+      const workspaceRoot = this.selected(command.sessionId),
+        sessionId = command.sessionId;
+      if (this.state.historyOnly)
+        throw new BoundaryError("Open the available workspace before managing materials");
+      const manager = this.materialManager();
+      this.update({ materialPreview: null });
+      if (command.type === "materials.import") {
+        const controller = new AbortController();
+        this.materialAbort = controller;
+        this.update({ importing: true });
+        try {
+          await manager.importFiles({
+            sessionId,
+            workspaceRoot,
+            paths: command.paths,
+            signal: controller.signal,
+          });
+        } catch (error) {
+          if (controller.signal.aborted)
+            throw new FileBoundaryError(
+              "Import cancelled; any saved originals remain recoverable in the library",
+            );
+          throw error;
+        } finally {
+          this.materialAbort = undefined;
+          this.update({ importing: false });
+        }
+      } else if (command.type === "material.select") {
+        const selected = await manager.selected({ sessionId, workspaceRoot });
+        await manager.attach({
+          sessionId,
+          workspaceRoot,
+          ids: [...new Set([...selected.map((r) => r.id), ...command.ids])],
+        });
+      } else if (command.type === "material.housekeeping") {
+        await manager.setHousekeeping(workspaceRoot, command.enabled);
+        await manager.housekeeping({ workspaceRoot });
+      } else if (command.type !== "library") {
+        const operation = { workspaceRoot, id: command.id, revision: command.revision };
+        if (command.type === "material.preview") {
+          const record = (await manager.list(workspaceRoot)).find(
+            (r) => r.id === command.id && r.revision === command.revision && r.state === "active",
+          );
+          if (!record) throw new FileBoundaryError("Select a current material first");
+          const bytes = await manager.read(operation);
+          const image = ["png", "jpg", "jpeg"].includes(record.format)
+            ? imagePreview(bytes, record.format)
+            : undefined;
+          const isText = ["txt", "text", "md", "json", "csv"].includes(record.format);
+          const text = isText
+            ? new TextDecoder("utf-8", { fatal: true }).decode(bytes)
+            : image
+              ? ""
+              : "原件已保留。此处显示文件身份；正文需在发送任务后通过受控文档工具读取，不是版式预览。";
+          this.update({
+            materialPreview: {
+              effectId: record.id,
+              path: record.path,
+              sha256: record.sha256,
+              sourceBytes: record.sourceBytes,
+              text: text.slice(0, 65536),
+              truncated: text.length > 65536,
+              ...(image ? { image } : {}),
+            },
+          });
+        } else if (command.type === "material.recycle") await manager.recycle(operation);
+        else if (command.type === "material.restore") await manager.restore(operation);
+        else await manager.purge(operation);
+      }
+      await this.refreshMaterials(command.type === "library" ? command.offset : 0);
+      return;
+    }
     if (command.type === "materials") {
       const workspace = this.selected(command.sessionId);
       if (command.paths.length)
@@ -603,7 +880,21 @@ class Host implements DesktopHost {
     }
     if (command.type === "material.remove") {
       this.selected(command.sessionId);
-      this.update({ materials: this.state.materials.filter((item) => item.path !== command.path) });
+      if (this.runtime?.materials) {
+        const workspaceRoot = this.selected(command.sessionId),
+          manager = this.materialManager();
+        const selected = await manager.selected({ sessionId: command.sessionId, workspaceRoot });
+        await manager.attach({
+          sessionId: command.sessionId,
+          workspaceRoot,
+          ids: selected.filter((r) => r.path !== command.path).map((r) => r.id),
+        });
+      }
+      this.update({
+        materials: this.state.materials.filter((item) => item.path !== command.path),
+        materialPreview: null,
+      });
+      await this.refreshMaterials();
       return;
     }
     if (command.type === "report.target" || command.type === "report.clear") {
@@ -651,6 +942,9 @@ class Host implements DesktopHost {
       return;
     }
     if (command.type === "start") {
+      if (this.state.historyOnly)
+        throw new BoundaryError("Workspace is unavailable; this session is open for history only");
+      this.update({ history: null, messageDetail: null });
       const workspace = this.selected(command.sessionId);
       if (!this.state.connection.ready)
         throw new BoundaryError("The model connection is unavailable");
@@ -665,7 +959,7 @@ class Host implements DesktopHost {
           throw new BoundaryError("Selected documents changed; select them again before sending");
         input.push({
           type: "text",
-          text: `Selected workspace documents (file identity only; contents have not been extracted):\n${JSON.stringify(current)}`,
+          text: `Selected workspace materials (file identity only; contents have not been extracted). Use read_document for Office/PDF, read for text. PNG/JPEG are local preview only; do not claim to have seen their contents:\n${JSON.stringify(current)}`,
         });
       }
       if (this.state.reportTarget)
@@ -684,6 +978,7 @@ class Host implements DesktopHost {
       await this.send({ type: "run.cancel", runId: command.runId as RunId });
       return;
     }
+    if (command.type !== "approve") throw new BoundaryError("Unknown desktop action");
     const pending = this.state.pendingApproval;
     if (
       this.state.run?.state !== "running" ||
@@ -834,12 +1129,26 @@ class Host implements DesktopHost {
           (this.expectedSession && event.sessionId !== this.expectedSession)
         )
           return;
-        const summary = this.knownSessions.get(event.sessionId) ?? {
-          sessionId: event.sessionId,
-          workspaceRoot: this.pendingWorkspace,
-          lastActivityAt: null,
-          promptPreview: null,
-        };
+        const listed = this.knownSessions.get(event.sessionId);
+        // Filtering the catalog must not reset the selected session when grants rebuild its runtime.
+        const metadata = listed?.metadata ??
+          (event.sessionId === this.state.activeSessionId ? this.state.activeMetadata : null) ?? {
+            title: null,
+            group: null,
+            pinned: false,
+            muted: false,
+            removedAt: null,
+            revision: 0,
+          };
+        const summary = listed
+          ? { ...listed, metadata }
+          : {
+              sessionId: event.sessionId,
+              workspaceRoot: this.pendingWorkspace,
+              lastActivityAt: null,
+              promptPreview: null,
+              metadata,
+            };
         this.knownSessions.set(event.sessionId, summary);
         let sessions = this.state.sessions;
         if (!this.expectedSession && sessions.offset === 0) {
@@ -855,6 +1164,7 @@ class Host implements DesktopHost {
         }
         this.update({
           activeSessionId: event.sessionId,
+          activeMetadata: summary.metadata ?? null,
           workspaceRoot: this.pendingWorkspace,
           sessions,
         });
@@ -1011,6 +1321,7 @@ class Host implements DesktopHost {
   }
 
   close(): Promise<void> {
+    this.materialAbort?.abort();
     if (this.closing) return this.closing;
     this.update({ status: "closing", webAccess: EMPTY_WEB_ACCESS });
     this.closing = (async () => {

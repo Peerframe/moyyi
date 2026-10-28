@@ -1,4 +1,5 @@
 import type { DesktopState } from "../shared.ts";
+import { RichMessage } from "./RichMessage.tsx";
 import { noticeLabel, toolStateLabel } from "./view-state.ts";
 
 export function MessageList({
@@ -28,9 +29,15 @@ export function MessageList({
             <p className="message-label">
               {message.role === "user" ? "你" : message.role === "assistant" ? "moyyi" : "会话记录"}
             </p>
-            <p className="message-text">
-              {message.role === "notice" ? noticeLabel(message.text) : message.text}
-            </p>
+            <div className="message-text">
+              {message.role === "assistant" ? (
+                <RichMessage content={message.text} />
+              ) : message.role === "notice" ? (
+                noticeLabel(message.text)
+              ) : (
+                message.text
+              )}
+            </div>
           </article>
         ),
       )}

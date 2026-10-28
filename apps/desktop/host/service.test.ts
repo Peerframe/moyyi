@@ -173,7 +173,20 @@ describe("desktop host boundary over the public runtime", () => {
     await f.host.dispatch({ type: "create", workspaceRoot: f.workspace, askEachRead: false });
     const sessionId = f.host.getState().activeSessionId;
     expect(f.host.getState().sessions.items).toEqual([
-      { sessionId, workspaceRoot: f.workspace, lastActivityAt: null, promptPreview: null },
+      {
+        sessionId,
+        workspaceRoot: f.workspace,
+        lastActivityAt: null,
+        promptPreview: null,
+        metadata: {
+          title: null,
+          group: null,
+          pinned: false,
+          muted: false,
+          removedAt: null,
+          revision: 0,
+        },
+      },
     ]);
     expect(f.requests).toHaveLength(0);
     await f.host.dispatch({ type: "start", sessionId, text: "Inspect this workspace" });
