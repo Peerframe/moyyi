@@ -30,10 +30,15 @@ boundary and left about25 seconds for final generation. M4 remains unaccepted; n
 public task, merge or daily installation followed. Flash settings and the daily M3 app are preserved.
 Source checks140/2782, the external package and all three CI lanes passed; engineering success
 does not replace the missing semantic result. The existing M4 receipt retains both failures.
-The newly authorized follow-up changes the experimental phase scheduler: a fixed one-third
-investigation deadline and settled stream/recording handoff reserve the remainder for one final
-answer. Offline validation and one independent8-request/300-second trial are pending; prompts,
-source, rubric, output limit and daily Flash default are unchanged. No new pass is claimed.
+The phase-deadline follow-up `3e33ff9` implements a fixed one-third investigation deadline and
+settled stream/recording handoff, with known failures kept terminal. Final source checks142/2836,
+instruction scenarios36/36, the external desktop bundle and all three CI lanes passed. Its one
+independent original-task trial stopped on the first request with classified429
+`engine_overloaded_error`, before any tool or final answer. The request window was26.775 seconds;
+there was no retry. This does not test the scheduling policy's live answer quality. The original
+source/question/rubric and8/300/8192 limits stayed fixed. The trial is sealed, the remaining7 calls
+are not transferred, and M4/PR47 remain unaccepted/unmerged. Flash settings were restored exactly;
+the daily M3 app reopened the new history without replay. No public release.
 
 | Coordinate | Current evidence |
 |---|---|

@@ -1,8 +1,8 @@
 # ADR 0042: One direct evidence answer within the original budget
 
-Status: a separately authorized phase-deadline revision is under validation, 2026-10-28.
-The default-off experiment remains unmerged and excluded from the daily product until every
-M4 gate passes. All earlier failures stay sealed; a new scheduling policy is not a semantic pass.
+Status: phase-deadline engineering checks passed; the one independent live trial stopped on
+first-request engine overload, 2026-10-28. The default-off experiment remains unmerged and excluded
+from the daily product until every M4 gate passes. All failures stay sealed; no semantic pass.
 
 ## Evidence and hypothesis
 
@@ -168,3 +168,28 @@ Targeted primary-source review informed the boundary, with no copied code or add
 Offline and new live results are recorded in the existing [M4 receipt](../tasks/2026-10-28-desktop-m4.md).
 A passing synthetic timing trace establishes scheduling behavior, not answer correctness. Only
 the independent final answer is graded; earlier drafts cannot substitute for it.
+
+
+## Phase-deadline delivery result
+
+Implementation `3e33ff9` passed142 test files/2836 tests,36 instruction scenarios and the actual
+external desktop bundle, including the original gates and the new synthetic phase-deadline case.
+[All three CI lanes passed](https://github.com/Peerframe/moyyi/actions/runs/40653421901).
+The installed-copy probe verifies100 seconds investigation/150 seconds total under the unchanged
+300-second ceiling, one fresh final, closed old stream, recording acknowledgement, retained file
+observation and no history replay. That is synthetic timing evidence, not model quality.
+
+The one newly authorized original-task trial retained Kimi CN high,8/300/8192, zero retry,
+original source/question and hidden rubric. Its first request was classified as HTTP429
+`engine_overloaded_error`; no tools, draft or independent final were produced. The notice-to-record
+window was26.775 seconds, before the100-second investigation cutoff. Raw provider diagnostics are
+not retained; the fixed UI classification and immutable request/history evidence are archived.
+Unknown usage remains unknown. The run was stopped without a second request. This establishes
+the observed provider failure category, not account-wide traffic or the provider's underlying
+capacity cause. It cannot evaluate the proposed timing policy's live semantic effectiveness.
+
+All six original requirements have no complete answer to grade. No conditional public task was
+opened; the unused7 calls and all earlier groups remain sealed. Native UI restored the exact
+Flash low/3/120 settings bytes and the unchanged M3 app reopened history without replay. PR47
+stays draft/unmerged; no daily replacement or public release occurred. The [M4 receipt](../tasks/2026-10-28-desktop-m4.md)
+records the accepted engineering evidence and remaining gates separately.
