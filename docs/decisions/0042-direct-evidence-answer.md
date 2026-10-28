@@ -1,9 +1,9 @@
 # ADR 0042: One direct evidence answer within the original budget
 
-Status: one independent retest authorized after HTTP429 diagnosis, 2026-10-28.
-The previous provider-blocked trial remains sealed and excluded from delivery. The default-off
-implementation is unchanged; it is not installed in the daily product and has no live semantic
-acceptance. This authorization does not reopen the earlier allowance.
+Status: excluded from M4 delivery after the independently authorized deadline-limited retest,
+2026-10-28. The default-off experimental source remains on the unmerged draft for review; it
+has no complete live final answer and is not installed in the daily product. Both earlier
+failures and the latest independent result remain sealed.
 
 ## Evidence and hypothesis
 
@@ -100,3 +100,27 @@ The [provider follow-up](0036-kimi-chat-provider.md#http429-diagnosis-follow-up-
 adds bounded error classification, not a claim to control upstream capacity. Freeze new evidence
 before sending; keep all old failures. Flash stays the daily default. Only all M4 gates passing
 permits merge and installation; public publication remains unauthorized.
+
+
+## Independent retest result after HTTP429 diagnosis
+
+The provider fix in `e337d64` passed140 files/2782 tests,4 Kimi runtime scenarios and the
+external desktop bundle. A test-only canonical-object comparison bug in the new package probe
+was corrected in `a6fd396`; all three CI lanes passed on that revision. The probe still requires
+full-value input preservation and now also checks persisted request blobs. No production request,
+source question, renderer, model setting or original budget changed for the live trial.
+
+The one authorized original-task retest used6 requests, no retry, and32 read-only
+observations (31 succeeded, one failed). No429 occurred. Requests1–4 completed tool use; request5 produced an investigation
+draft. Request5 began at127.178 seconds (before the150-second transition boundary) and lasted
+147.852 seconds. The final independent answer began at275.068 seconds, leaving about24.932
+seconds; it was interrupted at300.021 seconds with reasoning only, no answer text and unknown
+usage. Request windows occupied296.665 seconds; other work occupied about3.356 seconds.
+
+This demonstrates a scheduling limitation: checking half the deadline only between calls does
+not reserve time when an in-flight call crosses that boundary. It does not establish service
+queue versus inference time, or prove another threshold would work. The investigation draft is
+not a substitute for the predeclared independent final answer. No semantic pass, public follow-up,
+merge or daily installation follows; unused requests are sealed. The next repair must address
+time allocation and answer construction, not add retrieval, prompt variants or quota. Flash
+settings were restored byte for byte and the daily M3 app remains unchanged.

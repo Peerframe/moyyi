@@ -21,13 +21,15 @@ Default live configuration stays Flash + Responses + low, zero retries; daily gr
 read-only until explicitly enabled. Original tasks and acceptance standards stay unchanged.
 
 The unmerged M4 branch retains [one direct evidence answer](decisions/0042-direct-evidence-answer.md)
-as a default-off experiment, excluded from delivery after its bounded trial stopped on the third
-request with HTTP429. Its139-file/2746-test check,34 scripted scenarios, external package and CI
-passed; the independent answer was never reached, so neither original omission is resolved.
-The daily app is unchanged. No retry or conditional public task followed; scoped evidence and
-the unknown provider-error subtype are preserved in the existing M4 receipt. The owner has now
-authorized bounded429 diagnosis and one independent unchanged original-task retest (at most8
-requests, zero retries); it is pending, not a pass. Flash remains the daily default.
+as a default-off experiment, excluded from delivery. The previous third-request429 remains sealed;
+[bounded provider diagnosis](decisions/0036-kimi-chat-provider.md#http429-diagnosis-follow-up-2026-10-28)
+now distinguishes three official error types without exposing raw messages or adding retries.
+Its independent retest did not encounter429, but used6 requests and reached the original300-second
+deadline before producing the final answer. The fifth investigation call crossed the half-time
+boundary and left about25 seconds for final generation. M4 remains unaccepted; no conditional
+public task, merge or daily installation followed. Flash settings and the daily M3 app are preserved.
+Source checks140/2782, the external package and all three CI lanes passed; engineering success
+does not replace the missing semantic result. The existing M4 receipt retains both failures.
 
 | Coordinate | Current evidence |
 |---|---|
