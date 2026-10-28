@@ -100,6 +100,7 @@ try {
     "host-m2.mjs",
     "host-m3.mjs",
     "production-settings.mjs",
+    "kimi-errors.mjs",
     "maintenance.mjs",
   ]) {
     copyFileSync(join(repository, "scripts/desktop-fixtures", name), join(fixture, name));
@@ -190,6 +191,18 @@ try {
   assert.equal(productionSettings.credentialWrites, 0);
   assert.equal(productionSettings.networkAttempts, 0);
   assert.equal(productionSettings.liveModel, false);
+  const kimiErrors = JSON.parse(
+    run(node, ["--no-experimental-strip-types", join(fixture, "kimi-errors.mjs")]),
+  );
+  assert.equal(kimiErrors.passed, true);
+  assert.equal(kimiErrors.count, 4);
+  assert.equal(kimiErrors.cases.length, kimiErrors.count);
+  assert.equal(kimiErrors.syntheticRequests, 4);
+  assert.equal(kimiErrors.credentialReads, 0);
+  assert.equal(kimiErrors.networkAttempts, 0);
+  assert.equal(kimiErrors.toolExecutions, 0);
+  assert.equal(kimiErrors.automaticRetries, 0);
+  assert.equal(kimiErrors.liveModel, false);
   const maintenanceWorkspace = join(temporary, "maintenance-workspace");
   mkdirSync(maintenanceWorkspace);
   const maintenance = JSON.parse(
@@ -230,6 +243,7 @@ try {
         materialsAndReports,
         editsAndRecovery,
         productionSettings,
+        kimiErrors,
         maintenance,
         confinement,
         outsideCheckout: true,

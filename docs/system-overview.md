@@ -25,7 +25,9 @@ as a default-off experiment, excluded from delivery after its bounded trial stop
 request with HTTP429. Its139-file/2746-test check,34 scripted scenarios, external package and CI
 passed; the independent answer was never reached, so neither original omission is resolved.
 The daily app is unchanged. No retry or conditional public task followed; scoped evidence and
-the unknown provider-error subtype are preserved in the existing M4 receipt.
+the unknown provider-error subtype are preserved in the existing M4 receipt. The owner has now
+authorized bounded429 diagnosis and one independent unchanged original-task retest (at most8
+requests, zero retries); it is pending, not a pass. Flash remains the daily default.
 
 | Coordinate | Current evidence |
 |---|---|

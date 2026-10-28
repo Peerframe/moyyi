@@ -58,3 +58,26 @@ an installed package outside the source checkout. Live original-task comparison 
 unchanged source, prompt and six required rubric items, independently of connection acceptance.
 The historical Flash FAIL remains a sealed result. See the [system overview](../system-overview.md)
 for the current observed outcome and remaining limitations.
+
+## HTTP429 diagnosis follow-up (2026-10-28)
+
+The status-only adapter erased a distinction required by the official
+[error reference](https://platform.kimi.com/docs/api/errors) and
+[troubleshooting guide](https://www.kimi.com/help/kimi-api/api-troubleshooting):
+`engine_overloaded_error` is service capacity, `rate_limit_reached_error` is an account rate
+limit, and `exceeded_current_quota_error` is account quota/balance. A bare429 cannot distinguish
+them. Earlier private controls captured engine overload; the subsequent M4 third-request429
+discarded its body and cannot be retrospectively assigned that cause.
+
+The [official limits](https://platform.kimi.com/docs/pricing/limits) are shared across keys and
+models; input plus requested output tokens contribute to admission estimates. The owner's
+console showed positive balance and Tier1 limits above this trial's own traffic. That does not
+establish other account traffic or service availability. Do not recharge, change region/model,
+reduce original output limits or add automatic retries as an unproven workaround.
+
+Read only a bounded error body, classify the three exact `error.type` values, and emit fixed
+actionable text. Never expose the provider's arbitrary message, code or raw body. Malformed,
+missing, oversized, stalled or otherwise unreadable diagnostics preserve an unknown429; host
+cancellation still cancels. This adds no model request, dependency, new persistent format or
+retry. An authorized independent acceptance remains necessary to establish service availability
+and answer quality; diagnosing an error is not a semantic pass. No upstream source was copied.

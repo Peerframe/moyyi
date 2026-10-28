@@ -34,6 +34,22 @@ Limits: requests 4 MiB; streams 8 MiB; one SSE event 1 MiB; 100,000 events; 1,02
 The host owns HTTP cancellation, deadlines and credential security. HTTP bodies and transport
 diagnostics are never reflected into common errors.
 
+HTTP 429 diagnostics read at most 16 KiB and 128 data chunks (including empty chunks), with
+a separate two-second deadline and host cancellation. Only the exact documented `error.type`
+values `engine_overloaded_error`, `rate_limit_reached_error` and `exceeded_current_quota_error`
+select fixed overload, rate-limit or account-quota messages. Raw `message`, `code` and other
+provider strings are never reflected. Invalid UTF-8/JSON, duplicate keys, missing/unknown types,
+oversized bodies, read failures and diagnostic timeouts retain HTTP 429 with an explicitly
+unknown cause; this uses the existing common `rate_limited` kind without asserting a specific
+account limit. Host cancellation remains `cancelled`. Iterator cleanup and the single response
+close are started without waiting on a stuck cleanup for this path. It makes one transport
+attempt and adds no retry, request or success-stream change. These diagnostics cannot recover
+the subtype of an older HTTP-only failure.
+
+The 429 classification follows the official [error types](https://platform.kimi.com/docs/api/errors)
+and [troubleshooting guide](https://platform.kimi.com/docs/guide/troubleshooting), reviewed on
+2026-10-28. The parser reuses the local strict JSON contract; no upstream source is copied.
+
 Protocol references reviewed on 2026-10-27:
 
 - [Current Chat API](https://platform.kimi.com/docs/api/chat)

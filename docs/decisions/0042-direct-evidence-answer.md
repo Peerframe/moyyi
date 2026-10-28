@@ -1,8 +1,9 @@
 # ADR 0042: One direct evidence answer within the original budget
 
-Status: withdrawn from M4 delivery after a provider-blocked trial, 2026-10-28.
-The experimental implementation remains default off on the unmerged draft for review only;
-it is not installed in the daily product and has no live semantic acceptance.
+Status: one independent retest authorized after HTTP429 diagnosis, 2026-10-28.
+The previous provider-blocked trial remains sealed and excluded from delivery. The default-off
+implementation is unchanged; it is not installed in the daily product and has no live semantic
+acceptance. This authorization does not reopen the earlier allowance.
 
 ## Evidence and hypothesis
 
@@ -89,3 +90,13 @@ The candidate is excluded from M4 delivery under the exit rule. Its fixed source
 sealed failure remain reviewable; retaining that unmerged artifact does not accept the option,
 authorize another trial or waive any M4 gate. Daily Flash settings were restored byte for byte,
 and the existing M3 installation remains the owner app. No public release or merge occurred.
+
+## Independently authorized HTTP429 follow-up
+
+The owner explicitly authorized diagnosing the HTTP429 handling and then one new original-task
+trial. Preserve the exact question/source/six-item rubric, Kimi CN high,8 total requests,300 seconds,
+8192 output and zero automatic retries. The answer construction and model prompts are unchanged.
+The [provider follow-up](0036-kimi-chat-provider.md#http429-diagnosis-follow-up-2026-10-28)
+adds bounded error classification, not a claim to control upstream capacity. Freeze new evidence
+before sending; keep all old failures. Flash stays the daily default. Only all M4 gates passing
+permits merge and installation; public publication remains unauthorized.
