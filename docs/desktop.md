@@ -326,7 +326,10 @@ desktop before using the CLI against that store. A conflict is refused visibly. 
 runtime cleanup and child-process exit; it does not silently hand off a live writer. M1–M5 kept
 SQLite schema2. M6 adds schema3 metadata and material tables, migrating validated schema1/2 stores
 transactionally while leaving transcript/effect format1 unchanged. Credentials/configuration are
-not overwritten by installing the app.
+not overwritten by installing the app. Any CLI sharing this store must also use the M6 runtime
+before reopening it; a retained schema2 CLI rejects the upgraded database. Installing the desktop
+app alone does not update a separately installed CLI. Preserve the old CLI, app and schema2 data
+together, then install and verify both compatible runtimes without changing the CLI host or grants.
 
 ## Build and verify
 
@@ -359,16 +362,18 @@ and in its PR receipt. M3/M4 evidence remains in their receipts; M5 is the insta
 recorded in [PR #48](https://github.com/Peerframe/moyyi/pull/48). M6 adds an installed-copy synthetic
 fixture for external seven-format import, actual tool observation delivery, approved report/readback,
 preview, complete history/organization and restart retention. Its package, native interaction and
-fixed task acceptance remain pending until separately recorded. Migration/backup/restore/rollback
+bounded fixed-task acceptance are recorded in the [M6 receipt](tasks/2026-10-28-desktop-m6.md);
+final owner installation is tracked in PR50 and the local installation manifests. Migration/backup/restore/rollback
 must include the new material records and blobs. Source evidence alone does not establish
 installation or task correctness.
 
 Before installing, close both clients, back up the session/configuration directories, preserve
-the prior CLI tarball and any previous app, then copy the verified app to `~/Applications`.
-Check its signature/manifest, launch it from outside the checkout, and reopen an existing session.
+the prior CLI tarball and any previous app, then copy the verified app to `~/Applications` and
+update any CLI sharing its store to the matching qualified runtime tarball. Check both manifests,
+launch from outside the checkout, and reopen an existing session through each client sequentially.
 For a manual software rollback from an older app without the M4 controls, quit and restore the
 verified previous app only after checking current settings/store compatibility. Keep current data;
-the existing CLI package remains separate. Restore database backups only deliberately because
+the separate CLI package must also be compatible. Restore database backups only deliberately because
 doing so replaces the active history; first preserve the current store as a rescue backup.
 No automatic updater or additional desktop platform is claimed.
 

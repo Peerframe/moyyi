@@ -92,6 +92,12 @@ upgrade; candidate validation does not establish arbitrary downgrade compatibili
 new local tarball into the same selected prefix replaces the application, not the data directory.
 Keep the previous tarball if you need to inspect it. Do not run two writers against the same data.
 
+When CLI and desktop share a store, upgrade both to compatible runtimes before reopening either.
+M6 migrates schema1/2 to schema3; the earlier schema2 CLI and M5 desktop refuse that database.
+Retain both previous programs and their pre-upgrade data backup as one rollback set. A software-only
+downgrade cannot read schema3, and restoring old data deliberately replaces newer history, so first
+preserve the current store separately. Host configuration and model defaults need not change.
+
 ```sh
 npm uninstall --global --prefix /absolute/private/moyyi-prefix moyyi
 ```
