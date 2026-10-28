@@ -8,8 +8,10 @@ rmSync(output, { recursive: true, force: true });
 mkdirSync(output, { recursive: true });
 for (const [name, platform, format] of [
   ["main", "node", "esm"],
+  ["bridge", "node", "esm"],
   ["preload", "node", "cjs"],
   ["worker", "node", "esm"],
+  ["maintenance-worker", "node", "esm"],
   ["host/service", "node", "esm"],
 ] as const) {
   await build({
@@ -24,15 +26,21 @@ for (const [name, platform, format] of [
     target: "node24",
     external: ["electron", "moyyi/runtime", "moyyi/contracts"],
     plugins:
-      name === "worker"
+      name === "worker" || name === "main"
         ? [
             {
-              name: "packaged-host",
+              name: "packaged-desktop-boundary",
               setup(builder) {
-                builder.onResolve({ filter: /^\.\/host\/service\.ts$/ }, () => ({
-                  path: "./host.mjs",
-                  external: true,
-                }));
+                if (name === "worker")
+                  builder.onResolve({ filter: /^\.\/host\/service\.ts$/ }, () => ({
+                    path: "./host.mjs",
+                    external: true,
+                  }));
+                else
+                  builder.onResolve({ filter: /^\.\/bridge\.ts$/ }, () => ({
+                    path: "./bridge.mjs",
+                    external: true,
+                  }));
               },
             },
           ]

@@ -10,12 +10,14 @@ import { ApprovalCard } from "./ApprovalCard.tsx";
 import { ArtifactsPanel } from "./ArtifactsPanel.tsx";
 import { EffectsPanel } from "./EffectsPanel.tsx";
 import { appendReviewDraft, CHECK_DRAFT, permissionLabel } from "./effects-state.ts";
+import { MaintenanceDialog } from "./MaintenanceDialog.tsx";
 import { MaterialsPanel } from "./MaterialsPanel.tsx";
 import { MessageList } from "./MessageList.tsx";
 import { PermissionsDialog } from "./PermissionsDialog.tsx";
 import { SessionSidebar } from "./SessionSidebar.tsx";
 import { SettingsDialog } from "./SettingsDialog.tsx";
 import { presetLabel } from "./settings-state.ts";
+import { UsageGuide } from "./UsageGuide.tsx";
 import {
   approvalIdentity,
   createActionGate,
@@ -32,6 +34,8 @@ export function App({ bridge }: { bridge: DesktopBridge }) {
   const [askEachRead, setAskEachRead] = useState(false);
   const [draft, setDraft] = useState("");
   const [settingsOpen, setSettingsOpen] = useState(false);
+  const [helpOpen, setHelpOpen] = useState(false);
+  const [maintenanceOpen, setMaintenanceOpen] = useState(false);
   const [permissionsOpen, setPermissionsOpen] = useState(false);
   const gate = useRef(createActionGate());
   const composer = useRef<HTMLTextAreaElement>(null);
@@ -105,6 +109,8 @@ export function App({ bridge }: { bridge: DesktopBridge }) {
       state.run ||
       !state.connection.ready ||
       settingsOpen ||
+      helpOpen ||
+      maintenanceOpen ||
       permissionsOpen ||
       newSession ||
       !draft.trim()
@@ -177,6 +183,8 @@ export function App({ bridge }: { bridge: DesktopBridge }) {
     !busy &&
     !configuring &&
     !settingsOpen &&
+    !helpOpen &&
+    !maintenanceOpen &&
     !permissionsOpen &&
     state.connection.ready &&
     draft.trim().length > 0;
@@ -217,6 +225,9 @@ export function App({ bridge }: { bridge: DesktopBridge }) {
             </p>
           </div>
           <div className="header-actions">
+            <button type="button" disabled={busy} onClick={() => setHelpOpen(true)}>
+              使用帮助
+            </button>
             {!configuring ? (
               <button type="button" disabled={busy} onClick={() => setPermissionsOpen(true)}>
                 会话权限
@@ -233,8 +244,12 @@ export function App({ bridge }: { bridge: DesktopBridge }) {
           </div>
         </header>
         <p className="permission-line">
-          {presetLabel(state.settings.preset)} · low · {requestBudget} ·{" "}
-          {state.settings.timeoutMs / 1000} 秒 · 输出 8192 tokens · 重试 0 次
+          {presetLabel(state.settings.preset)} ·{" "}
+          {state.settings.preset === "flash"
+            ? "low"
+            : (state.settings.kimiReasoningEffort ?? "low")}{" "}
+          · {requestBudget} · {state.settings.timeoutMs / 1000} 秒 · 输出 8192 tokens · 重试 0 次
+          {state.settings.evidenceAnswer ? " · 独立证据成文（实验）" : ""}
           <br />
           {configuring
             ? "只读所选工作目录 · 不写入文件、不执行命令、不访问网页"
@@ -443,6 +458,22 @@ export function App({ bridge }: { bridge: DesktopBridge }) {
           </div>
         </form>
       </main>
+      {helpOpen ? (
+        <UsageGuide
+          onClose={() => setHelpOpen(false)}
+          onSettings={() => {
+            setHelpOpen(false);
+            setSettingsOpen(true);
+          }}
+          onMaintenance={() => {
+            setHelpOpen(false);
+            setMaintenanceOpen(true);
+          }}
+        />
+      ) : null}
+      {maintenanceOpen ? (
+        <MaintenanceDialog bridge={bridge} onClose={() => setMaintenanceOpen(false)} />
+      ) : null}
       {settingsOpen ? (
         <SettingsDialog
           settings={state.settings}

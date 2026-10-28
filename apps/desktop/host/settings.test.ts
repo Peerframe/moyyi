@@ -10,9 +10,12 @@ import {
 } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import type { RuntimeOptions } from "moyyi/runtime";
+import type { RuntimeEvent, SessionId } from "moyyi/contracts";
+import { createRuntime, type RuntimeOptions } from "moyyi/runtime";
 import { afterEach, describe, expect, it, vi } from "vitest";
+import { isDesktopState } from "../wire.ts";
 import type { CredentialRef, CredentialVault } from "./keychain.ts";
+import { createDesktopHost } from "./service.ts";
 import { createModelConfiguration } from "./settings.ts";
 import { parseSettings, validateApiKey } from "./settings-schema.ts";
 
@@ -48,6 +51,211 @@ const readKey = (options: RuntimeOptions) => {
   return options.deepseek.getApiKey();
 };
 describe("desktop data-only model configuration", () => {
+  it("persists explicit evidence answer within the unchanged cap and removes disabled settings", async () => {
+    const { config, home, vault } = fixture();
+    const reviewed = { ...settings, maxRequests: 8, evidenceAnswer: true };
+    const saved = await config.save(reviewed);
+    expect(saved.runtimeOptions.evidenceAnswer).toBe(true);
+    expect(saved.runtimeOptions.deepseekReasoningEffort).toBe("low");
+    expect(saved.runtimeOptions.limits).toMatchObject({ maxModelRequests: 8, maxRetries: 0 });
+    expect((await createModelConfiguration(home, vault).current()).settings).toEqual(reviewed);
+    for (const bad of [
+      { ...reviewed, maxRequests: 1 },
+      { ...reviewed, evidenceAnswer: "true" },
+      { ...reviewed, evidenceAnswer: undefined },
+      Object.defineProperty({ ...reviewed }, "evidenceAnswer", { get: () => true }),
+    ])
+      expect(() => parseSettings(bad)).toThrow();
+    const disabled = await config.save({ ...settings, evidenceAnswer: false });
+    expect(disabled.settings).toEqual(settings);
+    expect(disabled.runtimeOptions.evidenceAnswer).toBeUndefined();
+    expect(vault.read).not.toHaveBeenCalled();
+    expect(vault.add).not.toHaveBeenCalled();
+    expect(vault.remove).not.toHaveBeenCalled();
+  });
+  it("preserves legacy low settings, persists explicit Kimi high, and restores the old three-field format", async () => {
+    const { config, home, vault } = fixture();
+    const low = { ...settings, preset: "kimi-cn" as const };
+    const path = join(home, ".moyyi/desktop/settings.json");
+    const first = await config.save(low);
+    expect(first.runtimeOptions.kimiReasoningEffort).toBe("low");
+    const bytes = readFileSync(path, "utf8");
+    expect((await createModelConfiguration(home, vault).current()).settings).toEqual(low);
+    expect(readFileSync(path, "utf8")).toBe(bytes);
+    const high = { ...low, kimiReasoningEffort: "high" as const };
+    await config.save(high);
+    const reopened = await createModelConfiguration(home, vault).current();
+    expect(reopened.settings).toEqual(high);
+    expect(reopened.runtimeOptions.kimiReasoningEffort).toBe("high");
+    expect(JSON.parse(readFileSync(path, "utf8")).settings).toEqual(high);
+    for (const next of [low, settings]) {
+      const saved = await config.save({ ...next, kimiReasoningEffort: "low" });
+      expect(saved.settings).toEqual(next);
+      expect(JSON.parse(readFileSync(path, "utf8")).settings).toEqual(next);
+      expect(Object.keys(saved.settings).sort()).toEqual(["maxRequests", "preset", "timeoutMs"]);
+    }
+    expect((await config.current()).runtimeOptions.deepseekReasoningEffort).toBe("low");
+    expect(vault.read).not.toHaveBeenCalled();
+    expect(vault.add).not.toHaveBeenCalled();
+    expect(vault.remove).not.toHaveBeenCalled();
+  });
+
+  it("sends high on the real Kimi codec/HTTP path with the eight-request limit and lazy synthetic credentials", async () => {
+    const { config, home, vault, keys } = fixture();
+    keys.set("legacy-kimi-cn", "synthetic-kimi-secret");
+    const current = await config.save({
+      preset: "kimi-cn",
+      kimiReasoningEffort: "high",
+      maxRequests: 8,
+      timeoutMs: 300_000,
+    });
+    expect(current.runtimeOptions.limits).toMatchObject({
+      maxModelRequests: 8,
+      timeoutMs: 300_000,
+      maxRetries: 0,
+    });
+    const connection = current.runtimeOptions.kimi;
+    if (!connection || !("getApiKey" in connection)) throw Error("Expected Kimi HTTP options");
+    const requests: Record<string, unknown>[] = [];
+    const fetch: typeof globalThis.fetch = async (url, init) => {
+      expect(url).toBe("https://api.moonshot.cn/v1/chat/completions");
+      expect(init?.redirect).toBe("error");
+      const body = JSON.parse(String(init?.body)) as Record<string, unknown>;
+      requests.push(body);
+      expect(requests.length).toBeLessThanOrEqual(8);
+      const last = requests.length === 8;
+      const envelope = {
+        id: `synthetic-${requests.length}`,
+        object: "chat.completion.chunk",
+        created: 1,
+        model: "kimi-k3.1-pro",
+      };
+      const delta = last
+        ? { content: "Synthetic complete" }
+        : {
+            tool_calls: [
+              {
+                index: 0,
+                id: `read-${requests.length}`,
+                type: "function",
+                function: { name: "read", arguments: JSON.stringify({ path: "note.txt" }) },
+              },
+            ],
+          };
+      const usage = { prompt_tokens: 20, completion_tokens: 8, total_tokens: 28 };
+      const events = [
+        {
+          ...envelope,
+          choices: [{ index: 0, delta: { role: "assistant", ...delta }, finish_reason: null }],
+        },
+        {
+          ...envelope,
+          choices: [{ index: 0, delta: {}, finish_reason: last ? "stop" : "tool_calls", usage }],
+        },
+        { ...envelope, choices: [], usage },
+      ];
+      return new Response(
+        `${events.map((event) => `data: ${JSON.stringify(event)}\n\n`).join("")}data: [DONE]\n\n`,
+        {
+          headers: { "content-type": "text/event-stream" },
+        },
+      );
+    };
+    const workspace = join(home, "workspace");
+    mkdirSync(workspace);
+    writeFileSync(join(workspace, "note.txt"), "Synthetic source");
+    const runtime = await createRuntime({
+      ...current.runtimeOptions,
+      kimi: { ...connection, fetch },
+    });
+    const events: RuntimeEvent[] = [];
+    let sessionId: SessionId | undefined;
+    runtime.subscribe((event) => {
+      events.push(event);
+      if (event.type === "session.ready") sessionId = event.sessionId;
+    });
+    try {
+      expect(vault.read).not.toHaveBeenCalled();
+      await runtime.send({ type: "session.create", workspaceRoot: workspace });
+      if (!sessionId) throw Error("Expected session");
+      await runtime.send({
+        type: "run.start",
+        sessionId,
+        input: [{ type: "text", text: "Read the synthetic fixture" }],
+      });
+      await runtime.idle();
+      const finished = events.findLast((event) => event.type === "run.finished");
+      expect(finished, JSON.stringify(finished)).toMatchObject({
+        outcome: { kind: "completed" },
+      });
+      expect(requests).toHaveLength(8);
+      expect(
+        requests.every(
+          (request) =>
+            request.reasoning_effort === "high" && request.max_completion_tokens === 8192,
+        ),
+      ).toBe(true);
+      expect(requests.slice(0, 7).every((request) => request.tool_choice === "auto")).toBe(true);
+      expect(requests[7]?.tool_choice).toBe("none");
+      expect(vault.read).toHaveBeenCalledTimes(1);
+    } finally {
+      await runtime.close();
+    }
+    const low = await config.save({ preset: "kimi-cn", maxRequests: 8, timeoutMs: 300_000 });
+    expect(low.runtimeOptions.kimiReasoningEffort).toBe("low");
+    const next = low.runtimeOptions.kimi;
+    if (!next || !("getApiKey" in next)) throw Error("Expected Kimi HTTP options");
+    expect(vault.read).toHaveBeenCalledTimes(1);
+    await next.getApiKey();
+    await next.getApiKey();
+    expect(vault.read).toHaveBeenCalledTimes(2);
+  });
+
+  it("reconfigures effort through the desktop host, revokes grants, and validates the projected setting", async () => {
+    const { config, home, vault } = fixture();
+    const initial = await config.current();
+    const host = await createDesktopHost({
+      runtimeOptions: () => initial.runtimeOptions,
+      settings: initial.settings,
+      connection: initial.connection,
+      configure: config.save,
+    });
+    const workspace = join(home, "workspace");
+    mkdirSync(workspace);
+    try {
+      await host.dispatch({ type: "create", workspaceRoot: workspace, askEachRead: false });
+      const sessionId = host.getState().activeSessionId;
+      await host.dispatch({ type: "permissions", sessionId, writes: true, checks: false });
+      const high = {
+        preset: "kimi-cn",
+        maxRequests: 8,
+        timeoutMs: 300_000,
+        kimiReasoningEffort: "high",
+      };
+      await host.dispatch({ type: "configure", settings: high });
+      const state = host.getState();
+      expect(state.settings).toEqual(high);
+      expect(state.permissions).toEqual({ writes: false, checks: false });
+      expect(state.activeSessionId).toBe(sessionId);
+      expect(state.pendingApproval).toBeNull();
+      expect(state.messages).toEqual([]);
+      expect(isDesktopState(state)).toBe(true);
+      for (const invalid of [
+        { ...high, preset: "flash" },
+        { ...high, kimiReasoningEffort: "max" },
+      ])
+        expect(isDesktopState({ ...state, settings: invalid })).toBe(false);
+      await host.dispatch({ type: "report.target", sessionId, path: "report.json" });
+      await host.dispatch({ type: "configure", settings });
+      expect(host.getState().reportTarget).toBeNull();
+      expect(host.getState().settings).toEqual(settings);
+      expect(vault.read).not.toHaveBeenCalled();
+      expect(vault.add).not.toHaveBeenCalled();
+    } finally {
+      await host.close();
+    }
+  });
+
   it("starts Flash low with original limits and metadata only, without writing settings or reading a key", async () => {
     const { config, home, vault } = fixture();
     const current = await config.current();
@@ -132,6 +340,10 @@ describe("desktop data-only model configuration", () => {
       { ...settings, timeoutMs: 300_001 },
       { ...settings, preset: "auto" },
       { ...settings, maxRequests: 0 },
+      { ...settings, kimiReasoningEffort: "high" },
+      { ...settings, preset: "kimi-cn", kimiReasoningEffort: "max" },
+      { ...settings, preset: "kimi-cn", kimiReasoningEffort: undefined },
+      Object.defineProperty({ ...settings }, "kimiReasoningEffort", { get: () => "high" }),
     ])
       expect(() => parseSettings(v)).toThrow();
     expect(() =>

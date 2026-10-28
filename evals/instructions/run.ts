@@ -1,4 +1,5 @@
 import { mkdirSync, writeFileSync } from "node:fs";
+import { runEvidenceAnswerScenario } from "./evidence-answer.ts";
 import { runWorkspaceNavigationScenario } from "./navigation.ts";
 import { instructionScenarios, runInstructionScenario } from "./scenario.ts";
 
@@ -19,6 +20,18 @@ try {
     ...(await runWorkspaceNavigationScenario()),
     passed: true,
   });
+  for (const dataflow of [false, true])
+    results.push({
+      id: `direct-evidence-${dataflow ? "dataflow" : "lifecycle"}`,
+      ...(await runEvidenceAnswerScenario(dataflow)),
+      passed: true,
+    });
+  for (const dataflow of [false, true])
+    results.push({
+      id: `timed-evidence-${dataflow ? "dataflow" : "lifecycle"}`,
+      ...(await runEvidenceAnswerScenario(dataflow, true)),
+      passed: true,
+    });
   if (networkRequests !== 0) throw Error("Instruction conformance attempted network access");
 } finally {
   globalThis.fetch = originalFetch;

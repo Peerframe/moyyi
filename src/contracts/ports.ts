@@ -79,6 +79,8 @@ export interface SessionSnapshot {
 
 export interface ContextBuilder {
   build(input: ContextInput): ContextResult;
+  /** Explicit fresh-session answer from user inputs and original tool observations. */
+  buildEvidenceAnswer?(input: ContextInput): ContextResult;
   /** Plans an explicit, tool-free summary request without changing history. */
   planCompaction?(input: ContextInput): CompactionPlan | null;
 }

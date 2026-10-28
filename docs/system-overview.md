@@ -20,13 +20,26 @@ and installation after review and passing CI. This does not authorize public ver
 Default live configuration stays Flash + Responses + low, zero retries; daily grants remain
 read-only until explicitly enabled. Original tasks and acceptance standards stay unchanged.
 
+On2026-10-28, after reviewing the engineering pass and first-request Kimi service-overload
+result, the owner accepted **M4 local delivery with a known answer-quality limitation** and
+requested M5. Review and all three CI lanes passed for implementation `3e33ff9` and receipt
+`cc79064`; source checks142/2836 and the actual external bundle passed. PR47 integration and
+backed-up local installation are authorized by this decision and tracked separately below.
+
+The original six-item source task is still not accepted. The latest trial used1 request,
+zero retries, no tools and no answer; classified429 `engine_overloaded_error` prevented semantic
+assessment. All prior failures and sealed allowances remain unchanged. The default-off
+[evidence-answer experiment](decisions/0042-direct-evidence-answer.md) is not a factual verifier
+or recommended complex-task mode. The owner exception changes M4's delivery gate, not test
+scores, model limits or security requirements. No public release is authorized.
+
 | Coordinate | Current evidence |
 |---|---|
-| Latest product candidate | M3 [PR #46](https://github.com/Peerframe/moyyi/pull/46): feature acceptance evidence complete on external bundle source `4274de2`; final integration/installation coordinates belong in its delivery receipt. The independently authorized live repair/check/reopen/two-snapshot undo passed. The first repair failure and one incorrect extra DOM explanation remain recorded in [ADR 0039](decisions/0039-desktop-controlled-workflows.md). Original source-task failures are unchanged. |
-| Installation coordinate | The last recorded installed desktop baseline is M2 [PR #45](https://github.com/Peerframe/moyyi/pull/45). [PR #46](https://github.com/Peerframe/moyyi/pull/46) owns M3 final integration and installation coordinates; this source evidence does not claim that installation occurred. The unchanged CLI [PR #41 receipt](https://github.com/Peerframe/moyyi/pull/41) remains the CLI installation record: accepted tar SHA256 `76efa10a1b6f07cf575a3cbcfcb68c1d777255125b1460b6474206960b21731e`,394 files. Candidate source changes do not update either installation. Prior versions remain in the dated delivery history. |
+| Latest product work | M4 candidate on the M3 baseline: explicit experimental Kimi high settings, local help and guarded backup/restore/software rollback. Source checks, external bundle and actual native maintenance passed on `edc5207`; the original source task still strictly fails. The [M4 receipt](tasks/2026-10-28-desktop-m4.md) records separate builds and verdicts. M4 is owner-accepted for local delivery with the complex-source quality limitation; merge/install is in progress at this checkpoint. |
+| Installation coordinate | M3 [PR #46](https://github.com/Peerframe/moyyi/pull/46) is installed: source `6eb299340768daf807edf5b223a84f046a16b140`, merged main `85873c7e20a5f705cd78b9c4c0880f2772c29d1d`. Local archive SHA256 `08d801806e332eb41ec2d60bea5da546529647f58d6682546cf910ed7d810a8f`; the installation receipt records native launch and history reopen verification. The unchanged CLI [PR #41 receipt](https://github.com/Peerframe/moyyi/pull/41) remains the CLI installation record: accepted tar SHA256 `76efa10a1b6f07cf575a3cbcfcb68c1d777255125b1460b6474206960b21731e`,394 files. M4 source changes update neither installation. |
 | Product acceptance | M3 final source check131 files/2644 tests passed; writes/shell eval8/8 each. External-copy10-case and instrumented native9-case gates passed with synthetic providers. The independent live pair passed the unchanged functional/recovery checks in5 repair+3 undo requests; its answer still contains an incorrect extra DOM claim. The sealed first group remains failed. M2 and earlier CLI evidence remain separate; no M4 or general reliability claim. |
 | Previous evidence-only delivery | [PR #36](https://github.com/Peerframe/moyyi/pull/36), merged `ae960de` with [main CI passed](https://github.com/Peerframe/moyyi/actions/runs/40421088168): user-requested source-derived check, controlled report repair and readback. Offline check2,433 passed; actual installed workflow passed once in5 requests. Its original task failures remain separate. |
-| Optional Kimi | Installed opt-in `kimi-k3.1-pro` Chat provider, low/high/max, preserving visible reasoning and final-request tool prohibition. Two-request Chat connection probe passed; Responses rejected final `none`. Original-task independent comparison: six HTTP200, zero retries; strict FAIL, items1/2/3/5 met and4/6 partial. Installation is verified; the six-item task FAIL remains separate. |
+| Optional Kimi | Installed opt-in `kimi-k3.1-pro` Chat provider supports low/high/max and reasoning continuation; desktop M3 presets use low. M4 exposes explicit low/high for Kimi only, with high labelled experimental; Flash remains low. The earlier high control returned first-request429 with no answer. The new actual-desktop high trial completed in5 requests but still strictly failed the original six-item rubric, as did Kimi low; this is now measured failure, not merely untested wiring. |
 | Public version | None; local candidate installation and public source PRs are not a version release. |
 
 ## What the user can do
@@ -37,7 +50,7 @@ failures, later corrections and private evidence coordinates.
 
 | User outcome | Available evidence | Remaining boundary |
 |---|---|---|
-| Start, find work and resume | [Desktop](desktop.md): accepted M1/M2 workflows plus M3 instrumented native approval/cancel/reopen/draft/undo checks on the actual main/preload/renderer/host with a synthetic worker | macOS arm64 only, one SQLite writer. The native fixture does not validate the production credential worker or live model semantics. Final M3 installation is recorded separately in PR46. New/reopened sessions remain read-only. |
+| Start, find work and resume | [Desktop](desktop.md): installed M3, accepted M1/M2 workflows and M3 native approval/cancel/reopen/draft/undo checks; final installation receipt confirms native launch and history reopen | macOS arm64 only, one SQLite writer. The instrumented native fixture is separate from production credential and live semantics evidence. New/reopened sessions remain read-only. |
 | Read files and explain a project | Guarded path discovery/search/ranges (navigation enabled in the daily host), readable numbered source, complete next-request delivery; original public report task passed | Complex Skills explanation still fails the original rubric. More available text is not a factual verifier. |
 | Read PDF/DOCX/XLSX/PPTX/ODT/ODS/ODP | [Native parser](documents.md), actual installation/containment on Linux/macOS; both fixed comparison/report tasks also passed through the M2 native UI with actual approved files and readback | Body text only; no OCR, legacy/macro files, formula calculation or visual-layout claim. Larger/repeated tasks unmeasured. |
 | Modify, check and undo | M3 external-copy/native gates plus one independently authorized live repair/check/reopen/two-snapshot reverse undo passed against the unchanged checker and original bytes/mode | First live repair remains FAIL; the passing repair added an incorrect DOM explanation. File inspection proves bytes at check time, not mode, undo readiness or task correctness. |
@@ -45,6 +58,7 @@ failures, later corrections and private evidence coordinates.
 | Read actual websites | [Web](web.md) fetched full RFC8259; a new copied-session revision passed the unchanged task in4 requests: two edits, a complete7,691-byte read and five independently checked facts | The original first report/revision failures remain. The new trial follows explicit human feedback; autonomous correction, search-service/Anthropic live use and general reliability remain unverified. |
 | Transform ordinary data/documents | Exact quoted CSV transformation, formatting-preserving worksheet edit and a new unchanged roster merge task passed with actual outputs | Roster fields/older phone fallback/leading zeros passed independent review, but the model's commands inspected bytes/counts/hashes only. The separate explicit ledger verification workflow repaired an error once; autonomous source-derived verification remains unproven. |
 | Apply guidance and Skills | [Root instructions](instructions.md), explicitly selected [Skills](skills.md), refresh/authority/replay conformance | Correct loading does not guarantee guidance quality; nested instructions are not auto-discovered. |
+| Back up, restore or roll back locally | M4 implements the [maintenance contract](desktop.md#backup-restore-and-software-rollback-m4-candidate) through a trusted local helper; external bundle and actual native backup/restore/rollback passed in an isolated HOME | Current daily M3 does not include this feature. Native restore preserved current settings/workspace and rescued both prior sessions; confirmed software rollback reopened M3 with readable history, without replay or paid model calls. Offline guards cover incompatible settings and unverified old receipts. |
 
 ## One task through the whole system
 
@@ -118,19 +132,50 @@ host without adding a task engine, external service or dependency.
 | Current milestone | Usable baseline / demonstrated limit | Next bounded checkpoint | Actual blocker |
 |---|---|---|---|
 | M1 desktop loop: accepted baseline | External-bundle native startup/directory/approval/read; real host/SQLite/recovery and parser containment passed. One live Flash task used2 requests, zero retries: four exact facts/source, unchanged file/config; reopen added0 requests and changed no entries/effects. See [desktop guide](desktop.md). | Reuse the unchanged [PR #44 receipt](https://github.com/Peerframe/moyyi/pull/44) while extending the accepted M2 baseline | No unresolved M1 code blocker |
-| M2 materials/settings/reports: accepted installed baseline | Source check128 files/2610 tests, external-copy bundle/settings/containment gates and native helper UUID lifecycle passed. Both unchanged native-UI document tasks passed, each4 requests with seven real parses, one approved create and readback; preview/Finder observed. Final integration/install in [PR #45](https://github.com/Peerframe/moyyi/pull/45). | Preserve installed M2 while implementing M3 | Separate `security` CLI helper-key read timed out after30 seconds; no desktop-to-CLI credential-sync claim |
-| M3 edit/undo workflows: feature acceptance evidence complete | Final check131/2644, external-copy10-case and instrumented native9-case gates passed. Independent live repair5 requests/51.047s and two-snapshot undo3/30.123s passed; defaults restored to Flash3/120. | Final integration, package/CI and owner installation coordinates in [PR #46 receipt](https://github.com/Peerframe/moyyi/pull/46) | First group remains sealed FAIL; the passing repair answer includes a false extra DOM claim. Unknown effects retain protective leases; no automatic unlock. This is not M4 acceptance |
-| Quality lane: unresolved | Original source task FAILs and the withdrawn notes candidate remain; high control has no answer | Service-available, separately recorded original Kimi high control only under unchanged budgets; public counterexamples and optional high entry only if strict pass | Kimi server capacity blocks that live comparison; it does not block unrelated desktop work |
-| M4 integrated target: not accepted | M2 installed desktop accepted; prior daily CLI remains PR41 until separately updated. No claim that M2 or prior engineering phases constitute the complete product | All three fixed user workflows pass interaction, authority/recovery and factual/artifact gates from the actual installed entry; backup/rollback and guide | M3 delivery and applicable task correctness still need evidence; original source FAILs remain |
+| M2 materials/settings/reports: accepted baseline, retained in installed M3 | Source check128 files/2610 tests, external-copy bundle/settings/containment gates and native helper UUID lifecycle passed. Both unchanged native-UI document tasks passed, each4 requests with seven real parses, one approved create and readback; preview/Finder observed. Final integration/install in [PR #45](https://github.com/Peerframe/moyyi/pull/45). | Reuse unchanged task evidence and retain affected integration gates in M4 | Separate `security` CLI helper-key read timed out after30 seconds; no desktop-to-CLI credential-sync claim |
+| M3 edit/undo workflows: accepted installed baseline | Final check131/2644, external-copy10-case and instrumented native9-case gates passed. Independent live repair5 requests/51.047s and two-snapshot undo3/30.123s passed; installed source6eb2993/main85873c7, Flash3/120 defaults. | Preserve its files, authority and original task checks during M4 integration | First group remains sealed FAIL; the passing repair answer includes a false extra DOM claim. Unknown effects retain protective leases; no automatic unlock. This is not M4 acceptance |
+| Quality lane: unresolved | Actual-desktop Kimi high is sealed:5 requests,22 successful reads,138.996s, end_turn, unchanged source; original rubric still FAIL, items1/2/3/5 met and4/6 partial. Earlier unavailable/failed trials and withdrawn notes remain separate | Close this trial; public lifecycle/dataflow tasks were not triggered and each used0 requests. Any completion-contract route needs its own architecture/acceptance decision, not an automatic judge implementation | Selection-recreation and no-automatic-script-execution explanations remain incomplete despite actual source reads. This does not block independent maintenance acceptance |
+| M4 integrated target: owner-accepted with a known quality limitation | Clean source `edc5207` check136/2678 and external-bundle M1/M2/M3, settings and maintenance gates passed. Actual native backup, rescue restore, cancelled/confirmed software rollback and automatic history reopen passed with0 maintenance model calls | Integrate PR47 and install its verified package with backup under the2026-10-28 owner exception; retain unaffected M2/M3 evidence | Original source strict FAIL/unavailable trials remain. Conditional public tasks were not triggered; complex-task reliability is unaccepted. Minimum-window and other-platform native maintenance remain unverified |
 
 The GUI uses the self-owned core through a narrow client boundary. It neither replaces core
 permissions with UI states nor imports OpenBot's Bot/team/Server architecture. Approval and
 result-card presentation reuse is [recorded](openbot-provenance.md).
 The desktop uses actual runtime commands/events; scripted tests and live task evidence remain
 separate. Original task standards stay intact; an honest limited candidate may be inspected
-before M4, but the full target is not complete while its required source-analysis task fails.
+before M4. The2026-10-28 owner decision accepts limited M4 delivery while explicitly retaining
+the unresolved source-analysis quality gap.
 
-**Current bounded work: source interpretation remains unresolved; Kimi high is service-blocked.**
+### Historical quality diagnostics (delivery status superseded by the owner exception)
+
+**The isolated-evidence candidate was withdrawn; its semantic result remains unaccepted.**
+[ADR 0041](decisions/0041-isolated-evidence-review.md) preserves the whole-chain diagnosis and
+one new experiment, not an enabled feature. Candidate `32545fc` used6 actual Kimi high requests
+under the unchanged8/300/8192 limits. The sixth response was interrupted at the original time
+limit; partial visible text was retained, but neither evidence review nor final-answer stage ran.
+There is no complete answer to grade, so this does not establish a repair of the two old omissions
+or a semantic verdict on isolated review. The two conditional public tasks remain untriggered.
+The trial is sealed without retries or quota transfer. Product/runtime/UI experiment code was
+removed; the retained engineering improvement makes packaged settings checks pass through the
+actual desktop communication boundary. Flash defaults and daily M3 remain unchanged. PR47 stays
+draft and unmerged; no public release. The earlier completed-answer result below is separate.
+
+The new actual-desktop Kimi high trial used5 requests and22 successful read tools in138.996 seconds,
+within8/300/8192 and zero retries. Source bytes were unchanged and the answer ended normally.
+Independent original-rubric review still finds items1/2/3/5 met and4/6 partial: it now explains
+no automatic reference loading, but omits the operational need to recreate runtime for selection
+changes and the explicit no-automatic-script-execution boundary. Relevant implementations were
+actually read; no new material false claim was confirmed. The two conditional public tasks were
+not triggered and each used0 requests. No follow-up repairs this sealed answer.
+
+Current runtime/desktop context differs from the old isolated control, so this is not an
+effort-only causal comparison. The daily Flash3/120 settings were restored through the UI with
+their original file hash unchanged. The [M4 receipt](tasks/2026-10-28-desktop-m4.md) retains the
+fixed inputs, verdict and a bounded three-project source review. Plan/schema state and model
+judges do not independently establish factual completeness. A new completion contract requires
+a separate decision about evidence and acceptance; no automatic critic or new task framework is
+added to this delivery. M4 remains unaccepted while its original source-analysis gate fails.
+
+**Closed diagnostic routes remain closed.**
 The structured-findings candidate was withdrawn after one unchanged original-task trial. Eight
 Flash/Responses/low requests completed, all16 tool results, including the notes, reached the final request,
 and source bytes stayed unchanged. The notes never formed the two missing propositions and
@@ -141,16 +186,18 @@ candidate's transport/limits. No notes plugin, new prompt or automatic review st
 The owner then authorized one Kimi high control using the original isolated runtime, question,
 source, system/tools and8-request/300-second/8,192-output ceiling. Offline14 gates and nine synthetic
 requests passed. Its first actual request returned429 `engine_overloaded_error`, with no answer,
-no tool calls, unknown usage and zero retries. This is unavailable semantic evidence: high has
-neither passed nor failed the six-item answer rubric. The [official troubleshooting guide](https://platform.kimi.com/docs/guide/troubleshooting)
+no tool calls, unknown usage and zero retries. That earlier isolated trial is unavailable semantic
+evidence and has no answer-rubric score; it is separate from the new completed high FAIL above.
+The [official troubleshooting guide](https://platform.kimi.com/docs/guide/troubleshooting)
 identifies this subtype as server capacity, distinct from quota or organization rate limits;
 changing moyyi's prompts or adding credits is not an established remedy. The sealed trial is not
 reopened. A later availability-backed validation must be separately recorded within unchanged
 limits, not used to reroll a completed bad answer. No alternative model/region was substituted.
 
-The optional complex-task entry and conditional public lifecycle/dataflow trials have **not**
-started because their quality gate is unmet. The installed PR41 baseline and daily Flash low,
-read grants, max3 and zero retries remain unchanged. The [research record](research/2026-10-26-agent-navigation.md#form-findings-during-investigation-2026-10-27)
+The verified complex-task recommendation and conditional public lifecycle/dataflow trials have
+**not** passed their gate. The candidate's explicitly labelled high selector does not imply that
+recommendation. The installed PR41 CLI/M3 desktop and daily Flash low, read grants, max3 and zero
+retries remain unchanged. The [research record](research/2026-10-26-agent-navigation.md#form-findings-during-investigation-2026-10-27)
 and [dated delivery record](tasks/2026-10-26-optimization-plan.md) retain rejected code, exact trial
 identities and known limits. Do not repeat generic completeness prompts, expand retrieval, or
 report service failure as evidence that high cannot solve the task.

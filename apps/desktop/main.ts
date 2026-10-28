@@ -1,8 +1,10 @@
-import { realpathSync, statSync } from "node:fs";
+import { readFileSync, realpathSync, statSync } from "node:fs";
 import { dirname, join, relative } from "node:path";
 import { pathToFileURL } from "node:url";
 import { app, BrowserWindow, dialog, ipcMain, Menu, session, shell } from "electron";
 import { DesktopProcess } from "./bridge.ts";
+import type { MaintenanceRequest } from "./host/maintenance.ts";
+import { MaintenanceProcess } from "./host/maintenance-client.ts";
 import { parseDesktopCommand } from "./host/validation.ts";
 import { isTrustedSender, pickerOptions } from "./security.ts";
 
@@ -15,6 +17,7 @@ else {
   let quitting = false;
   let allowedToQuit = false;
   let selecting = false;
+  let maintenanceDone: Promise<void> | undefined;
   app.on("second-instance", () => {
     window?.show();
     window?.focus();
@@ -24,7 +27,10 @@ else {
     event.preventDefault();
     if (quitting) return;
     quitting = true;
-    void (worker?.close() ?? Promise.resolve())
+    void (async () => {
+      await maintenanceDone;
+      await worker?.close();
+    })()
       .then(() => {
         allowedToQuit = true;
         app.quit();
@@ -108,10 +114,15 @@ else {
           { label: "窗口", submenu: [{ role: "minimize" }, { role: "zoom" }] },
         ]),
       );
-      worker = new DesktopProcess(directory, join(dirname(directory), "node/bin/node"), (state) => {
-        if (!ownedWindow.isDestroyed()) ownedWindow.webContents.send("moyyi:state", state);
-      });
-      const host = worker;
+      const node = join(dirname(directory), "node/bin/node");
+      function startWorker(): DesktopProcess {
+        const next = new DesktopProcess(directory, node, (state) => {
+          if (!ownedWindow.isDestroyed()) ownedWindow.webContents.send("moyyi:state", state);
+        });
+        worker = next;
+        return next;
+      }
+      let host = startWorker();
       function trusted(event: Electron.IpcMainInvokeEvent): void {
         if (
           ownedWindow.isDestroyed() ||
@@ -130,10 +141,108 @@ else {
         trusted(event);
         return host.getState();
       });
+      for (const mode of ["backup", "restore", "rollback"] as const) {
+        ipcMain.handle(`moyyi:${mode}`, async (event, value: unknown) => {
+          trusted(event);
+          if (value !== undefined) throw Error("维护入口不接受自定义路径或命令。");
+          if (selecting || quitting || maintenanceDone || host.hasPendingCommands())
+            throw Error("请先完成当前操作。");
+          selecting = true;
+          let finish = () => {};
+          maintenanceDone = new Promise<void>((resolve) => {
+            finish = resolve;
+          });
+          let helper: MaintenanceProcess | undefined;
+          let stopped = false;
+          let armed = false;
+          try {
+            const state = await host.getState();
+            if (state.run || state.status !== "ready" || host.hasPendingCommands())
+              throw Error("请先结束当前任务，再进行维护。");
+            let request: MaintenanceRequest;
+            if (mode === "backup") {
+              const selected = await dialog.showSaveDialog(ownedWindow, {
+                title: "备份会话与设置",
+                buttonLabel: "创建备份",
+                defaultPath: `moyyi-backup-${new Date().toISOString().slice(0, 10)}`,
+                message: "创建新的备份文件夹；含会话、撤销快照和设置，不含钥匙串密钥及项目文件。",
+                showsTagField: false,
+              });
+              if (selected.canceled || !selected.filePath) return null;
+              request = { mode, destination: selected.filePath };
+            } else if (mode === "restore") {
+              const selected = await dialog.showOpenDialog(ownedWindow, {
+                title: "选择 moyyi 备份文件夹",
+                buttonLabel: "选择备份",
+                properties: ["openDirectory", "noResolveAliases"],
+              });
+              if (selected.canceled || selected.filePaths.length !== 1) return null;
+              const confirmation = await dialog.showMessageBox(ownedWindow, {
+                type: "warning",
+                title: "恢复会话记录",
+                message: "用这份备份替换当前会话记录？",
+                detail: `${selected.filePaths[0]}\n\n将先保存当前会话的救援备份。模型设置、钥匙串和工作区文件不变；不会重放操作或恢复写入权限。恢复不是撤销文件修改。`,
+                buttons: ["取消", "保存救援备份并恢复"],
+                defaultId: 0,
+                cancelId: 0,
+                noLink: true,
+              });
+              if (confirmation.response !== 1) return null;
+              request = { mode, backupPath: selected.filePaths[0] as string };
+            } else {
+              const candidate = JSON.parse(
+                readFileSync(join(dirname(directory), "candidate.json"), "utf8"),
+              ) as { runtime?: { revision?: unknown } };
+              const revision = candidate.runtime?.revision;
+              if (typeof revision !== "string" || !/^[a-f0-9]{40}$/.test(revision))
+                throw Error("当前安装版本无法核对。");
+              request = { mode, expectedCurrentRevision: revision };
+            }
+            // Selecting blocks all mutation IPC; the worker must really exit before its replacement owns the lock.
+            const current = await host.getState();
+            if (current.run || current.status !== "ready" || host.hasPendingCommands())
+              throw Error("任务状态已变化，请重新开始维护。");
+            await host.close();
+            stopped = true;
+            worker = undefined;
+            helper = new MaintenanceProcess(directory, node, mode === "rollback");
+            const result = await helper.run(request);
+            if (mode === "rollback") {
+              const confirmation = await dialog.showMessageBox(ownedWindow, {
+                type: "warning",
+                title: "回退 moyyi 软件",
+                message: "退出并回退到上一份已验证的安装？",
+                detail: `目标版本：${result.targetRevision?.slice(0, 7)}\n\n保留当前会话、模型设置和工作区文件。当前软件将保存在：${result.rescuePath}\n\n确认后安全退出，再替换软件并重新打开。`,
+                buttons: ["取消", "退出并回退"],
+                defaultId: 0,
+                cancelId: 0,
+                noLink: true,
+              });
+              if (confirmation.response !== 1) return null;
+              await helper.arm();
+              armed = true;
+            }
+            return result;
+          } finally {
+            try {
+              await helper?.close();
+              if (stopped && !armed && !quitting) {
+                host = startWorker();
+                await host.getState();
+              }
+            } finally {
+              selecting = false;
+              maintenanceDone = undefined;
+              finish();
+              if (armed) app.quit();
+            }
+          }
+        });
+      }
       ipcMain.handle("moyyi:act", async (event, value: unknown) => {
         trusted(event);
         const command = parseDesktopCommand(value);
-        if (selecting) throw Error("请先完成或取消当前选择。 ");
+        if (selecting || quitting) throw Error("请先完成或取消当前选择。 ");
         if (
           ["create", "close", "configure", "materials", "report.target", "permissions"].includes(
             command.type,
@@ -146,7 +255,8 @@ else {
         trusted(event);
         const { askEachRead } = pickerOptions(value);
         const state = await host.getState();
-        if (selecting || state.run || state.status !== "ready") throw Error("请先结束当前任务。");
+        if (selecting || quitting || state.run || state.status !== "ready")
+          throw Error("请先结束当前任务。");
         selecting = true;
         try {
           const selected = await dialog.showOpenDialog(ownedWindow, {
@@ -166,6 +276,7 @@ else {
         const state = await host.getState();
         if (
           selecting ||
+          quitting ||
           state.run ||
           state.status !== "ready" ||
           state.activeSessionId !== sessionId ||
@@ -200,7 +311,7 @@ else {
           Object.keys(value).some((k) => !["settings", "apiKey"].includes(k))
         )
           throw Error("Invalid model settings");
-        if (selecting) throw Error("请先完成或取消当前选择。 ");
+        if (selecting || quitting) throw Error("请先完成或取消当前选择。 ");
         const command = parseDesktopCommand({ ...value, type: "configure" });
         return host.send(command);
       });

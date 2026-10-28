@@ -53,7 +53,11 @@ export function layerOf(file: string): string | null {
     if (name === "security.ts") return "desktop:security";
     if (name === "wire.ts") return "desktop:wire";
     if (name === "preload.ts") return "desktop:preload";
-    if (["main.ts", "bridge.ts", "connection.ts", "worker.ts"].includes(name ?? "")) {
+    if (
+      ["main.ts", "bridge.ts", "connection.ts", "worker.ts", "maintenance-worker.ts"].includes(
+        name ?? "",
+      )
+    ) {
       return "desktop:host";
     }
     return `desktop:unknown:${parts.slice(2).join("/")}`;

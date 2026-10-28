@@ -32,6 +32,8 @@ export interface ExecutionHost {
   readonly runId: RunId;
   readonly workspaceRoot: string;
   readonly signal: AbortSignal;
+  /** Stops new work without cancelling an execution whose effects still need settlement. */
+  readonly admissionSignal?: AbortSignal;
   readonly tools: readonly ToolDefinition[];
   readonly policy: PermissionPolicy;
   readonly validator: ArgumentValidator;
@@ -164,7 +166,7 @@ async function executeCall(call: ToolCallPart, host: ExecutionHost): Promise<Too
   });
   const say = (status: ToolResultPart["status"], message: string) =>
     reply(status, [{ type: "text", text: message }]);
-  if (host.signal.aborted)
+  if (host.signal.aborted || host.admissionSignal?.aborted)
     return say("cancelled", "Cancelled before preparation; nothing executed.");
   const matches = host.tools.filter((tool) => tool.name === call.name);
   const tool = matches[0];
@@ -221,8 +223,12 @@ async function executeCall(call: ToolCallPart, host: ExecutionHost): Promise<Too
     operation: (context: ToolContext) => Promise<T>,
   ): Promise<T> => {
     let live = true;
+    const invocationContext =
+      phase === "prepare" && host.admissionSignal
+        ? { ...context, signal: AbortSignal.any([host.signal, host.admissionSignal]) }
+        : context;
     const guard = () => {
-      if (!live || host.signal.aborted || epoch() !== capabilityEpoch)
+      if (!live || invocationContext.signal.aborted || epoch() !== capabilityEpoch)
         throw new Error("Capability expired, cancelled or revoked");
       const decision = phase === "execute" ? executePolicy() : undefined;
       if (
@@ -234,16 +240,16 @@ async function executeCall(call: ToolCallPart, host: ExecutionHost): Promise<Too
         throw new Error("Capability access is not authorized");
     };
     const scoped: ToolContext = {
-      ...context,
+      ...invocationContext,
       ...(host.files && profile.class !== "external"
-        ? { files: host.files.create(context, guard) }
+        ? { files: host.files.create(invocationContext, guard) }
         : {}),
       ...(host.documents &&
       phase === "execute" &&
       profile.class === "read" &&
       tool.name === "read_document"
         ? {
-            documents: host.documents.create(context, guard, {
+            documents: host.documents.create(invocationContext, guard, {
               phase,
               ...(effect ? { effect } : {}),
               ...(action ? { action } : {}),
@@ -252,7 +258,7 @@ async function executeCall(call: ToolCallPart, host: ExecutionHost): Promise<Too
         : {}),
       ...(host.web && profile.class === "external"
         ? {
-            web: host.web.create(context, guard, {
+            web: host.web.create(invocationContext, guard, {
               phase,
               ...(effect ? { effect } : {}),
               ...(action ? { action } : {}),
@@ -261,7 +267,7 @@ async function executeCall(call: ToolCallPart, host: ExecutionHost): Promise<Too
         : {}),
       ...(host.writes && profile.class === "workspace_write"
         ? {
-            writes: host.writes.create(context, guard, {
+            writes: host.writes.create(invocationContext, guard, {
               phase,
               ...(effect ? { effect } : {}),
               ...(action ? { action } : {}),
@@ -270,7 +276,7 @@ async function executeCall(call: ToolCallPart, host: ExecutionHost): Promise<Too
         : {}),
       ...(host.processes && profile.class === "process"
         ? {
-            processes: host.processes.create(context, guard, {
+            processes: host.processes.create(invocationContext, guard, {
               phase,
               ...(effect ? { effect } : {}),
               ...(action ? { action } : {}),
@@ -285,7 +291,7 @@ async function executeCall(call: ToolCallPart, host: ExecutionHost): Promise<Too
     }
   };
   function stopped(): Stop | undefined {
-    if (host.signal.aborted)
+    if (host.signal.aborted || host.admissionSignal?.aborted)
       return { status: "cancelled", message: "Cancelled before execution; nothing executed." };
     const read = preparePolicy();
     if (read.kind !== "allow")
@@ -369,7 +375,7 @@ async function executeCall(call: ToolCallPart, host: ExecutionHost): Promise<Too
     action = checkedAction(await invoke("prepare", (context) => tool.prepare(args, context)));
   } catch (error) {
     return say(
-      host.signal.aborted ? "cancelled" : "failed",
+      host.signal.aborted || host.admissionSignal?.aborted ? "cancelled" : "failed",
       `Preparation failed: ${message(error)}`,
     );
   }

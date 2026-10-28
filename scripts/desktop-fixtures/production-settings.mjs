@@ -27,19 +27,19 @@ function installGuard() {
   const originalExecFile = childProcess.execFile;
   const originalExecute = promisify(originalExecFile);
   const isolatedKeychain = join(process.env.HOME, "Library/Keychains/login.keychain-db");
-  const expected = [
+  const expected = ["moyyi.deepseek.api-key", "moyyi.kimi.cn.api-key"].map((service) => [
     "find-generic-password",
     "-a",
     "moyyi",
     "-s",
-    "moyyi.deepseek.api-key",
+    service,
     isolatedKeychain,
-  ];
+  ]);
   function checkNative(file, args) {
     // Only a metadata lookup against a nonexistent, explicit isolated-HOME keychain is allowed.
     if (
       file === "/usr/bin/security" &&
-      JSON.stringify(args) === JSON.stringify(expected) &&
+      expected.some((command) => JSON.stringify(args) === JSON.stringify(command)) &&
       !existsSync(isolatedKeychain)
     ) {
       counts.metadataChecks++;
@@ -114,75 +114,60 @@ async function verify() {
       clearTimeout(timer);
     }
   }
-  // Same command/state/ACK lifecycle as the existing M1 production-worker acceptance case.
+  assert(
+    readFileSync(join(appDirectory, "main.mjs"), "utf8").includes("./bridge.mjs"),
+    "The native main and this probe must import the same production DesktopProcess boundary",
+  );
+  const { DesktopProcess } = await import(new URL("../bridge.mjs", import.meta.url));
   async function launch() {
-    const child = childProcess.fork(join(appDirectory, "worker.mjs"), [], {
-      execPath: process.execPath,
-      execArgv: ["--no-experimental-strip-types", "--import", self],
-      cwd: appDirectory,
-      env: { HOME: home, PATH: "/usr/bin:/bin:/usr/sbin:/sbin", LANG: "en_US.UTF-8" },
-      stdio: ["ignore", "ignore", "pipe", "ipc"],
-      serialization: "json",
-    });
-    let state, failure, counters;
-    let sequence = 0;
+    let child, state, counters;
     let stderr = "";
-    const pending = new Map();
-    const observers = new Set();
-    child.stderr.on("data", (chunk) => {
-      stderr = (stderr + chunk).slice(-4096);
-    });
-    child.on("error", (error) => {
-      failure = error;
-      for (const observer of observers) observer();
-    });
-    child.on("message", (message) => {
-      if (message.type === "state") state = message.state;
-      else if (message.type === "probe.guard") counters = message.counts;
-      else if (message.type === "fatal") failure = Error(message.message);
-      else if (message.type === "ack") {
-        const request = pending.get(message.id);
-        if (!request) return;
-        pending.delete(message.id);
-        message.error ? request.reject(Error(message.error)) : request.resolve(state);
-      }
-      for (const observer of observers) observer();
-    });
-    const exited = new Promise((resolve) =>
-      child.once("exit", (code, signal) => {
-        failure ??= Error(`Worker exited: ${code}/${signal} ${stderr}`);
-        for (const request of pending.values()) request.reject(failure);
-        pending.clear();
-        for (const observer of observers) observer();
-        resolve({ code, signal });
-      }),
-    );
-    async function request(command) {
-      assert(child.connected);
-      return bounded(
-        new Promise((resolve, reject) => {
-          const id = ++sequence;
-          pending.set(id, { resolve, reject });
-          child.send({ type: "command", id, command }, (error) => {
-            if (error) {
-              pending.delete(id);
-              reject(error);
-            }
-          });
-        }),
-        command.type,
-      );
+    const originalFork = childProcess.fork;
+    // Instrument only process launch and the guard's out-of-band counters. Every production
+    // state/ACK/fatal message passes through the actual DesktopProcess validator and lifecycle.
+    childProcess.fork = (module, args, options) => {
+      assert.equal(module, join(appDirectory, "worker.mjs"));
+      assert.deepEqual(args, []);
+      assert.equal(options.execPath, process.execPath);
+      assert.deepEqual(options.execArgv, []);
+      child = originalFork(module, args, {
+        ...options,
+        execArgv: ["--no-experimental-strip-types", "--import", self],
+        env: { ...options.env, HOME: home },
+        stdio: ["ignore", "ignore", "pipe", "ipc"],
+      });
+      const emit = child.emit;
+      child.emit = function (event, ...values) {
+        if (event === "message" && values[0]?.type === "probe.guard") {
+          counters = values[0].counts;
+          return true;
+        }
+        return emit.call(this, event, ...values);
+      };
+      child.stderr.on("data", (chunk) => {
+        stderr = (stderr + chunk).slice(-4096);
+      });
+      return child;
+    };
+    syncBuiltinESMExports();
+    let desktop;
+    try {
+      desktop = new DesktopProcess(appDirectory, process.execPath, (next) => {
+        state = next;
+      });
+    } finally {
+      childProcess.fork = originalFork;
+      syncBuiltinESMExports();
     }
+    assert(child, "DesktopProcess must launch the actual installed worker");
+    const exited = new Promise((resolve) =>
+      child.once("exit", (code, signal) => resolve({ code, signal })),
+    );
     async function close() {
-      let acknowledgementError;
       try {
-        if (child.connected && !failure) await request({ type: "close" });
-      } catch (error) {
-        acknowledgementError = error;
-      }
-      if (child.connected) child.disconnect();
-      try {
-        assert.equal((await bounded(exited, "exit")).code, 0);
+        await bounded(desktop.close(), "DesktopProcess close");
+        const result = await bounded(exited, "worker exit");
+        assert.equal(result.code, 0, stderr);
       } catch (error) {
         child.kill("SIGKILL");
         await exited;
@@ -190,36 +175,33 @@ async function verify() {
       }
       assert(counters, "The no-secret/network guard must initialize before the worker");
       for (const key of Object.keys(totals)) totals[key] += counters[key];
-      if (acknowledgementError) throw acknowledgementError;
     }
     try {
-      await bounded(
-        new Promise((resolve, reject) => {
-          const check = () => {
-            if (failure) {
-              observers.delete(check);
-              reject(failure);
-            } else if (state && counters) {
-              observers.delete(check);
-              resolve();
-            }
-          };
-          observers.add(check);
-          check();
-        }),
-        "initial state",
-      );
+      await bounded(desktop.getState(), "DesktopProcess initial state");
+      assert(counters, "Guard initialization must precede initial production state");
     } catch (error) {
       if (child.connected) child.disconnect();
       child.kill("SIGKILL");
       await exited;
       throw error;
     }
-    return { state: () => state, request, close };
+    return {
+      state: () => state,
+      request: (command) => bounded(desktop.send(command), command.type),
+      getState: () => desktop.getState(),
+      injectState: (next) => child.emit("message", { type: "state", state: next }),
+      close,
+    };
   }
   let worker = await launch();
   let sessionId;
   const settings = { preset: "flash", maxRequests: 4, timeoutMs: 120_000 };
+  const high = {
+    preset: "kimi-cn",
+    kimiReasoningEffort: "high",
+    maxRequests: 8,
+    timeoutMs: 300_000,
+  };
   const savedPath = join(home, ".moyyi/desktop/settings.json");
   try {
     assert.equal(worker.state().connection.ready, false);
@@ -276,6 +258,93 @@ async function verify() {
     assert.equal(worker.state().messages.length, 0);
     cases.push(
       "missing credentials reject start before secret reads or network calls; both processes exit cleanly",
+    );
+    await worker.request({ type: "permissions", sessionId, writes: true, checks: false });
+    assert.equal(worker.state().permissions.writes, true);
+    const selected = await worker.request({ type: "configure", settings: high });
+    assert.deepEqual(selected.settings, high);
+    assert.equal(selected.budgets.maxRequests, 8);
+    assert.equal(selected.budgets.timeoutMs, 300_000);
+    assert.deepEqual(selected.permissions, { writes: false, checks: false });
+    assert.equal(selected.activeSessionId, sessionId);
+    assert.equal(selected.messages.length, 0);
+    assert.deepEqual(JSON.parse(readFileSync(savedPath, "utf8")).settings, high);
+  } finally {
+    await worker.close();
+  }
+  worker = await launch();
+  try {
+    assert.deepEqual(worker.state().settings, high);
+    assert.equal(worker.state().budgets.maxRequests, 8);
+    assert.equal(worker.state().budgets.timeoutMs, 300_000);
+    assert.equal(worker.state().connection.ready, false);
+    assert.deepEqual(worker.state().permissions, { writes: false, checks: false });
+    await worker.request({ type: "load", sessionId, askEachRead: false });
+    await assert.rejects(
+      worker.request({ type: "start", sessionId, text: "Must remain offline with high selected" }),
+      /unavailable/,
+    );
+    assert.equal(worker.state().messages.length, 0);
+    cases.push(
+      "explicit Kimi high persists/restarts at 8 requests/300 seconds without credentials, replay or restored grants",
+    );
+    const validState = await worker.getState();
+    worker.injectState({
+      ...validState,
+      settings: { ...validState.settings, preset: "unsupported" },
+    });
+    await assert.rejects(worker.getState(), /无效数据|意外停止/);
+    await worker.close();
+    worker = await launch();
+    assert.deepEqual(worker.state().settings, high);
+    assert.equal(worker.state().connection.ready, false);
+    cases.push(
+      "actual DesktopProcess accepts high save/restart state and rejects an invalid worker preset before forwarding",
+    );
+    const evidenceSettings = { ...high, evidenceAnswer: true };
+    const evidenceState = await worker.request({ type: "configure", settings: evidenceSettings });
+    assert.deepEqual(evidenceState.settings, evidenceSettings);
+    assert.equal(evidenceState.budgets.maxRequests, 8);
+    assert.deepEqual(evidenceState.permissions, { writes: false, checks: false });
+    await worker.close();
+    worker = await launch();
+    assert.deepEqual(worker.state().settings, evidenceSettings);
+    assert.equal(worker.state().connection.ready, false);
+    await worker.request({ type: "load", sessionId, askEachRead: false });
+    await assert.rejects(
+      worker.request({ type: "start", sessionId, text: "Remain offline" }),
+      /unavailable/,
+    );
+    assert.equal(worker.state().messages.length, 0);
+    cases.push(
+      "evidence answer saves and restarts through DesktopProcess with the same budget and no restored grants or model call",
+    );
+    await worker.request({
+      type: "configure",
+      settings: { ...high, kimiReasoningEffort: "low" },
+    });
+    assert.deepEqual(JSON.parse(readFileSync(savedPath, "utf8")).settings, {
+      preset: "kimi-cn",
+      maxRequests: 8,
+      timeoutMs: 300_000,
+    });
+    await worker.request({ type: "configure", settings });
+    assert.deepEqual(JSON.parse(readFileSync(savedPath, "utf8")).settings, settings);
+  } finally {
+    await worker.close();
+  }
+  worker = await launch();
+  try {
+    assert.deepEqual(worker.state().settings, settings);
+    assert.equal(worker.state().budgets.maxRequests, 4);
+    assert.equal(worker.state().connection.ready, false);
+    assert.deepEqual(Object.keys(JSON.parse(readFileSync(savedPath, "utf8")).settings).sort(), [
+      "maxRequests",
+      "preset",
+      "timeoutMs",
+    ]);
+    cases.push(
+      "returning to low/Flash writes the legacy three-field settings and restarts with Flash/4",
     );
   } finally {
     await worker.close();

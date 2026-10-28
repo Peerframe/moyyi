@@ -72,6 +72,48 @@ async function sentCommand() {
 }
 
 describe("desktop inherited process pipe", () => {
+  it.each(["kimi-cn", "kimi-global"] as const)(
+    "accepts existing %s high settings in startup and configure state",
+    async (preset) => {
+      const onState = vi.fn();
+      const process = new DesktopProcess("/installed/app", "/installed/node/bin/node", onState);
+      const high: DesktopState = {
+        ...initial,
+        settings: {
+          preset,
+          kimiReasoningEffort: "high",
+          maxRequests: 8,
+          timeoutMs: 300_000,
+        },
+      };
+      child.emit("message", { type: "state", state: structuredClone(high) });
+      expect((await process.getState()).settings).toEqual(high.settings);
+      const saving = process.send({ type: "configure", settings: high.settings });
+      const sent = await sentCommand();
+      child.emit("message", { type: "state", state: structuredClone(high) });
+      child.emit("message", { type: "ack", id: sent.id });
+      expect((await saving).settings).toEqual(high.settings);
+      expect(child.disconnect).not.toHaveBeenCalled();
+      child.exit();
+      await process.close();
+    },
+  );
+
+  it.each(["unsupported", null, 1])(
+    "disconnects a state with invalid preset=%s",
+    async (preset) => {
+      const { process } = start();
+      child.emit("message", {
+        type: "state",
+        state: { ...initial, settings: { ...initial.settings, maxRequests: 8, preset } },
+      });
+      expect(child.disconnect).toHaveBeenCalledOnce();
+      await expect(process.getState()).rejects.toThrow("无效数据");
+      child.exit();
+      await process.close();
+    },
+  );
+
   it("uses the packaged Node and fixed worker without inherited Node injection options", async () => {
     const { process } = start();
     const [module, args, options] = pipe.fork.mock.calls[0] as [

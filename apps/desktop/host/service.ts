@@ -737,7 +737,15 @@ class Host implements DesktopHost {
             .map((part) => part.text)
             .join("\n"),
         });
-    } else if (body.kind === "notice") this.add({ id: entry.id, role: "notice", text: body.text });
+    } else if (body.kind === "notice")
+      this.add({
+        id: entry.id,
+        role: "notice",
+        text:
+          body.code === "evidence_answer"
+            ? "调查阶段结束，正在用原问题和实际工具证据独立成文。先前回答保留为调查记录；仍使用本轮原预算，完成后也需核对事实。"
+            : body.text,
+      });
     else if (body.kind === "compaction")
       this.add({
         id: entry.id,
@@ -868,7 +876,13 @@ class Host implements DesktopHost {
         break;
       case "command.rejected":
         this.commandError =
-          "The runtime rejected this command; refresh the current state before trying again";
+          event.reason ===
+          "Evidence answer requires a new session. Disable it to continue this conversation; history was not changed."
+            ? "独立证据成文仅适用于新会话。请新建会话，或在模型设置中关闭后继续；历史未修改。"
+            : event.reason ===
+                "Evidence answer cannot accept steering. Cancel and start a new self-contained session."
+              ? "独立证据成文不支持追加指令。请取消后在新会话提出完整问题；没有补发请求。"
+              : "The runtime rejected this command; refresh the current state before trying again";
         this.update({ error: this.commandError });
         break;
       case "plugin.status":

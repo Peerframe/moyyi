@@ -1,14 +1,66 @@
 import { describe, expect, it, vi } from "vitest";
-import { DEFAULT_DESKTOP_SETTINGS } from "../shared.ts";
+import { DEFAULT_DESKTOP_SETTINGS, type DesktopSettings } from "../shared.ts";
 import {
   newSettingsDraft,
   saveSettingsDraft,
+  selectKimiReasoningEffort,
   selectSettingsPreset,
   validateSettingsDraft,
 } from "./settings-state.ts";
 import { createActionGate } from "./view-state.ts";
 
 describe("desktop settings credential lifetime", () => {
+  it("keeps evidence answer explicit and within the selected request limit", () => {
+    const reviewed = newSettingsDraft({
+      preset: "kimi-cn",
+      maxRequests: 8,
+      timeoutMs: 300_000,
+      evidenceAnswer: true,
+    });
+    expect(validateSettingsDraft(reviewed)).toBeNull();
+    expect(
+      validateSettingsDraft({ ...reviewed, settings: { ...reviewed.settings, maxRequests: 1 } }),
+    ).toContain("至少 2");
+    expect(selectSettingsPreset(reviewed, "kimi-global").settings.evidenceAnswer).toBe(true);
+    expect(selectSettingsPreset(reviewed, "flash").settings.evidenceAnswer).toBeUndefined();
+    expect(DEFAULT_DESKTOP_SETTINGS.evidenceAnswer).toBeUndefined();
+  });
+  it("uses low for old settings and clears high when returning to Flash", async () => {
+    const base = newSettingsDraft(DEFAULT_DESKTOP_SETTINGS);
+    const kimi = selectSettingsPreset(base, "kimi-cn");
+    expect(kimi.settings.kimiReasoningEffort).toBeUndefined();
+    const high = selectKimiReasoningEffort({ ...kimi, apiKey: "synthetic-input" }, "high");
+    expect(high.settings.kimiReasoningEffort).toBe("high");
+    expect(high.apiKey).toBe("synthetic-input");
+    expect(selectSettingsPreset(high, "kimi-global").settings.kimiReasoningEffort).toBe("high");
+    expect(selectSettingsPreset(high, "flash")).toEqual(base);
+    expect(selectKimiReasoningEffort(high, "low").settings).toEqual(kimi.settings);
+    const configure = vi.fn(async () => undefined);
+    await expect(
+      saveSettingsDraft(
+        { settings: { ...DEFAULT_DESKTOP_SETTINGS, kimiReasoningEffort: "high" }, apiKey: "" },
+        () => {},
+        configure,
+      ),
+    ).rejects.toThrow("仅 Kimi");
+    await expect(
+      saveSettingsDraft(
+        {
+          settings: { ...kimi.settings, kimiReasoningEffort: "max" } as unknown as DesktopSettings,
+          apiKey: "",
+        },
+        () => {},
+        configure,
+      ),
+    ).rejects.toThrow("仅 Kimi");
+    expect(configure).not.toHaveBeenCalled();
+    expect(DEFAULT_DESKTOP_SETTINGS).toEqual({
+      preset: "flash",
+      maxRequests: 3,
+      timeoutMs: 120_000,
+    });
+  });
+
   it("clears a credential on preset change and dialog reset without mutating saved settings", () => {
     const settings = { ...DEFAULT_DESKTOP_SETTINGS };
     const draft = { settings, apiKey: "private-input" };

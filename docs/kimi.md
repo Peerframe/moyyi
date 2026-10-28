@@ -47,6 +47,11 @@ The last allowed request retains history/tool definitions and disables new tool 
 Responses endpoint currently rejects that mode, so this provider deliberately uses Chat.
 It does not implement SDK retries, automatic protocol fallback, remote tool execution, images,
 audio, Kimi Code credentials or custom gateways. Errors hide raw credential-bearing exceptions.
+HTTP429 diagnostics read at most16 KiB/128 chunks for at most2 seconds. The exact documented
+`error.type` distinguishes engine overload, account rate limits and account quota/balance;
+unknown, malformed or unavailable diagnostics keep an explicitly unknown429. Messages are fixed
+locally; raw response messages are never exposed. This does not add retries or resolve upstream
+capacity. See [ADR0036](decisions/0036-kimi-chat-provider.md#http429-diagnosis-follow-up-2026-10-28).
 
 ## Offline acceptance and diagnostics
 

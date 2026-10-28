@@ -21,6 +21,12 @@ export interface Response {
   providerStopReason: JsonValue;
   usage: Usage;
   replay?: ReplayEnvelope;
+  /** True only when cancellation, rather than a received terminal or validation error, stopped collection. */
+  signalInterrupted: boolean;
+  /** Local iterator closure; callers must await this before starting a replacement phase. */
+  settled: Promise<void>;
+  /** A terminal already pending publication when cancellation won; never late content. */
+  deferredTerminal?: Extract<ModelStreamEvent, { type: "completed" | "error" }>;
 }
 
 /** Bounded stream collection; even incomplete deltas survive interruption as common content. */
@@ -41,8 +47,11 @@ export async function consumeResponse(
     stopReason: "interrupted",
     providerStopReason: null,
     usage: UNKNOWN_USAGE,
+    signalInterrupted: false,
+    settled: Promise.resolve(),
   };
   let iterator: AsyncIterator<ModelStreamEvent> | undefined;
+  let pending: Promise<IteratorResult<ModelStreamEvent>> | undefined;
   let finished = false;
   let terminalSeen = false;
   function fail(kind: ModelError["kind"], message: string) {
@@ -59,7 +68,32 @@ export async function consumeResponse(
       .stream(JSON.parse(canonicalizeJson(request)) as ModelRequest, signal)
       [Symbol.asyncIterator]();
     while (!signal.aborted) {
-      const next = await cancellable(iterator.next(), signal);
+      pending = iterator.next();
+      const next = await cancellable(pending, signal, (late) => {
+        try {
+          if (late.done || (late.value.type !== "completed" && late.value.type !== "error")) return;
+          const encoded = canonicalizeJson(late.value);
+          if (size + new TextEncoder().encode(encoded).byteLength > maxBytes)
+            throw new Error("Deferred model terminal exceeded byte limit");
+          const event = JSON.parse(encoded) as Extract<
+            ModelStreamEvent,
+            { type: "completed" | "error" }
+          >;
+          const violations = checkModelStream([...events, event]);
+          if (violations.length) throw new Error("Invalid deferred model terminal");
+          response.deferredTerminal = event;
+        } catch {
+          response.deferredTerminal = {
+            type: "error",
+            error: {
+              kind: "protocol",
+              message: "Invalid deferred model terminal",
+              partialOutput: response.partial,
+              usage: UNKNOWN_USAGE,
+            },
+          };
+        }
+      });
       if (next === null) break;
       if (next.done) {
         finished = true;
@@ -136,8 +170,10 @@ export async function consumeResponse(
       }
       events.push(event);
     }
-    if (signal.aborted) fail("cancelled", "Model stream cancelled");
-    else if (!response.error) {
+    if (signal.aborted && !terminalSeen && !response.error) {
+      response.signalInterrupted = true;
+      fail("cancelled", "Model stream cancelled");
+    } else if (!response.error) {
       const violations = checkModelStream(events);
       if (violations.length) fail("protocol", violations.join("; "));
     }
@@ -153,16 +189,31 @@ export async function consumeResponse(
     } catch {
       message = "Unreportable provider error";
     }
-    fail(signal.aborted ? "cancelled" : "protocol", message);
+    if (!response.error) {
+      response.signalInterrupted = signal.aborted && !terminalSeen;
+      fail(response.signalInterrupted ? "cancelled" : "protocol", message);
+    }
   } finally {
-    if (!finished && iterator?.return) {
-      // A broken provider cannot block local cancellation by ignoring AbortSignal. Its eventual
-      // return is observed, but no subsequent content or tool action is accepted from it.
+    if (!finished && iterator) {
+      // Cancellation stays prompt. The phase owner separately bounds its wait for closure;
+      // no later events from this iterator can alter the recorded partial content.
       try {
-        void Promise.resolve(iterator.return()).catch(() => {});
-      } catch {
-        /* provider bug */
+        const closed = iterator.return
+          ? Promise.resolve(iterator.return()).then((result) => {
+              if (!result.done) throw new Error("Model iterator did not close");
+            })
+          : Promise.reject(new Error("Model iterator cannot confirm closure"));
+        response.settled = Promise.all([
+          closed,
+          pending?.then(
+            () => {},
+            () => {},
+          ),
+        ]).then(() => {});
+      } catch (error) {
+        response.settled = Promise.reject(error);
       }
+      void response.settled.catch(() => {});
     }
   }
   for (const index of [...new Set([...complete.keys(), ...deltas.keys()])].sort((a, b) => a - b)) {
@@ -211,13 +262,19 @@ export async function consumeResponse(
   return response;
 }
 
-function cancellable<T>(promise: Promise<T>, signal: AbortSignal): Promise<T | null> {
+function cancellable<T>(
+  promise: Promise<T>,
+  signal: AbortSignal,
+  discarded: (value: T) => void,
+): Promise<T | null> {
   if (signal.aborted) {
-    void promise.catch(() => {});
+    void promise.then(discarded, () => {});
     return Promise.resolve(null);
   }
   return new Promise((resolve, reject) => {
+    let cancelled = false;
     const abort = () => {
+      cancelled = true;
       cleanup();
       resolve(null);
     };
@@ -226,7 +283,8 @@ function cancellable<T>(promise: Promise<T>, signal: AbortSignal): Promise<T | n
     promise.then(
       (value) => {
         cleanup();
-        resolve(value);
+        if (cancelled) discarded(value);
+        else resolve(value);
       },
       (error: unknown) => {
         cleanup();

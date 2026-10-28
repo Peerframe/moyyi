@@ -9,6 +9,7 @@ import {
   type ModelRequest,
   type TranscriptEntry,
 } from "../contracts/index.ts";
+import { buildEvidenceAnswer } from "./evidence-answer.ts";
 
 export class ContextCapacityError extends Error {
   readonly requiredTokens: number;
@@ -31,6 +32,12 @@ interface ProjectedEntry {
 
 /** Applies explicit, immutable compactions; never drops history to make a request fit. */
 export class MinimalContextBuilder implements ContextBuilder {
+  buildEvidenceAnswer(input: ContextInput): ContextResult {
+    return buildEvidenceAnswer(input, (request) =>
+      budget(request, input.profile.contextWindowTokens),
+    );
+  }
+
   build(input: ContextInput): ContextResult {
     const projection = project(input.path);
     let request = render(input, projection);

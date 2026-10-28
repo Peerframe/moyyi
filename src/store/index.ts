@@ -3,6 +3,8 @@ import {
   existsSync,
   lstatSync,
   mkdtempSync,
+  readdirSync,
+  readFileSync,
   realpathSync,
   renameSync,
   rmSync,
@@ -50,7 +52,9 @@ export type StoreCheckpoint =
   | "commit:before_commit"
   | "snapshot:before_commit"
   | "backup:before_publish"
-  | "backup:before_parent_sync";
+  | "backup:before_parent_sync"
+  | "restore:before_replace"
+  | "restore:after_replace";
 export interface StoreOptions {
   readonly maxBlobBytes?: number;
   /** Trusted test fault injection only. Never sourced from plugins, models or stored data. */
@@ -640,6 +644,68 @@ export class SqliteSessionStore implements SessionStore, WorkspaceSnapshotStore 
         return effect;
       })
       .filter((effect) => !isTerminal(effect.state));
+  }
+
+  /** Replace only the database while retaining the original writer-lock inode and all old blobs.
+   * The caller supplies a validated, private VACUUM snapshot, never an active database.
+   * A failed final sync is an unconfirmed publication, not permission to erase the rescue copy.
+   */
+  async restoreSnapshot(
+    snapshot: string,
+    rescueDestination: string,
+    rescuePublished?: () => void,
+  ): Promise<void> {
+    this.#ready();
+    if (
+      this.#db.prepare("SELECT 1 FROM workspace_leases LIMIT 1").get() ||
+      this.#db.prepare("SELECT 1 FROM runs WHERE status = 'active' LIMIT 1").get() ||
+      (await this.unsettledEffects()).length
+    )
+      throw new Error("Unsettled work prevents data restoration; inspect it read-only first");
+    await this.backup(rescueDestination);
+    rescuePublished?.();
+    this.#ready();
+    this.#writing = true;
+    let databaseClosed = false;
+    let published = false;
+    try {
+      const blobs = join(snapshot, "blobs");
+      for (const name of readdirSync(blobs)) {
+        if (!/^[a-f0-9]{64}$/.test(name)) throw new Error("Invalid restore blob name");
+        const path = join(blobs, name);
+        assertRegularFile(path);
+        if (this.#blobs.put(readFileSync(path)) !== `sha256:${name}`)
+          throw new Error("Restore blob hash mismatch");
+      }
+      const prepared = join(snapshot, "data.sqlite");
+      assertRegularFile(prepared);
+      const checkpoint = this.#db.prepare("PRAGMA wal_checkpoint(TRUNCATE)").get();
+      if (checkpoint?.busy !== 0) throw new Error("Database checkpoint is busy");
+      this.#options.checkpoint?.("restore:before_replace");
+      this.#db.close();
+      databaseClosed = true;
+      // Keep this.directory and writer-lock.sqlite in place for competing CLI/desktop clients.
+      for (const suffix of ["-wal", "-shm", "-journal"]) {
+        const path = join(this.directory, `data.sqlite${suffix}`);
+        if (lstatIfPresent(path)) {
+          assertRegularFile(path);
+          rmSync(path);
+        }
+      }
+      renameSync(prepared, join(this.directory, "data.sqlite"));
+      published = true;
+      this.#options.checkpoint?.("restore:after_replace");
+      syncDirectory(this.directory);
+    } catch (error) {
+      if (published) throw new BackupDurabilityError(this.directory, error);
+      throw error;
+    } finally {
+      this.#writing = false;
+      if (databaseClosed) {
+        this.#closed = true;
+        this.#releaseLock();
+      }
+    }
   }
 
   /** Publish a self-contained snapshot; acknowledge only after the final directory sync. */

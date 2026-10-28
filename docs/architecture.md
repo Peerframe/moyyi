@@ -133,7 +133,7 @@ Enforced by [tests/boundaries.ts](../tests/boundaries.ts):
 - `shared.ts` is a data-only contract without external imports. `security.ts` is likewise pure;
   `wire.ts` can use only shared data and security validation. `preload.ts` imports only these
   three modules and Electron, exposing named methods rather than generic IPC or Node access.
-- The trusted desktop host consists of `main.ts`, `bridge.ts`, `connection.ts`, `worker.ts` and
+- The trusted desktop host consists of `main.ts`, `bridge.ts`, `connection.ts`, `worker.ts`, `maintenance-worker.ts` and
   `host/`. It may use Node, its own host/shared/validation modules and the public `moyyi/runtime`
   and `moyyi/contracts` exports. Among these host files, only `main.ts` imports Electron. Relative imports into `src`
   or other repository code, unlisted desktop paths and undeclared application directories fail
@@ -239,6 +239,17 @@ request for an answer without increasing the request quota. Core records a count
 each attempt and sets optional `ModelRequest.toolChoice: "none"` on the last one, retaining tool
 definitions and history. Providers disable new calls and core independently refuses any violating
 call before preparation/execution. An absent, truncated or tool-only final answer is not completed.
+
+[ADR 0042](decisions/0042-direct-evidence-answer.md) adds an experimental, default-off
+`evidenceAnswer` option for fresh self-contained sessions. Core can transition once to an answer
+at a completed draft, last request or absolute one-third investigation deadline. New tool
+admissions stop at that deadline; started effects settle under the original run signal. The old
+stream and recorder must close within a one-second cleanup cap before final inference. Errors,
+user cancellation and the original global deadline remain terminal. Context projects the original
+user input and all paired observations without prior assistant interpretations. Context keeps
+all sections/effects and refuses oversized inputs. Existing records preserve the original
+history and the `moyyi-evidence-answer-v1` request. No extra budget, final tool execution,
+steering, automatic retry, implicit compaction or factual-success judgement is introduced.
 Budget notices extend the current user turn in context; they do not rewrite the system or old
 prefixes. The exact request, including tool choice, is recorded without a persisted schema change.
 

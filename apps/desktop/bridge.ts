@@ -10,6 +10,7 @@ export class DesktopProcess {
   private state: DesktopState | undefined;
   private failure: string | undefined;
   private sequence = 0;
+  private inFlight = 0;
   private readonly waiting = new Map<
     number,
     { resolve: () => void; reject: (error: Error) => void; timer: ReturnType<typeof setTimeout> }
@@ -101,24 +102,33 @@ export class DesktopProcess {
     return this.state;
   }
 
+  hasPendingCommands(): boolean {
+    return this.inFlight > 0;
+  }
+
   async send(command: DesktopCommand): Promise<DesktopState> {
-    await this.getState();
-    if (this.waiting.size >= 8) throw Error("操作正在处理中，请稍候。");
-    const id = ++this.sequence;
-    await new Promise<void>((resolve, reject) => {
-      const timer = setTimeout(() => {
-        this.waiting.delete(id);
-        reject(Error("操作尚未确认。请查看当前状态，不要重复批准。"));
-      }, 60_000);
-      this.waiting.set(id, { resolve, reject, timer });
-      this.child.send({ type: "command", id, command }, (error) => {
-        if (!error) return;
-        clearTimeout(timer);
-        this.waiting.delete(id);
-        reject(Error("本地服务通讯中断。"));
+    this.inFlight++;
+    try {
+      await this.getState();
+      if (this.waiting.size >= 8) throw Error("操作正在处理中，请稍候。");
+      const id = ++this.sequence;
+      await new Promise<void>((resolve, reject) => {
+        const timer = setTimeout(() => {
+          this.waiting.delete(id);
+          reject(Error("操作尚未确认。请查看当前状态，不要重复批准。"));
+        }, 60_000);
+        this.waiting.set(id, { resolve, reject, timer });
+        this.child.send({ type: "command", id, command }, (error) => {
+          if (!error) return;
+          clearTimeout(timer);
+          this.waiting.delete(id);
+          reject(Error("本地服务通讯中断。"));
+        });
       });
-    });
-    return this.getState();
+      return await this.getState();
+    } finally {
+      this.inFlight--;
+    }
   }
 
   close(): Promise<void> {

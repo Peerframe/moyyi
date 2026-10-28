@@ -7,6 +7,7 @@ import {
   UNKNOWN_USAGE,
 } from "../../contracts/index.ts";
 import { buildKimiRequest, decodeKimiEvents, kimiProfile } from "./codec.ts";
+import { classifyKimi429 } from "./http-error.ts";
 import { type KimiOptions, resolveKimiReasoningEffort } from "./options.ts";
 import { parseKimiSse } from "./sse.ts";
 import type { KimiTransport, KimiWireResponse } from "./types.ts";
@@ -70,20 +71,19 @@ export function createKimiClient(transport: KimiTransport, options: KimiOptions 
         return;
       }
       try {
-        if (signal.aborted) {
-          yield error("cancelled", "Kimi request cancelled");
-          return;
-        }
         if (response.status !== 200) {
+          if (response.status === 429) {
+            const diagnostic = await classifyKimi429(response.body, signal);
+            yield error(diagnostic.kind, diagnostic.message, retryAfter(response.retryAfter));
+            return;
+          }
           const kind: ModelErrorKind = [401, 402, 403].includes(response.status)
             ? "auth"
-            : response.status === 429
-              ? "rate_limited"
-              : [500, 503].includes(response.status)
-                ? "overloaded"
-                : [400, 404, 413, 422].includes(response.status)
-                  ? "invalid_request"
-                  : "protocol";
+            : [500, 503].includes(response.status)
+              ? "overloaded"
+              : [400, 404, 413, 422].includes(response.status)
+                ? "invalid_request"
+                : "protocol";
           yield error(
             kind,
             response.status === 402
@@ -91,6 +91,10 @@ export function createKimiClient(transport: KimiTransport, options: KimiOptions 
               : `Kimi HTTP ${response.status}`,
             retryAfter(response.retryAfter),
           );
+          return;
+        }
+        if (signal.aborted) {
+          yield error("cancelled", "Kimi request cancelled");
           return;
         }
         if (response.contentType?.split(";")[0]?.trim().toLowerCase() !== "text/event-stream") {
@@ -101,7 +105,10 @@ export function createKimiClient(transport: KimiTransport, options: KimiOptions 
       } finally {
         // Cleanup failures cannot add a second terminal event or expose transport diagnostics.
         try {
-          await response.close();
+          const closing = response.close();
+          // A stalled diagnostic body must not turn into a stalled terminal cleanup.
+          if (response.status === 429) void Promise.resolve(closing).catch(() => {});
+          else await closing;
         } catch {
           /* host cleanup failure */
         }
