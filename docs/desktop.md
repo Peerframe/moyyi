@@ -398,3 +398,12 @@ wait for it to settle first; an already sent GET cannot be recalled. There is no
 login state, JavaScript execution, automatic redirect/following, cookies or file downloads.
 The original network limits in [web.md](web.md) remain. M5 acceptance is recorded separately in
 [the delivery receipt](tasks/2026-10-28-desktop-m5.md); original M4 answer failures remain retained.
+
+### Choosing a request limit for document reports
+
+The daily default remains Flash + Responses + low with three requests and120 seconds. A full
+read-documents → approved create → readback → final answer flow can need at least four model
+requests. For that multi-step task, select eight requests and300 seconds in Model settings before
+sending, then return to the daily limits when finished. M6's fixed live acceptance used four of
+eight requests; it does not guarantee that every report will fit. Selection/preview/history alone
+do not call the model. Keep the report-create approval separate from general file-write permission.
