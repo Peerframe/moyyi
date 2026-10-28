@@ -205,10 +205,7 @@ async function compatibility(home: string, target: Candidate): Promise<void> {
   const allowed = legacy ? ["maxRequests", "preset", "timeoutMs"] : (declared?.settingsKeys ?? []);
   if (
     allowed.some(
-      (key) =>
-        !["maxRequests", "preset", "timeoutMs", "kimiReasoningEffort", "answerReview"].includes(
-          key,
-        ),
+      (key) => !["maxRequests", "preset", "timeoutMs", "kimiReasoningEffort"].includes(key),
     ) ||
     settings.format !== 1 ||
     !settings.settings ||

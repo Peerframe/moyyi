@@ -79,8 +79,6 @@ export interface SessionSnapshot {
 
 export interface ContextBuilder {
   build(input: ContextInput): ContextResult;
-  /** Builds an opt-in, tool-free review stage; it does not certify task correctness. */
-  buildAnswerReview?(input: ContextInput, stage: "evidence" | "answer"): ContextResult;
   /** Plans an explicit, tool-free summary request without changing history. */
   planCompaction?(input: ContextInput): CompactionPlan | null;
 }

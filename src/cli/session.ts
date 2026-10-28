@@ -253,25 +253,6 @@ export function createCliSession(runtime: Runtime, options: CliSessionOptions): 
         output("compaction audit", `Summary request recorded (${body.stopReason}).`);
         return;
       }
-      if (body.request.rendererVersion === "moyyi-evidence-review-v1") {
-        if (body.stopReason === "refusal" || body.content.some((part) => part.type === "refusal")) {
-          output(
-            "assistant refusal",
-            body.content
-              .flatMap((part) =>
-                part.type === "text" || part.type === "refusal" ? [part.text] : [],
-              )
-              .join(""),
-          );
-          output("evidence review", "Review refused; no final answer request was sent.");
-          return;
-        }
-        output(
-          "evidence review",
-          `Evidence request recorded (${body.stopReason}); not task acceptance.`,
-        );
-        return;
-      }
       const text = body.content
         .filter((part) => part.type === "text" || part.type === "refusal")
         .map((part) => part.text)

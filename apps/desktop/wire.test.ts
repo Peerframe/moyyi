@@ -29,27 +29,25 @@ const state: DesktopState = {
   error: null,
 };
 describe("desktop wire data", () => {
-  it("accepts review settings on saved and restarted state without relaxing the settings schema", () => {
+  it("accepts existing high settings on saved and restarted state without relaxing the settings schema", () => {
     const settings = {
       preset: "kimi-cn",
       maxRequests: 8,
       timeoutMs: 300_000,
       kimiReasoningEffort: "high",
     };
-    for (const answerReview of [undefined, false, true]) {
-      const candidate = {
-        ...state,
-        settings: { ...settings, ...(answerReview === undefined ? {} : { answerReview }) },
-      };
+    for (const preset of ["kimi-cn", "kimi-global"]) {
+      const candidate = { ...state, settings: { ...settings, preset } };
       expect(isDesktopState(candidate)).toBe(true);
       expect(isWorkerMessage(JSON.parse(JSON.stringify({ type: "state", state: candidate })))).toBe(
         true,
       );
     }
     for (const changed of [
-      ...["true", null, 0, 1, {}, []].map((answerReview) => ({ answerReview })),
-      { answerReview: true, maxRequests: 3 },
-      { answerReview: true, apiKey: "must-not-cross" },
+      ...["unsupported", null, 0, 1, {}, []].map((preset) => ({ preset })),
+      { maxRequests: 9 },
+      { apiKey: "must-not-cross" },
+      { unexpectedFlag: true },
     ])
       expect(
         isWorkerMessage({
@@ -57,9 +55,7 @@ describe("desktop wire data", () => {
           state: { ...state, settings: { ...settings, ...changed } },
         }),
       ).toBe(false);
-    expect(isDesktopState({ ...state, settings: { ...state.settings, answerReview: false } })).toBe(
-      true,
-    );
+    expect(isDesktopState({ ...state, settings: { ...settings, preset: "flash" } })).toBe(false);
   });
 
   it("preserves unknown effects, exact receipts and expected absence without accepting authority", () => {

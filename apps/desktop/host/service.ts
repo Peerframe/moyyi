@@ -681,33 +681,6 @@ class Host implements DesktopHost {
         },
       });
     }
-    if (
-      body.kind === "assistant_message" &&
-      body.request.rendererVersion === "moyyi-evidence-review-v1"
-    ) {
-      this.update({ streamText: "" });
-      const refused =
-        body.stopReason === "refusal" || body.content.some((part) => part.type === "refusal");
-      if (refused) {
-        this.add({
-          id: `${entry.id}:refusal`,
-          role: "assistant",
-          text: body.content
-            .flatMap((part) => (part.type === "text" || part.type === "refusal" ? [part.text] : []))
-            .join(""),
-        });
-      }
-      this.add({
-        id: entry.id,
-        role: "notice",
-        text: refused
-          ? "证据复核已拒绝继续；没有生成后续回答，调查记录保留。"
-          : body.stopReason === "end_turn"
-            ? "独立证据整理已记录，仍需检查引用并形成回答；这不是任务验收通过。"
-            : "独立证据整理未完成。原调查记录已保留，不会自动补发请求。",
-      });
-      return;
-    }
     if (body.kind === "user_message" || body.kind === "assistant_message") {
       const role = body.kind === "user_message" ? "user" : "assistant";
       for (const [index, part] of body.content.entries()) {
@@ -895,11 +868,7 @@ class Host implements DesktopHost {
         break;
       case "command.rejected":
         this.commandError =
-          event.command === "run.start" &&
-          event.reason ===
-            "Isolated evidence review requires a new session. Disable review to continue this conversation; history was not changed."
-            ? "独立证据复核只适用于新会话。请新建会话，或在模型设置中关闭复核后继续；历史未修改。"
-            : "The runtime rejected this command; refresh the current state before trying again";
+          "The runtime rejected this command; refresh the current state before trying again";
         this.update({ error: this.commandError });
         break;
       case "plugin.status":

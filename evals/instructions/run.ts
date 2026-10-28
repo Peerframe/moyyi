@@ -1,5 +1,4 @@
 import { mkdirSync, writeFileSync } from "node:fs";
-import { runAnswerReviewScenario } from "./answer-review.ts";
 import { runWorkspaceNavigationScenario } from "./navigation.ts";
 import { instructionScenarios, runInstructionScenario } from "./scenario.ts";
 
@@ -20,13 +19,6 @@ try {
     ...(await runWorkspaceNavigationScenario()),
     passed: true,
   });
-  for (const invalidReference of [false, true]) {
-    results.push({
-      id: `isolated-evidence-${invalidReference ? "invalid-reference" : "complete"}`,
-      ...(await runAnswerReviewScenario(invalidReference)),
-      passed: true,
-    });
-  }
   if (networkRequests !== 0) throw Error("Instruction conformance attempted network access");
 } finally {
   globalThis.fetch = originalFetch;

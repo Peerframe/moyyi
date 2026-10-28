@@ -142,7 +142,7 @@ const manifest = {
     schemaVersion: 2,
     persistedFormat: 1,
     settingsFormat: 1,
-    settingsKeys: ["preset", "maxRequests", "timeoutMs", "kimiReasoningEffort", "answerReview"],
+    settingsKeys: ["preset", "maxRequests", "timeoutMs", "kimiReasoningEffort"],
   },
   electron: "45.0.0",
   react: "19.3.1",

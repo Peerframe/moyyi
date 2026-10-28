@@ -1,8 +1,8 @@
 # ADR 0041: Bounded isolated evidence review
 
-Status: experimental candidate 2026-10-28; semantic acceptance pending. The owner's next M4
-instruction authorizes investigating and testing a new mechanism under the original limits.
-This does not reopen the previous sealed trial, change Flash defaults, or accept M4.
+Status: withdrawn after one bounded actual-desktop trial, 2026-10-28. This document preserves
+the hypothesis, original contract and result; it is not an active runtime or desktop option.
+The trial does not reopen previous results, change Flash defaults, or accept M4.
 
 ## Evidence and scope
 
@@ -40,7 +40,7 @@ source is copied or substantially adapted; no dependency is added. The previous 
 review remains in the M4 receipt. The new hypothesis is isolated inference, not an automatic
 correctness judge or another retrieval layer.
 
-## Candidate contract
+## Historical candidate contract
 
 Trusted runtime option `answerReview: true` enables an experimental path; omission/false retains
 the old loop. The desktop exposes it explicitly, default off. A total request limit of at least4
@@ -95,3 +95,32 @@ If the new mechanism fails, preserve its result and withdraw its product path; d
 prompt and reroll this question. M4 stays unaccepted, PR47 unmerged and the daily M3 app retained.
 If it passes all gates, retain it as an explicit optional configuration, then complete review,
 CI and installation with backup. No public release is authorized.
+
+## Executed outcome and withdrawal
+
+Candidate `93b9e8e` passed139 files/2740 tests and34 offline instruction scenarios; native
+settings save then revealed a missing outbound-state whitelist field before any model request.
+`32545fc` fixed that integration gap and made the package settings fixture use the same
+`DesktopProcess` module as the application. It passed139 files/2746 tests, actual external-bundle
+verification and all three CI lanes. These checks establish engineering behavior only.
+
+The one live trial used the original source, question, hidden rubric, Kimi CN high profile and
+8-request/300-second/8192-output ceiling with zero retries. Six requests were sent. The first
+five returned tool calls; the sixth produced partial user-visible text before the original
+deadline interrupted it. All six used the ordinary investigation renderer. Neither isolated
+evidence nor final-answer stage was reached, so no complete answer exists for six-item grading.
+This is an end-to-end acceptance failure and unavailable semantic evidence for the isolation
+hypothesis; it does not show that either old omission was fixed. Conditional public tasks were
+not opened. No unused quota is transferred and no prompt variant is retried.
+
+Reserving request slots alone did not ensure time for the later stages. This trial does not
+separate provider latency, investigation breadth and added budget guidance as causal factors.
+It is therefore insufficient to ship the option or to assert that a larger time limit would
+fix quality. The experimental core/context/CLI/desktop option and its dedicated fixtures were
+removed under the predeclared exit rule. The independently useful packaged-bridge validation
+remains for the existing high settings, with the original six settings cases plus one boundary
+case. Private request records and public commit history retain the failed candidate.
+
+Flash3/120 settings were restored through the native UI byte for byte against the pre-trial
+backup. Daily M3 remains installed; PR47 stays draft. M4's two original answer omissions remain
+unresolved, so conditional merge and installation are not authorized by a passed gate.

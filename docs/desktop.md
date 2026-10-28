@@ -50,13 +50,6 @@ all three. M4's settings candidate adds an explicit low/high choice for Kimi onl
 **实验**; it did not pass the fixed complex-source task and is not a reliability recommendation.
 Flash always uses low. Switching back to Flash removes high from the configuration. Legacy
 three-field settings retain low behavior; saving low or Flash retains that older representation.
-The M4 experiment also offers **独立证据复核** (default off). It requires a total limit of at least4
-and reserves2 of those requests for independent evidence organization and the final answer;
-it does not raise limits, retry or perform tools during review. Source-derived citations are checked
-for existence, not semantic truth. Switching presets back to Flash clears this experimental option.
-It only accepts a new conversation with a self-contained question. Disable it before continuing
-existing history; opening history itself never triggers a review or model request.
-Its real-task gate is tracked in [ADR 0041](decisions/0041-isolated-evidence-review.md).
 Endpoints are fixed presets. The form accepts1–8 requests and30–300 seconds per turn;8192 output
 tokens and zero retries stay fixed. An empty API Key preserves that preset's existing key.
 Changing preset, saving or closing clears the input. Save stores local configuration only: it

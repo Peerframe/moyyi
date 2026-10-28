@@ -131,15 +131,17 @@ The desktop uses actual runtime commands/events; scripted tests and live task ev
 separate. Original task standards stay intact; an honest limited candidate may be inspected
 before M4, but the full target is not complete while its required source-analysis task fails.
 
-**Current bounded work: test an isolated evidence candidate inside the original budget.**
-The owner has authorized further diagnosis and one new mechanism after PR47's draft delivery.
-[ADR 0041](decisions/0041-isolated-evidence-review.md) records a default-off candidate: at most6
-investigation requests plus one isolated evidence pass and one final answer, sharing the original8
-request/300-second/8192 limits. No old assistant draft, reasoning or hidden rubric enters the
-isolated pass. Provenance checks are not truth checks. Offline/package evidence precedes one new
-original-task trial; only strict PASS opens the unchanged public tasks. There is no additional
-paid diagnostic group, retry loop, default-model change or public release. The following old
-trial remains sealed, and M4 merge/installation remains conditional on its original gates.
+**Current result: the isolated-evidence candidate was withdrawn; M4 is still unaccepted.**
+[ADR 0041](decisions/0041-isolated-evidence-review.md) preserves the whole-chain diagnosis and
+one new experiment, not an enabled feature. Candidate `32545fc` used6 actual Kimi high requests
+under the unchanged8/300/8192 limits. The sixth response was interrupted at the original time
+limit; partial visible text was retained, but neither evidence review nor final-answer stage ran.
+There is no complete answer to grade, so this does not establish a repair of the two old omissions
+or a semantic verdict on isolated review. The two conditional public tasks remain untriggered.
+The trial is sealed without retries or quota transfer. Product/runtime/UI experiment code was
+removed; the retained engineering improvement makes packaged settings checks pass through the
+actual desktop communication boundary. Flash defaults and daily M3 remain unchanged. PR47 stays
+draft and unmerged; no public release. The earlier completed-answer result below is separate.
 
 The new actual-desktop Kimi high trial used5 requests and22 successful read tools in138.996 seconds,
 within8/300/8192 and zero retries. Source bytes were unchanged and the answer ended normally.

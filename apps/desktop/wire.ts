@@ -97,13 +97,7 @@ export function isDesktopState(s: unknown): s is DesktopState {
   )
     return false;
   if (
-    !object(s.settings, [
-      "preset",
-      "maxRequests",
-      "timeoutMs",
-      "kimiReasoningEffort",
-      "answerReview",
-    ]) ||
+    !object(s.settings, ["preset", "maxRequests", "timeoutMs", "kimiReasoningEffort"]) ||
     !choice(s.settings.preset, ["flash", "kimi-cn", "kimi-global"]) ||
     !integer(s.settings.maxRequests) ||
     Number(s.settings.maxRequests) < 1 ||
@@ -113,9 +107,7 @@ export function isDesktopState(s: unknown): s is DesktopState {
     Number(s.settings.timeoutMs) > 300_000 ||
     (s.settings.kimiReasoningEffort !== undefined &&
       !choice(s.settings.kimiReasoningEffort, ["low", "high"])) ||
-    (s.settings.preset === "flash" && s.settings.kimiReasoningEffort === "high") ||
-    (Object.hasOwn(s.settings, "answerReview") && typeof s.settings.answerReview !== "boolean") ||
-    (s.settings.answerReview === true && Number(s.settings.maxRequests) < 4)
+    (s.settings.preset === "flash" && s.settings.kimiReasoningEffort === "high")
   )
     return false;
   const hash = (value: unknown) => typeof value === "string" && /^[a-f0-9]{64}$/.test(value);

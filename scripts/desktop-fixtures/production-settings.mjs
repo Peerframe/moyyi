@@ -288,35 +288,18 @@ async function verify() {
     cases.push(
       "explicit Kimi high persists/restarts at 8 requests/300 seconds without credentials, replay or restored grants",
     );
-    const reviewed = { ...high, answerReview: true };
-    await worker.request({ type: "configure", settings: reviewed });
-    await worker.close();
-    worker = await launch();
-    assert.deepEqual(worker.state().settings, reviewed);
-    assert.equal(worker.state().budgets.maxRequests, 8);
-    assert.deepEqual(worker.state().permissions, { writes: false, checks: false });
-    await assert.rejects(
-      worker.request({
-        type: "configure",
-        settings: { ...reviewed, maxRequests: 3 },
-      }),
-    );
-    assert.deepEqual(JSON.parse(readFileSync(savedPath, "utf8")).settings, reviewed);
-    cases.push(
-      "explicit evidence review persists without new requests, rejects insufficient total budget, and grants no authority",
-    );
     const validState = await worker.getState();
     worker.injectState({
       ...validState,
-      settings: { ...validState.settings, answerReview: "true" },
+      settings: { ...validState.settings, preset: "unsupported" },
     });
     await assert.rejects(worker.getState(), /无效数据|意外停止/);
     await worker.close();
     worker = await launch();
-    assert.deepEqual(worker.state().settings, reviewed);
+    assert.deepEqual(worker.state().settings, high);
     assert.equal(worker.state().connection.ready, false);
     cases.push(
-      "actual DesktopProcess accepts review-enabled save/restart state and rejects nonboolean worker settings before forwarding",
+      "actual DesktopProcess accepts high save/restart state and rejects an invalid worker preset before forwarding",
     );
     await worker.request({
       type: "configure",
