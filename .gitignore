@@ -11,3 +11,8 @@ evals/results/
 !evals/tasks/remaining-work/fixture/progress.log
 .DS_Store
 evals/private/
+# Brand history and source archives stay local; only the selected brandkit is tracked.
+design/brand/*.zip
+design/brand/2026-10-28-v1/
+design/brand/2026-10-28-chibi-v2/
+design/brand/2026-10-28-logo-directions/
