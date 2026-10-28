@@ -36,6 +36,20 @@ export function UsageGuide({
       </p>
       <div className="guide-workflows">
         <section>
+          <h3>读取网页与核对来源</h3>
+          <ol>
+            <li>任务空闲时打开「网页访问」，填写确切 HTTPS 来源并选择 DNS；在系统窗口确认。</li>
+            <li>在任务中提供完整网页 URL 与问题。每次 GET 先核对目标和预览，再批准或拒绝。</li>
+            <li>
+              展开「网页来源」，对照实际返回正文、URL、HTTP 状态、记录时间和截断标记核对回答。
+            </li>
+          </ol>
+          <p>
+            默认不联网。Cloudflare DoH 会向 Cloudflare
+            发送主机名；网页正文会进入所选模型的上下文。不登录、不执行网页脚本、不自动跟随跳转，也不自动事实核验。打开历史来源不会重新请求网页。
+          </p>
+        </section>
+        <section>
           <h3>读取项目</h3>
           <ol>
             <li>选择项目目录，说明你想理解的问题和范围。</li>

@@ -37,6 +37,25 @@ export interface DesktopPermissions {
   readonly writes: boolean;
   readonly checks: boolean;
 }
+export interface DesktopWebAccess {
+  readonly allowedOrigins: readonly string[];
+  readonly dns: "system" | "cloudflare-doh";
+}
+/** Recorded tool observations, not verified claims or webpage publication dates. */
+export interface DesktopWebSource {
+  readonly id: string;
+  readonly entryId: string;
+  readonly callId: string;
+  readonly url: string;
+  readonly status: number;
+  readonly contentType: string;
+  readonly title: string | null;
+  readonly text: string;
+  readonly truncated: boolean;
+  readonly displayTruncated: boolean;
+  readonly recordedAt: string;
+  readonly textSha256: string;
+}
 export interface DesktopEffect {
   readonly effectId: string;
   readonly runId: string;
@@ -97,6 +116,8 @@ export interface DesktopState {
   readonly materials: readonly DesktopMaterial[];
   readonly reportTarget: string | null;
   readonly permissions: DesktopPermissions;
+  readonly webAccess: DesktopWebAccess;
+  readonly sources: { readonly items: readonly DesktopWebSource[]; readonly truncated: boolean };
   readonly openedHistory: boolean;
   readonly effects: {
     readonly items: readonly DesktopEffect[];
@@ -157,6 +178,7 @@ export type DesktopCommand =
       readonly writes: boolean;
       readonly checks: boolean;
     }
+  | ({ readonly type: "web.permissions"; readonly sessionId: string } & DesktopWebAccess)
   | { readonly type: "effects"; readonly sessionId: string; readonly offset: number }
   | { readonly type: "effect.inspect"; readonly sessionId: string; readonly effectId: string }
   | { readonly type: "materials"; readonly sessionId: string; readonly paths: readonly string[] }
@@ -171,7 +193,14 @@ export type DesktopCommand =
 export type DesktopAction = Exclude<
   DesktopCommand,
   {
-    readonly type: "create" | "close" | "configure" | "materials" | "report.target" | "permissions";
+    readonly type:
+      | "create"
+      | "close"
+      | "configure"
+      | "materials"
+      | "report.target"
+      | "permissions"
+      | "web.permissions";
   }
 >;
 
@@ -205,6 +234,9 @@ export interface DesktopBridge {
   selectReportTarget(options: { readonly sessionId: string }): Promise<DesktopState>;
   configurePermissions(
     options: DesktopPermissions & { readonly sessionId: string },
+  ): Promise<DesktopState>;
+  configureWebAccess(
+    options: DesktopWebAccess & { readonly sessionId: string },
   ): Promise<DesktopState>;
   revealArtifact(options: {
     readonly sessionId: string;

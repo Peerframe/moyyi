@@ -9,6 +9,8 @@ const state: DesktopState = {
   materials: [],
   reportTarget: null,
   permissions: { writes: false, checks: false },
+  webAccess: { allowedOrigins: [], dns: "system" },
+  sources: { items: [], truncated: false },
   openedHistory: false,
   effects: { items: [], offset: 0, hasMore: false },
   effectInspection: null,
@@ -29,6 +31,103 @@ const state: DesktopState = {
   error: null,
 };
 describe("desktop wire data", () => {
+  it("accepts bounded recorded web sources while rejecting malformed permissions and projections", () => {
+    const source = {
+      id: "entry:call",
+      entryId: "entry",
+      callId: "call",
+      url: "https://example.com/source",
+      status: 200,
+      contentType: "text/plain",
+      title: null,
+      text: "<script>inert</script>",
+      truncated: false,
+      displayTruncated: false,
+      recordedAt: "2026-10-28T01:02:03.000Z",
+      textSha256: `sha256:${"a".repeat(64)}`,
+    };
+    const candidate = {
+      ...state,
+      webAccess: { allowedOrigins: ["https://example.com"], dns: "cloudflare-doh" },
+      sources: { items: [source], truncated: false },
+    };
+    expect(isWorkerMessage(JSON.parse(JSON.stringify({ type: "state", state: candidate })))).toBe(
+      true,
+    );
+    for (const webAccess of [
+      { ...candidate.webAccess, dns: "custom" },
+      { ...candidate.webAccess, remembered: true },
+      ...[
+        "http://example.com",
+        "https://example.com/",
+        "https://example.com/path",
+        "https://example.com:8443",
+        "https://example.com?x=1",
+        "https://user@example.com",
+        "https://127.0.0.1",
+        "https://[::1]",
+        "https://x.local",
+        "https://EXAMPLE.com",
+        "https://example.com\\x",
+        "https://example.com\n",
+      ].map((origin) => ({ ...candidate.webAccess, allowedOrigins: [origin] })),
+      { ...candidate.webAccess, allowedOrigins: ["https://example.com", "https://example.com"] },
+      {
+        ...candidate.webAccess,
+        allowedOrigins: Array.from({ length: 9 }, (_, i) => `https://site${i}.com`),
+      },
+    ])
+      expect(isDesktopState({ ...candidate, webAccess })).toBe(false);
+    for (const changed of [
+      { id: "different" },
+      { entryId: "" },
+      { callId: "x".repeat(129) },
+      { url: "javascript:alert(1)" },
+      { status: 301 },
+      { status: 200.1 },
+      { title: "x".repeat(513) },
+      { contentType: "x".repeat(513) },
+      { text: "x".repeat(16_385) },
+      { text: "\ud800" },
+      { recordedAt: "2026-10-28" },
+      { textSha256: "a".repeat(64) },
+      { displayTruncated: "true" },
+      { truncated: undefined },
+      { authority: true },
+    ])
+      expect(
+        isDesktopState({
+          ...candidate,
+          sources: { items: [{ ...source, ...changed }], truncated: false },
+        }),
+      ).toBe(false);
+    expect(
+      isDesktopState({ ...candidate, sources: { items: Array(21).fill(source), truncated: true } }),
+    ).toBe(false);
+    // The whole projection limit counts UTF-8 bytes rather than JavaScript code units.
+    expect(
+      isDesktopState({
+        ...candidate,
+        sources: {
+          items: Array(6).fill({ ...source, text: "汉".repeat(16_384) }),
+          truncated: true,
+        },
+      }),
+    ).toBe(false);
+    const longUrl = `https://example.com/${"x".repeat(5000)}`;
+    expect(
+      isDesktopState({
+        ...candidate,
+        sources: { items: [{ ...source, url: longUrl }], truncated: true },
+      }),
+    ).toBe(true);
+    expect(
+      isDesktopState({
+        ...candidate,
+        sources: { items: [{ ...source, url: `${longUrl}${"x".repeat(4000)}` }], truncated: true },
+      }),
+    ).toBe(false);
+  });
   it("round-trips evidence answer through the actual state schema without accepting invalid flags", () => {
     const settings = { ...state.settings, evidenceAnswer: true };
     expect(

@@ -144,6 +144,14 @@ Enforced by [tests/boundaries.ts](../tests/boundaries.ts):
   policy still enforce behavior. Test-only Vitest and React server rendering do not widen
   production imports.
 
+### Desktop M5 web and sources boundary
+
+M5 keeps this client boundary: a named, doubly validated native-confirmed bridge command grants
+temporary exact web origins. The host composes the existing WebPolicy with its local policy and
+the existing network capability; no renderer networking is enabled. Recorded successful fetch
+results supply a bounded source projection, independently of assistant claims. Settings and
+persisted contracts are unchanged. See [ADR0043](decisions/0043-desktop-web-sources.md).
+
 ### Desktop M2 host boundary
 
 [ADR 0038](decisions/0038-desktop-materials-and-reports.md) keeps the existing client/runtime

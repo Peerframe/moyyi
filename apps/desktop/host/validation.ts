@@ -2,6 +2,7 @@ import { Buffer } from "node:buffer";
 import { isAbsolute } from "node:path";
 import type { DesktopCommand } from "../shared.ts";
 import { parseSettings, validateApiKey } from "./settings-schema.ts";
+import { normalizeDesktopWebAccess } from "./web.ts";
 
 const invalid = () => new Error("Invalid desktop command");
 const containsControl = (value: string) =>
@@ -96,6 +97,15 @@ export function parseDesktopCommand(value: unknown): DesktopCommand {
       )
         throw invalid();
       return { type: "materials", sessionId: input.sessionId, paths: [...input.paths] };
+    case "web.permissions": {
+      exact(["type", "sessionId", "allowedOrigins", "dns"]);
+      if (!identifier(input.sessionId)) throw invalid();
+      const access = normalizeDesktopWebAccess({
+        allowedOrigins: input.allowedOrigins,
+        dns: input.dns,
+      });
+      return { type: "web.permissions", sessionId: input.sessionId, ...access };
+    }
     case "permissions":
       exact(["type", "sessionId", "writes", "checks"]);
       if (

@@ -1,7 +1,12 @@
 # Authorized web fetch and search
 
-The phase 5 branch adds `web_fetch` and `web_search`. They are registered by the runtime but
+The runtime provides `web_fetch` and `web_search`. They are registered by the runtime but
 unavailable without an explicit host grant. Selecting DeepSeek/Anthropic does not enable them.
+
+The M5 desktop candidate exposes specified-page fetch through **网页访问** and a recorded-source
+panel. Desktop search remains disabled; it does not select a public search instance. See
+[desktop usage](desktop.md#web-pages-and-recorded-sources-m5) and
+[ADR0043](decisions/0043-desktop-web-sources.md). CLI configuration below remains independent.
 
 Add the following to an existing trusted host configuration:
 

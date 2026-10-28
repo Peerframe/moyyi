@@ -41,6 +41,21 @@ in the [system overview](system-overview.md); the Chinese
 owner-facing brief is in the existing [delivery record](tasks/2026-10-26-optimization-plan.md).
 This roadmap is the implementation sequence, not another task queue alongside those records.
 
+### M5: specified web pages and recorded sources
+
+Selected by the owner on2026-10-28. Build one complete desktop flow on merged M4: authorize
+exact HTTPS sites for the current session, approve each request, inspect actual recorded text,
+then create/read back and open a separately approved report. Keep web grants ephemeral and
+independent of model, file and command grants. Show source URLs, HTTP status, record times and
+truncation without claiming automatic fact verification. Reuse the current web transport and
+OpenBot-adapted approval/result components. Search services, authenticated browsing and link
+crawling remain outside this delivery.
+
+Completion requires focused authority/lifecycle tests, unchanged full checks and CI, actual
+external-package verification, native interaction acceptance and the frozen public-source report
+task in the [M5 record](tasks/2026-10-28-desktop-m5.md). M4's owner exception does not waive M5
+checks or regrade the original source task. See [ADR0043](decisions/0043-desktop-web-sources.md).
+
 ### What counts as the product
 
 The first candidate serves one local owner and one agent, with multiple recoverable conversations.

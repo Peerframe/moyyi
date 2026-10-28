@@ -1,7 +1,12 @@
 /* Long-list folding adapted from OpenBot TaskSteps.tsx at
  * 010439bb9002fabb7e1facd8450ee85edbafa309. Copyright (c) 2026 OpenBot contributors.
  * MIT; see OPENBOT-LICENSE.txt. Rows here are recorded effects, never inferred task stages. */
-import type { DesktopEffect, DesktopPermissions, DesktopState } from "../shared.ts";
+import type {
+  DesktopEffect,
+  DesktopPermissions,
+  DesktopState,
+  DesktopWebAccess,
+} from "../shared.ts";
 
 export function visibleEffects(items: readonly DesktopEffect[], expanded: boolean) {
   return expanded || items.length <= 12 ? items : [...items.slice(0, 3), ...items.slice(-6)];
@@ -30,13 +35,19 @@ export function appendReviewDraft(current: string, addition: string): string {
   return current.trim() ? `${current}\n\n${addition}` : addition;
 }
 
-export function permissionLabel(permissions: DesktopPermissions, reportTarget: string | null) {
-  if (reportTarget)
-    return `可读工作目录；仅可审批创建报告：${reportTarget} · 不执行命令、不访问网页`;
+export function permissionLabel(
+  permissions: DesktopPermissions,
+  reportTarget: string | null,
+  webAccess?: DesktopWebAccess,
+) {
+  const web = webAccess?.allowedOrigins.length
+    ? `网页读取限 ${webAccess.allowedOrigins.length} 个来源，逐次批准（${webAccess.dns === "system" ? "系统 DNS" : "Cloudflare DoH"}）`
+    : "不访问网页";
+  if (reportTarget) return `可读工作目录；仅可审批创建报告：${reportTarget} · 不执行命令、${web}`;
   return [
     permissions.writes ? "工作目录文件修改需逐次批准" : "工作目录文件只读",
     permissions.checks ? "Node 命令检查需逐次批准（目录只读、无网络）" : "不执行命令",
-    "不访问网页",
+    web,
   ].join(" · ");
 }
 

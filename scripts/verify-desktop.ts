@@ -99,6 +99,7 @@ try {
     "host.mjs",
     "host-m2.mjs",
     "host-m3.mjs",
+    "host-m5.mjs",
     "production-settings.mjs",
     "kimi-errors.mjs",
     "phase-deadline.mjs",
@@ -173,6 +174,25 @@ try {
   assert.equal(editsAndRecovery.credentialReads, 0);
   assert.equal(editsAndRecovery.networkAttempts, 0);
   assert.equal(editsAndRecovery.liveModel, false);
+  const webWorkspace = join(temporary, "web-workspace");
+  mkdirSync(webWorkspace);
+  const webSources = JSON.parse(
+    run(node, [
+      "--no-experimental-strip-types",
+      join(fixture, "host-m5.mjs"),
+      webWorkspace,
+      join(temporary, "m5-private"),
+    ]),
+  );
+  assert.equal(webSources.passed, true);
+  assert.equal(webSources.count, 5);
+  assert.equal(webSources.cases.length, webSources.count);
+  assert.equal(webSources.syntheticRequests, 10);
+  assert.equal(webSources.syntheticDns, 2);
+  assert.equal(webSources.syntheticHttp, 2);
+  assert.equal(webSources.credentialReads, 0);
+  assert.equal(webSources.networkAttempts, 0);
+  assert.equal(webSources.liveModel, false);
   const settingsWorkspace = join(temporary, "settings-workspace");
   mkdirSync(settingsWorkspace);
   const productionSettings = JSON.parse(
@@ -255,6 +275,7 @@ try {
         materialsAndReports,
         editsAndRecovery,
         productionSettings,
+        webSources,
         kimiErrors,
         phaseDeadline,
         maintenance,

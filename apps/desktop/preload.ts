@@ -30,6 +30,7 @@ const bridge: DesktopBridge = {
   selectDocuments: (options) => state(ipcRenderer.invoke("moyyi:documents", options)),
   selectReportTarget: (options) => state(ipcRenderer.invoke("moyyi:report-target", options)),
   configurePermissions: (options) => state(ipcRenderer.invoke("moyyi:permissions", options)),
+  configureWebAccess: (options) => state(ipcRenderer.invoke("moyyi:web-permissions", options)),
   revealArtifact: (options) => state(ipcRenderer.invoke("moyyi:reveal-artifact", options)),
   subscribe(listener: (snapshot: DesktopState) => void) {
     const handler = (_event: Electron.IpcRendererEvent, value: unknown) => {
