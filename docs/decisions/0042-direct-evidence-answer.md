@@ -1,9 +1,8 @@
 # ADR 0042: One direct evidence answer within the original budget
 
-Status: excluded from M4 delivery after the independently authorized deadline-limited retest,
-2026-10-28. The default-off experimental source remains on the unmerged draft for review; it
-has no complete live final answer and is not installed in the daily product. Both earlier
-failures and the latest independent result remain sealed.
+Status: a separately authorized phase-deadline revision is under validation, 2026-10-28.
+The default-off experiment remains unmerged and excluded from the daily product until every
+M4 gate passes. All earlier failures stay sealed; a new scheduling policy is not a semantic pass.
 
 ## Evidence and hypothesis
 
@@ -33,14 +32,30 @@ with a self-contained question. Existing user history is rejected before mutatio
 steering is rejected because references to an excluded assistant draft could lose their meaning.
 Cancel and use a new session, or disable the option to continue ordinary history.
 
-The existing investigation loop is retained. At a safe request boundary, a completed draft,
-the last available request, or elapsed time of at least half the run limit selects one final
-answer. The half-time boundary is a transparent scheduling policy, not a latency prediction:
-a slow in-flight request or later generation can still exhaust the original deadline. No
-request is cancelled and restarted to make room. All calls, including the final answer, share
-the original request/output/time bounds. This opt-in path disables automatic retries, even if
-the host's ordinary retry allowance is nonzero. No final retry or new tool execution is permitted.
-Refusal, error, cancellation and truncated output do not start another answer attempt.
+The investigation phase has an absolute deadline at one third of the original run timeout
+(100 seconds for a300-second run). A completed draft or the last available request can select
+one final answer earlier. At the phase deadline, core stops the investigation request and new
+tool admissions. It retains interrupted output, cancels unexecuted calls and drops replay data.
+Already executing tools keep the original run signal and must settle; unknown effects prevent
+handoff. Pending approvals stop at the phase boundary and late replies cannot launch a tool.
+
+Before final inference, the previous stream and optional recording sink must settle under the
+original run deadline and a separate one-second cleanup cap. Failed or stuck cleanup stops the
+run instead of overlapping requests. The final request contains the original question and all
+actual observations, never resumes the cancelled draft and is never retried. Provider errors,
+refusals, truncated output, user cancellation and the global timeout remain terminal; only the
+host's investigation cutoff permits this phase transition. A phase abort cannot erase an earlier
+terminal outcome, including one withheld by recording acknowledgement or transport cleanup.
+Only validated late failure facts can block the handoff; late content and calls are discarded.
+An already received HTTP failure is not turned into a retryable phase interruption. User cancel
+still wins through the original run signal. All calls count against the original request/output/time limits.
+
+The1/3 allocation is a fixed host scheduling policy: one final generation must process all
+observations without fallback, so it receives the larger remaining window. It is not an upstream
+recommended number or measured latency guarantee. Settling tools, persistence and final inference
+can still exhaust the original timeout; early cutoff may leave insufficient evidence. The default
+loop is unchanged, and this opt-in path disables automatic retries even if ordinary retries were
+configured. No new prompt, model, output limit, final tool execution or extra budget is introduced.
 
 Context projects all original user input and paired tool calls/results, including statuses,
 raw arguments, source identities and exact returned content. It retains all context sections
@@ -124,3 +139,32 @@ not a substitute for the predeclared independent final answer. No semantic pass,
 merge or daily installation follows; unused requests are sealed. The next repair must address
 time allocation and answer construction, not add retrieval, prompt variants or quota. Flash
 settings were restored byte for byte and the daily M3 app remains unchanged.
+
+
+## Absolute phase deadline follow-up (2026-10-28)
+
+The owner authorized one new independent original-task retest after offline verification, with
+8 requests,300 seconds,8192 output and zero retries. Preserve the original source/question/rubric,
+Kimi CN high for this opt-in trial, Flash as the daily default and every sealed failure. This
+revision changes scheduling and settlement, not the evidence projection or prompts.
+
+Targeted primary-source review informed the boundary, with no copied code or added dependency:
+
+- [Pydantic AI](https://github.com/pydantic/pydantic-ai/blob/bc2213364ca0318f4077110bbc9c240c0ee2f7cd/pydantic_ai_slim/pydantic_ai/models/_request_timeout.py#L55-L96),
+  MIT, commit `bc2213364ca0318f4077110bbc9c240c0ee2f7cd`: an absolute request deadline covers
+  opening and streamed reads; each chunk does not refresh it. Its
+  [tests](https://github.com/pydantic/pydantic-ai/blob/bc2213364ca0318f4077110bbc9c240c0ee2f7cd/tests/test_request_timeout.py#L118-L204)
+  distinguish timeout/cancellation and interrupted output. It does not reserve final-answer time.
+- [LangGraph](https://github.com/langchain-ai/langgraph/blob/eb8ec111b3e9d3108af5d7bdcac51e3e913637a0/libs/langgraph/langgraph/pregel/_retry.py#L418-L518),
+  MIT, commit `eb8ec111b3e9d3108af5d7bdcac51e3e913637a0`: the watchdog closes the write scope
+  before cancellation; [late-write tests](https://github.com/langchain-ai/langgraph/blob/eb8ec111b3e9d3108af5d7bdcac51e3e913637a0/libs/langgraph/tests/test_retry.py#L1091-L1200)
+  illustrate rejecting late results. Framework cancellation cannot undo external effects, hence
+  moyyi waits for already started tools rather than treating them as safely rolled back.
+- [AutoGen](https://github.com/microsoft/autogen/blob/004749e6b7102c8fd317b9b1499ce5807223c278/python/packages/autogen-agentchat/tests/test_termination_condition.py#L281-L298),
+  code MIT, commit `004749e6b7102c8fd317b9b1499ce5807223c278`: elapsed-time termination is
+  checked on invocation after replies. It retains the boundary-only gap observed here, so it is
+  not adopted as the deadline mechanism. No upstream tests were run locally.
+
+Offline and new live results are recorded in the existing [M4 receipt](../tasks/2026-10-28-desktop-m4.md).
+A passing synthetic timing trace establishes scheduling behavior, not answer correctness. Only
+the independent final answer is graded; earlier drafts cannot substitute for it.

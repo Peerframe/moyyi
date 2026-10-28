@@ -242,7 +242,10 @@ call before preparation/execution. An absent, truncated or tool-only final answe
 
 [ADR 0042](decisions/0042-direct-evidence-answer.md) adds an experimental, default-off
 `evidenceAnswer` option for fresh self-contained sessions. Core can transition once to an answer
-at a completed draft, last request or half-time request boundary; context projects the original
+at a completed draft, last request or absolute one-third investigation deadline. New tool
+admissions stop at that deadline; started effects settle under the original run signal. The old
+stream and recorder must close within a one-second cleanup cap before final inference. Errors,
+user cancellation and the original global deadline remain terminal. Context projects the original
 user input and all paired observations without prior assistant interpretations. Context keeps
 all sections/effects and refuses oversized inputs. Existing records preserve the original
 history and the `moyyi-evidence-answer-v1` request. No extra budget, final tool execution,

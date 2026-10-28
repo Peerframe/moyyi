@@ -20,7 +20,6 @@ export async function classifyKimi429(
   } catch {
     // Diagnostic failures must retain the original HTTP 429, never become network errors.
   }
-  if (hostSignal.aborted) return { kind: "cancelled", message: "Kimi request cancelled" };
   switch (type) {
     case "engine_overloaded_error":
       return {

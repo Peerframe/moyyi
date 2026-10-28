@@ -103,7 +103,8 @@ export class RecordingModelClient implements ModelClient {
 
   /** Explicit host shutdown/idle barrier; cancellation itself does not wait for custom I/O. */
   async flush(): Promise<void> {
-    await Promise.all([...this.pending]);
+    // Finalizing an exchange may register provider cleanup after this wait began.
+    while (this.pending.size) await Promise.all([...this.pending]);
     const error = this.finalizationErrors.shift();
     if (error) throw error;
   }
@@ -138,7 +139,49 @@ export class RecordingModelClient implements ModelClient {
         if (signal.aborted) throw aborted();
         iterator = this.client.stream(copy(saved), signal)[Symbol.asyncIterator]();
         for (;;) {
-          const step = await next(iterator, signal);
+          const prefixLength = events.length;
+          const sizeBefore = size;
+          const afterTerminal = terminal !== undefined;
+          const step = await next(iterator, signal, (read) => {
+            const pending = read
+              .then(
+                (late) => {
+                  if (!signal.aborted || late.done) return;
+                  try {
+                    if (afterTerminal) throw Error("Event after terminal");
+                    if (late.value.type !== "error" && late.value.type !== "completed") return;
+                    const event = copy(late.value);
+                    assertEvent(event);
+                    if (
+                      prefixLength >= MAX_RECORDING_EVENTS - 1 ||
+                      sizeBefore + bytes(event) > MAX_RECORDING_BYTES - reserve ||
+                      checkModelStream([...events.slice(0, prefixLength), event]).length
+                    )
+                      throw Error("Invalid deferred terminal");
+                    if (
+                      (event.type === "error" && event.error.kind !== "cancelled") ||
+                      (event.type === "completed" &&
+                        !["end_turn", "tool_use"].includes(event.stopReason))
+                    )
+                      this.finalizationErrors.push(
+                        Error("Recording observed a terminal failure during cancellation"),
+                      );
+                  } catch {
+                    this.finalizationErrors.push(
+                      Error("Recording observed an invalid terminal during cancellation"),
+                    );
+                  }
+                },
+                () => {
+                  if (signal.aborted)
+                    this.finalizationErrors.push(
+                      Error("Recording provider read failed during cancellation"),
+                    );
+                },
+              )
+              .finally(() => this.pending.delete(pending));
+            this.pending.add(pending);
+          });
           if (step.done) {
             finished = true;
             break;
@@ -153,8 +196,11 @@ export class RecordingModelClient implements ModelClient {
             throw Error("Recording stream exceeds its resource limit");
           state.accept(event);
           size += bytes(event);
-          if (isTerminal(event)) terminal = event;
-          else {
+          if (isTerminal(event)) {
+            if (checkModelStream([...events, event]).length)
+              throw Error("Provider stream violates the model contract");
+            terminal = event;
+          } else {
             events.push(event);
             yield copy(event);
           }
@@ -163,25 +209,47 @@ export class RecordingModelClient implements ModelClient {
         if (!terminal) throw Error("Provider stream ended without a terminal");
         if (checkModelStream([...events, terminal]).length)
           throw Error("Provider stream violates the model contract");
-      } catch {
+      } catch (cause) {
         // Provider exception strings may contain authorization data; diagnostics stay fixed.
-        terminal = failure(
-          signal.aborted ? "cancelled" : "protocol",
-          signal.aborted
-            ? "Model recording cancelled"
-            : "Provider stream could not be recorded safely",
-          events.length > 0 || declaredPartial(terminal),
-          terminalUsage(terminal),
-        );
+        const cancelled = cause instanceof RecordingCancellation;
+        if (!cancelled || !terminal)
+          terminal = failure(
+            cancelled ? "cancelled" : "protocol",
+            cancelled
+              ? "Model recording cancelled"
+              : "Provider stream could not be recorded safely",
+            events.length > 0 || declaredPartial(terminal),
+            terminalUsage(terminal),
+          );
       }
       collected = true;
     } finally {
+      if (!finished && iterator && !iterator.return)
+        this.finalizationErrors.push(Error("Recording provider cannot confirm closure"));
       if (!finished && iterator?.return) {
-        // A broken provider may ignore cancellation; do not wait indefinitely for its iterator.
+        // Cancellation stays prompt; an explicit host barrier must still settle the provider
+        // before another request can start. Core bounds that barrier during phase transitions.
         try {
-          void Promise.resolve(iterator.return()).catch(() => {});
+          const cleanup = Promise.resolve(iterator.return())
+            .then(
+              (result) => {
+                if (result?.done !== true)
+                  this.finalizationErrors.push(
+                    Error("Recording provider iterator did not close during finalization"),
+                  );
+              },
+              () => {
+                this.finalizationErrors.push(
+                  Error("Recording provider cleanup failed during finalization"),
+                );
+              },
+            )
+            .finally(() => this.pending.delete(cleanup));
+          this.pending.add(cleanup);
         } catch {
-          /* best effort */
+          this.finalizationErrors.push(
+            Error("Recording provider cleanup failed during finalization"),
+          );
         }
       }
       // iterator.return() jumps directly here while a yielded delta is suspended. Persist the
@@ -217,12 +285,14 @@ export class RecordingModelClient implements ModelClient {
         try {
           await this.sink.invalidate(writeId);
         } catch {
-          if (!collected)
+          if (!collected || signal.aborted)
             this.finalizationErrors.push(
               Error("Recording invalidation failed during finalization"),
             );
         }
-        if (!collected)
+        // Core can stop consuming while a collected terminal is waiting on the sink. In that
+        // case no yielded failure is observable; the host's settlement barrier must fail.
+        if (!collected || signal.aborted)
           this.finalizationErrors.push(Error("Recording sink failed during stream finalization"));
       }
     }
@@ -779,12 +849,14 @@ function failure(
 ): ModelStreamEvent {
   return { type: "error", error: { kind, message, partialOutput, usage: availableUsage } };
 }
+class RecordingCancellation extends Error {}
 function aborted(): Error {
-  return new Error("Cancelled");
+  return new RecordingCancellation("Cancelled");
 }
 async function next(
   iterator: AsyncIterator<ModelStreamEvent>,
   signal: AbortSignal,
+  track: (read: Promise<IteratorResult<ModelStreamEvent>>) => void,
 ): Promise<IteratorResult<ModelStreamEvent>> {
   if (signal.aborted) throw aborted();
   let cancel: (() => void) | undefined;
@@ -793,7 +865,9 @@ async function next(
     signal.addEventListener("abort", cancel, { once: true });
   });
   try {
-    return await Promise.race([iterator.next(), interrupted]);
+    const read = Promise.resolve(iterator.next());
+    track(read);
+    return await Promise.race([read, interrupted]);
   } finally {
     if (cancel) signal.removeEventListener("abort", cancel);
   }

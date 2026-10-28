@@ -30,6 +30,10 @@ boundary and left about25 seconds for final generation. M4 remains unaccepted; n
 public task, merge or daily installation followed. Flash settings and the daily M3 app are preserved.
 Source checks140/2782, the external package and all three CI lanes passed; engineering success
 does not replace the missing semantic result. The existing M4 receipt retains both failures.
+The newly authorized follow-up changes the experimental phase scheduler: a fixed one-third
+investigation deadline and settled stream/recording handoff reserve the remainder for one final
+answer. Offline validation and one independent8-request/300-second trial are pending; prompts,
+source, rubric, output limit and daily Flash default are unchanged. No new pass is claimed.
 
 | Coordinate | Current evidence |
 |---|---|

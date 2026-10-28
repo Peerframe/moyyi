@@ -7,6 +7,7 @@ import {
   type Plugin,
   type RunOutcome,
   type SessionId,
+  type Timestamp,
   type ToolCallId,
   UNKNOWN_USAGE,
 } from "../../src/contracts/index.ts";
@@ -27,7 +28,7 @@ function text(text: string): ModelStreamEvent[] {
 }
 
 /** Scripted choices test the real runtime/files/store; this does not grade a live model. */
-export async function runEvidenceAnswerScenario(dataflow = false) {
+export async function runEvidenceAnswerScenario(dataflow = false, timed = false) {
   const directory = mkdtempSync(join(tmpdir(), "moyyi-evidence-eval-"));
   const workspace = join(directory, "workspace");
   cpSync((dataflow ? sourceDataflowReport : sourceLifecycleReport).fixtureDir, workspace, {
@@ -38,6 +39,18 @@ export async function runEvidenceAnswerScenario(dataflow = false) {
   let sessionId: SessionId | undefined;
   let outcome: RunOutcome | undefined;
   let requests = 0;
+  const startedAt = Date.parse("2026-10-28T00:00:00Z");
+  let now = startedAt;
+  const timers = new Map<() => void, number>();
+  const advance = (milliseconds: number) => {
+    now += milliseconds;
+    for (const [callback, due] of timers) {
+      if (due > now) continue;
+      timers.delete(callback);
+      callback();
+    }
+  };
+  let investigationClosed = false;
   const draft = "MISLEADING_DRAFT_CANARY: every configuration changes dynamically.";
   const final = "SCRIPTED_FINAL_NOT_A_QUALITY_SCORE";
   const plugin: Plugin = {
@@ -46,7 +59,7 @@ export async function runEvidenceAnswerScenario(dataflow = false) {
     setup(host) {
       host.registerModelProvider({
         id: scriptedProfile.origin.provider,
-        models: [scriptedProfile],
+        models: [timed ? { ...scriptedProfile, maxOutputTokens: 8192 } : scriptedProfile],
         createClient: () => ({
           async *stream(request, signal) {
             signal.throwIfAborted();
@@ -75,8 +88,30 @@ export async function runEvidenceAnswerScenario(dataflow = false) {
               return;
             }
             if (requests === 2) {
-              yield* text(draft);
+              if (timed) {
+                // A streamed draft cannot move the absolute investigation deadline.
+                yield { type: "text_delta", index: 0, text: draft };
+                advance(100_000);
+                assert.equal(signal.aborted, true);
+                investigationClosed = true;
+              } else {
+                yield* text(draft);
+              }
               return;
+            }
+            if (timed) {
+              assert.equal(request.maxOutputTokens, 8192);
+              assert(
+                investigationClosed,
+                "Close the interrupted investigation before final inference",
+              );
+              assert.equal(now - startedAt, 100_000);
+              assert.equal(
+                signal.aborted,
+                false,
+                "The final request uses the original run deadline",
+              );
+              advance(50_000);
             }
             assert.equal(request.toolChoice, "none");
             assert.equal(request.tools.length, 0);
@@ -106,7 +141,29 @@ export async function runEvidenceAnswerScenario(dataflow = false) {
       plugins: [{ plugin }],
       dataDirectory: join(directory, "private-store"),
       evidenceAnswer: true,
-      limits: { maxModelRequests: 3, maxRetries: 0, timeoutMs: 30_000 },
+      limits: {
+        maxModelRequests: timed ? 8 : 3,
+        maxRetries: 0,
+        timeoutMs: timed ? 300_000 : 30_000,
+      },
+      ...(timed
+        ? {
+            clock: { now: () => new Date(now).toISOString() as Timestamp },
+            scheduler: {
+              deadline(milliseconds: number, callback: () => void) {
+                timers.set(callback, now + milliseconds);
+                return () => {
+                  timers.delete(callback);
+                };
+              },
+              async sleep(milliseconds: number, signal: AbortSignal) {
+                signal.throwIfAborted();
+                advance(milliseconds);
+                signal.throwIfAborted();
+              },
+            },
+          }
+        : {}),
     });
     runtime.subscribe((event) => {
       if (event.type === "session.ready") sessionId = event.sessionId;
@@ -133,6 +190,9 @@ export async function runEvidenceAnswerScenario(dataflow = false) {
     return {
       kind: "scripted-direct-evidence",
       dataflow,
+      ...(timed
+        ? { investigationMs: 100_000, elapsedMs: now - startedAt, timeoutMs: 300_000 }
+        : {}),
       requests,
       sourceUnchanged: true,
       noReplay: true,

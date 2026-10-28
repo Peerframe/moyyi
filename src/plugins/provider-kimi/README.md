@@ -41,7 +41,8 @@ select fixed overload, rate-limit or account-quota messages. Raw `message`, `cod
 provider strings are never reflected. Invalid UTF-8/JSON, duplicate keys, missing/unknown types,
 oversized bodies, read failures and diagnostic timeouts retain HTTP 429 with an explicitly
 unknown cause; this uses the existing common `rate_limited` kind without asserting a specific
-account limit. Host cancellation remains `cancelled`. Iterator cleanup and the single response
+account limit. Once an HTTP failure is known, cancellation of its diagnostic read preserves that
+failure; the core still gives user cancellation and the overall run deadline priority. Iterator cleanup and the single response
 close are started without waiting on a stuck cleanup for this path. It makes one transport
 attempt and adds no retry, request or success-stream change. These diagnostics cannot recover
 the subtype of an older HTTP-only failure.

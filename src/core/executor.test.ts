@@ -508,6 +508,91 @@ describe("tool execution pipeline", () => {
 });
 
 describe("cancellation, revocation and storage barriers", () => {
+  it("rejects an expired admission before preparing a tool", async () => {
+    const test = setup();
+    const admission = new AbortController();
+    admission.abort();
+    expect(
+      (await executeCalls([call()], { ...test.host, admissionSignal: admission.signal }))[0]
+        ?.status,
+    ).toBe("cancelled");
+    expect(test.selected.prepare).not.toHaveBeenCalled();
+    expect(test.selected.execute).not.toHaveBeenCalled();
+    expect(test.records).toEqual([]);
+    expect(test.controller.signal.aborted).toBe(false);
+  });
+
+  it.each([
+    "prepare",
+    "intended",
+    "awaiting_approval",
+    "approval",
+    "approved",
+    "lease",
+    "preconditions",
+    "started",
+  ])(
+    "rejects phase-expired admission after await at %s without cancelling the run",
+    async (point) => {
+      const test = setup(tool("workspace_write"));
+      const admission = new AbortController();
+      if (point === "awaiting_approval" || point === "approval")
+        test.host.policy.beforeExecute = () => ({ kind: "ask" });
+      const record = test.host.record;
+      test.host.record = async (effect, result) => {
+        await record(effect, result);
+        if (effect.state === point) admission.abort();
+      };
+      const prepare = test.selected.prepare;
+      test.selected.prepare = async (args, context) => {
+        const action = await prepare(args, context);
+        if (point === "prepare") {
+          admission.abort();
+          expect(context.signal.aborted).toBe(true);
+        }
+        return action;
+      };
+      test.host.approve = async () => {
+        if (point === "approval") admission.abort();
+        return true;
+      };
+      test.host.ensureLease = async () => {
+        if (point === "lease") admission.abort();
+      };
+      test.host.preconditions.check = async () => {
+        if (point === "preconditions") admission.abort();
+        return { valid: true };
+      };
+      const results = await executeCalls([call()], {
+        ...test.host,
+        admissionSignal: admission.signal,
+      });
+      expect(results[0]?.status).toBe("cancelled");
+      expect(test.selected.execute).not.toHaveBeenCalled();
+      expect(test.controller.signal.aborted).toBe(false);
+      if (point === "started") expect(test.records.at(-1)?.state).toBe("failed");
+      if (point !== "prepare") expect(test.settled).toEqual(results);
+    },
+  );
+
+  it("settles an admitted execution and cancels later calls without preparing them", async () => {
+    const test = setup(tool("workspace_write"));
+    const admission = new AbortController();
+    test.selected.execute = vi.fn<ToolDefinition["execute"]>(async (_action, context) => {
+      admission.abort();
+      expect(context.signal.aborted).toBe(false);
+      return { status: "succeeded", content: [] };
+    });
+    const results = await executeCalls([call("test", "first"), call("test", "second")], {
+      ...test.host,
+      admissionSignal: admission.signal,
+    });
+    expect(results.map((result) => result.status)).toEqual(["succeeded", "cancelled"]);
+    expect(test.selected.prepare).toHaveBeenCalledTimes(1);
+    expect(test.selected.execute).toHaveBeenCalledTimes(1);
+    expect(test.records.at(-1)?.state).toBe("succeeded");
+  });
+
   it("does not execute when cancellation wins an approval race", async () => {
     const test = setup();
     test.host.policy.beforeExecute = () => ({ kind: "ask" });

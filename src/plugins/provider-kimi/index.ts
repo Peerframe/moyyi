@@ -71,18 +71,10 @@ export function createKimiClient(transport: KimiTransport, options: KimiOptions 
         return;
       }
       try {
-        if (signal.aborted) {
-          yield error("cancelled", "Kimi request cancelled");
-          return;
-        }
         if (response.status !== 200) {
           if (response.status === 429) {
             const diagnostic = await classifyKimi429(response.body, signal);
-            yield error(
-              diagnostic.kind,
-              diagnostic.message,
-              diagnostic.kind === "cancelled" ? undefined : retryAfter(response.retryAfter),
-            );
+            yield error(diagnostic.kind, diagnostic.message, retryAfter(response.retryAfter));
             return;
           }
           const kind: ModelErrorKind = [401, 402, 403].includes(response.status)
@@ -99,6 +91,10 @@ export function createKimiClient(transport: KimiTransport, options: KimiOptions 
               : `Kimi HTTP ${response.status}`,
             retryAfter(response.retryAfter),
           );
+          return;
+        }
+        if (signal.aborted) {
+          yield error("cancelled", "Kimi request cancelled");
           return;
         }
         if (response.contentType?.split(";")[0]?.trim().toLowerCase() !== "text/event-stream") {

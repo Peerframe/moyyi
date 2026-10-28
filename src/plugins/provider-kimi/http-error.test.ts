@@ -244,7 +244,7 @@ describe("bounded Kimi HTTP 429 diagnostics", () => {
     }
   });
 
-  it("preserves host cancellation while body and cleanup are stalled", async () => {
+  it("preserves a known HTTP failure when cancellation interrupts its stalled diagnostic", async () => {
     const pending = pendingBody();
     const close = vi.fn(() => new Promise<void>(() => {}));
     const controller = new AbortController();
@@ -255,8 +255,9 @@ describe("bounded Kimi HTTP 429 diagnostics", () => {
       {
         type: "error",
         error: {
-          kind: "cancelled",
-          message: "Kimi request cancelled",
+          kind: "rate_limited",
+          message: unknownMessage,
+          retryAfterMs: 3000,
           partialOutput: false,
           usage: UNKNOWN_USAGE,
         },

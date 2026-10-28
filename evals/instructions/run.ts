@@ -26,6 +26,12 @@ try {
       ...(await runEvidenceAnswerScenario(dataflow)),
       passed: true,
     });
+  for (const dataflow of [false, true])
+    results.push({
+      id: `timed-evidence-${dataflow ? "dataflow" : "lifecycle"}`,
+      ...(await runEvidenceAnswerScenario(dataflow, true)),
+      passed: true,
+    });
   if (networkRequests !== 0) throw Error("Instruction conformance attempted network access");
 } finally {
   globalThis.fetch = originalFetch;

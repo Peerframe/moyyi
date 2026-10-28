@@ -74,6 +74,8 @@ export interface CoreDeps {
   readonly limits?: Partial<RunLimits>;
   /** Experimental fresh-session evidence-only final answer; shares the existing run budget. */
   readonly evidenceAnswer?: boolean;
+  /** Acknowledge model recording/transport cleanup before the independent answer phase. */
+  readonly settleModel?: () => Promise<void>;
   readonly files?: WorkspaceFilesFactory;
   readonly documents?: WorkspaceDocumentsFactory;
   readonly processes?: WorkspaceProcessesFactory;
@@ -100,6 +102,12 @@ interface Running {
   pendingSteering: number;
   stopTimer: () => void;
   startedAt: number;
+  investigation?: {
+    readonly controller: AbortController;
+    readonly signal: AbortSignal;
+    expired: boolean;
+    stopTimer: () => void;
+  };
 }
 interface PendingApproval {
   readonly run: Running;
@@ -300,10 +308,31 @@ export class AgentCore {
         run.deadlineExpired = true;
         run.controller.abort();
       });
+      if (!compact && this.#deps.evidenceAnswer) {
+        const controller = new AbortController();
+        const investigation = {
+          controller,
+          signal: AbortSignal.any([run.controller.signal, controller.signal]),
+          expired: false,
+          stopTimer: () => {},
+        };
+        run.investigation = investigation;
+        investigation.stopTimer = this.#deps.scheduler.deadline(
+          Math.max(
+            0,
+            run.startedAt + this.#limits.timeoutMs / 3 - Date.parse(this.#deps.clock.now()),
+          ),
+          () => {
+            investigation.expired = true;
+            controller.abort();
+          },
+        );
+      }
       run.done = Promise.resolve()
         .then(() => this.#drive(run))
         .finally(() => {
           run.stopTimer();
+          run.investigation?.stopTimer();
           this.#running.delete(id);
         });
       if (entry) this.#emit({ type: "entry.appended", entry });
@@ -325,6 +354,7 @@ export class AgentCore {
     const compactionPublished = run.kind === "compaction" && outcome.kind === "completed";
     run.finishing = true;
     run.stopTimer();
+    run.investigation?.stopTimer();
     if (run.deadlineExpired && !compactionPublished)
       outcome = { kind: "budget_exhausted", budget: "time" };
     try {
@@ -419,13 +449,75 @@ export class AgentCore {
     };
   }
 
-  async #collect(run: Running): Promise<readonly ContextSection[]> {
+  async #collect(run: Running, signal = run.controller.signal): Promise<readonly ContextSection[]> {
     try {
-      return (await this.#deps.collect?.(run.workspaceRoot, run.controller.signal)) ?? [];
+      return (await this.#deps.collect?.(run.workspaceRoot, signal)) ?? [];
     } catch (error) {
       if (run.controller.signal.aborted) return [];
+      if (signal.aborted && error instanceof Error && error.name === "AbortError") return [];
       throw error;
     }
+  }
+
+  async #settleInvestigation(
+    run: Running,
+    response: Response | undefined,
+  ): Promise<RunOutcome | undefined> {
+    run.investigation?.stopTimer();
+    const signal = run.controller.signal;
+    signal.throwIfAborted();
+    await new Promise<void>((resolve, reject) => {
+      const abort = () => finish(new Error("Run stopped during investigation cleanup"));
+      let stopTimer = () => {};
+      let finished = false;
+      const finish = (error?: Error) => {
+        if (finished) return;
+        finished = true;
+        stopTimer();
+        signal.removeEventListener("abort", abort);
+        if (error) reject(error);
+        else resolve();
+      };
+      signal.addEventListener("abort", abort, { once: true });
+      stopTimer = this.#deps.scheduler.deadline(1_000, () =>
+        finish(new Error("Investigation cleanup exceeded 1000 ms; answer was not started")),
+      );
+      void (async () => {
+        await response?.settled;
+        if (finished || signal.aborted) return;
+        await this.#deps.settleModel?.();
+        finish();
+      })().catch(() => finish(new Error("Investigation cleanup failed; answer was not started")));
+    });
+    // Recording may have received a terminal but withheld its publication until durable ACK.
+    // Closure exposes only that validated terminal; it never admits late text or tool calls.
+    const terminal = response?.deferredTerminal;
+    if (terminal?.type === "error" && terminal.error.kind !== "cancelled")
+      return { kind: "failed", reason: terminal.error.message };
+    if (terminal?.type === "completed") {
+      if (terminal.stopReason === "max_tokens")
+        return { kind: "budget_exhausted", budget: "model_output_tokens" };
+      if (!["end_turn", "refusal", "tool_use"].includes(terminal.stopReason))
+        return {
+          kind: "failed",
+          reason: `Model response did not complete (stop reason: ${terminal.stopReason})`,
+        };
+      if (terminal.stopReason !== "tool_use") {
+        const hasAnswer = response?.parts.some(
+          (part) => (part.type === "text" || part.type === "refusal") && part.text.trim(),
+        );
+        if (!hasAnswer)
+          return { kind: "failed", reason: "Model response contained no answer text" };
+        if (
+          terminal.stopReason === "refusal" ||
+          response?.parts.some((part) => part.type === "refusal")
+        )
+          return { kind: "completed" };
+      }
+    }
+    if (response?.signalInterrupted && response.parts.some((part) => part.type === "refusal"))
+      return { kind: "failed", reason: response.error?.message ?? "Model stream cancelled" };
+    return undefined;
   }
 
   async #compact(run: Running): Promise<RunOutcome> {
@@ -565,6 +657,8 @@ export class AgentCore {
   async #loop(run: Running): Promise<RunOutcome> {
     let retries = 0;
     let draftReady = false;
+    let lastResponse: Response | undefined;
+    let investigationSettled = false;
     while (!run.controller.signal.aborted) {
       if (run.requests >= this.#limits.maxModelRequests) {
         run.finishing = true;
@@ -572,21 +666,28 @@ export class AgentCore {
       }
       await run.queue;
       const remaining = this.#limits.maxModelRequests - run.requests;
-      // A safe request boundary, not a second deadline: never interrupt/retry a slow request
-      // to create another allowance. The original timer can still prevent a final answer.
-      const timeToAnswer =
-        this.#deps.evidenceAnswer === true &&
-        run.requests > 0 &&
-        Date.parse(this.#deps.clock.now()) - run.startedAt >= this.#limits.timeoutMs / 2;
+      const timeToAnswer = run.investigation?.expired === true;
       const evidenceAnswer =
         this.#deps.evidenceAnswer === true && (draftReady || remaining === 1 || timeToAnswer);
       const finalRequest = remaining === 1 || evidenceAnswer;
+      if (evidenceAnswer && !investigationSettled) {
+        try {
+          const terminalOutcome = await this.#settleInvestigation(run, lastResponse);
+          if (run.controller.signal.aborted) break;
+          if (terminalOutcome) return terminalOutcome;
+        } catch (error) {
+          if (run.controller.signal.aborted) break;
+          throw error;
+        }
+        investigationSettled = true;
+        if (run.controller.signal.aborted) break;
+      }
       if (evidenceAnswer)
         await this.#append(run, {
           kind: "notice",
           code: "evidence_answer",
           text:
-            `Evidence answer: ${draftReady ? "draft ready" : timeToAnswer ? "half of the run time elapsed" : "last request"}. ` +
+            `Evidence answer: ${draftReady ? "draft ready" : timeToAnswer ? "investigation time elapsed" : "last request"}. ` +
             "One tool-free answer from the original question and recorded observations follows within the existing budget. " +
             "Earlier assistant text is retained as investigation, not supplied to this request. This is not task acceptance.",
         });
@@ -616,8 +717,12 @@ export class AgentCore {
         (entry) =>
           entry.runId === run.id && entry.body.kind === "user_message" && entry.body.steering,
       ).length;
-      const sections = await this.#collect(run);
+      const requestSignal = evidenceAnswer
+        ? run.controller.signal
+        : (run.investigation?.signal ?? run.controller.signal);
+      const sections = await this.#collect(run, requestSignal);
       if (run.controller.signal.aborted) break;
+      if (!evidenceAnswer && run.investigation?.expired) continue;
       const contextInput: ContextInput = {
         path: pathToHead(snapshot),
         profile: this.#deps.profile,
@@ -643,14 +748,16 @@ export class AgentCore {
         evidenceAnswer ? "moyyi-evidence-answer-v1" : "moyyi-core-v2",
       );
       if (run.controller.signal.aborted) break;
+      if (!evidenceAnswer && run.investigation?.expired) continue;
       run.requests++;
       const response = await consumeResponse(
         this.#deps.model,
         request,
-        run.controller.signal,
+        requestSignal,
         this.#limits.maxModelResponseBytes,
         (text) => this.#emit({ type: "assistant.delta", runId: run.id, text }),
       );
+      lastResponse = response;
       const used = new Set(
         snapshot.entries.flatMap((entry) =>
           entry.body.kind === "assistant_message"
@@ -704,6 +811,27 @@ export class AgentCore {
       const calls = response.parts.filter(
         (part): part is ToolCallPart => part.type === "tool_call",
       );
+      if (
+        !finalRequest &&
+        run.investigation?.expired &&
+        !run.controller.signal.aborted &&
+        response.signalInterrupted &&
+        response.error?.kind === "cancelled"
+      ) {
+        if (calls.length)
+          await this.#append(run, {
+            kind: "tool_results",
+            results: calls.map((call) => ({
+              type: "tool_result",
+              callId: call.callId,
+              status: "cancelled",
+              content: [
+                { type: "text", text: "Investigation time elapsed; tool was not executed." },
+              ],
+            })),
+          });
+        continue;
+      }
       if (finalRequest && !interrupted && !run.controller.signal.aborted && calls.length) {
         // Pair even a provider-violating call without prepare, approval, journal or execution.
         await this.#append(run, {
@@ -794,6 +922,7 @@ export class AgentCore {
         runId: run.id,
         workspaceRoot: run.workspaceRoot,
         signal: run.controller.signal,
+        ...(run.investigation ? { admissionSignal: run.investigation.signal } : {}),
         tools: this.#deps.tools,
         policy: this.#deps.policy,
         validator: this.#deps.validator,
@@ -809,7 +938,7 @@ export class AgentCore {
         nextEffectId: () => this.#deps.ids.next("effect") as EffectId,
         record: (effect, result) => this.#record(run, effect, result),
         ensureLease: () => this.#ensureLease(run),
-        approve: (effect, action) => this.#approve(run, effect, action),
+        approve: (effect, action) => this.#approve(run, effect, action, run.investigation?.signal),
       };
       const results = await executeCalls(calls, host);
       const missing = results.filter((result) => !run.resultIds.has(result.callId));
@@ -897,12 +1026,17 @@ export class AgentCore {
       run.leased = true;
     });
   }
-  #approve(run: Running, effect: EffectRecord, action: PreparedAction): Promise<boolean> {
-    if (run.controller.signal.aborted) return Promise.resolve(false);
+  #approve(
+    run: Running,
+    effect: EffectRecord,
+    action: PreparedAction,
+    signal = run.controller.signal,
+  ): Promise<boolean> {
+    if (signal.aborted) return Promise.resolve(false);
     return new Promise((resolve) => {
       const finish = (accepted: boolean) => {
         this.#approvals.delete(effect.id);
-        run.controller.signal.removeEventListener("abort", abort);
+        signal.removeEventListener("abort", abort);
         resolve(accepted);
       };
       const abort = () => finish(false);
@@ -912,7 +1046,7 @@ export class AgentCore {
         revision: this.#deps.policy.revision?.() ?? 0,
         resolve: finish,
       });
-      run.controller.signal.addEventListener("abort", abort, { once: true });
+      signal.addEventListener("abort", abort, { once: true });
       this.#emit({
         type: "approval.requested",
         effectId: effect.id,

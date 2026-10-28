@@ -78,6 +78,8 @@ reduce original output limits or add automatic retries as an unproven workaround
 Read only a bounded error body, classify the three exact `error.type` values, and emit fixed
 actionable text. Never expose the provider's arbitrary message, code or raw body. Malformed,
 missing, oversized, stalled or otherwise unreadable diagnostics preserve an unknown429; host
-cancellation still cancels. This adds no model request, dependency, new persistent format or
+cancellation still cancels the run. The phase-deadline follow-up in [ADR0042](0042-direct-evidence-answer.md)
+preserves an already received HTTP failure when its diagnostic read is cancelled, so a known429
+cannot authorize a fresh final request; user cancellation retains priority in core. This adds no model request, dependency, new persistent format or
 retry. An authorized independent acceptance remains necessary to establish service availability
 and answer quality; diagnosing an error is not a semantic pass. No upstream source was copied.

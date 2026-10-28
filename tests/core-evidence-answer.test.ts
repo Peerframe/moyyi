@@ -17,7 +17,7 @@ import {
   type ToolDefinition,
   UNKNOWN_USAGE,
 } from "../src/contracts/index.ts";
-import { AgentCore } from "../src/core/index.ts";
+import { AgentCore, type CoreDeps } from "../src/core/index.ts";
 import { scriptedProfile } from "../src/plugins/provider-scripted/index.ts";
 import { AjvArgumentValidator } from "../src/runtime/validation.ts";
 import { SqliteSessionStore } from "../src/store/index.ts";
@@ -76,11 +76,21 @@ interface Step {
   readonly events: readonly ModelStreamEvent[];
   readonly elapsedMs?: number;
   readonly waitForAbort?: boolean;
+  readonly afterEventsMs?: number;
+  readonly close?: () => Promise<void>;
 }
 
 async function harness(
   steps: readonly Step[],
-  options: { enabled?: boolean | undefined; maxRequests?: number; maxRetries?: number } = {},
+  options: {
+    enabled?: boolean | undefined;
+    maxRequests?: number;
+    maxRetries?: number;
+    settleModel?: () => Promise<void>;
+    collect?: CoreDeps["collect"];
+    toolClass?: ToolDefinition["effect"]["class"];
+    ask?: boolean;
+  } = {},
 ) {
   const directory = mkdtempSync(join(tmpdir(), "moyyi-core-evidence-answer-"));
   const workspace = join(directory, "workspace");
@@ -123,7 +133,7 @@ async function harness(
       required: ["path"],
       additionalProperties: false,
     },
-    effect: { class: "read", reversibility: "none", verification: "none" },
+    effect: { class: options.toolClass ?? "read", reversibility: "none", verification: "none" },
     prepare: vi.fn(async (args) => ({
       digest: "untrusted" as ActionDigest,
       summary: "Read fixture",
@@ -144,33 +154,42 @@ async function harness(
         requests.push(request);
         signals.push(signal);
         if (!step) throw Error("Unexpected additional model request");
-        advance(step.elapsedMs ?? 0);
-        for (const event of step.events) {
-          if (signal.aborted) break;
-          await Promise.resolve();
-          yield event;
+        try {
+          advance(step.elapsedMs ?? 0);
+          for (const event of step.events) {
+            if (signal.aborted) break;
+            await Promise.resolve();
+            yield event;
+          }
+          advance(step.afterEventsMs ?? 0);
+          if (step.waitForAbort && !signal.aborted)
+            await new Promise<void>((resolve) =>
+              signal.addEventListener("abort", () => resolve(), { once: true }),
+            );
+          if (signal.aborted)
+            yield {
+              type: "error",
+              error: {
+                kind: "cancelled",
+                message: "Cancelled fixture",
+                partialOutput: true,
+                usage: UNKNOWN_USAGE,
+              },
+            };
+        } finally {
+          await step.close?.();
         }
-        if (step.waitForAbort && !signal.aborted)
-          await new Promise<void>((resolve) =>
-            signal.addEventListener("abort", () => resolve(), { once: true }),
-          );
-        if (signal.aborted)
-          yield {
-            type: "error",
-            error: {
-              kind: "cancelled",
-              message: "Cancelled fixture",
-              partialOutput: true,
-              usage: UNKNOWN_USAGE,
-            },
-          };
       },
     },
     profile: { ...scriptedProfile, maxOutputTokens: 8192 },
     tools: [selected],
     store,
     context,
-    policy: { beforePrepare: () => ({ kind: "allow" }), beforeExecute: () => ({ kind: "allow" }) },
+    policy: {
+      beforePrepare: () => ({ kind: "allow" }),
+      beforeExecute: () =>
+        options.ask ? { kind: "ask", reason: "Fixture approval" } : { kind: "allow" },
+    },
     validator: new AjvArgumentValidator(),
     preconditions: { check: async () => ({ valid: true }) },
     hasher: {
@@ -181,6 +200,8 @@ async function harness(
     clock: { now: () => new Date(now).toISOString() as Timestamp },
     ids: { next: (prefix) => `${prefix}_${++serial}` },
     emit: (event) => events.push(event),
+    ...(options.settleModel ? { settleModel: options.settleModel } : {}),
+    ...(options.collect ? { collect: options.collect } : {}),
     limits: {
       maxModelRequests: options.maxRequests ?? 8,
       timeoutMs: 300_000,
@@ -251,6 +272,14 @@ async function waitForRequests(test: Awaited<ReturnType<typeof harness>>, count:
   await vi.waitFor(() => expect(test.requests).toHaveLength(count));
 }
 
+function gate() {
+  let release = () => {};
+  const promise = new Promise<void>((resolve) => {
+    release = resolve;
+  });
+  return { promise, release };
+}
+
 afterEach(async () => {
   for (const cleanup of cleanups.splice(0)) await cleanup();
 });
@@ -264,6 +293,7 @@ describe("bounded evidence answer through the real core and SQLite", () => {
       expect(await test.finish()).toEqual({ kind: "completed" });
       expect(test.requests).toHaveLength(1);
       expect(test.fresh).not.toHaveBeenCalled();
+      expect(test.deadline.mock.calls.map(([delay]) => delay)).toEqual([300_000]);
       expect(assistants(await test.snapshot())[0]?.request.rendererVersion).toBe("moyyi-core-v2");
     },
   );
@@ -309,12 +339,12 @@ describe("bounded evidence answer through the real core and SQLite", () => {
     const blob = await test.store.getBlob(ref);
     if (!blob) throw Error("Missing request blob");
     expect(JSON.parse(new TextDecoder().decode(blob))).toEqual(freshRequest?.messages[0]);
-    expect(test.deadline).toHaveBeenCalledTimes(1);
+    expect(test.deadline.mock.calls.map(([delay]) => delay)).toEqual([300_000, 100_000, 1_000]);
     expect(test.deadline).toHaveBeenCalledWith(300_000, expect.any(Function));
   });
 
-  it.each([149_999, 150_000])(
-    "switches only at the safe half-time boundary (%i ms)",
+  it.each([99_999, 100_000])(
+    "enforces the absolute investigation deadline (%i ms)",
     async (elapsedMs) => {
       const test = await harness([
         { events: toolTurn(), elapsedMs },
@@ -323,25 +353,34 @@ describe("bounded evidence answer through the real core and SQLite", () => {
       ]);
       await test.start();
       expect(await test.finish()).toEqual({ kind: "completed" });
-      expect(test.requests).toHaveLength(elapsedMs < 150_000 ? 3 : 2);
-      expect(test.requests[1]?.toolChoice).toBe(elapsedMs < 150_000 ? undefined : "none");
+      expect(test.requests).toHaveLength(elapsedMs < 100_000 ? 3 : 2);
+      expect(test.requests[1]?.toolChoice).toBe(elapsedMs < 100_000 ? undefined : "none");
+      expect(test.selected.execute).toHaveBeenCalledTimes(elapsedMs < 100_000 ? 1 : 0);
       expect(test.fresh).toHaveBeenCalledTimes(1);
     },
   );
 
-  it("uses request eight for the fresh answer and never creates a ninth allowance", async () => {
-    const test = await harness([
-      ...Array.from({ length: 7 }, (_, i) => ({ events: toolTurn(`call_${i + 1}`) })),
-      { events: textTurn() },
-    ]);
-    await test.start();
-    expect(await test.finish()).toEqual({ kind: "completed" });
-    expect(test.requests).toHaveLength(8);
-    expect(test.selected.execute).toHaveBeenCalledTimes(7);
-    expect(test.fresh).toHaveBeenCalledTimes(1);
-    expect(test.requests[7]?.toolChoice).toBe("none");
-    expect(results(await test.snapshot())).toHaveLength(7);
-  });
+  it.each([4, 8])(
+    "uses request %i for the fresh answer without another allowance",
+    async (maxRequests) => {
+      const test = await harness(
+        [
+          ...Array.from({ length: maxRequests - 1 }, (_, i) => ({
+            events: toolTurn(`call_${i + 1}`),
+          })),
+          { events: textTurn() },
+        ],
+        { maxRequests },
+      );
+      await test.start();
+      expect(await test.finish()).toEqual({ kind: "completed" });
+      expect(test.requests).toHaveLength(maxRequests);
+      expect(test.selected.execute).toHaveBeenCalledTimes(maxRequests - 1);
+      expect(test.fresh).toHaveBeenCalledTimes(1);
+      expect(test.requests[maxRequests - 1]?.toolChoice).toBe("none");
+      expect(results(await test.snapshot())).toHaveLength(maxRequests - 1);
+    },
+  );
 
   it("denies a final-stage tool violation without prepare, execution, or a follow-up", async () => {
     const test = await harness([{ events: textTurn(draft) }, { events: toolTurn("forbidden") }]);
@@ -436,11 +475,10 @@ describe("bounded evidence answer through the real core and SQLite", () => {
     expect(assistants(await test.snapshot())[1]?.stopReason).toBe("interrupted");
   });
 
-  it("does not retry or synthesize after a half-time error despite the host retry allowance", async () => {
-    const test = await harness(
-      [{ events: [networkError()], elapsedMs: 150_000 }, { events: [networkError()] }],
-      { maxRetries: 1 },
-    );
+  it("preserves an error received before phase cancellation despite the host retry allowance", async () => {
+    const test = await harness([{ events: [networkError()], afterEventsMs: 100_000 }], {
+      maxRetries: 1,
+    });
     await test.start();
     expect((await test.finish()).kind).toBe("failed");
     expect(test.requests).toHaveLength(1);
@@ -492,7 +530,7 @@ describe("bounded evidence answer through the real core and SQLite", () => {
 
   it("does not renew the shared deadline for the fresh answer", async () => {
     const test = await harness([
-      { events: toolTurn(), elapsedMs: 150_000 },
+      { events: toolTurn(), elapsedMs: 100_000 },
       {
         events: [{ type: "text_delta", index: 0, text: "Late partial answer" }],
         waitForAbort: true,
@@ -500,10 +538,10 @@ describe("bounded evidence answer through the real core and SQLite", () => {
     ]);
     await test.start();
     await waitForRequests(test, 2);
-    test.advance(150_000);
+    test.advance(200_000);
     expect(await test.finish()).toEqual({ kind: "budget_exhausted", budget: "time" });
     expect(test.requests).toHaveLength(2);
-    expect(test.deadline).toHaveBeenCalledTimes(1);
+    expect(test.deadline.mock.calls.map(([delay]) => delay)).toEqual([300_000, 100_000, 1_000]);
     expect(assistants(await test.snapshot()).at(-1)?.stopReason).toBe("interrupted");
   });
 
@@ -567,4 +605,289 @@ describe("bounded evidence answer through the real core and SQLite", () => {
     expect(test.requests).toHaveLength(1);
     expect(assistants(await test.snapshot())).toHaveLength(1);
   });
+
+  it("leaves an ordinary slow request and the settlement hook unchanged", async () => {
+    const settleModel = vi.fn(async () => {});
+    const test = await harness([{ events: textTurn(), elapsedMs: 150_000 }], {
+      enabled: false,
+      settleModel,
+    });
+    await test.start();
+    expect(await test.finish()).toEqual({ kind: "completed" });
+    expect(test.requests).toHaveLength(1);
+    expect(test.signals[0]?.aborted).toBe(false);
+    expect(settleModel).not.toHaveBeenCalled();
+  });
+
+  it("preserves interrupted content, pairs only received calls, and never replays them into the answer", async () => {
+    const test = await harness([
+      {
+        events: [
+          { type: "text_delta", index: 0, text: "Partial investigation prose" },
+          {
+            type: "reasoning_delta",
+            index: 1,
+            kind: "visible",
+            text: "Partial investigation reasoning",
+          },
+          { type: "part_completed", index: 2, part: call("not_executed") },
+          { type: "tool_call_delta", index: 3, argumentsDelta: '{"incomplete":' },
+        ],
+        waitForAbort: true,
+      },
+      { events: textTurn() },
+    ]);
+    await test.start();
+    await vi.waitFor(() =>
+      expect(test.events).toContainEqual(
+        expect.objectContaining({
+          type: "assistant.delta",
+          text: "Partial investigation prose",
+        }),
+      ),
+    );
+    // Let the remaining completed part and incomplete arguments reach the collector.
+    await new Promise((resolve) => setImmediate(resolve));
+    test.advance(100_000);
+    expect(await test.finish()).toEqual({ kind: "completed" });
+    expect(test.requests).toHaveLength(2);
+    const snapshot = await test.snapshot();
+    expect(assistants(snapshot)[0]).toMatchObject({ stopReason: "interrupted" });
+    expect(assistants(snapshot)[0]?.content).toContainEqual({
+      type: "text",
+      text: "Partial investigation prose",
+    });
+    expect(assistants(snapshot)[0]?.content).toContainEqual(
+      expect.objectContaining({
+        type: "text",
+        text: expect.stringContaining("Incomplete tool arguments"),
+      }),
+    );
+    expect(results(snapshot)).toMatchObject([{ callId: "not_executed", status: "cancelled" }]);
+    expect(test.selected.prepare).not.toHaveBeenCalled();
+    const final = canonicalizeJson(test.requests[1]);
+    expect(final).toContain("not_executed");
+    expect(final).toContain("cancelled");
+    expect(final).not.toContain("Partial investigation");
+    expect(final).not.toContain("Incomplete tool arguments");
+    expect(assistants(snapshot)[0]).not.toHaveProperty("replay");
+  });
+
+  it.each(["max_tokens", "refusal"] as const)(
+    "does not replace a received %s terminal when phase cancellation follows it",
+    async (stopReason) => {
+      const test = await harness([
+        {
+          events: [
+            {
+              type: "part_completed",
+              index: 0,
+              part: {
+                type: stopReason === "refusal" ? "refusal" : "text",
+                text: "Received terminal content",
+              },
+            },
+            { ...complete, stopReason },
+          ],
+          afterEventsMs: 100_000,
+        },
+      ]);
+      await test.start();
+      const outcome = await test.finish();
+      expect(outcome).toEqual(
+        stopReason === "max_tokens"
+          ? { kind: "budget_exhausted", budget: "model_output_tokens" }
+          : { kind: "completed" },
+      );
+      expect(test.requests).toHaveLength(1);
+      expect(test.fresh).not.toHaveBeenCalled();
+      expect(assistants(await test.snapshot())[0]?.stopReason).toBe(stopReason);
+    },
+  );
+
+  it("does not continue after partial refusal at the phase deadline", async () => {
+    const test = await harness([
+      {
+        events: [{ type: "refusal_delta", index: 0, text: "Refusal already received" }],
+        afterEventsMs: 100_000,
+      },
+    ]);
+    await test.start();
+    expect((await test.finish()).kind).toBe("failed");
+    expect(test.requests).toHaveLength(1);
+    expect(test.fresh).not.toHaveBeenCalled();
+  });
+
+  it("waits for both iterator closure and recording before starting the answer", async () => {
+    const closed = gate();
+    const recorded = gate();
+    const closing = vi.fn(() => closed.promise);
+    const settleModel = vi.fn(() => recorded.promise);
+    const test = await harness(
+      [{ events: [], waitForAbort: true, close: closing }, { events: textTurn() }],
+      { settleModel },
+    );
+    await test.start();
+    await waitForRequests(test, 1);
+    test.advance(100_000);
+    await vi.waitFor(() => expect(closing).toHaveBeenCalledTimes(1));
+    expect(test.requests).toHaveLength(1);
+    expect(settleModel).not.toHaveBeenCalled();
+    closed.release();
+    await vi.waitFor(() => expect(settleModel).toHaveBeenCalledTimes(1));
+    expect(test.requests).toHaveLength(1);
+    recorded.release();
+    expect(await test.finish()).toEqual({ kind: "completed" });
+    expect(test.requests).toHaveLength(2);
+  });
+
+  it.each(["iterator", "recording"] as const)("stops on %s cleanup failure", async (point) => {
+    const fail = async () => {
+      throw Error("Synthetic private cleanup diagnostic");
+    };
+    const test = await harness(
+      [{ events: [], waitForAbort: true, ...(point === "iterator" ? { close: fail } : {}) }],
+      point === "recording" ? { settleModel: fail } : {},
+    );
+    await test.start();
+    await waitForRequests(test, 1);
+    test.advance(100_000);
+    expect(await test.finish()).toEqual({
+      kind: "failed",
+      reason: "Investigation cleanup failed; answer was not started",
+    });
+    expect(test.requests).toHaveLength(1);
+    expect(test.fresh).not.toHaveBeenCalled();
+  });
+
+  it.each(["iterator", "recording"] as const)(
+    "bounds stuck %s cleanup to one second",
+    async (point) => {
+      const blocked = gate();
+      const cleanup = vi.fn(() => blocked.promise);
+      const test = await harness(
+        [{ events: [], waitForAbort: true, ...(point === "iterator" ? { close: cleanup } : {}) }],
+        point === "recording" ? { settleModel: cleanup } : {},
+      );
+      await test.start();
+      await waitForRequests(test, 1);
+      test.advance(100_000);
+      await vi.waitFor(() =>
+        expect(test.deadline).toHaveBeenCalledWith(1_000, expect.any(Function)),
+      );
+      await vi.waitFor(() => expect(cleanup).toHaveBeenCalledTimes(1));
+      test.advance(1_000);
+      expect(await test.finish()).toEqual({
+        kind: "failed",
+        reason: "Investigation cleanup exceeded 1000 ms; answer was not started",
+      });
+      blocked.release();
+      await new Promise((resolve) => setImmediate(resolve));
+      expect(test.requests).toHaveLength(1);
+      expect(test.fresh).not.toHaveBeenCalled();
+    },
+  );
+
+  it.each(["cancel", "deadline"] as const)(
+    "preserves the global %s during phase cleanup",
+    async (stop) => {
+      const blocked = gate();
+      const settleModel = vi.fn(() => blocked.promise);
+      const test = await harness([{ events: [], waitForAbort: true }], { settleModel });
+      const runId = await test.start();
+      await waitForRequests(test, 1);
+      test.advance(100_000);
+      await vi.waitFor(() => expect(settleModel).toHaveBeenCalledTimes(1));
+      if (stop === "cancel") await test.core.send({ type: "run.cancel", runId });
+      else test.advance(200_000);
+      expect(await test.finish()).toEqual(
+        stop === "cancel" ? { kind: "cancelled" } : { kind: "budget_exhausted", budget: "time" },
+      );
+      blocked.release();
+      expect(test.requests).toHaveLength(1);
+    },
+  );
+
+  it("cancels phase collection and refreshes it under the final run signal", async () => {
+    const signals: AbortSignal[] = [];
+    const collect = vi.fn<NonNullable<CoreDeps["collect"]>>(async (_workspace, signal) => {
+      signals.push(signal);
+      if (signals.length === 1) {
+        await new Promise<void>((_resolve, reject) =>
+          signal.addEventListener("abort", () => reject(signal.reason), { once: true }),
+        );
+      }
+      return [];
+    });
+    const test = await harness([{ events: textTurn() }], { collect });
+    await test.start();
+    await vi.waitFor(() => expect(signals).toHaveLength(1));
+    test.advance(100_000);
+    expect(await test.finish()).toEqual({ kind: "completed" });
+    expect(signals).toHaveLength(2);
+    expect(signals[0]?.aborted).toBe(true);
+    expect(signals[1]?.aborted).toBe(false);
+    expect(test.requests).toHaveLength(1);
+    expect(test.requests[0]?.toolChoice).toBe("none");
+  });
+
+  it("expires pending approval at the phase deadline without executing the tool", async () => {
+    const test = await harness([{ events: toolTurn() }, { events: textTurn() }], {
+      ask: true,
+      toolClass: "workspace_write",
+    });
+    await test.start();
+    await vi.waitFor(() =>
+      expect(test.events.some((event) => event.type === "approval.requested")).toBe(true),
+    );
+    const approval = test.events.find((event) => event.type === "approval.requested");
+    if (approval?.type !== "approval.requested") throw Error("Missing approval");
+    test.advance(100_000);
+    expect(await test.finish()).toEqual({ kind: "completed" });
+    expect(test.selected.execute).not.toHaveBeenCalled();
+    expect(results(await test.snapshot())).toMatchObject([{ status: "cancelled" }]);
+    await test.core.send({
+      type: "approval.respond",
+      effectId: approval.effectId,
+      digest: approval.digest,
+      decision: "approve",
+    });
+    expect(test.events.at(-1)).toMatchObject({
+      type: "command.rejected",
+      command: "approval.respond",
+    });
+  });
+
+  it.each([false, true])(
+    "settles a started side effect before handoff, unknown=%s",
+    async (unknown) => {
+      const executing = gate();
+      let executionSignal: AbortSignal | undefined;
+      const test = await harness([{ events: toolTurn() }, { events: textTurn() }], {
+        toolClass: "workspace_write",
+      });
+      vi.mocked(test.selected.execute).mockImplementation(async (_action, context) => {
+        executionSignal = context.signal;
+        await executing.promise;
+        if (unknown) throw Error("Effect may have happened");
+        return {
+          status: "succeeded",
+          content: [{ type: "text", text: "Known side effect result" }],
+        };
+      });
+      await test.start();
+      await vi.waitFor(() => expect(executionSignal).toBeDefined());
+      test.advance(100_000);
+      expect(executionSignal?.aborted).toBe(false);
+      expect(test.requests).toHaveLength(1);
+      executing.release();
+      expect((await test.finish()).kind).toBe(unknown ? "failed" : "completed");
+      expect(test.requests).toHaveLength(unknown ? 1 : 2);
+      expect(results(await test.snapshot())).toMatchObject([
+        { status: unknown ? "unknown" : "succeeded" },
+      ]);
+      if (unknown) expect(test.fresh).not.toHaveBeenCalled();
+      else expect(canonicalizeJson(test.requests[1])).toContain("Known side effect result");
+    },
+  );
 });

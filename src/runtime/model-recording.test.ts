@@ -562,6 +562,137 @@ describe("ModelClient recording and deterministic replay", () => {
     expectError(storage.records[0]?.events ?? [], "cancelled", true);
   });
 
+  it.each([false, true])(
+    "flush waits for provider cleanup and retains its rejection (%s)",
+    async (rejectCleanup) => {
+      const entered = Promise.withResolvers<void>();
+      const cleanup = Promise.withResolvers<IteratorResult<ModelStreamEvent>>();
+      const read = Promise.withResolvers<IteratorResult<ModelStreamEvent>>();
+      const abort = new AbortController();
+      const source: ModelClient = {
+        stream() {
+          return {
+            [Symbol.asyncIterator]: () => ({
+              next: async () => {
+                entered.resolve();
+                return read.promise;
+              },
+              return: () => cleanup.promise,
+            }),
+          };
+        },
+      };
+      const model = new RecordingModelClient(source, new MemoryRecordingSink(), options);
+      const response = consumeResponse(model, request, abort.signal, 10000, () => {});
+      await entered.promise;
+      // Begin the barrier before the exchange registers the provider cleanup promise.
+      let flushed = false;
+      const flushedResult = model.flush().then(() => {
+        flushed = true;
+      });
+      abort.abort();
+      expect((await response).error?.kind).toBe("cancelled");
+      await Promise.resolve();
+      expect(flushed).toBe(false);
+      if (rejectCleanup) {
+        const rejected = expect(flushedResult).rejects.toThrow(
+          "Recording provider cleanup failed during finalization",
+        );
+        cleanup.reject(Error("private provider detail"));
+        read.resolve({ done: true, value: undefined });
+        await rejected;
+      } else {
+        cleanup.resolve({ done: true, value: undefined });
+        await Promise.resolve();
+        expect(flushed).toBe(false);
+        read.resolve({ done: true, value: undefined });
+        await flushedResult;
+        expect(flushed).toBe(true);
+      }
+    },
+  );
+
+  it("flush rejects a provider return that does not confirm closure", async () => {
+    const read = Promise.withResolvers<IteratorResult<ModelStreamEvent>>();
+    const entered = Promise.withResolvers<void>();
+    const abort = new AbortController();
+    const model = new RecordingModelClient(
+      {
+        stream() {
+          return {
+            [Symbol.asyncIterator]: () => ({
+              next: async () => {
+                entered.resolve();
+                return read.promise;
+              },
+              return: async () => ({ done: false as const, value: events[0] as ModelStreamEvent }),
+            }),
+          };
+        },
+      },
+      new MemoryRecordingSink(),
+      options,
+    );
+    const response = consumeResponse(model, request, abort.signal, 10000, () => {});
+    await entered.promise;
+    abort.abort();
+    expect((await response).error?.kind).toBe("cancelled");
+    read.resolve({ done: true, value: undefined });
+    await expect(model.flush()).rejects.toThrow(
+      "Recording provider iterator did not close during finalization",
+    );
+  });
+
+  it.each([false, true])(
+    "flush retains publication failures after core cancels a collected terminal (invalidation failure: %s)",
+    async (invalidationFails) => {
+      const entered = Promise.withResolvers<void>();
+      const release = Promise.withResolvers<void>();
+      const abort = new AbortController();
+      const invalidate = vi.fn(async () => {
+        if (invalidationFails) throw Error("private invalidation path");
+      });
+      const model = new RecordingModelClient(
+        fake(),
+        {
+          invalidate,
+          async write() {
+            entered.resolve();
+            await release.promise;
+            throw Error("private sink path");
+          },
+        },
+        options,
+      );
+      const response = consumeResponse(model, request, abort.signal, 10000, () => {});
+      await entered.promise;
+      abort.abort();
+      expect((await response).error?.kind).toBe("cancelled");
+      release.resolve();
+      await expect(model.flush()).rejects.toThrow(
+        invalidationFails
+          ? "Recording invalidation failed during finalization"
+          : "Recording sink failed during stream finalization",
+      );
+      expect(invalidate).toHaveBeenCalledTimes(1);
+    },
+  );
+
+  it("delivers ordinary sink failures through the stream without changing flush", async () => {
+    const model = new RecordingModelClient(
+      fake(),
+      {
+        async write() {
+          throw Error("private sink path");
+        },
+        async invalidate() {},
+      },
+      options,
+    );
+    expectError(await collect(model), "protocol", true);
+    await expect(model.flush()).resolves.toBeUndefined();
+  });
+
   it("invalidates output published before a custom sink throws and refuses legacy sinks", async () => {
     const storage = new MemoryRecordingSink();
     const model = new RecordingModelClient(

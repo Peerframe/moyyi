@@ -559,6 +559,7 @@ export async function createRuntime(
     const documents = documentsEnabled ? new NodeWorkspaceDocuments(files) : undefined;
     core = new AgentCore({
       model: selectedClient,
+      ...(recorder ? { settleModel: recorder.flush.bind(recorder) } : {}),
       profile,
       tools: registry.tools,
       store,

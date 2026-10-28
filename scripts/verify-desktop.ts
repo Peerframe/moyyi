@@ -101,6 +101,7 @@ try {
     "host-m3.mjs",
     "production-settings.mjs",
     "kimi-errors.mjs",
+    "phase-deadline.mjs",
     "maintenance.mjs",
   ]) {
     copyFileSync(join(repository, "scripts/desktop-fixtures", name), join(fixture, name));
@@ -203,6 +204,17 @@ try {
   assert.equal(kimiErrors.toolExecutions, 0);
   assert.equal(kimiErrors.automaticRetries, 0);
   assert.equal(kimiErrors.liveModel, false);
+  const phaseDeadline = JSON.parse(
+    run(node, ["--no-experimental-strip-types", join(fixture, "phase-deadline.mjs")]),
+  );
+  assert.equal(phaseDeadline.passed, true);
+  assert.equal(phaseDeadline.syntheticRequests, 3);
+  assert.equal(phaseDeadline.investigationMs, 100_000);
+  assert.equal(phaseDeadline.elapsedMs, 150_000);
+  assert.equal(phaseDeadline.timeoutMs, 300_000);
+  assert.equal(phaseDeadline.networkAttempts, 0);
+  assert.equal(phaseDeadline.automaticRetries, 0);
+  assert.equal(phaseDeadline.liveModel, false);
   const maintenanceWorkspace = join(temporary, "maintenance-workspace");
   mkdirSync(maintenanceWorkspace);
   const maintenance = JSON.parse(
@@ -244,6 +256,7 @@ try {
         editsAndRecovery,
         productionSettings,
         kimiErrors,
+        phaseDeadline,
         maintenance,
         confinement,
         outsideCheckout: true,
