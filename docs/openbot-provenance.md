@@ -102,7 +102,8 @@ The four renderer test files passed32 tests, desktop typecheck and scoped Biome 
 implementation checkpoint. Tests cover10–12-row retention, expansion identity, unknown/failed/
 cancelled effects, expected absence, escaped text and draft-only callbacks. These are component
 and pure-state checks, not native interaction or installed acceptance. Upstream tests were read,
-not run; M3 package, native UI and fixed workflow acceptance remain pending.
+not run. At that implementation checkpoint M3 package, native UI and fixed workflow acceptance
+were pending; later acceptance/installation is recorded in [PR46](https://github.com/Peerframe/moyyi/pull/46).
 
 ## Skills boundary experience
 
@@ -179,3 +180,98 @@ reader described above. No new OpenBot files are copied or substantially adapted
 web grant, validated bridge and recorded-source projection are original moyyi code connected to
 the existing public runtime. The old control plane, login/session system and browser authority
 remain excluded. See [ADR0043](decisions/0043-desktop-web-sources.md).
+
+
+## Complete transfer inventory
+
+The owner requested a plan on2026-10-28 to transfer all applicable personal-agent capabilities.
+This inventory replaces the earlier UI-only candidate list as the coverage index; the copied-code
+table above remains the record of **actual** reuse. Delivery order/acceptance live only in the
+[roadmap](roadmap.md#openbot-reuse-within-this-sequence). These rows are plans and source findings,
+not claims of implemented or tested moyyi support.
+
+Source: OpenBot `010439bb9002fabb7e1facd8450ee85edbafa309` (MIT), inspected through fixed Git objects.
+`W/` = [apps/web/src](https://github.com/Peerframe/openbot/tree/010439bb9002fabb7e1facd8450ee85edbafa309/apps/web/src),
+`D/` = [apps/desktop/src](https://github.com/Peerframe/openbot/tree/010439bb9002fabb7e1facd8450ee85edbafa309/apps/desktop/src),
+`S/` = [apps/server-python/src/openbot_server](https://github.com/Peerframe/openbot/tree/010439bb9002fabb7e1facd8450ee85edbafa309/apps/server-python/src/openbot_server),
+`P/` = [packages](https://github.com/Peerframe/openbot/tree/010439bb9002fabb7e1facd8450ee85edbafa309/packages).
+Paths below name representative actual entry points; follow their consumers and tests before
+copying. The inventory groups all product roots by capability/ownership; it is not a line-by-line
+repository audit. Tests cited by source inspection were not executed for this planning delivery.
+
+Disposition: **covered** = existing moyyi behavior/adaptation, with acceptance limits in the system
+overview; **adapt** = reuse a small view/helper; **reimplement boundary** = preserve useful behavior
+and failure cases while replacing Server/Node/storage authority; **excluded** = stated product
+boundary; **unready upstream** = declaration/qualification fixture, not shippable implementation.
+Every new discovery gets a row here rather than an untracked optional backlog.
+
+| ID / capability | Fixed source and actual scope | Disposition / destination / delivery |
+|---|---|---|
+| C01 Document body parsing | `S/parser_worker.ts`, `S/attachment_processing.py`: bounded seven-format extraction; separate password/OCR/media paths | **Covered**: `src/runtime/document-worker.ts` and documents plugin; retain current pinned parser graph and evidence. Remaining media paths are P12–P14. |
+| C02 Public source text | `S/public_source.py`, `S/work_product_web.py`: bounded public HTTPS text and separately configured search | **Covered** for HTML lessons/fetch/M5; desktop search is P15. Keep current web capability and source records. |
+| C03 Approvals, operation history and results | `W/components/{ApprovalCard,ArtifactCard,TaskSteps,WorkTasksScreen}.tsx` | **Covered** partial view adaptations in desktop renderer, with own policy/receipts; extend only remaining P01–P06 behavior. |
+| C04 Loop and execution guarantees | `P/harness/src/openbot_agent_runtime/{executor,guard,catalog}.py`, `S/work_corrections.py`, `S/work_reconciliation.py`, `S/work_product_result.py` | **Covered by own core**: reuse relevant cancellation, budget, revoke, late-result and unknown-effect cases. Do not add another loop/reviewer or treat model result review as fact certification. |
+| P01 External file selection/import | `W/components/ComposerAttachmentPicker.tsx`, `W/composer-context.ts`, `S/owner_files.py`, `S/product_attachment_routes.py`: picker/drop/image paste, cancellation and bounded original bytes | **Adapt + reimplement boundary**, M6: desktop input/main plus runtime-owned snapshot import. Explicit selected files only; immutable original/hash, no upload or parent-directory permission from selection. |
+| P02 Managed materials and retention | `W/components/{AttachmentsManager,SettingsStorage}.tsx`, `S/attachment_references.py`, `S/attachment_purge_files.py`, `S/storage_service.py` | **Adapt + reimplement boundary**, M6: imported-copy library/reference store, recoverable removal and explicit cleanup; retain the optional age-based housekeeping setting disabled by default, limited to unreferenced managed recycled copies. Never apply storage cleanup to arbitrary workspace files. |
+| P03 Readable rich output and images | `W/components/{RichMessage,AttachmentPreview,ArtifactCard}.tsx`: limited Markdown and PNG/JPEG preview; not a general Office/PDF renderer | **Adapt**, M6: renderer over validated local result identities; inert HTML, bounded decoding, no implicit remote image fetch; retain actual receipt/hash checks. |
+| P04 Save original/result | `D/report-save.ts`, `D/attachment-save-dialog.ts`, `W/components/ShareConversationDialog.tsx`: original/PNG/Markdown/template saving, not hosted conversation sharing | **Adapt + reimplement boundary**, M6: native Save dialog, exact selected bytes/digest, exclusive destination creation and cancel. Not a public-share feature. |
+| P05 Complete history and organization | `W/sidebar-organization.ts`, `W/components/{SidebarItemMenu,ChannelWorkspace}.tsx`: pin/group/hide/mute/name search, revision-bound rename and cursor history | **Adapt + reimplement boundary**, M6: local session metadata/history paging, rename and recoverable removal with reference protection. Name search is not full-text indexing; hidden/muted does not mean erased. No channel/member identity model. |
+| P06 Message and task conveniences | `W/components/{MessageActionBar,TaskActions,ApprovalStack}.tsx`: copy, quoted reply, details and cancellation/correction UI | **Adapt where missing**, M6/M13: own recorded message/effect IDs, draft-only actions where required, no automatic retry or social/team reaction subsystem. |
+| P07 Model connection management | `W/components/{ModelConnectionsDialog,ModelSelector,SettingsModelServices}.tsx`, `S/model_connections.py`, `S/model_presets.py` | **Adapt UX + reimplement boundary**, M7: desktop/settings and Keychain-backed named connections. Fixed presets have implementation, not proof every service works. Endpoint discovery and completion tests remain distinct. |
+| P08 Model protocol adapters | `S/product_model.py`, `S/work_product_model.py`, `S/work_openai_model.py`: actual SDK single-step adapters behind11 presets | **Reimplement only missing compatibility**, M7: existing ModelClient/provider plugins, explicit API/capability fixtures. Preserve reasoning/tool IDs/usage/stream termination; never import Python SDK loop or infer all11 endpoints are live-qualified. Flash remains default. |
+| P09 Personal instructions/preferences | `W/components/{EmployeeDescriptionForm,EmployeeProfileView}.tsx`, `S/owner_preferences.py` | **Adapt + reimplement boundary**, M7: one local personal configuration/context source, source/version visible. Description/appearance cannot grant capabilities; no Bot identity graph. |
+| P10 Skills catalog/import/review | `W/components/{EmployeeSkillImport,EmployeeSkillReview,SettingsSkills}.tsx`, `S/{skill_yaml,employee_knowledge,knowledge_runtime,work_product_knowledge}.py` | **Adapt + reimplement boundary**, M7: skill library, immutable versions/digests, preview, enable/revoke and bounded discovery/read_skill. Existing YAML safety/explicit loading retained; no automatic script/reference-directory execution. |
+| P11 Safe template portability | `W/components/{SettingsTransfer,ExportEmployeeDialog,ImportEmployeeDialog}.tsx`, `S/employee_portability{,_format,_inputs,_publisher}.py`, `P/employee-publisher` | **Adapt parsers/UX + new local format boundary**, M7: allowed personal settings and reviewed licensed self-contained Skills, preview digest, quarantine and disabled defaults. Exclude source identity, secrets, memories, history and authority. v1 metadata-only differs from explicit v2 single-SKILL.md content; the old REVIEWED_SKILLS doc lags this code. Signature is not execution consent. |
+| P12 Local image OCR | `S/parser_worker.ts`, `S/attachment_processing.py`, `W/components/AttachmentActions.tsx`: PNG/JPEG OCR with offline English/Chinese data | **Adapt + reimplement sandbox lifecycle**, M8: documents/media capability and processing UI; independently pin/review language assets and limits. No whole-PDF rasterization or visual-layout promise. |
+| P13 Secret PDF input / optional binary vision | `S/attachment_processing.py`, `S/model_media.py`, `S/work_product_attachment_reads.py`: transient PDF password and compatible explicit binary input routes | **Reimplement trusted boundary**, M8: native transient password handle never in tool params/history; provider capability gates and explicit data submission for selected image/PDF only. Current plaintext docs behavior remains default. |
+| P14 Recording and transcription | `W/components/VoiceRecorder.tsx`, `D/microphone-policy.ts`, `S/model_media.py`: record/preview/discard attachment; explicit external transcription | **Adapt + reimplement boundary**, M8: microphone lifecycle separate from upload/paid transcription. No realtime voice agent or background microphone. Actual service/key acceptance remains separate from synthetic HTTP. |
+| P15 Desktop search | `S/work_product_web.py`: configured search service, not arbitrary browser crawling | **Adapt settings over existing web plugin**, M9: selected backend/provenance/rate/bounds, independently checked result/source association. Existing fetch is not search acceptance. |
+| P16 Browser observe/action/takeover | `S/{browser_gate,browser_sessions,work_product_browser,work_browser_page_actions}.py`, `apps/node/src/browser-host.ts`, `providers/docker/src/browser-task.ts` | **Adapt bounded patterns + reimplement local composition**, M9: browser plugin/runtime port and desktop approval/view. Native driver/isolation must pass an early installed feasibility gate. Node enrollment/Temporal/remote authority excluded; the Linux composition fixture is not a production installer. |
+| P17 Reviewed knowledge/memory | `W/components/{KnowledgeReviewPanel,EmployeeEvolutionArchive,SettingsMemory}.tsx`, `S/{employee_knowledge,knowledge_runtime,work_native_knowledge}.py` | **Adapt + reimplement boundary**, M10: one personal knowledge/memory plugin/store with reviewed candidates and source/revision validation. Existing hint/catalog selection is not semantic/vector RAG. Preserve Hermes attribution; no autonomous acceptance. |
+| P18 MCP tools/resources/prompts | `S/{plugin_service,plugin_transport,plugin_inputs,plugin_catalog,work_product_plugins}.py`, `W/components/{PluginManagerPanel,PluginGrantEditor,PluginToolList}.tsx` | **Adapt UX/negative cases + reimplement plugin port**, M11: actual Streamable HTTP, explicit grants/descriptor digests and revoke. Source does not provide stdio/OAuth/sampling/permanent GET-push; these are not promised by this transfer. |
+| P19 Interactive MCP Apps | `W/components/PluginAppFrame.tsx`, `W/plugin-app-sandbox.ts`, `S/plugin_service.py` | **Adapt + reimplement isolated host**, M11 after P18: source AppBridge wires bounded resource reads and denies unwired host capabilities; preserve that scope. Separate frame and identity/origin validation, no default device/network/privileged IPC. Broader in-frame tool execution is new work, not inherited support. A demo or refusal-only path does not pass success acceptance. |
+| P20 Fixed-interval schedules | `W/components/AutomationsScreen.tsx`, `S/automation_store.py`, `S/work_product_service.py` | **Adapt views/algorithms + local persistence**, M12: one scheduler client submitting through runtime; durable claim/non-overlap/coalescing/pause/cancel distinctions. No calendar cron/DST guarantee, second loop or implied tool authority. |
+| P21 Desktop notifications | `D/desktop-notifications.ts`, `W/system-notifications.ts`: bounded nonforeground notices and navigation | **Adapt**, M12: explicit preference and sensitive-text policy; click opens actual run, never grants approval. Include foreground/background and denial checks. |
+| P22 Preferences, menus and accessible dialogs | `W/workspace-preferences.ts`, `W/components/{Dialog,DesktopSettingsScreen,SettingsGeneral,SettingsSearch}.tsx`, `W/components/useModalDialog.ts`, `D/navigation-menu.ts`, `D/platform-preferences.ts` | **Adapt**, M6 affected dialogs then M13 remaining preferences: font/density/send key/focus/reduced motion, side panels,12/24-hour format,Dock badge/native menus and shortcut conflict handling. Login/background startup opt-in and actual platform-gated; no untested theme/platform claims. |
+| P23 First-run diagnostics/help | `W/components/{Onboarding,DesktopInstallScreen,DesktopConnectionScreen}.tsx`, `D/desktop-support-links.ts` | **Covered + adapt gaps**, M7/M13: local connection/runtime diagnostics and bounded safe help; exclude Server/PostgreSQL/login install flow. Startup success is not model acceptance. |
+| P24 Audit inspection/export | `W/components/SettingsSections.tsx`, `S/audit_records.py` | **Adapt views + own event projection**, M13: filters/paging, bounded CSV with formula escaping and content/privacy controls. No invented historical events, raw reasoning or secrets. |
+| P25 Maintenance/data recovery | `D/{profile-compatibility,restricted-json-file,local-content,bounded-response}.ts`, related tests | **Covered + adapt gaps**, M13: current local backup/restore/rollback expanded for newly introduced stores. Old snapshots readable; incompatible settings/packages fail clearly; preserve user data. |
+| P26 Execution helpers and reusable failure tests | `S/work_product_commands.py`, `S/work_command_*.py`, `apps/node/src/command-*.ts`, `experiments/linux-execution/protected_host.py` | **Covered + selectively port cases** across stages: fixed Linux/input/output offline execution is not a general local PTY. Retain moyyi file/shell/undo implementations; useful deadline/lost-ACK/output integrity cases can strengthen them without remote signing/control-plane dependencies. |
+| P27 Shared utilities, schemas and contributor tooling | `P/{config,logging,domain,protocol,work-contract-generator,provider-sdk,provider-conformance-runner,windows-secret-acl}`, source tests/CI/scripts/notices | **Selective helper/test reuse**, each affected stage/M13 final sweep. Inspect exact file/license and consumer; target moyyi's existing contracts/checks. Do not import entire packages, generated old DTOs, maintenance frameworks or Windows support claims from a useful helper. |
+
+### Explicit exclusions and non-shippable upstream paths
+
+| ID / source family | Reason and retained value |
+|---|---|
+| X01 `apps/server-python` control/login/identity/routing; `P/db`, old migrations; `apps/server`, frozen TS oracle | Server/Bot/team/channel/Owner authority and SQL data model conflict with single local core. Server capability functions above are individually eligible; excluding the control plane does not exclude all Python helpers. Oracle cases may be test references, never product fallback. |
+| X02 `apps/node`, `apps/worker-host-{macos,windows}`, `P/python-node-runtime`, Worker enrollment/signing/remote profiles; Temporal composition | Remote multi-host operating architecture is outside the personal local product. Extract independently useful containment/cleanup/validation cases through P16/P26/P27; retain native default and current platform scope. |
+| X03 `work_collaboration*`, Bot/member/channel social UI, employee ownership transfer, `P/office-plugin` | Multi-Agent routing/team identity/office simulation excluded. Useful presentation primitives still go through P06/P09; portable personal templates P11 are not employee/account ownership transfer. |
+| X04 `providers/{cua,lume,coder}/src/index.ts` | **Unready upstream**: ComputerProvider metadata/capability declarations without an execution implementation. Not transferable working macOS CUA, VM or coding agents; a future implementation would be new work with separate scope. |
+| X05 `experiments/browser-execution/composition` and other execution experiments | Real bounded Linux/synthetic HTTPS qualification exists, but not an installed production Host or cross-platform service. Reuse the demonstrated cases for P16/P26; never count experiment success as moyyi native/product acceptance. |
+| X06 `D/{desktop-updates,signed-update-port}.ts`, signing/installer scripts and other-platform distributions | Preserve reviewed signature/publisher/hash/confirmation failure cases through P25/P27. Public feed, signing/notarization credentials, automatic updater and Windows/Linux desktop release are outside current local delivery authority. No public publishing occurs during transfer. |
+| X07 docs, demo/marketing images, brand assets, example services, fixtures and dependency trees | Documentation/tests are references; generic assets need license/branding review in the actual view port. `P/mcp-example` is a fixture/reference, not the user's extension service. No wholesale node_modules/venv/locks/private assets/imported third-party skill bundles. |
+
+The top-level product roots are accounted for: Web/Desktop capability rows; Python Server capability
+rows plus X01; Node/Worker roots X02; providers P16/P26/X04; harness C04; shared packages P27;
+employee-publisher P11; DB X01; office-plugin X03; examples/experiments/docs/tests X05/X07.
+A newly discovered eligible leaf must be added to the matching row before claiming closure.
+
+### Uncommitted upstream source queue
+
+The OpenBot checkout had172 dirty entries during this inventory. Only file names/status were
+used to identify affected families; their uncommitted contents are **not** asserted to be covered
+by the fixed revision, and no owner file was committed, reverted or copied. Relevant families:
+
+- Model dialogs/selectors/settings, `model_connections.py`, `work_product_model.py` and shared
+  model contracts: revisit P07/P08 after source qualification.
+- `attachment_processing.py`, attachment client, `employee_portability.py`, `audit_records.py`
+  and tests: revisit P01/P02/P11/P12–P14/P24.
+- Desktop settings/main/native and Python service/proxy/packaging files, lockfile, CI/production
+  graph: inspect for useful P22/P23/P25/P27 changes; do not import the changed service architecture.
+- Work composition/task profiles, identity/Worker state, workspace/HTTP contracts and database
+  changes: classify new capability deltas versus X01/X02 before including anything.
+
+At each port, use a new reviewed fixed commit or an explicitly captured content-hash snapshot
+for relevant changes and record both base and delta. Do not silently drop this queue, reset dirty
+files, manufacture a source commit, or treat old documents as more authoritative than actual
+versioned implementation. Source access/credential/platform blockers remain visible until resolved.

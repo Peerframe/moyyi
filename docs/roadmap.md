@@ -224,26 +224,99 @@ The system overview and installation receipt identify the actual daily version.
 
 ### OpenBot reuse within this sequence
 
-Use only fixed committed source, not the current dirty OpenBot checkout. The inspected revision
-is010439bb9002fabb7e1facd8450ee85edbafa309 (MIT). Existing document parsing reuse is already integrated;
-next reuse concerns presentation and interaction. Candidate inventory and precise paths live in
-[provenance](openbot-provenance.md#desktop-reuse-inventory). M1 adapts the approval presentation;
-M2 adapts the result card; its external bundle and both original native-UI live document tasks
-passed; final integration and installation are recorded in [PR #45](https://github.com/Peerframe/moyyi/pull/45).
-M3 now narrowly adapts the folded effect list and retains existing local snapshot handling;
-M3 has separate functional/recovery evidence; M4 acceptance has not been inferred from it or earlier results.
+The owner requested a plan on2026-10-28 to transfer **all applicable OpenBot capabilities**.
+This expands the earlier M1–M5 selection; it does not authorize replacing moyyi's self-owned
+core with OpenBot's runtime. This is a planning delivery only: no new capability, provider,
+background task or permission is enabled by this document.
 
-- M1: adapt the approval-card view and duplicate-click/pending feedback to moyyi events and exact
-  effect/digest callbacks. Keep authorization in moyyi; no Bot/channel/domain DTO imports.
-- M2: adapt result-card presentation to actual execution receipts and local file-open actions;
-  rewrite attachment selection and model settings against local host ports.
-- M3: adapt `TaskSteps` list folding and reuse history/late-response interaction lessons over moyyi session commands.
-  Do not port OpenBot's server-login recovery as task recovery or introduce its Work polling model.
+The scope is every implemented capability in fixed OpenBot
+`010439bb9002fabb7e1facd8450ee85edbafa309` that is useful to one personal local agent, plus a
+separate review of relevant uncommitted work once its source is fixed. The
+[transfer inventory](openbot-provenance.md#complete-transfer-inventory) owns source paths and
+row dispositions. This roadmap owns delivery order; the system overview owns current status.
+No parallel migration queue is introduced. Existing M1–M5 adaptations and accepted evidence stay
+in place. A feature already served by moyyi is retained and checked for actual gaps, not rebuilt
+merely to copy more upstream files.
 
-Record actual copied/adapted files, upstream commit, MIT notice and new tests at port time. Prefer
-small components over copying the whole workspace. Do not import Server identity/authority,
-Bot/channel/team concepts, PostgreSQL, Temporal or cluster orchestration. A UI component must fit
-moyyi's product contract; its old API must not determine the new architecture.
+#### Scope and architectural rules
+
+- Transfer working capabilities, reusable UI, independent utilities and failure cases. Prefer a
+  small direct adaptation where contracts fit; otherwise retain the useful behavior/tests and
+  implement its local boundary. Every imported file retains its exact source and license. Before each new dependency/protocol/
+  permission/storage decision, check primary upstream source/docs/issues, pin the reviewed version
+  and record the decision in the existing ADR/research structure; do not import upstream lockfiles.
+- Core, context, SQLite store, effect journal, policy and client protocol remain moyyi's. UI calls
+  the trusted desktop host; capabilities use existing plugin contracts and runtime-owned ports.
+  Parsing, external processes and browser connections stay outside the renderer and core.
+- Keep one authority and one execution history. OpenBot Server/HTTP/SQL state is not a second
+  source of truth. No Bot/channel/team routing, remote Worker enrollment, PostgreSQL, Temporal,
+  legacy task engine, employee ownership transfer or office visualization is introduced.
+- Existing native sandbox defaults, Flash + Responses + low, original task rubrics and request,
+  file, document and output limits remain; upstream limits do not override them. New provider choices are explicit optional connections, never silent fallbacks.
+- Model tools, imported files, Skills, memory and MCP output cannot grant permissions. Reopening
+  does not restore execution authority. New side effects have an effect profile, scoped grant,
+  approval where required, bounded cancellation and truthful unknown-effect handling.
+- New storage for imported assets, skill versions, memory or schedules requires a reviewed schema
+  and versioned migration with backup/old-store/rollback compatibility. The consumed v1 exception
+  is not reopened; follow the [persisted-format recipe](recipes/change-persisted-format.md).
+- User chats, credentials, cookies, browser profiles, memories and permissions are not silently
+  copied from OpenBot. Safe templates and explicitly selected assets are separate from private
+  data migration. Each upstream bundled asset/skill/dependency needs its own license review.
+
+#### Delivery order and finite acceptance
+
+Every row below must end in a usable installed flow. A milestone can use several small sequential
+PRs when necessary; each PR targets the latest merged main. Do not build all backends before
+connecting them to the desktop. Reuse unchanged prior checks and do not relabel source review,
+fixtures or contract-only support as native or live acceptance.
+
+| Stage | User-visible delivery and reuse | Dependencies / finite completion evidence |
+|---|---|---|
+| **M6 — Materials, results and complete history** | Import selected external files through picker/drop/paste; keep originals and content hashes, manage references and recoverable removal, with age-based housekeeping disabled unless explicitly enabled. Render safe Markdown tables/lists and bounded PNG/JPEG previews; open/save receipt-backed results. Add complete paged history, name search, pin/group/mute/rename and recoverable session removal. Adapt attachment/message/result views and local saving patterns. | First vertical slice: select an external document, import a bounded snapshot into the chosen workspace, read it with existing parsers, produce/open a report and restore after restart. Source bytes unchanged; collision, cancel, replacement, denied import, referenced-file removal and restore covered. No raw HTML execution, remote image load or path/permission expansion. Delivered preview must be usable in normal/narrow supported windows. |
+| **M7 — Personal setup, Skills and safe templates** | Connection management with explicit supported model/API/capability settings; personal role/preferences without multiple Bot identities. A desktop skill library supports import, complete review, version/digest, enable/disable/revoke, discovery and on-demand bounded reads. Safe template export/import carries reviewed reusable instructions with license and digest. | Build on M6 input/preview. Restart and switch connections without implicit key/model changes. One task discovers and reads an enabled skill; disabled/revoked/changed/unreviewed versions cannot be used and allowed-tools grants no authority. Import/export has a readable diff, no credentials/private history/permissions, disabled defaults and explicit local review. Upstream v1 metadata-only and explicit v2 single-file content differ; no arbitrary skill directory/script execution is inferred. |
+| **M8 — Images, OCR and voice** | Adapt local image OCR, recording/cancel UI and explicit media-transcription transport; allow transient encrypted-PDF input through a trusted native secret field where support is verified. Add optional compatible image/PDF model input only for an explicitly configured and tested provider. | Uses M6 assets and M7 explicit connections. Real local PNG/JPEG OCR with pinned offline languages; record/cancel and one selected synthetic recording transcribed through an explicitly enabled service. Passwords never enter tool arguments, transcript or logs. Cancel/failure preserves originals and prior valid output; missing language/key/provider is explicit. No upload on selection/view, automatic external fallback, OCR accuracy guarantee, scan-PDF rasterization or legacy Office support inherited from upstream. |
+| **M9 — Web research and controlled browser** | Extend existing desktop web settings to a selected search backend; integrate browser observation, navigation, bounded actions and user takeover using the useful OpenBot approval/observation patterns. Keep M5's source records and report path. | Separately verify the configured search backend returns results that map to actual sources. Prove the actual local browser/driver and containment outside the checkout, then finish observe→approved action→result artifact in one disposable public test site. Bind decisions to current observation/session, reject stale approvals, prevent agent input during takeover, and preserve unknown after interruption. Login requires a separate explicit user flow; no copying the owner's normal browser profile. OpenBot's Linux qualification fixture is not a production installer; macOS/native execution must be independently established. |
+| **M10 — Reviewed knowledge and memory** | A personal knowledge/notes library and candidate memories with provenance, user accept/edit/reject/disable/delete, scoped retrieval and export choices. Reuse bounded catalog, candidate/review lifecycle and memory views; retain Hermes attribution. | Uses M6 materials/M7 identity-free personal settings. Accept a synthetic preference, reopen, apply it in a different session, then revoke it and prove it is no longer supplied. Keep project/private/global scope separate; stale references and injection cannot change authority. Memory is not a hidden system prompt, a copy of all chats, raw reasoning or a second task store. |
+| **M11 — MCP extensions** | Tool/resource/prompt discovery and explicit connections/grants, followed by isolated interactive MCP Apps where actual host support is proven. Adapt useful catalogs, review/approval views and bounded transport behavior. | Tools/resources/prompts ship first through the existing registry/ports. Run a disposable real MCP server through the installed app: discovery, approval, revoke, user-initiated reconnection, cancel and changed descriptor checks. Never automatically replay sent or unknown-result calls. App HTML runs only in an isolated frame with bounded resource reads; preserve denial of upstream-unwired host capabilities. Origin/identity/message rules prevent direct privileged IPC, arbitrary navigation and unapproved tool calls; broader in-frame tool execution is a separate extension. Existing synthetic peers or refusal-only paths are not sufficient success evidence. |
+| **M12 — Scheduled work and notifications** | Personal schedules, pause/resume/delete, next/last outcome, non-overlap and notifications opening the actual run. Reuse interval/coalescing/status behavior and desktop notification patterns. | Build on persisted runtime and the earlier capability grants. A real local scheduler creates one run, survives restart, skips overlap, coalesces missed occurrences and respects pause/revoke. It submits through the same protocol/policy; no second agent loop or implied approval. Explicitly show whether the app must stay running; background startup is opt-in. Fixed elapsed intervals are not calendar/DST-aware cron; unknown submissions are reconciled without blind retry. |
+| **M13 — Daily integration and transfer closure** | Finish remaining reusable desktop preferences/navigation, original/result saving and content-controlled audit export; qualify maintenance against the new stored assets, Skills, memories and schedules. Reconcile every inventory row and verify combined daily flows. | New store backup/restore/software rollback plus complete existing session compatibility. Independent tasks cover external document→report, Skills+memory→new session, browser/MCP→artifact, and scheduled read→notification; inspect real facts/files/forbidden effects. Every applicable row has installed evidence. An unresolved blocker keeps that row and overall transfer closure incomplete; record it and continue independent rows. M4's original quality gap remains visible and is not waived by migration success. No public release or unsupported-platform claim. |
+
+**M6 is the first implementation checkpoint.** It must deliver one ordinary external-document
+workflow before adding the rest of its library/preview refinements. Later stage research should
+settle its current dependency/authority decision, not delay that first product improvement.
+M8 can proceed once M6/M7 are accepted; M9–M11 share existing ports but each has independent
+permissions and acceptance. Scheduling is last because it must reuse already verified foreground
+capabilities. M13 is not permission to postpone integration or regressions until the end.
+
+#### What “all transferred” means
+
+For every inventory row, retain the original path/revision, actual upstream behavior, disposition,
+moyyi owner, license, focused checks, package/native evidence and remaining limitation. The copied
+code table records only actual adaptations, never this plan. “Covered by existing moyyi” requires
+behavior evidence; “planned”, “source reviewed”, “unavailable credential”, “declaration only” and
+“not tested on this platform” cannot be relabeled completed. No percentage based on file count.
+
+The frozen inventory is grouped by user capabilities and repository ownership, not a claim that
+every source line was audited. During each port follow imports/consumers/tests and classify any
+newly found reusable module in the same inventory. Before declaring completion, scan all product
+roots again and close uncovered rows. Relevant uncommitted upstream changes need a fixed reviewed
+revision or content-hash snapshot with provenance before use; they are a visible pending source
+set, not silently ignored or automatically committed on the owner's behalf.
+
+There are separate outcomes: **capabilities available**, **task correctness demonstrated**, and
+**public release ready**. They must not be combined. The original six-item source task and all
+sealed failures keep their scores. Project-context selection and real check feedback may improve
+quality, but a map, checklist, another model critique or successful readback is not proof of a
+correct answer. Apply a bounded hypothesis to the demonstrated failure layer, keep the original
+budget, and stop/research a different route when it fails rather than reroll the same prompt.
+
+Planning does not start implementation, run paid calls or change the installed app. When
+implementation starts, apply the existing owner authorization for necessary bounded live validation
+and review/CI-gated sequential merge/install within its scope; the planning request itself adds
+no new external-service, credential or private-data permissions. Freeze each new task/config/request/time/cost envelope before execution and retain
+failed trials; sealed allowances are never reused. Missing external service credentials may block
+that capability's real acceptance, while independent stages continue. Public release, new accounts,
+user-data uploads and wider personal permissions remain governed by their specific authority.
 
 ### Reassessment, reporting and scope control
 
@@ -271,11 +344,15 @@ No calendar or percentage estimate is justified until M1's installed-process pro
 actual integration cost. That probe must lead directly into the first usable slice, not postpone
 visible delivery indefinitely. Re-estimate remaining milestones from demonstrated scope and blockers.
 
-## Deferred directions
+## Directions outside the transfer sequence
 
-- OCR/visual document understanding, browser automation and unverified external search/providers.
-- MCP, long-term memory/learning, sub-agents and unattended scheduling, each with independent
-  authority, lifecycle and task-quality evidence before expansion.
+The2026-10-28 plan brings existing OpenBot OCR/media, browser/search, Skills, reviewed memory,
+MCP and fixed-interval scheduling into M6–M13. They remain **unimplemented** until their own gates
+pass; this supersedes their earlier blanket deferral. The following remain outside scope:
+
+- New general visual/scan-PDF understanding, arbitrary skill scripts, autonomous self-learning,
+  sub-agents, and computer drivers for which upstream has declarations but no viable execution.
+- Remote Bot/team/cluster operation, human-account/employee ownership transfer and a second core.
 - Optional Docker backend; native system isolation remains the accepted default.
 - Qwen/shasha model training, additional model projects and organization/team/Bot-cluster features.
 - Other desktop platforms until their actual bundle/user flows are exercised.
