@@ -72,6 +72,8 @@ export interface CoreDeps {
     signal: AbortSignal,
   ) => Promise<readonly ContextSection[]>;
   readonly limits?: Partial<RunLimits>;
+  /** Experimental fresh-session evidence-only final answer; shares the existing run budget. */
+  readonly evidenceAnswer?: boolean;
   readonly files?: WorkspaceFilesFactory;
   readonly documents?: WorkspaceDocumentsFactory;
   readonly processes?: WorkspaceProcessesFactory;
@@ -97,6 +99,7 @@ interface Running {
   steeringRevision: number;
   pendingSteering: number;
   stopTimer: () => void;
+  startedAt: number;
 }
 interface PendingApproval {
   readonly run: Running;
@@ -125,6 +128,13 @@ export class AgentCore {
       throw new Error("Tool output limit must be at least 64 bytes");
     if (new Set(deps.tools.map((tool) => tool.name)).size !== deps.tools.length)
       throw new Error("Duplicate tool names");
+    if (deps.evidenceAnswer !== undefined && typeof deps.evidenceAnswer !== "boolean")
+      throw new Error("Evidence answer must be a boolean");
+    if (
+      deps.evidenceAnswer &&
+      (!deps.context.buildEvidenceAnswer || this.#limits.maxModelRequests < 2)
+    )
+      throw new Error("Evidence answer requires a context port and at least two total requests");
   }
 
   async recover(): Promise<void> {
@@ -167,6 +177,10 @@ export class AgentCore {
           break;
         case "run.steer": {
           const run = this.#run(command.runId);
+          if (this.#deps.evidenceAnswer)
+            throw new Error(
+              "Evidence answer cannot accept steering. Cancel and start a new self-contained session.",
+            );
           if (run.kind === "compaction")
             throw new Error("Compaction cannot accept steering; wait or cancel it");
           if (run.controller.signal.aborted || run.finishing) throw new Error("Run is stopping");
@@ -235,6 +249,14 @@ export class AgentCore {
     try {
       const content = compact ? [] : userContent(input, this.#limits.maxInputBytes);
       const snapshot = await this.#session(sessionId);
+      if (
+        !compact &&
+        this.#deps.evidenceAnswer &&
+        snapshot.entries.some((entry) => entry.body.kind === "user_message")
+      )
+        throw new Error(
+          "Evidence answer requires a new session. Disable it to continue this conversation; history was not changed.",
+        );
       if (snapshot.runs.some((run) => run.status === "active"))
         throw new Error("Session requires startup recovery");
       if (this.#closed) throw new Error("Runtime is closing");
@@ -257,6 +279,7 @@ export class AgentCore {
         steeringRevision: 0,
         pendingSteering: 0,
         stopTimer: () => {},
+        startedAt: Date.parse(this.#deps.clock.now()),
       };
       const entry = compact
         ? undefined
@@ -272,6 +295,7 @@ export class AgentCore {
       });
       if (entry) run.head = entry.id;
       this.#running.set(id, run);
+      run.startedAt = Date.parse(this.#deps.clock.now());
       run.stopTimer = this.#deps.scheduler.deadline(this.#limits.timeoutMs, () => {
         run.deadlineExpired = true;
         run.controller.abort();
@@ -540,6 +564,7 @@ export class AgentCore {
 
   async #loop(run: Running): Promise<RunOutcome> {
     let retries = 0;
+    let draftReady = false;
     while (!run.controller.signal.aborted) {
       if (run.requests >= this.#limits.maxModelRequests) {
         run.finishing = true;
@@ -547,14 +572,31 @@ export class AgentCore {
       }
       await run.queue;
       const remaining = this.#limits.maxModelRequests - run.requests;
-      const finalRequest = remaining === 1;
+      // A safe request boundary, not a second deadline: never interrupt/retry a slow request
+      // to create another allowance. The original timer can still prevent a final answer.
+      const timeToAnswer =
+        this.#deps.evidenceAnswer === true &&
+        run.requests > 0 &&
+        Date.parse(this.#deps.clock.now()) - run.startedAt >= this.#limits.timeoutMs / 2;
+      const evidenceAnswer =
+        this.#deps.evidenceAnswer === true && (draftReady || remaining === 1 || timeToAnswer);
+      const finalRequest = remaining === 1 || evidenceAnswer;
+      if (evidenceAnswer)
+        await this.#append(run, {
+          kind: "notice",
+          code: "evidence_answer",
+          text:
+            `Evidence answer: ${draftReady ? "draft ready" : timeToAnswer ? "half of the run time elapsed" : "last request"}. ` +
+            "One tool-free answer from the original question and recorded observations follows within the existing budget. " +
+            "Earlier assistant text is retained as investigation, not supplied to this request. This is not task acceptance.",
+        });
       await this.#append(run, {
         kind: "notice",
         code: "model_request_budget",
         text:
           `Model request budget: attempt ${run.requests + 1} of ${this.#limits.maxModelRequests}; ` +
           `${remaining} request(s) remaining including this one. ` +
-          `${remaining - 1} tool-enabled request(s) remain before the answer-only final request. ` +
+          `${finalRequest ? 0 : remaining - 1} tool-enabled request(s) remain before the answer-only final request. ` +
           (finalRequest
             ? "This is the final request. New tool calls are disabled. Give the user your final answer " +
               "using only evidence already available. Distinguish verified findings, incomplete work " +
@@ -576,7 +618,7 @@ export class AgentCore {
       ).length;
       const sections = await this.#collect(run);
       if (run.controller.signal.aborted) break;
-      const built = this.#deps.context.build({
+      const contextInput: ContextInput = {
         path: pathToHead(snapshot),
         profile: this.#deps.profile,
         tools: this.#deps.tools.map(({ name, description, inputSchema }) => ({
@@ -587,12 +629,19 @@ export class AgentCore {
         sections,
         ...(finalRequest ? { toolChoice: "none" as const } : {}),
         unsettledEffects: snapshot.effects.filter((effect) => !isTerminal(effect.state)),
-      });
+      };
+      const built = evidenceAnswer
+        ? this.#deps.context.buildEvidenceAnswer?.(contextInput)
+        : this.#deps.context.build(contextInput);
+      if (!built) throw new Error("Evidence answer context port is unavailable");
       // The core's final-attempt constraint also applies to custom context builders/providers.
       const request: ModelRequest = finalRequest
         ? { ...built.request, toolChoice: "none" }
         : built.request;
-      const rendered = await this.#recordRequest(request, "moyyi-core-v2");
+      const rendered = await this.#recordRequest(
+        request,
+        evidenceAnswer ? "moyyi-evidence-answer-v1" : "moyyi-core-v2",
+      );
       if (run.controller.signal.aborted) break;
       run.requests++;
       const response = await consumeResponse(
@@ -630,6 +679,7 @@ export class AgentCore {
         !response.error.partialOutput &&
         !run.controller.signal.aborted &&
         !finalRequest &&
+        !this.#deps.evidenceAnswer &&
         ["rate_limited", "overloaded", "network"].includes(response.error.kind) &&
         retries < this.#limits.maxRetries
       ) {
@@ -704,6 +754,16 @@ export class AgentCore {
         if (!response.error && completeStop && hasAnswer && calls.length === 0) {
           await run.queue;
           if (run.pendingSteering > 0 || run.steeringRevision > consumedSteering) {
+            retries = 0;
+            continue;
+          }
+          if (
+            this.#deps.evidenceAnswer &&
+            !finalRequest &&
+            response.stopReason === "end_turn" &&
+            !response.parts.some((part) => part.type === "refusal")
+          ) {
+            draftReady = true;
             retries = 0;
             continue;
           }

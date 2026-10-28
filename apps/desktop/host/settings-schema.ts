@@ -5,7 +5,7 @@ export function parseSettings(value: unknown): DesktopSettings {
     throw Error("Invalid model settings");
   const fields = Object.getOwnPropertyDescriptors(value);
   const required = ["preset", "maxRequests", "timeoutMs"];
-  const keys = [...required, "kimiReasoningEffort"];
+  const keys = [...required, "kimiReasoningEffort", "evidenceAnswer"];
   if (
     Reflect.ownKeys(value).some((key) => typeof key !== "string" || !keys.includes(key)) ||
     Object.values(fields).some((field) => !("value" in field)) ||
@@ -27,7 +27,9 @@ export function parseSettings(value: unknown): DesktopSettings {
     Number(v.timeoutMs) < 30_000 ||
     Number(v.timeoutMs) > 300_000 ||
     (fields.kimiReasoningEffort !== undefined && effort !== "low" && effort !== "high") ||
-    (v.preset === "flash" && effort === "high")
+    (v.preset === "flash" && effort === "high") ||
+    (fields.evidenceAnswer !== undefined && typeof v.evidenceAnswer !== "boolean") ||
+    (v.evidenceAnswer === true && Number(v.maxRequests) < 2)
   )
     throw Error("Invalid model settings");
   return {
@@ -36,6 +38,7 @@ export function parseSettings(value: unknown): DesktopSettings {
     timeoutMs: Number(v.timeoutMs),
     // Keep low settings readable by the previous desktop release without a migration.
     ...(effort === "high" ? { kimiReasoningEffort: "high" as const } : {}),
+    ...(v.evidenceAnswer === true ? { evidenceAnswer: true } : {}),
   };
 }
 

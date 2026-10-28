@@ -20,6 +20,12 @@ and installation after review and passing CI. This does not authorize public ver
 Default live configuration stays Flash + Responses + low, zero retries; daily grants remain
 read-only until explicitly enabled. Original tasks and acceptance standards stay unchanged.
 
+The current unaccepted M4 follow-up is [one direct evidence answer](decisions/0042-direct-evidence-answer.md),
+default off, replacing neither the daily app nor the sealed failures. It removes ADR0041's
+intermediate claims stage and adds a safe request-boundary transition within the original time
+and request budget. Offline and live verdicts are tracked in the existing M4 receipt; no model
+quality pass, merge or installation follows from its implementation alone.
+
 | Coordinate | Current evidence |
 |---|---|
 | Latest product work | M4 candidate on the M3 baseline: explicit experimental Kimi high settings, local help and guarded backup/restore/software rollback. Source checks, external bundle and actual native maintenance passed on `edc5207`; the original source task still strictly fails. The [M4 receipt](tasks/2026-10-28-desktop-m4.md) records separate builds and verdicts. M4 is not fully accepted or installed as the daily app. |

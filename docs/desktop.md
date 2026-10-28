@@ -50,6 +50,16 @@ all three. M4's settings candidate adds an explicit low/high choice for Kimi onl
 **实验**; it did not pass the fixed complex-source task and is not a reliability recommendation.
 Flash always uses low. Switching back to Flash removes high from the configuration. Legacy
 three-field settings retain low behavior; saving low or Flash retains that older representation.
+
+The current M4 candidate also offers **独立证据成文（实验）**, default off. For a new session
+containing a self-contained question, it uses one request within the selected budget to answer
+directly from the question and all actual tool observations. Earlier assistant interpretations
+remain in history but are not sent into that final request. At a request boundary after half
+the time limit it stops investigating; this does not guarantee completion or correctness.
+It requires at least two requests, disallows steering and requires disabling the option before
+continuing an old conversation. Cancellation still works. Switching to Flash clears the option;
+old applications cannot read the enabled setting, so disable it before a compatible rollback.
+See [ADR0042](decisions/0042-direct-evidence-answer.md) for the experimental acceptance boundary.
 Endpoints are fixed presets. The form accepts1–8 requests and30–300 seconds per turn;8192 output
 tokens and zero retries stay fixed. An empty API Key preserves that preset's existing key.
 Changing preset, saving or closing clears the input. Save stores local configuration only: it

@@ -202,6 +202,28 @@ export function SettingsDialog({
           <p className="panel-note">
             输出上限固定 8192 tokens，自动重试 0 次。保存设置不授予写入权限。
           </p>
+          <label>
+            <input
+              type="checkbox"
+              checked={draft.settings.evidenceAnswer ?? false}
+              onChange={(event) => {
+                const enabled = event.target.checked;
+                setDraft((current) => {
+                  const { evidenceAnswer: _previous, ...settings } = current.settings;
+                  return {
+                    ...current,
+                    settings: { ...settings, ...(enabled ? { evidenceAnswer: true } : {}) },
+                  };
+                });
+                setNotice(null);
+              }}
+            />
+            <span>独立证据成文（实验）</span>
+          </label>
+          <p className="panel-note">
+            在总上限内用一次请求，直接根据原问题和实际工具证据独立成文。至少 2 次总上限；
+            仅用于有完整问题的新会话，不支持追加指令；继续旧会话请先关闭。请求边界已用一半时间时提前成文，仍可能超时或不完整；不增加预算、不保证正确。默认关闭。
+          </p>
         </fieldset>
         {error ? (
           <p className="error" role="alert">

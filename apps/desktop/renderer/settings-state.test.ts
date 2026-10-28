@@ -10,6 +10,21 @@ import {
 import { createActionGate } from "./view-state.ts";
 
 describe("desktop settings credential lifetime", () => {
+  it("keeps evidence answer explicit and within the selected request limit", () => {
+    const reviewed = newSettingsDraft({
+      preset: "kimi-cn",
+      maxRequests: 8,
+      timeoutMs: 300_000,
+      evidenceAnswer: true,
+    });
+    expect(validateSettingsDraft(reviewed)).toBeNull();
+    expect(
+      validateSettingsDraft({ ...reviewed, settings: { ...reviewed.settings, maxRequests: 1 } }),
+    ).toContain("至少 2");
+    expect(selectSettingsPreset(reviewed, "kimi-global").settings.evidenceAnswer).toBe(true);
+    expect(selectSettingsPreset(reviewed, "flash").settings.evidenceAnswer).toBeUndefined();
+    expect(DEFAULT_DESKTOP_SETTINGS.evidenceAnswer).toBeUndefined();
+  });
   it("uses low for old settings and clears high when returning to Flash", async () => {
     const base = newSettingsDraft(DEFAULT_DESKTOP_SETTINGS);
     const kimi = selectSettingsPreset(base, "kimi-cn");

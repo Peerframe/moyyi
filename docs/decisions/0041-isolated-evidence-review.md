@@ -124,3 +124,34 @@ case. Private request records and public commit history retain the failed candid
 Flash3/120 settings were restored through the native UI byte for byte against the pre-trial
 backup. Daily M3 remains installed; PR47 stays draft. M4's two original answer omissions remain
 unresolved, so conditional merge and installation are not authorized by a passed gate.
+
+## Narrow follow-up research
+
+This ADR remains withdrawn. A separate direct-evidence-answer hypothesis belongs to ADR0042;
+neither implementation below establishes its semantic effectiveness.
+
+DSPy commit `39dd3e5df9ede98578e6d9d7f53d3c7ee388c6c0` (MIT) uses a separate
+[`ChainOfThought` extractor](https://github.com/stanfordnlp/dspy/blob/39dd3e5df9ede98578e6d9d7f53d3c7ee388c6c0/dspy/predict/react.py#L82-L122).
+Its trajectory retains earlier thoughts, tool arguments and observations: it is not an
+evidence-only projection. Extraction adds a call outside `max_iters`; context overflow can retry
+and discard older trajectory entries. ReAct provides no shared wall-clock deadline.
+Its [representative tests](https://github.com/stanfordnlp/dspy/blob/39dd3e5df9ede98578e6d9d7f53d3c7ee388c6c0/tests/predict/test_react.py#L296-L339)
+use mocked outputs to check invocation, not answer completeness.
+
+LangGraph commit `eb8ec111b3e9d3108af5d7bdcac51e3e913637a0` (MIT) makes another
+[`structured_response` call](https://github.com/langchain-ai/langgraph/blob/eb8ec111b3e9d3108af5d7bdcac51e3e913637a0/libs/prebuilt/langgraph/prebuilt/chat_agent_executor.py#L744-L785)
+with all state messages, including prior assistant output. Graph recursion limits count steps,
+not HTTP attempts; its optional
+[`step_timeout`](https://github.com/langchain-ai/langgraph/blob/eb8ec111b3e9d3108af5d7bdcac51e3e913637a0/libs/langgraph/langgraph/pregel/main.py#L737-L738)
+limits each step, not the whole investigation and answer. The
+[structured-output test](https://github.com/langchain-ai/langgraph/blob/eb8ec111b3e9d3108af5d7bdcac51e3e913637a0/libs/prebuilt/tests/test_react_agent.py#L498-L522)
+uses a [fake model returning a preset value](https://github.com/langchain-ai/langgraph/blob/eb8ec111b3e9d3108af5d7bdcac51e3e913637a0/libs/prebuilt/tests/model.py#L52-L58),
+so it supplies no factual-coverage evidence.
+
+The narrower hypothesis removes the intermediate claims generation: original user input and
+unaltered tool observations feed one fresh answer, without previous assistant drafts, reasoning
+or a judge. That reduces generation stages but remains unproven. The withdrawn trial never
+reached either later stage, so its timeout does not establish that claims caused omissions.
+Any candidate must share the original request/time/output limits and demonstrate actual answer
+quality before adoption. No upstream code or prompts were copied, no dependency was added, and
+no upstream tests or paid model requests were run for this research.

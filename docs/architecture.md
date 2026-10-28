@@ -239,6 +239,14 @@ request for an answer without increasing the request quota. Core records a count
 each attempt and sets optional `ModelRequest.toolChoice: "none"` on the last one, retaining tool
 definitions and history. Providers disable new calls and core independently refuses any violating
 call before preparation/execution. An absent, truncated or tool-only final answer is not completed.
+
+[ADR 0042](decisions/0042-direct-evidence-answer.md) adds an experimental, default-off
+`evidenceAnswer` option for fresh self-contained sessions. Core can transition once to an answer
+at a completed draft, last request or half-time request boundary; context projects the original
+user input and all paired observations without prior assistant interpretations. Context keeps
+all sections/effects and refuses oversized inputs. Existing records preserve the original
+history and the `moyyi-evidence-answer-v1` request. No extra budget, final tool execution,
+steering, automatic retry, implicit compaction or factual-success judgement is introduced.
 Budget notices extend the current user turn in context; they do not rewrite the system or old
 prefixes. The exact request, including tool choice, is recorded without a persisted schema change.
 

@@ -51,6 +51,28 @@ const readKey = (options: RuntimeOptions) => {
   return options.deepseek.getApiKey();
 };
 describe("desktop data-only model configuration", () => {
+  it("persists explicit evidence answer within the unchanged cap and removes disabled settings", async () => {
+    const { config, home, vault } = fixture();
+    const reviewed = { ...settings, maxRequests: 8, evidenceAnswer: true };
+    const saved = await config.save(reviewed);
+    expect(saved.runtimeOptions.evidenceAnswer).toBe(true);
+    expect(saved.runtimeOptions.deepseekReasoningEffort).toBe("low");
+    expect(saved.runtimeOptions.limits).toMatchObject({ maxModelRequests: 8, maxRetries: 0 });
+    expect((await createModelConfiguration(home, vault).current()).settings).toEqual(reviewed);
+    for (const bad of [
+      { ...reviewed, maxRequests: 1 },
+      { ...reviewed, evidenceAnswer: "true" },
+      { ...reviewed, evidenceAnswer: undefined },
+      Object.defineProperty({ ...reviewed }, "evidenceAnswer", { get: () => true }),
+    ])
+      expect(() => parseSettings(bad)).toThrow();
+    const disabled = await config.save({ ...settings, evidenceAnswer: false });
+    expect(disabled.settings).toEqual(settings);
+    expect(disabled.runtimeOptions.evidenceAnswer).toBeUndefined();
+    expect(vault.read).not.toHaveBeenCalled();
+    expect(vault.add).not.toHaveBeenCalled();
+    expect(vault.remove).not.toHaveBeenCalled();
+  });
   it("preserves legacy low settings, persists explicit Kimi high, and restores the old three-field format", async () => {
     const { config, home, vault } = fixture();
     const low = { ...settings, preset: "kimi-cn" as const };

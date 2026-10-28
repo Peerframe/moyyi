@@ -301,6 +301,24 @@ async function verify() {
     cases.push(
       "actual DesktopProcess accepts high save/restart state and rejects an invalid worker preset before forwarding",
     );
+    const evidenceSettings = { ...high, evidenceAnswer: true };
+    const evidenceState = await worker.request({ type: "configure", settings: evidenceSettings });
+    assert.deepEqual(evidenceState.settings, evidenceSettings);
+    assert.equal(evidenceState.budgets.maxRequests, 8);
+    assert.deepEqual(evidenceState.permissions, { writes: false, checks: false });
+    await worker.close();
+    worker = await launch();
+    assert.deepEqual(worker.state().settings, evidenceSettings);
+    assert.equal(worker.state().connection.ready, false);
+    await worker.request({ type: "load", sessionId, askEachRead: false });
+    await assert.rejects(
+      worker.request({ type: "start", sessionId, text: "Remain offline" }),
+      /unavailable/,
+    );
+    assert.equal(worker.state().messages.length, 0);
+    cases.push(
+      "evidence answer saves and restarts through DesktopProcess with the same budget and no restored grants or model call",
+    );
     await worker.request({
       type: "configure",
       settings: { ...high, kimiReasoningEffort: "low" },

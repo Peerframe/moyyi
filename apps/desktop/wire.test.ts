@@ -29,6 +29,14 @@ const state: DesktopState = {
   error: null,
 };
 describe("desktop wire data", () => {
+  it("round-trips evidence answer through the actual state schema without accepting invalid flags", () => {
+    const settings = { ...state.settings, evidenceAnswer: true };
+    expect(
+      isWorkerMessage(JSON.parse(JSON.stringify({ type: "state", state: { ...state, settings } }))),
+    ).toBe(true);
+    for (const changed of [{ evidenceAnswer: "true" }, { maxRequests: 1 }, { extra: true }])
+      expect(isDesktopState({ ...state, settings: { ...settings, ...changed } })).toBe(false);
+  });
   it("accepts existing high settings on saved and restarted state without relaxing the settings schema", () => {
     const settings = {
       preset: "kimi-cn",

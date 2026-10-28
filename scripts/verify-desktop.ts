@@ -182,7 +182,7 @@ try {
     ]),
   );
   assert.equal(productionSettings.passed, true);
-  assert.equal(productionSettings.count, 7);
+  assert.equal(productionSettings.count, 8);
   assert.equal(productionSettings.cases.length, productionSettings.count);
   assert.equal(productionSettings.savedMaxRequests, 4);
   assert.equal(productionSettings.restoredMaxRequests, 4);

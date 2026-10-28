@@ -129,6 +129,8 @@ export interface RuntimeOptions {
   readonly projectInstructions?: false;
   /** Explicit opt-in for bounded path-only navigation; omitted or false performs no scan. */
   readonly workspaceNavigation?: boolean;
+  /** Opt-in direct evidence answer within the same run/request budget. */
+  readonly evidenceAnswer?: boolean;
   readonly developmentPlugins?: readonly DevelopmentPlugin[];
   readonly plugins?: readonly PluginEntry[];
   readonly model?: ModelOrigin;
@@ -199,6 +201,9 @@ export async function createRuntime(
   if (options.workspaceNavigation !== undefined && typeof options.workspaceNavigation !== "boolean")
     throw Error("Workspace navigation must be a boolean");
   const workspaceNavigation = options.workspaceNavigation === true;
+  if (options.evidenceAnswer !== undefined && typeof options.evidenceAnswer !== "boolean")
+    throw Error("Evidence answer must be a boolean");
+  const evidenceAnswer = options.evidenceAnswer === true;
   // Capture guidance and execution grants together before asynchronous plugin setup/reloads.
   const workspaceProcesses = options.workspaceProcesses
     ? {
@@ -601,6 +606,7 @@ export async function createRuntime(
           workspaceNavigation,
         ),
       ...(options.limits === undefined ? {} : { limits: options.limits }),
+      ...(evidenceAnswer ? { evidenceAnswer } : {}),
     });
     if (!recovered) {
       await core.recover();
