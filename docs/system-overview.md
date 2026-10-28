@@ -20,11 +20,12 @@ and installation after review and passing CI. This does not authorize public ver
 Default live configuration stays Flash + Responses + low, zero retries; daily grants remain
 read-only until explicitly enabled. Original tasks and acceptance standards stay unchanged.
 
-The current unaccepted M4 follow-up is [one direct evidence answer](decisions/0042-direct-evidence-answer.md),
-default off, replacing neither the daily app nor the sealed failures. It removes ADR0041's
-intermediate claims stage and adds a safe request-boundary transition within the original time
-and request budget. Offline and live verdicts are tracked in the existing M4 receipt; no model
-quality pass, merge or installation follows from its implementation alone.
+The unmerged M4 branch retains [one direct evidence answer](decisions/0042-direct-evidence-answer.md)
+as a default-off experiment, excluded from delivery after its bounded trial stopped on the third
+request with HTTP429. Its139-file/2746-test check,34 scripted scenarios, external package and CI
+passed; the independent answer was never reached, so neither original omission is resolved.
+The daily app is unchanged. No retry or conditional public task followed; scoped evidence and
+the unknown provider-error subtype are preserved in the existing M4 receipt.
 
 | Coordinate | Current evidence |
 |---|---|

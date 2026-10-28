@@ -1,6 +1,8 @@
 # ADR 0042: One direct evidence answer within the original budget
 
-Status: experimental candidate, 2026-10-28. Default off; no live quality result yet.
+Status: withdrawn from M4 delivery after a provider-blocked trial, 2026-10-28.
+The experimental implementation remains default off on the unmerged draft for review only;
+it is not installed in the daily product and has no live semantic acceptance.
 
 ## Evidence and hypothesis
 
@@ -64,3 +66,26 @@ No prompt variants or best-of reruns follow a failure. Preserve the result and w
 candidate if it fails; M4 remains unaccepted and PR47 unmerged. An engineering pass alone does
 not authorize daily installation. A pass of every M4 gate permits the already authorized
 review, merge and backed-up installation, with no public release.
+
+## Executed result
+
+Candidate `2dd9216` passed139 files/2746 tests,34 offline instruction scenarios, the actual
+external-package verification and all three CI lanes. Packaged settings coverage retains the
+original seven cases and adds an eighth save/restart case for this option. These are engineering
+checks, not semantic acceptance. The native settings round trip selected high/8/300 explicitly.
+
+The one fixed original-task trial sent three requests with no retries. The first two completed
+tool-use turns; the third returned HTTP429 without answer content, about62.2 seconds after run
+start. No independent-answer request occurred. The original six requirements therefore have
+no complete new answer to grade; the earlier two omissions remain unresolved. No conditional
+public task was opened and the unused allowance was sealed, not transferred.
+
+The adapter retained only the HTTP status, not the provider's error subtype. The account page
+showed available balance and limits above this trial's own traffic, but shared-account traffic
+and engine availability were not established. Neither account throttling nor engine overload
+is asserted as the precise cause. A status-only failure cannot settle the semantic hypothesis.
+
+The candidate is excluded from M4 delivery under the exit rule. Its fixed source/package and
+sealed failure remain reviewable; retaining that unmerged artifact does not accept the option,
+authorize another trial or waive any M4 gate. Daily Flash settings were restored byte for byte,
+and the existing M3 installation remains the owner app. No public release or merge occurred.
