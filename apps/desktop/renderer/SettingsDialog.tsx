@@ -202,6 +202,28 @@ export function SettingsDialog({
           <p className="panel-note">
             输出上限固定 8192 tokens，自动重试 0 次。保存设置不授予写入权限。
           </p>
+          <label>
+            <input
+              type="checkbox"
+              checked={draft.settings.answerReview ?? false}
+              onChange={(event) => {
+                const enabled = event.target.checked;
+                setDraft((current) => {
+                  const { answerReview: _previous, ...settings } = current.settings;
+                  return {
+                    ...current,
+                    settings: { ...settings, ...(enabled ? { answerReview: true } : {}) },
+                  };
+                });
+                setNotice(null);
+              }}
+            />
+            <span>独立证据复核（实验）</span>
+          </label>
+          <p className="panel-note">
+            从总上限中预留 2 次请求，用实际读到的材料重新整理依据，再回答。需要至少 4 次总上限；
+            仅用于有明确问题的新会话；继续旧会话请先关闭。不会增加次数或时限、保证答案正确或在复核阶段修改文件。默认关闭。
+          </p>
         </fieldset>
         {error ? (
           <p className="error" role="alert">

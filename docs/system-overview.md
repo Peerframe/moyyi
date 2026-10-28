@@ -131,7 +131,16 @@ The desktop uses actual runtime commands/events; scripted tests and live task ev
 separate. Original task standards stay intact; an honest limited candidate may be inspected
 before M4, but the full target is not complete while its required source-analysis task fails.
 
-**Current bounded work: deliver the checked maintenance candidate and preserve the sealed source-task failure.**
+**Current bounded work: test an isolated evidence candidate inside the original budget.**
+The owner has authorized further diagnosis and one new mechanism after PR47's draft delivery.
+[ADR 0041](decisions/0041-isolated-evidence-review.md) records a default-off candidate: at most6
+investigation requests plus one isolated evidence pass and one final answer, sharing the original8
+request/300-second/8192 limits. No old assistant draft, reasoning or hidden rubric enters the
+isolated pass. Provenance checks are not truth checks. Offline/package evidence precedes one new
+original-task trial; only strict PASS opens the unchanged public tasks. There is no additional
+paid diagnostic group, retry loop, default-model change or public release. The following old
+trial remains sealed, and M4 merge/installation remains conditional on its original gates.
+
 The new actual-desktop Kimi high trial used5 requests and22 successful read tools in138.996 seconds,
 within8/300/8192 and zero retries. Source bytes were unchanged and the answer ended normally.
 Independent original-rubric review still finds items1/2/3/5 met and4/6 partial: it now explains

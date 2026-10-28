@@ -312,6 +312,23 @@ async function verify() {
     cases.push(
       "explicit Kimi high persists/restarts at 8 requests/300 seconds without credentials, replay or restored grants",
     );
+    const reviewed = { ...high, answerReview: true };
+    await worker.request({ type: "configure", settings: reviewed });
+    await worker.close();
+    worker = await launch();
+    assert.deepEqual(worker.state().settings, reviewed);
+    assert.equal(worker.state().budgets.maxRequests, 8);
+    assert.deepEqual(worker.state().permissions, { writes: false, checks: false });
+    await assert.rejects(
+      worker.request({
+        type: "configure",
+        settings: { ...reviewed, maxRequests: 3 },
+      }),
+    );
+    assert.deepEqual(JSON.parse(readFileSync(savedPath, "utf8")).settings, reviewed);
+    cases.push(
+      "explicit evidence review persists without new requests, rejects insufficient total budget, and grants no authority",
+    );
     await worker.request({
       type: "configure",
       settings: { ...high, kimiReasoningEffort: "low" },

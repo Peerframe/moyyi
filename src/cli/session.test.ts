@@ -719,6 +719,32 @@ describe("CLI protocol session", () => {
     },
   );
   it.each([false, true])(
+    "keeps evidence audit JSON private but displays a refusal (%s)",
+    async (refused) => {
+      const host = setup({ interactive: false, initialPrompt: "Inspect" });
+      await host.cli.start();
+      const entry = assistant(refused ? "Actual refusal reason" : "INTERNAL_EVIDENCE_JSON");
+      if (entry.body.kind !== "assistant_message") throw Error("Wrong fixture");
+      host.emit({
+        type: "entry.appended",
+        entry: {
+          ...entry,
+          body: {
+            ...entry.body,
+            content: refused
+              ? [{ type: "refusal", text: "Actual refusal reason" }]
+              : entry.body.content,
+            request: { ...entry.body.request, rendererVersion: "moyyi-evidence-review-v1" },
+          },
+        },
+      });
+      host.emit({ type: "run.finished", runId, outcome: { kind: "completed" } });
+      expect(await host.cli.done).toBe(0);
+      expect(host.output()).not.toContain("INTERNAL_EVIDENCE_JSON");
+      if (refused) expect(host.output()).toContain("Actual refusal reason");
+    },
+  );
+  it.each([false, true])(
     "explains capped output without exposing reasoning (partial text: %s)",
     async (partial) => {
       const host = setup({ interactive: false, initialPrompt: "Inspect" });

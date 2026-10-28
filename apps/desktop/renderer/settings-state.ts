@@ -13,12 +13,13 @@ export function selectSettingsPreset(
   draft: SettingsDraft,
   preset: DesktopSettings["preset"],
 ): SettingsDraft {
-  const { kimiReasoningEffort, ...settings } = draft.settings;
+  const { kimiReasoningEffort, answerReview, ...settings } = draft.settings;
   return {
     settings: {
       ...settings,
       preset,
       ...(preset !== "flash" && kimiReasoningEffort === "high" ? { kimiReasoningEffort } : {}),
+      ...(preset !== "flash" && answerReview ? { answerReview } : {}),
     },
     apiKey: "",
   };
@@ -47,6 +48,12 @@ export function validateSettingsDraft(draft: SettingsDraft): string | null {
     return "仅 Kimi 可显式选择 high；Flash 固定使用 low。";
   if (!Number.isSafeInteger(maxRequests) || maxRequests < 1 || maxRequests > 8)
     return "每轮请求上限应为 1 到 8 的整数。";
+  if (
+    (draft.settings.answerReview !== undefined &&
+      typeof draft.settings.answerReview !== "boolean") ||
+    (draft.settings.answerReview && maxRequests < 4)
+  )
+    return "独立证据复核需要至少 4 次请求的总上限，其中 2 次用于整理与回答。";
   if (!Number.isSafeInteger(timeoutMs) || timeoutMs < 30_000 || timeoutMs > 300_000)
     return "每轮时限应为 30 到 300 秒。";
   if (draft.apiKey && !/^[\x21-\x7e]{1,4096}$/.test(draft.apiKey))

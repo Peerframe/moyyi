@@ -249,6 +249,7 @@ export function App({ bridge }: { bridge: DesktopBridge }) {
             ? "low"
             : (state.settings.kimiReasoningEffort ?? "low")}{" "}
           · {requestBudget} · {state.settings.timeoutMs / 1000} 秒 · 输出 8192 tokens · 重试 0 次
+          {state.settings.answerReview ? " · 独立证据复核（预留 2 次）" : ""}
           <br />
           {configuring
             ? "只读所选工作目录 · 不写入文件、不执行命令、不访问网页"

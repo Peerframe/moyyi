@@ -167,6 +167,86 @@ function required<T>(value: T | null | undefined): T {
 }
 
 describe("desktop host boundary over the public runtime", () => {
+  it.each(["end_turn", "refusal"] as const)(
+    "shows evidence refusal with %s instead of hiding the actual reason",
+    async (stopReason) => {
+      const refusal: ModelStreamEvent[] = [
+        {
+          type: "part_completed",
+          index: 0,
+          part:
+            stopReason === "refusal"
+              ? { type: "text", text: "Synthetic refusal reason" }
+              : { type: "refusal", text: "Synthetic refusal reason" },
+        },
+        {
+          ...complete(),
+          type: "completed",
+          stopReason,
+          providerStopReason: null,
+          usage: UNKNOWN_USAGE,
+        },
+      ];
+      const f = await fixture([answer("Draft"), refusal], {
+        answerReview: true,
+        limits: { maxModelRequests: 4, timeoutMs: 30_000, maxRetries: 0 },
+      });
+      await f.host.dispatch({ type: "create", workspaceRoot: f.workspace, askEachRead: false });
+      const sessionId = required(f.host.getState().activeSessionId);
+      await f.host.dispatch({ type: "start", sessionId, text: "Inspect the source" });
+      const done = await waitFor(f.host, (s) => s.outcome?.kind === "completed");
+      expect(done.messages.some((m) => m.text === "Synthetic refusal reason")).toBe(true);
+      expect(done.messages.some((m) => m.text.includes("复核已拒绝继续"))).toBe(true);
+      expect(f.requests).toHaveLength(2);
+      await f.host.close();
+      const reopened = await f.reopen();
+      await reopened.dispatch({ type: "load", sessionId, askEachRead: false });
+      expect(reopened.getState().messages.some((m) => m.text === "Synthetic refusal reason")).toBe(
+        true,
+      );
+      expect(f.requests).toHaveLength(2);
+    },
+  );
+  it("keeps evidence JSON as audit data during streaming and history reopening", async () => {
+    const internal = JSON.stringify({ claims: [], unknowns: ["RAW_EVIDENCE_JSON_MARKER"] });
+    const f = await fixture(
+      [
+        call("read", { path: "note.txt" }),
+        answer("Investigation draft"),
+        answer(internal),
+        answer("Reviewed final answer"),
+      ],
+      { answerReview: true, limits: { maxModelRequests: 6, timeoutMs: 30_000, maxRetries: 0 } },
+    );
+    await f.host.dispatch({ type: "create", workspaceRoot: f.workspace, askEachRead: false });
+    const sessionId = required(f.host.getState().activeSessionId);
+    const visible: string[] = [];
+    const off = f.host.subscribe((state) => visible.push(state.streamText));
+    await f.host.dispatch({
+      type: "start",
+      sessionId,
+      text: "Inspect note.txt without changing it",
+    });
+    const done = await waitFor(f.host, (s) => s.outcome?.kind === "completed");
+    off();
+    expect(f.requests).toHaveLength(4);
+    expect(visible.join("")).not.toContain("RAW_EVIDENCE_JSON_MARKER");
+    expect(JSON.stringify(done.messages)).not.toContain("RAW_EVIDENCE_JSON_MARKER");
+    expect(done.messages.some((m) => m.text.includes("不是任务验收通过"))).toBe(true);
+    expect(done.messages.some((m) => m.text === "Reviewed final answer")).toBe(true);
+    await f.host.close();
+    const reopened = await f.reopen();
+    await reopened.dispatch({ type: "load", sessionId, askEachRead: false });
+    expect(f.requests).toHaveLength(4);
+    expect(JSON.stringify(reopened.getState().messages)).not.toContain("RAW_EVIDENCE_JSON_MARKER");
+    expect(reopened.getState().messages.some((m) => m.text === "Reviewed final answer")).toBe(true);
+    const before = reopened.getState().messages;
+    await expect(
+      reopened.dispatch({ type: "start", sessionId, text: "Continue the second proposal above" }),
+    ).rejects.toThrow(/新会话/);
+    expect(reopened.getState().messages).toEqual(before);
+    expect(f.requests).toHaveLength(4);
+  });
   it("creates, streams and reopens real SQLite history without a new model call", async () => {
     const f = await fixture([answer("Read-only answer")]);
     expect(f.requests).toHaveLength(0);

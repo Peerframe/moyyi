@@ -72,6 +72,8 @@ export interface CoreDeps {
     signal: AbortSignal,
   ) => Promise<readonly ContextSection[]>;
   readonly limits?: Partial<RunLimits>;
+  /** Experimental bounded evidence/answer stages; normal completion is not independent acceptance. */
+  readonly answerReview?: boolean;
   readonly files?: WorkspaceFilesFactory;
   readonly documents?: WorkspaceDocumentsFactory;
   readonly processes?: WorkspaceProcessesFactory;
@@ -123,6 +125,13 @@ export class AgentCore {
     }
     if (this.#limits.maxToolOutputBytes < 64)
       throw new Error("Tool output limit must be at least 64 bytes");
+    if (
+      deps.answerReview === true &&
+      (this.#limits.maxModelRequests < 4 || typeof deps.context.buildAnswerReview !== "function")
+    )
+      throw new Error(
+        "Answer review requires at least 4 model requests and a review context builder",
+      );
     if (new Set(deps.tools.map((tool) => tool.name)).size !== deps.tools.length)
       throw new Error("Duplicate tool names");
   }
@@ -235,6 +244,14 @@ export class AgentCore {
     try {
       const content = compact ? [] : userContent(input, this.#limits.maxInputBytes);
       const snapshot = await this.#session(sessionId);
+      if (
+        !compact &&
+        this.#deps.answerReview === true &&
+        snapshot.entries.some((entry) => entry.body.kind === "user_message")
+      )
+        throw new Error(
+          "Isolated evidence review requires a new session. Disable review to continue this conversation; history was not changed.",
+        );
       if (snapshot.runs.some((run) => run.status === "active"))
         throw new Error("Session requires startup recovery");
       if (this.#closed) throw new Error("Runtime is closing");
@@ -540,34 +557,56 @@ export class AgentCore {
 
   async #loop(run: Running): Promise<RunOutcome> {
     let retries = 0;
+    const answerReview = this.#deps.answerReview === true;
+    const investigationLimit = this.#limits.maxModelRequests - 2;
+    let reviewStage: "evidence" | "answer" | undefined;
+    let reviewSteering = 0;
+    const changedDuringReview = () =>
+      run.pendingSteering > 0 || run.steeringRevision !== reviewSteering;
+    const changedTask = (): RunOutcome => ({
+      kind: "failed",
+      reason:
+        "Task changed during answer review; steering was preserved. Start a new run to continue.",
+    });
     while (!run.controller.signal.aborted) {
       if (run.requests >= this.#limits.maxModelRequests) {
         run.finishing = true;
         return { kind: "budget_exhausted", budget: "model_requests" };
       }
       await run.queue;
+      if (reviewStage && changedDuringReview()) return changedTask();
       const remaining = this.#limits.maxModelRequests - run.requests;
-      const finalRequest = remaining === 1;
+      const finalRequest = !answerReview && remaining === 1;
       await this.#append(run, {
         kind: "notice",
-        code: "model_request_budget",
-        text:
-          `Model request budget: attempt ${run.requests + 1} of ${this.#limits.maxModelRequests}; ` +
-          `${remaining} request(s) remaining including this one. ` +
-          `${remaining - 1} tool-enabled request(s) remain before the answer-only final request. ` +
-          (finalRequest
-            ? "This is the final request. New tool calls are disabled. Give the user your final answer " +
-              "using only evidence already available. Distinguish verified findings, incomplete work " +
-              "and uncertainty; do not invent results or claim unperformed actions. If evidence is " +
-              "insufficient, explain the partial result and what remains unverified."
-            : remaining === 2
-              ? "This is the last tool-enabled request. Complete any still-required artifact creation " +
-                "and verification in this tool batch; the next request cannot use tools. A proposed " +
-                "artifact in chat is not a created file. Retries consume this same budget. This notice " +
-                "does not grant permissions or override user constraints."
-              : "Reserve the final request for an answer. Gather necessary evidence; group independent " +
-                "reads; finish early when ready. Retries use this budget. Existing permissions and " +
-                "user constraints apply."),
+        code: reviewStage ? "answer_review_stage" : "model_request_budget",
+        text: reviewStage
+          ? `Answer review stage: ${reviewStage}. Tools are disabled. This stage uses the same run, ` +
+            "request limit and deadline; it is not independent task acceptance. " +
+            `Model request ${run.requests + 1} of ${this.#limits.maxModelRequests}.`
+          : answerReview
+            ? `Model request budget: attempt ${run.requests + 1} of ${this.#limits.maxModelRequests}; ` +
+              `at most ${investigationLimit} investigation requests, including retries. ` +
+              `${investigationLimit - run.requests} investigation request(s) remain including this one. ` +
+              "Two requests are reserved for tool-free evidence review and the final answer. " +
+              "Gather necessary evidence and finish investigation early when ready. Existing " +
+              "permissions and user constraints apply; review is not independent task acceptance."
+            : `Model request budget: attempt ${run.requests + 1} of ${this.#limits.maxModelRequests}; ` +
+              `${remaining} request(s) remaining including this one. ` +
+              `${remaining - 1} tool-enabled request(s) remain before the answer-only final request. ` +
+              (finalRequest
+                ? "This is the final request. New tool calls are disabled. Give the user your final answer " +
+                  "using only evidence already available. Distinguish verified findings, incomplete work " +
+                  "and uncertainty; do not invent results or claim unperformed actions. If evidence is " +
+                  "insufficient, explain the partial result and what remains unverified."
+                : remaining === 2
+                  ? "This is the last tool-enabled request. Complete any still-required artifact creation " +
+                    "and verification in this tool batch; the next request cannot use tools. A proposed " +
+                    "artifact in chat is not a created file. Retries consume this same budget. This notice " +
+                    "does not grant permissions or override user constraints."
+                  : "Reserve the final request for an answer. Gather necessary evidence; group independent " +
+                    "reads; finish early when ready. Retries use this budget. Existing permissions and " +
+                    "user constraints apply."),
       });
       const snapshot = await this.#session(run.sessionId);
       const consumedSteering = snapshot.entries.filter(
@@ -576,7 +615,7 @@ export class AgentCore {
       ).length;
       const sections = await this.#collect(run);
       if (run.controller.signal.aborted) break;
-      const built = this.#deps.context.build({
+      const input: ContextInput = {
         path: pathToHead(snapshot),
         profile: this.#deps.profile,
         tools: this.#deps.tools.map(({ name, description, inputSchema }) => ({
@@ -585,22 +624,36 @@ export class AgentCore {
           inputSchema,
         })),
         sections,
-        ...(finalRequest ? { toolChoice: "none" as const } : {}),
+        ...(finalRequest || reviewStage ? { toolChoice: "none" as const } : {}),
         unsettledEffects: snapshot.effects.filter((effect) => !isTerminal(effect.state)),
-      });
+      };
+      const built = reviewStage
+        ? this.#deps.context.buildAnswerReview?.(input, reviewStage)
+        : this.#deps.context.build(input);
+      if (!built) throw new Error("Answer review context builder is unavailable");
       // The core's final-attempt constraint also applies to custom context builders/providers.
-      const request: ModelRequest = finalRequest
-        ? { ...built.request, toolChoice: "none" }
-        : built.request;
-      const rendered = await this.#recordRequest(request, "moyyi-core-v2");
+      const request: ModelRequest =
+        finalRequest || reviewStage ? { ...built.request, toolChoice: "none" } : built.request;
+      const rendered = await this.#recordRequest(
+        request,
+        reviewStage === "evidence"
+          ? "moyyi-evidence-review-v1"
+          : reviewStage === "answer"
+            ? "moyyi-reviewed-answer-v1"
+            : "moyyi-core-v2",
+      );
       if (run.controller.signal.aborted) break;
+      if (reviewStage && changedDuringReview()) return changedTask();
       run.requests++;
       const response = await consumeResponse(
         this.#deps.model,
         request,
         run.controller.signal,
         this.#limits.maxModelResponseBytes,
-        (text) => this.#emit({ type: "assistant.delta", runId: run.id, text }),
+        (text) => {
+          if (reviewStage !== "evidence")
+            this.#emit({ type: "assistant.delta", runId: run.id, text });
+        },
       );
       const used = new Set(
         snapshot.entries.flatMap((entry) =>
@@ -630,6 +683,8 @@ export class AgentCore {
         !response.error.partialOutput &&
         !run.controller.signal.aborted &&
         !finalRequest &&
+        !reviewStage &&
+        (!answerReview || run.requests < investigationLimit) &&
         ["rate_limited", "overloaded", "network"].includes(response.error.kind) &&
         retries < this.#limits.maxRetries
       ) {
@@ -654,6 +709,39 @@ export class AgentCore {
       const calls = response.parts.filter(
         (part): part is ToolCallPart => part.type === "tool_call",
       );
+      const refused =
+        response.stopReason === "refusal" || response.parts.some((part) => part.type === "refusal");
+      if ((reviewStage || (answerReview && refused)) && calls.length) {
+        // A review request has no tool authority, even if the provider violates tool_choice.
+        await this.#append(run, {
+          kind: "tool_results",
+          results: calls.map((call) => ({
+            type: "tool_result",
+            callId: call.callId,
+            status: "denied",
+            content: [
+              {
+                type: "text",
+                text: reviewStage
+                  ? "Tool was not executed: answer review is tool-free."
+                  : "Tool was not executed: the response contains a refusal.",
+              },
+            ],
+          })),
+        });
+        if (run.controller.signal.aborted) break;
+        if (response.error) return { kind: "failed", reason: response.error.message };
+        if (response.stopReason === "max_tokens")
+          return { kind: "budget_exhausted", budget: "model_output_tokens" };
+        await run.queue;
+        if (reviewStage && changedDuringReview()) return changedTask();
+        return {
+          kind: "failed",
+          reason: reviewStage
+            ? "Answer review returned a forbidden tool call"
+            : "Refused response contained tool calls",
+        };
+      }
       if (finalRequest && !interrupted && !run.controller.signal.aborted && calls.length) {
         // Pair even a provider-violating call without prepare, approval, journal or execution.
         await this.#append(run, {
@@ -703,7 +791,18 @@ export class AgentCore {
         // recorded, but cannot turn a truncated/empty response into an automatic continuation.
         if (!response.error && completeStop && hasAnswer && calls.length === 0) {
           await run.queue;
-          if (run.pendingSteering > 0 || run.steeringRevision > consumedSteering) {
+          if (reviewStage && changedDuringReview()) return changedTask();
+          if (
+            (!answerReview || !refused) &&
+            (run.pendingSteering > 0 || run.steeringRevision > consumedSteering)
+          ) {
+            if (answerReview && run.requests >= investigationLimit) return changedTask();
+            retries = 0;
+            continue;
+          }
+          if (answerReview && !refused && reviewStage !== "answer") {
+            reviewSteering = consumedSteering;
+            reviewStage = reviewStage === "evidence" ? "answer" : "evidence";
             retries = 0;
             continue;
           }
@@ -756,6 +855,10 @@ export class AgentCore {
       if (missing.length) await this.#append(run, { kind: "tool_results", results: missing });
       if (results.some((result) => result.status === "unknown"))
         return { kind: "failed", reason: "Tool outcome unknown; verify before retrying" };
+      if (answerReview && run.requests >= investigationLimit) {
+        reviewSteering = consumedSteering;
+        reviewStage = "evidence";
+      }
     }
     return run.deadlineExpired
       ? { kind: "budget_exhausted", budget: "time" }

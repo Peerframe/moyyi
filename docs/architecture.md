@@ -87,6 +87,13 @@ Development reload is incompatible with recording/replay and refreshes only expl
 
 ### Trust
 
+[ADR 0041](decisions/0041-isolated-evidence-review.md) defines an experimental, explicit host
+option for isolated evidence review. Core reserves two requests inside the existing run budget
+and forbids tools in those stages; the optional context port builds their pure evidence projection
+and checks references. It does not add a provider loop, plugin authority, judge verdict or persisted
+format. Ordinary conversation remains unchanged when the option is absent. Task acceptance stays
+outside the model, including when provenance checks pass.
+
 [ADR 0027](decisions/0027-bounded-workspace-navigation.md) adds explicitly enabled, path-only
 workspace navigation through the context-source port. Runtime authorizes directory listing and
 ignore-file reads separately, including restrictive plugin rules in both phases. The bounded

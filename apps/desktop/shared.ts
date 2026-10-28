@@ -4,6 +4,7 @@ export interface DesktopSettings {
   readonly maxRequests: number;
   readonly timeoutMs: number;
   readonly kimiReasoningEffort?: "low" | "high";
+  readonly answerReview?: boolean;
 }
 export const DEFAULT_DESKTOP_SETTINGS: DesktopSettings = {
   preset: "flash",
