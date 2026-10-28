@@ -1,8 +1,9 @@
 # ADR 0042: One direct evidence answer within the original budget
 
 Status: phase-deadline engineering checks passed; the one independent live trial stopped on
-first-request engine overload, 2026-10-28. The default-off experiment remains unmerged and excluded
-from the daily product until every M4 gate passes. All failures stay sealed; no semantic pass.
+first-request engine overload, 2026-10-28. The owner subsequently accepted local M4 delivery
+with this quality limitation retained. The option remains default-off and experimental;
+no semantic pass or complex-task recommendation is implied. All failures stay sealed.
 
 ## Evidence and hypothesis
 
@@ -193,3 +194,16 @@ opened; the unused7 calls and all earlier groups remain sealed. Native UI restor
 Flash low/3/120 settings bytes and the unchanged M3 app reopened history without replay. PR47
 stays draft/unmerged; no daily replacement or public release occurred. The [M4 receipt](../tasks/2026-10-28-desktop-m4.md)
 records the accepted engineering evidence and remaining gates separately.
+
+
+## Owner delivery exception (2026-10-28)
+
+After receiving the separate engineering-pass and unavailable-live-verification results, the
+owner explicitly requested accepting M4 and proceeding to M5. This authorizes review/CI-gated
+merge and local installation of PR47 despite the unresolved original-source and conditional
+public-task gate. It does not rescore any answer, claim that the two omissions are repaired,
+reopen a sealed request allowance or authorize a public release. Flash/Responses/low remains
+the daily default; Kimi high and evidence-answer remain labelled experimental and default-off.
+Existing permissions, cancellation, recording, package and CI gates are not waived. The prior
+sections are immutable historical outcomes; their then-current unmerged status is superseded
+by this explicit delivery decision and the subsequent installation receipt.

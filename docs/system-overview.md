@@ -20,29 +20,22 @@ and installation after review and passing CI. This does not authorize public ver
 Default live configuration stays Flash + Responses + low, zero retries; daily grants remain
 read-only until explicitly enabled. Original tasks and acceptance standards stay unchanged.
 
-The unmerged M4 branch retains [one direct evidence answer](decisions/0042-direct-evidence-answer.md)
-as a default-off experiment, excluded from delivery. The previous third-request429 remains sealed;
-[bounded provider diagnosis](decisions/0036-kimi-chat-provider.md#http429-diagnosis-follow-up-2026-10-28)
-now distinguishes three official error types without exposing raw messages or adding retries.
-Its independent retest did not encounter429, but used6 requests and reached the original300-second
-deadline before producing the final answer. The fifth investigation call crossed the half-time
-boundary and left about25 seconds for final generation. M4 remains unaccepted; no conditional
-public task, merge or daily installation followed. Flash settings and the daily M3 app are preserved.
-Source checks140/2782, the external package and all three CI lanes passed; engineering success
-does not replace the missing semantic result. The existing M4 receipt retains both failures.
-The phase-deadline follow-up `3e33ff9` implements a fixed one-third investigation deadline and
-settled stream/recording handoff, with known failures kept terminal. Final source checks142/2836,
-instruction scenarios36/36, the external desktop bundle and all three CI lanes passed. Its one
-independent original-task trial stopped on the first request with classified429
-`engine_overloaded_error`, before any tool or final answer. The request window was26.775 seconds;
-there was no retry. This does not test the scheduling policy's live answer quality. The original
-source/question/rubric and8/300/8192 limits stayed fixed. The trial is sealed, the remaining7 calls
-are not transferred, and M4/PR47 remain unaccepted/unmerged. Flash settings were restored exactly;
-the daily M3 app reopened the new history without replay. No public release.
+On2026-10-28, after reviewing the engineering pass and first-request Kimi service-overload
+result, the owner accepted **M4 local delivery with a known answer-quality limitation** and
+requested M5. Review and all three CI lanes passed for implementation `3e33ff9` and receipt
+`cc79064`; source checks142/2836 and the actual external bundle passed. PR47 integration and
+backed-up local installation are authorized by this decision and tracked separately below.
+
+The original six-item source task is still not accepted. The latest trial used1 request,
+zero retries, no tools and no answer; classified429 `engine_overloaded_error` prevented semantic
+assessment. All prior failures and sealed allowances remain unchanged. The default-off
+[evidence-answer experiment](decisions/0042-direct-evidence-answer.md) is not a factual verifier
+or recommended complex-task mode. The owner exception changes M4's delivery gate, not test
+scores, model limits or security requirements. No public release is authorized.
 
 | Coordinate | Current evidence |
 |---|---|
-| Latest product work | M4 candidate on the M3 baseline: explicit experimental Kimi high settings, local help and guarded backup/restore/software rollback. Source checks, external bundle and actual native maintenance passed on `edc5207`; the original source task still strictly fails. The [M4 receipt](tasks/2026-10-28-desktop-m4.md) records separate builds and verdicts. M4 is not fully accepted or installed as the daily app. |
+| Latest product work | M4 candidate on the M3 baseline: explicit experimental Kimi high settings, local help and guarded backup/restore/software rollback. Source checks, external bundle and actual native maintenance passed on `edc5207`; the original source task still strictly fails. The [M4 receipt](tasks/2026-10-28-desktop-m4.md) records separate builds and verdicts. M4 is owner-accepted for local delivery with the complex-source quality limitation; merge/install is in progress at this checkpoint. |
 | Installation coordinate | M3 [PR #46](https://github.com/Peerframe/moyyi/pull/46) is installed: source `6eb299340768daf807edf5b223a84f046a16b140`, merged main `85873c7e20a5f705cd78b9c4c0880f2772c29d1d`. Local archive SHA256 `08d801806e332eb41ec2d60bea5da546529647f58d6682546cf910ed7d810a8f`; the installation receipt records native launch and history reopen verification. The unchanged CLI [PR #41 receipt](https://github.com/Peerframe/moyyi/pull/41) remains the CLI installation record: accepted tar SHA256 `76efa10a1b6f07cf575a3cbcfcb68c1d777255125b1460b6474206960b21731e`,394 files. M4 source changes update neither installation. |
 | Product acceptance | M3 final source check131 files/2644 tests passed; writes/shell eval8/8 each. External-copy10-case and instrumented native9-case gates passed with synthetic providers. The independent live pair passed the unchanged functional/recovery checks in5 repair+3 undo requests; its answer still contains an incorrect extra DOM claim. The sealed first group remains failed. M2 and earlier CLI evidence remain separate; no M4 or general reliability claim. |
 | Previous evidence-only delivery | [PR #36](https://github.com/Peerframe/moyyi/pull/36), merged `ae960de` with [main CI passed](https://github.com/Peerframe/moyyi/actions/runs/40421088168): user-requested source-derived check, controlled report repair and readback. Offline check2,433 passed; actual installed workflow passed once in5 requests. Its original task failures remain separate. |
@@ -142,16 +135,19 @@ host without adding a task engine, external service or dependency.
 | M2 materials/settings/reports: accepted baseline, retained in installed M3 | Source check128 files/2610 tests, external-copy bundle/settings/containment gates and native helper UUID lifecycle passed. Both unchanged native-UI document tasks passed, each4 requests with seven real parses, one approved create and readback; preview/Finder observed. Final integration/install in [PR #45](https://github.com/Peerframe/moyyi/pull/45). | Reuse unchanged task evidence and retain affected integration gates in M4 | Separate `security` CLI helper-key read timed out after30 seconds; no desktop-to-CLI credential-sync claim |
 | M3 edit/undo workflows: accepted installed baseline | Final check131/2644, external-copy10-case and instrumented native9-case gates passed. Independent live repair5 requests/51.047s and two-snapshot undo3/30.123s passed; installed source6eb2993/main85873c7, Flash3/120 defaults. | Preserve its files, authority and original task checks during M4 integration | First group remains sealed FAIL; the passing repair answer includes a false extra DOM claim. Unknown effects retain protective leases; no automatic unlock. This is not M4 acceptance |
 | Quality lane: unresolved | Actual-desktop Kimi high is sealed:5 requests,22 successful reads,138.996s, end_turn, unchanged source; original rubric still FAIL, items1/2/3/5 met and4/6 partial. Earlier unavailable/failed trials and withdrawn notes remain separate | Close this trial; public lifecycle/dataflow tasks were not triggered and each used0 requests. Any completion-contract route needs its own architecture/acceptance decision, not an automatic judge implementation | Selection-recreation and no-automatic-script-execution explanations remain incomplete despite actual source reads. This does not block independent maintenance acceptance |
-| M4 integrated target: engineering candidate checked, not fully accepted | Clean source `edc5207` check136/2678 and external-bundle M1/M2/M3, settings and maintenance gates passed. Actual native backup, rescue restore, cancelled/confirmed software rollback and automatic history reopen passed with0 maintenance model calls | Submit the reviewed candidate and CI evidence; keep the daily M3/CLI PR41 unchanged while the source-task gate fails. Reuse unaffected M2/M3 task evidence | Original source strict FAIL remains. Conditional public tasks were not triggered; full M4 merge/daily installation is not accepted. Minimum-window and other-platform native maintenance remain unverified |
+| M4 integrated target: owner-accepted with a known quality limitation | Clean source `edc5207` check136/2678 and external-bundle M1/M2/M3, settings and maintenance gates passed. Actual native backup, rescue restore, cancelled/confirmed software rollback and automatic history reopen passed with0 maintenance model calls | Integrate PR47 and install its verified package with backup under the2026-10-28 owner exception; retain unaffected M2/M3 evidence | Original source strict FAIL/unavailable trials remain. Conditional public tasks were not triggered; complex-task reliability is unaccepted. Minimum-window and other-platform native maintenance remain unverified |
 
 The GUI uses the self-owned core through a narrow client boundary. It neither replaces core
 permissions with UI states nor imports OpenBot's Bot/team/Server architecture. Approval and
 result-card presentation reuse is [recorded](openbot-provenance.md).
 The desktop uses actual runtime commands/events; scripted tests and live task evidence remain
 separate. Original task standards stay intact; an honest limited candidate may be inspected
-before M4, but the full target is not complete while its required source-analysis task fails.
+before M4. The2026-10-28 owner decision accepts limited M4 delivery while explicitly retaining
+the unresolved source-analysis quality gap.
 
-**Current result: the isolated-evidence candidate was withdrawn; M4 is still unaccepted.**
+### Historical quality diagnostics (delivery status superseded by the owner exception)
+
+**The isolated-evidence candidate was withdrawn; its semantic result remains unaccepted.**
 [ADR 0041](decisions/0041-isolated-evidence-review.md) preserves the whole-chain diagnosis and
 one new experiment, not an enabled feature. Candidate `32545fc` used6 actual Kimi high requests
 under the unchanged8/300/8192 limits. The sixth response was interrupted at the original time
