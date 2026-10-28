@@ -81,7 +81,7 @@ describe("desktop wire data", () => {
     for (const changed of [
       { id: "different" },
       { entryId: "" },
-      { callId: "x".repeat(129) },
+      { callId: "x".repeat(513) },
       { url: "javascript:alert(1)" },
       { status: 301 },
       { status: 200.1 },
@@ -127,6 +127,57 @@ describe("desktop wire data", () => {
         sources: { items: [{ ...source, url: `${longUrl}${"x".repeat(4000)}` }], truncated: true },
       }),
     ).toBe(false);
+  });
+  it("round-trips provider-normalized source IDs and checks individual and composite bounds", () => {
+    const uuid = "00000000-0000-4000-8000-000000000000";
+    const source = {
+      entryId: `entry_${uuid}`,
+      callId: `deepseek:${JSON.stringify([uuid, `call_${"a".repeat(30)}`])}`,
+      url: "https://example.com/source",
+      status: 200,
+      contentType: "text/plain",
+      title: null,
+      text: "Actual recorded source",
+      truncated: false,
+      displayTruncated: false,
+      recordedAt: "2026-10-28T01:02:03.000Z",
+      textSha256: `sha256:${"a".repeat(64)}`,
+    };
+    const accepted = (entryId: string, callId: string, id = `${entryId}:${callId}`) =>
+      isWorkerMessage(
+        JSON.parse(
+          JSON.stringify({
+            type: "state",
+            state: {
+              ...state,
+              sources: { items: [{ ...source, entryId, callId, id }], truncated: false },
+            },
+          }),
+        ),
+      );
+    expect(`${source.entryId}:${source.callId}`).toHaveLength(130);
+    expect(accepted(source.entryId, source.callId)).toBe(true);
+    for (const [entryLength, callLength] of [
+      [1, 1],
+      [128, 1],
+      [1, 512],
+      [128, 512],
+    ])
+      expect(accepted("e".repeat(entryLength as number), "c".repeat(callLength as number))).toBe(
+        true,
+      );
+    for (const [entryLength, callLength] of [
+      [0, 1],
+      [1, 0],
+      [129, 1],
+      [1, 513],
+      [128, 513],
+    ])
+      expect(accepted("e".repeat(entryLength as number), "c".repeat(callLength as number))).toBe(
+        false,
+      );
+    expect(accepted("e".repeat(128), "c".repeat(512), "x".repeat(641))).toBe(false);
+    expect(accepted("e".repeat(128), "c".repeat(512), "x".repeat(642))).toBe(false);
   });
   it("round-trips evidence answer through the actual state schema without accepting invalid flags", () => {
     const settings = { ...state.settings, evidenceAnswer: true };

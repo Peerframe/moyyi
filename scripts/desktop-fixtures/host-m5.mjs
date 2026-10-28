@@ -78,7 +78,8 @@ const answer = (text) => [
 ];
 const calls = (items) => [
   ...items.map(([name, args], index) => {
-    const callId = `m5_${++callSequence}`;
+    // Match the production response-scoped ID shape instead of unrealistically short fixture IDs.
+    const callId = `deepseek:${JSON.stringify(["11111111-2222-4333-8444-555555555555", `call_${++callSequence}_${"x".repeat(28)}`])}`;
     return {
       type: "part_completed",
       index,

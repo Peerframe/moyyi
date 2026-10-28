@@ -87,6 +87,54 @@ describe("desktop web permission admission", () => {
 });
 
 describe("observed web sources", () => {
+  it("retains the real DeepSeek normalized ID shape beyond the old composite limit", () => {
+    const uuid = "00000000-0000-4000-8000-000000000000";
+    const entryId = `entry_${uuid}`;
+    const callId = `deepseek:${JSON.stringify([uuid, `call_${"a".repeat(30)}`])}` as ToolCallId;
+    expect(entryId).toHaveLength(42);
+    expect(callId).toHaveLength(87);
+    const source = projectWebSource(entryId, recordedAt, { ...result(), callId }, "web_fetch");
+    expect(source).toMatchObject({
+      id: `${entryId}:${callId}`,
+      entryId,
+      callId,
+      text: response.text,
+    });
+    expect(source?.id).toHaveLength(130);
+  });
+  it("bounds entry and normalized call IDs separately, including their maximum composite", () => {
+    for (const [entryLength, callLength] of [
+      [1, 1],
+      [128, 1],
+      [1, 512],
+      [128, 512],
+    ]) {
+      const entryId = "e".repeat(entryLength as number);
+      const callId = "c".repeat(callLength as number) as ToolCallId;
+      const source = projectWebSource(entryId, recordedAt, { ...result(), callId }, "web_fetch");
+      expect(source?.id).toBe(`${entryId}:${callId}`);
+      expect(source?.id.length).toBe((entryLength as number) + 1 + (callLength as number));
+    }
+    for (const [entryLength, callLength] of [
+      [0, 1],
+      [1, 0],
+      [129, 1],
+      [1, 513],
+      [128, 513],
+    ]) {
+      expect(
+        projectWebSource(
+          "e".repeat(entryLength as number),
+          recordedAt,
+          {
+            ...result(),
+            callId: "c".repeat(callLength as number) as ToolCallId,
+          },
+          "web_fetch",
+        ),
+      ).toBeNull();
+    }
+  });
   it("binds source identity and hashes the complete observed UTF-8 body", () => {
     const text = `${"a".repeat(16_383)}😀tail`;
     const source = projectWebSource(

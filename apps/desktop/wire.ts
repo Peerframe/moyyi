@@ -123,7 +123,12 @@ function sources(value: unknown): boolean {
           "recordedAt",
           "textSha256",
         ]) &&
-        [v.id, v.entryId, v.callId].every((id) => string(id, 128) && id.length > 0) &&
+        string(v.entryId, 128) &&
+        v.entryId.length > 0 &&
+        string(v.callId, 512) &&
+        v.callId.length > 0 &&
+        // A source identity combines two independently bounded IDs and their separator.
+        string(v.id, 128 + 1 + 512) &&
         v.id === `${v.entryId}:${v.callId}` &&
         publicHttps(v.url) &&
         integer(v.status) &&

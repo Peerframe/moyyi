@@ -81,7 +81,11 @@ export function projectWebSource(
   if (
     toolName !== "web_fetch" ||
     result.status !== "succeeded" ||
-    [id, entryId, result.callId].some((value) => !value || value.length > 128) ||
+    !entryId ||
+    entryId.length > 128 ||
+    !result.callId ||
+    // Provider-normalized local call IDs have a 512-character bound. The composite can reach 641.
+    result.callId.length > 512 ||
     !Number.isFinite(Date.parse(recordedAt)) ||
     new Date(recordedAt).toISOString() !== recordedAt ||
     result.content.length !== 1 ||
