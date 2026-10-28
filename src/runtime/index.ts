@@ -20,6 +20,7 @@ import {
   type RunLimits,
   type RuntimeEvent,
   type Scheduler,
+  type SessionManagement,
   type SessionStore,
   type Timestamp,
 } from "../contracts/index.ts";
@@ -59,11 +60,12 @@ import {
   WorkspaceWritePolicy,
 } from "../policy/index.ts";
 import { SqliteSessionStore } from "../store/index.ts";
+import type { MaterialStore } from "../store/materials.ts";
 import { type AnthropicHttpOptions, anthropicHttpTransport } from "./anthropic-http.ts";
 import { type DeepSeekHttpOptions, deepSeekHttpTransport } from "./deepseek-http.ts";
 import { NodeWorkspaceDocuments } from "./documents.ts";
 import { NodeWorkspaceFiles } from "./files.ts";
-import { historyPage, sessionCatalog, sessionResults } from "./history.ts";
+import { historyPage, sessionCatalog, sessionManagementError, sessionResults } from "./history.ts";
 import { collectContext } from "./instructions.ts";
 import { type KimiHttpOptions, kimiHttpTransport } from "./kimi-http.ts";
 import { FileRecordingSink, RecordingModelClient, ReplayModelClient } from "./model-recording.ts";
@@ -76,6 +78,15 @@ import { NodeWebAccess, type WebAccessOptions } from "./web.ts";
 import type { WebHttpDependencies } from "./web-http.ts";
 import { NodeWorkspaceWrites } from "./writes.ts";
 
+export {
+  type CreateMaterial,
+  MATERIAL_FORMATS,
+  MAX_MATERIAL_BYTES,
+  type MaterialFormat,
+  type MaterialState,
+  type MaterialStore,
+  type StoredMaterial,
+} from "../store/materials.ts";
 export {
   backupLocalStore,
   type LocalStoreReceipt,
@@ -106,6 +117,10 @@ export {
 export interface Runtime {
   /** Load results, so a client can show which plugins failed instead of assuming readiness. */
   readonly plugins: readonly PluginStatus[];
+  /** Trusted host-only inspection/organization. Never exposed as a model tool. */
+  readonly sessions: SessionManagement;
+  /** Managed original copies, available only with the owned local SQLite store. */
+  readonly materials?: MaterialStore;
   send(command: ClientCommand): Promise<void>;
   subscribe(listener: (event: RuntimeEvent) => void): () => void;
   /** Wait for current runs; send(run.start) only waits for acceptance. */
@@ -637,6 +652,79 @@ export async function createRuntime(
     );
     return pending;
   };
+  const manage = <T>(operation: () => Promise<T>): Promise<T> => {
+    if (closed) return Promise.reject(Error("Runtime is closed"));
+    if (inspecting || reloading || commands.size || activeRuns.size)
+      return Promise.reject(Error("Session management requires an idle runtime"));
+    // Claim admission before invoking a custom store or crossing an await. Closing waits for
+    // the acknowledgement, but an ordinary rejected host request must not poison shutdown.
+    inspecting = true;
+    let acknowledge = () => {};
+    const marker = new Promise<void>((resolve) => {
+      acknowledge = resolve;
+    });
+    commands.add(marker);
+    const pending = (async () => {
+      try {
+        await core?.idle();
+        if (closed) throw Error("Runtime is closed");
+        const result = await operation();
+        if (closed) throw Error("Runtime is closed");
+        return result;
+      } finally {
+        inspecting = false;
+        commands.delete(marker);
+        acknowledge();
+      }
+    })();
+    return pending;
+  };
+  const management = () => {
+    if (!store?.sessionManagement)
+      throw Error("Configured store does not support session management");
+    return store.sessionManagement;
+  };
+  const sessions: SessionManagement = {
+    list: (query) =>
+      manage(() => management().list(query)).catch((error) => {
+        throw sessionManagementError(error);
+      }),
+    history: (query) =>
+      manage(() => management().history(query)).catch((error) => {
+        throw sessionManagementError(error);
+      }),
+    readMessage: (query) =>
+      manage(() => management().readMessage(query)).catch((error) => {
+        throw sessionManagementError(error);
+      }),
+    update: (change) =>
+      manage(() =>
+        management().update(
+          change,
+          (options.clock?.now() ?? new Date().toISOString()) as Timestamp,
+        ),
+      ).catch((error) => {
+        throw sessionManagementError(error);
+      }),
+  };
+  const materialStore = ownedStore?.materials;
+  const materials: MaterialStore | undefined = materialStore
+    ? {
+        list: (...args) => manage(() => materialStore.list(...args)),
+        listSession: (...args) => manage(() => materialStore.listSession(...args)),
+        get: (...args) => manage(() => materialStore.get(...args)),
+        find: (...args) => manage(() => materialStore.find(...args)),
+        create: (...args) => manage(() => materialStore.create(...args)),
+        activate: (...args) => manage(() => materialStore.activate(...args)),
+        recycle: (...args) => manage(() => materialStore.recycle(...args)),
+        restore: (...args) => manage(() => materialStore.restore(...args)),
+        purge: (...args) => manage(() => materialStore.purge(...args)),
+        attach: (...args) => manage(() => materialStore.attach(...args)),
+        read: (...args) => manage(() => materialStore.read(...args)),
+        housekeeping: (...args) => manage(() => materialStore.housekeeping(...args)),
+        setHousekeeping: (...args) => manage(() => materialStore.setHousekeeping(...args)),
+      }
+    : undefined;
   const reload = async (entry: DevelopmentPlugin) => {
     try {
       await core?.close();
@@ -726,6 +814,8 @@ export async function createRuntime(
     }
   };
   return {
+    sessions,
+    ...(materials ? { materials } : {}),
     get plugins() {
       return plugins.map((entry) => ({ ...entry }));
     },
@@ -771,6 +861,20 @@ export async function createRuntime(
       if (!core) {
         reject(command.type, unavailable);
         return Promise.resolve();
+      }
+      if (
+        (command.type === "run.start" || command.type === "session.compact") &&
+        store?.isSessionRemoved
+      ) {
+        try {
+          if (store.isSessionRemoved(command.sessionId)) {
+            reject(command.type, "Restore this session before starting new work");
+            return Promise.resolve();
+          }
+        } catch {
+          reject(command.type, "Session state could not be read");
+          return Promise.resolve();
+        }
       }
       return track(core.send(command));
     },

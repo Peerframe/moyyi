@@ -31,6 +31,20 @@ function fake() {
   };
   const close = vi.fn(async () => {});
   const runtime: Runtime = {
+    sessions: {
+      list: async () => {
+        throw Error("Unused session management");
+      },
+      history: async () => {
+        throw Error("Unused session management");
+      },
+      readMessage: async () => {
+        throw Error("Unused session management");
+      },
+      update: async () => {
+        throw Error("Unused session management");
+      },
+    },
     plugins: [],
     diagnostics: [],
     close,

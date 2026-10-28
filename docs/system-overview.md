@@ -27,11 +27,15 @@ requested M5. Review and all three CI lanes passed for implementation `3e33ff9` 
 launch/history reopening passed without model calls or changes to owner data/settings. M5 completes the owner-selected desktop web/source/report flow on that main baseline. Its
 verified delivery artifact is `dd897834`; the [PR48 receipt](https://github.com/Peerframe/moyyi/pull/48)
 records merge `418c4ff6` and verified daily installation after backup, with all14 sessions/279
-entries/14 runs/158 effects and settings unchanged; main CI passed. The2026-10-28 owner now
-requests a complete applicable OpenBot transfer plan. The [roadmap](roadmap.md#openbot-reuse-within-this-sequence)
+entries/14 runs/158 effects and settings unchanged; main CI passed. The2026-10-28 owner approved
+the applicable OpenBot transfer plan and then authorized M6. PR49 was reviewed, passed all three
+CI lanes and merged at `6d570670`. The [roadmap](roadmap.md#openbot-reuse-within-this-sequence)
 owns M6–M13 order, and the [inventory](openbot-provenance.md#complete-transfer-inventory) owns
-source/disposition coverage. This planning change implements no new capabilities; M6 material
-import and readable results is the next bounded implementation checkpoint.
+source/disposition coverage. M6 now implements external material import, readable results and
+complete paged display history under [ADR0044](decisions/0044-desktop-material-library-and-history.md).
+Full source checks passed150 files/2960 tests and a preliminary external installation passed its
+offline gates. Native, live-task and final artifact acceptance remain pending in the
+[M6 receipt](tasks/2026-10-28-desktop-m6.md); M5 remains the installed baseline until those pass.
 
 The original six-item source task is still not accepted. The latest trial used1 request,
 zero retries, no tools and no answer; classified429 `engine_overloaded_error` prevented semantic

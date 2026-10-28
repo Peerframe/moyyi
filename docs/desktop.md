@@ -13,10 +13,13 @@ M5's specified-page/source/report workflow has completed bounded acceptance in t
 `dd897834` bundle. The [PR48 receipt](https://github.com/Peerframe/moyyi/pull/48) records final
 merge/installation; the [M5 task record](tasks/2026-10-28-desktop-m5.md) separates its one live
 trial, initial source-panel defect and corrected zero-call history reopening.
+M5 remains the installed baseline. M6 materials, previews and complete history are **candidate
+implemented, acceptance pending**; source changes do not update the installed app.
 See [ADR 0037](decisions/0037-installed-desktop-client.md),
 [ADR 0038](decisions/0038-desktop-materials-and-reports.md),
 [ADR 0039](decisions/0039-desktop-controlled-workflows.md),
-[ADR 0040](decisions/0040-desktop-local-maintenance.md) and the
+[ADR 0040](decisions/0040-desktop-local-maintenance.md),
+[ADR 0044](decisions/0044-desktop-material-library-and-history.md) and the
 [system overview](system-overview.md) for exact scope and separate evidence.
 
 ## Use
@@ -39,20 +42,20 @@ file access before approval. Approval-required automatic context reads are omitt
 
 The left sidebar lists recorded sessions. Reopening loads their existing history without
 repeating effects or approvals. The current chosen approval setting applies, not old authority.
-Large histories are displayed with explicit truncation; full transcripts remain in the store.
-The conversation displays at most100 recent messages and a bounded text projection. Full
-transcript browsing, rich Markdown, image preview and external document import remain outside
-this client. Selecting files does not upload them or read their body into the model.
+The live conversation displays at most100 recent messages and a bounded text projection; full
+transcripts remain in the store. M6 adds explicit older-page and long-message reading, described
+below. Its previews and external import are candidate features, not claims about the installed
+M5 app. Selecting files does not upload them or read their body into the model.
 
 ## Settings, materials and reports
 
-Open **模型设置** to choose Flash, Kimi China or Kimi Global. Installed M3 uses low reasoning for
-all three. M4's settings candidate adds an explicit low/high choice for Kimi only. High is labelled
+Open **模型设置** to choose Flash, Kimi China or Kimi Global. M3 originally used low reasoning for
+all three. Installed M5 retains M4's explicit low/high choice for Kimi only. High is labelled
 **实验**; it did not pass the fixed complex-source task and is not a reliability recommendation.
 Flash always uses low. Switching back to Flash removes high from the configuration. Legacy
 three-field settings retain low behavior; saving low or Flash retains that older representation.
 
-The current M4 candidate also offers **独立证据成文（实验）**, default off. For a new session
+The installed M4/M5 settings also offer **独立证据成文（实验）**, default off. For a new session
 containing a self-contained question, it uses one request within the selected budget to answer
 directly from the question and all actual tool observations. Earlier assistant interpretations
 remain in history but are not sent into that final request. Investigation is limited to one
@@ -70,13 +73,15 @@ does not probe the provider, incur model usage or prove that the remote key is v
 or inaccessible credential leaves sending disabled while history remains accessible. If applying
 settings cannot be confirmed, reopen settings to inspect the current values before retrying.
 
-Within a selected workspace, **选择材料** accepts up to8 PDF/DOCX/XLSX/PPTX/ODT/ODS/ODP files,
+The installed M2–M5 **选择材料** control accepts up to8 workspace-local
+PDF/DOCX/XLSX/PPTX/ODT/ODS/ODP files,
 each at most10MiB. The panel shows relative path, size, format and selection-time SHA-256; it
 does not claim document extraction. Protected paths, links, outside-workspace files and unstable
 file identities are rejected. Sending rechecks the selected hashes before supplying file
 identities to the normal tool loop. Remove a material to exclude it from that explicit selection;
 this does not revoke the session's broader workspace read grant. No new parser or external-file
-copy/import is introduced.
+copy/import was introduced in that slice. M6 replaces this entry with the managed import flow
+below.
 
 To produce a file, use **选择报告位置** for one missing `.json`, `.md`, `.txt` or `.csv` path
 inside the workspace, with an existing parent directory. This enables only creation at that
@@ -86,7 +91,8 @@ returns to read-only after active work finishes or is stopped. New/reopened sess
 connection change also discard the report grant. Cancelling either picker preserves the current
 selection; rejected input does not silently grant a different path.
 
-**报告成果** comes from successful recorded create receipts, not assistant prose. **打开报告**
+In the installed M2–M5 view, **报告成果** comes from successful recorded create receipts, not
+assistant prose. **打开报告**
 re-reads a bounded regular file, compares its SHA-256 to the receipt and displays UTF-8 plain
 text inside the app. Changed, missing and unavailable files have distinct states; old text is
 cleared on a failed check. Inspection accepts at most1MiB and displays at most65,536 characters,
@@ -95,6 +101,62 @@ location of that checked report; it does not execute the file or confirm Finder'
 Receipt pages follow the underlying20-effect history, so an empty report page can still have a
 next page. File existence, matching bytes and a completed turn do not prove report accuracy;
 check its claims, citations and coverage against the materials.
+
+## Materials, previews and complete history (M6 candidate)
+
+These controls are **candidate implemented, acceptance pending** under
+[ADR 0044](decisions/0044-desktop-material-library-and-history.md). They reuse the normal task
+loop, permissions and parsers. They do not change Flash defaults or rescore any earlier task.
+
+In an idle selected session, choose **导入材料**, drop selected files into the materials panel,
+or explicitly choose **粘贴图片** for clipboard PNG. Confirm the selected source paths in the
+native dialog. Supported inputs are the seven document formats above, UTF-8 TXT/TEXT/MD/CSV/JSON,
+and PNG/JPEG. Each file is at most10MiB and the current selection at most8 files. Import stores
+immutable original bytes and their hash, then publishes a uniquely named copy inside the selected
+workspace; the external original is unchanged. Protected paths, links, special files, changed
+identities and oversized inputs are rejected. Interrupted imports remain visible for recovery.
+The library has a separate capacity bound; removing a record is not a promise to reclaim storage.
+
+Open **材料库与回收站** to inspect identities/hashes, add an existing item to the current task,
+preview, recycle or restore it. Current selections survive reopening, but execution permissions
+do not. **移除** only deselects; **移入材料回收站** retains original bytes and the workspace copy.
+Neither revokes the session's workspace read grant. References remain even after deselection or
+session recycling, so referenced materials cannot be purged. **移除无引用记录与副本** is limited
+to an unreferenced recycled item whose managed copy still passes identity/hash checks; shared
+blobs, history, snapshots and backups are not erased. **自动回收30天未关联材料** is off by default
+and only soft-recycles eligible unreferenced managed materials, never arbitrary project files.
+
+**预览材料** displays bounded text for text formats. PDF/Office previews show the retained file
+identity and an explanatory message, not extracted body text or page layout. Send a task to read
+their body through `read_document`; text uses the existing `read` tool and normal read policy.
+Images are local preview only: there is no OCR or image submission to the model. Import and
+preview themselves make no model call or upload.
+
+Markdown messages and `.md` reports render headings, lists, tables, code and emphasis as escaped
+React nodes. Raw HTML, links and remote images remain inert. PNG/JPEG previews accept only
+host-checked local bytes, at most512KiB encoded,4096 pixels per side and8,388,608 pixels total.
+An unsupported, oversized or undecodable image shows an error rather than stale content; its
+original remains retained. Report previews still require an actual create receipt and a fresh
+hash match. **另存副本** uses the native save dialog, rereads the receipt-backed file (at most10MiB)
+and creates a new destination exclusively. Cancellation writes nothing; existing files are never
+overwritten. A failed write can leave a partial destination and is reported as failure.
+Saving or previewing is not factual verification. Saving arbitrary imported originals is not
+implemented by this result-only control.
+
+Choose **查看完整历史**, then **更早记录** to read older display records in chronological pages.
+Long entries expose **逐段查看完整消息** and continuation controls instead of silently ending at
+the live-window prefix. These are text projections of recorded user/assistant/tool/notice entries;
+provider reasoning, replay and request blobs are not exposed. Paging does not call a model,
+replay an operation or restore approval. A missing workspace or recycled session can still be
+opened read-only; continuing requires a restored active session, an available workspace and fresh
+permissions.
+
+The sidebar searches names and prompt excerpts, not full conversation text. **整理会话** saves a
+name/group, pin or mute with revision checks; stale changes require refresh. **静音完成提醒** only
+suppresses the app's completion announcement, leaving result status visible; it is not an OS
+notification setting. **移入回收站** is recoverable through **恢复会话**. It retains transcript,
+effect and material-reference records and refuses removal while work or unsettled effects prevent
+safe removal. It is not permanent deletion.
 
 ## Changes, checks and recovery
 
@@ -160,18 +222,20 @@ The displayed limits and effect receipts describe execution, not factual reliabi
 remains the daily default. Original source-analysis omissions remain unresolved; larger budgets,
 Kimi high or a normal completion message do not establish correctness.
 
-## Backup, restore and software rollback (M4 candidate)
+<a id="backup-restore-and-software-rollback-m4-candidate"></a>
+
+## Backup, restore and software rollback
 
 These controls passed actual isolated bundle/native acceptance, recorded in the
 [M4 receipt](tasks/2026-10-28-desktop-m4.md). Full M4 quality acceptance remains blocked by the
-original source task. The current daily M3 app does not
-gain them from source edits. Open **备份与回退** only after work finishes. The app closes its session
-worker before maintenance and reopens it afterwards, with grants reset. Close any CLI using the
+original source task. The owner accepted M4 delivery with that limitation retained, and M5
+continues these installed controls. Open **备份与回退** only after work finishes. The app closes
+its session worker before maintenance and reopens it afterwards, with grants reset. Close any CLI using the
 same store first. Maintenance makes no model call and does not read or export Keychain secrets.
 
 | Action | What to do and what changes |
 |---|---|
-| **创建备份** | Choose a new folder in the native save dialog. The backup includes a consistent session database, referenced transcript/undo blobs, data-only settings and a hash manifest. It never overwrites an existing backup. Project files and Keychain secrets are excluded; credential references in settings are not portable keys. Keep this private backup protected. |
+| **创建备份** | Choose a new folder in the native save dialog. The backup includes a consistent session database, referenced transcript/undo blobs (plus retained managed-material originals in M6), data-only settings and a hash manifest. It never overwrites an existing backup. Project files and Keychain secrets are excluded; credential references in settings are not portable keys. Keep this private backup protected. |
 | **选择备份并恢复** | Select a moyyi backup and confirm the native warning. The app verifies its files and formats, saves the current records/settings under `~/.moyyi/backups/before-restore-<id>`, then replaces only the session database in its original location. Current settings, Keychain and workspace files are unchanged. The selected backup's settings are not applied. |
 | **检查可回退版本** | The app checks the previously retained installation, archive hash, app identity/signature and compatibility with current data/settings. If available, it shows the target revision and rescue location. **退出并回退** arms replacement only after the current app exits; the helper retains the current app and attempts to reopen the old one. This confirmation is not proof that the old app launched successfully. |
 
@@ -188,7 +252,12 @@ database backup. It requires a verified previous installation retained in manage
 not an arbitrary downloaded app. Explicit Kimi high adds a settings field older M2/M3 apps cannot
 read: rollback refuses it and asks you to switch to Flash and save first. It never silently edits
 settings or Keychain to make the older app start. A later software launch/history verification
-must be recorded separately. There is no automatic updater or public installer in this candidate.
+must be recorded separately. M6 upgrades the SQLite store to schema3; M5's schema2 package cannot
+open that upgraded store. Software rollback therefore refuses a schema mismatch even when settings
+are compatible. Retain the verified pre-upgrade app **and data backup** together. Returning to that
+older data is a separate deliberate restore after preserving the current store as a rescue backup;
+new history/material records must never be deleted merely to start an older app. There is no
+automatic updater or public installer in this candidate.
 
 ## Demonstrated M1 acceptance
 
@@ -254,8 +323,10 @@ CLI hosts remain explicit CLI configuration, not desktop forms or imported setti
 
 Only one runtime may own this store. Close the CLI before opening the desktop, and quit the
 desktop before using the CLI against that store. A conflict is refused visibly. Quit waits for
-runtime cleanup and child-process exit; it does not silently hand off a live writer. No database
-schema changed, and model credentials/configuration are not overwritten by installing the app.
+runtime cleanup and child-process exit; it does not silently hand off a live writer. M1–M5 kept
+SQLite schema2. M6 adds schema3 metadata and material tables, migrating validated schema1/2 stores
+transactionally while leaving transcript/effect format1 unchanged. Credentials/configuration are
+not overwritten by installing the app.
 
 ## Build and verify
 
@@ -284,10 +355,13 @@ parser containment canary with synthetic model responses. It never uses an API k
 does not replace visible GUI testing, paid task-quality checks or the original fixed tasks.
 
 M2's external-copy, native-control, live-task and final installation evidence is recorded above
-and in its PR receipt. M3 is the verified installed baseline recorded in [PR #46](https://github.com/Peerframe/moyyi/pull/46).
-M4's new maintenance paths additionally require real temporary-store failure/recovery checks and
-actual bundle/native confirmation/exit/reopen evidence. Its high selector requires separate task
-quality evidence. Source evidence alone does not establish installation of a later package.
+and in its PR receipt. M3/M4 evidence remains in their receipts; M5 is the installed baseline
+recorded in [PR #48](https://github.com/Peerframe/moyyi/pull/48). M6 adds an installed-copy synthetic
+fixture for external seven-format import, actual tool observation delivery, approved report/readback,
+preview, complete history/organization and restart retention. Its package, native interaction and
+fixed task acceptance remain pending until separately recorded. Migration/backup/restore/rollback
+must include the new material records and blobs. Source evidence alone does not establish
+installation or task correctness.
 
 Before installing, close both clients, back up the session/configuration directories, preserve
 the prior CLI tarball and any previous app, then copy the verified app to `~/Applications`.

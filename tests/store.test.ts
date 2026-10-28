@@ -116,7 +116,7 @@ describe("SQLite transactions and frozen v1 records", () => {
   it("initializes the versioned schema with WAL/FULL and checks integrity", () => {
     const { store } = setup();
     expect(store.diagnostics()).toMatchObject({
-      schemaVersion: 2,
+      schemaVersion: 3,
       persistedFormat: 1,
       journalMode: "wal",
       synchronous: 2,

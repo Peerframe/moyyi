@@ -1,4 +1,10 @@
-import type { HistoryPage, SessionListPage } from "./history.ts";
+import type {
+  HistoryPage,
+  ManagedSessionSummary,
+  SessionListPage,
+  SessionManagement,
+  SessionUpdate,
+} from "./history.ts";
 import type { ModelProfile, ModelRequest, ToolSpec } from "./model.ts";
 import type {
   BlobRef,
@@ -24,6 +30,12 @@ export interface SessionStore {
   listSessions(): Promise<readonly SessionId[]>;
   /** Optional bounded, read-only catalog for local clients. Recovery keeps listSessions. */
   listSessionSummaries?(page: HistoryPage): Promise<SessionListPage>;
+  /** Optional host-only management. Recovery and core continue using the original ports. */
+  readonly sessionManagement?: Omit<SessionManagement, "update"> & {
+    update(change: SessionUpdate, now: Timestamp): Promise<ManagedSessionSummary>;
+  };
+  /** Removed sessions remain readable/recoverable, but must be restored before new runs. */
+  isSessionRemoved?(sessionId: SessionId): boolean;
   /** Applies all changes in one transaction, or none of them. */
   commit(batch: StoreBatch): Promise<void>;
   loadSession(sessionId: SessionId): Promise<SessionSnapshot | null>;

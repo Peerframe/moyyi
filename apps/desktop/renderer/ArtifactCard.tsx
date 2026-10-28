@@ -11,15 +11,17 @@ export function ArtifactCard({
   busy,
   onOpen,
   onReveal,
+  onSave,
 }: {
   artifact: DesktopArtifact;
   busy: boolean;
   onOpen(): Promise<void>;
   onReveal(): Promise<void>;
+  onSave?(): Promise<void>;
 }) {
   const gate = useRef(createActionGate());
   const mounted = useRef(true);
-  const [action, setAction] = useState<"open" | "reveal" | null>(null);
+  const [action, setAction] = useState<"open" | "reveal" | "save" | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   useEffect(() => {
@@ -29,13 +31,13 @@ export function ArtifactCard({
     };
   }, []);
 
-  async function operate(next: "open" | "reveal") {
+  async function operate(next: "open" | "reveal" | "save") {
     if (busy || !gate.current.begin()) return;
     setAction(next);
     setError(null);
     setNotice(null);
     try {
-      await (next === "open" ? onOpen() : onReveal());
+      await (next === "open" ? onOpen() : next === "reveal" ? onReveal() : onSave?.());
       if (mounted.current && next === "reveal") setNotice("已请求在访达中显示，请查看访达窗口。");
     } catch {
       if (mounted.current) setError("操作未完成，请查看文件状态后重试。");
@@ -73,6 +75,15 @@ export function ArtifactCard({
           >
             {action === "reveal" ? "正在请求…" : "在访达显示"}
           </button>
+          {onSave ? (
+            <button
+              type="button"
+              disabled={busy || action !== null}
+              onClick={() => void operate("save")}
+            >
+              另存副本
+            </button>
+          ) : null}
         </div>
         {notice ? (
           <p className="panel-note" role="status">

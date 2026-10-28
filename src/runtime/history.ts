@@ -9,6 +9,35 @@ import {
   type ToolResultPart,
 } from "../contracts/index.ts";
 
+/** Store/SQLite exceptions can contain paths or payloads; only fixed diagnoses reach hosts. */
+export function sessionManagementError(error: unknown): Error {
+  const diagnoses = [
+    "Runtime is closed",
+    "Configured store does not support session management",
+    "Session management requires an idle runtime",
+    "Session catalog changed; refresh the list",
+    "Session changed; refresh before editing",
+    "Session has unsettled work; it cannot be removed",
+    "Session not found",
+    "Message not found",
+    "Empty session update",
+    "Invalid session request",
+    "Invalid session identity",
+    "Invalid session page",
+    "Invalid session name",
+    "Invalid session cursor",
+    "Invalid session filter",
+    "Invalid session update",
+    "Invalid message identity",
+    "Invalid text boundary",
+  ];
+  return Error(
+    error instanceof Error && diagnoses.includes(error.message)
+      ? error.message
+      : "Session management could not be completed",
+  );
+}
+
 export function historyPage(offset?: number, limit?: number): HistoryPage | null {
   const page = {
     offset: offset === undefined ? 0 : offset,

@@ -18,6 +18,15 @@ preview and Finder request use moyyi's new local host boundary rather than the u
 folding and row presentation from `apps/web/src/components/TaskSteps.tsx` at that commit. Their
 record identities, actual effect states, receipt inspection and draft-only undo are moyyi code;
 the upstream progress-fetch lifecycle and Server types are not imported.
+`apps/desktop/renderer/RichMessage.tsx` narrowly adapts escaped Markdown presentation from
+`apps/web/src/components/RichMessage.tsx`. `apps/desktop/host/save-result.ts` adapts exclusive native
+saving from `apps/desktop/src/report-save.ts`; moyyi supplies its own receipt/hash validation.
+`apps/desktop/renderer/SessionSidebar.tsx` adapts organization controls from
+`apps/web/src/sidebar-organization.ts` and `apps/web/src/components/SidebarItemMenu.tsx`, with new
+local session metadata/history APIs instead of upstream channel/Server persistence. These three
+M6 adaptations use the same fixed revision `010439bb9002fabb7e1facd8450ee85edbafa309`; their source
+comments retain attribution. Material import/reference storage is independently implemented from
+the reviewed lifecycle lessons, not copied from OpenBot services or migrations.
 Bot/channel DTOs, Server authority and the old runtime are not imported. The desktop distribution
 also carries `apps/desktop/renderer/OPENBOT-LICENSE.txt` under its Resources/licenses directory.
 The source and fixtures are licensed under MIT:

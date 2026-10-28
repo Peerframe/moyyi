@@ -43,6 +43,9 @@ write tools were synthetic; phase 2 introduces an explicit runtime write grant. 
 | `apps/desktop/renderer/ApprovalCard.tsx`, `styles.css` | `apps/web/src/components/ApprovalCard.tsx`, `apps/web/src/tokens.css`, `apps/web/src/styles.css` | `010439bb9002fabb7e1facd8450ee85edbafa309` | Narrow view/token adaptation; new authority and session bridge. MIT retained in app. |
 | `apps/desktop/renderer/ArtifactCard.tsx` | `apps/web/src/components/ArtifactCard.tsx`, `apps/web/src/artifact-shell-save.ts` | `010439bb9002fabb7e1facd8450ee85edbafa309` | Narrow presentation/pending/error and identity-only action adaptation. New moyyi receipt/hash checks and local plain-text/reveal actions replace Server downloads. MIT retained; M2 accepted and installed through PR #45. |
 | `apps/desktop/renderer/EffectsPanel.tsx`, `effects-state.ts` | `apps/web/src/components/TaskSteps.tsx` | `010439bb9002fabb7e1facd8450ee85edbafa309` | Narrow folded-list/row adaptation for actual effect history. No upstream fetch, Server/domain types or assumed completed stages. MIT retained; M3 candidate evidence is recorded below. |
+| `apps/desktop/renderer/RichMessage.tsx` | `apps/web/src/components/RichMessage.tsx` | `010439bb9002fabb7e1facd8450ee85edbafa309` | Narrow Markdown presentation adaptation using escaped React nodes; no raw HTML, link navigation or remote image loading. MIT retained. M6 candidate implemented, acceptance pending. |
+| `apps/desktop/host/save-result.ts` | `apps/desktop/src/report-save.ts` | `010439bb9002fabb7e1facd8450ee85edbafa309` | Narrow exclusive native-save adaptation; moyyi receipt selection and fresh source/hash validation replace upstream download authority. Result-only, no arbitrary original export. MIT retained. M6 candidate implemented, acceptance pending. |
+| `apps/desktop/renderer/SessionSidebar.tsx` | `apps/web/src/sidebar-organization.ts`, `apps/web/src/components/SidebarItemMenu.tsx` | `010439bb9002fabb7e1facd8450ee85edbafa309` | Organization controls adapted for local title/group/pin/mute/recycle state. New revision-checked moyyi management/store boundary; no channel/login/Server state. MIT retained. M6 candidate implemented, acceptance pending. |
 | `src/plugins/skills/parse.ts` | `packages/employee-publisher/src/agent-skills.ts` | `010439bb9002fabb7e1facd8450ee85edbafa309` | Adapted bounded YAML AST-validation approach (aliases, anchors/tags, scalar keys, node/depth caps); rewritten schema checks and moyyi plugin/port, no publisher or authority code. MIT notice in `THIRD_PARTY_NOTICES.md` |
 
 ## Desktop M1 adaptation
@@ -73,8 +76,8 @@ The settings form and material picker are independently rewritten against the lo
 Review of `ModelSettingsScreen.tsx`, `ModelSelector.tsx` and `ComposerAttachmentPicker.tsx` informed
 credential clearing, explicit unavailable choices, cancellation and stale-result handling.
 No Server catalog, revision/identity DTO, upload endpoint, channel model or attachment parser is
-copied. This slice uses only workspace-local native selection; upstream drag/drop, OCR and
-transcription are not ported. New renderer tests exercise escaped result text, historical states,
+copied. The M2 slice used only workspace-local native selection; upstream drag/drop, OCR and
+transcription were not ported in that slice. M6's later import implementation is recorded separately. New renderer tests exercise escaped result text, historical states,
 empty result pages, input clearing and action locking. Upstream tests were read, not run.
 The external candidate and both original live document tasks passed through the native UI;
 actual report text and comparison-file Finder selection were observed. This is moyyi candidate
@@ -155,11 +158,10 @@ The [current product plan](roadmap.md#openbot-reuse-within-this-sequence) moves 
 client into the next delivery. The following candidates were read at fixed OpenBot commit
 `010439bb9002fabb7e1facd8450ee85edbafa309`, under its
 [MIT license](https://github.com/Peerframe/openbot/blob/010439bb9002fabb7e1facd8450ee85edbafa309/LICENSE).
-The owner's dirty checkout was not used as source. This is a candidate inventory: no UI source
-was copied during planning. M1 adapts the approval view; the M2 source candidate now adapts the
-result card and independently implements the settings/material interactions described above;
-upstream tests have not been run, and this inventory itself certifies no desktop behavior.
-Record actual adapted files/notices and moyyi verification when each port is implemented.
+The owner's dirty checkout was not used as source. No UI source was copied during the planning delivery. Actual M1–M3 adaptations and M6 candidate
+adaptations are recorded above and below; upstream tests have not been run. This inventory itself
+certifies no desktop behavior. Record actual adapted files/notices and moyyi verification when
+each port is implemented.
 
 | Candidate at the fixed revision | Reuse decision and dependency boundary | Planned slice |
 |---|---|---|
@@ -182,13 +184,47 @@ the existing public runtime. The old control plane, login/session system and bro
 remain excluded. See [ADR0043](decisions/0043-desktop-web-sources.md).
 
 
+## Desktop M6 candidate adaptation
+
+M6 is **candidate implemented, acceptance pending**. The fixed source remains
+`010439bb9002fabb7e1facd8450ee85edbafa309`; no dirty OpenBot source or new dependency is imported.
+`RichMessage.tsx` adapts the fixed
+[rich-message view](https://github.com/Peerframe/openbot/blob/010439bb9002fabb7e1facd8450ee85edbafa309/apps/web/src/components/RichMessage.tsx)
+into a small escaped React-node Markdown renderer. `host/save-result.ts` adapts
+[report-save.ts](https://github.com/Peerframe/openbot/blob/010439bb9002fabb7e1facd8450ee85edbafa309/apps/desktop/src/report-save.ts)
+for receipt-selected, freshly hash-checked bytes and exclusive native-chosen destinations.
+`SessionSidebar.tsx` adapts controls from
+[sidebar-organization.ts](https://github.com/Peerframe/openbot/blob/010439bb9002fabb7e1facd8450ee85edbafa309/apps/web/src/sidebar-organization.ts)
+and [SidebarItemMenu.tsx](https://github.com/Peerframe/openbot/blob/010439bb9002fabb7e1facd8450ee85edbafa309/apps/web/src/components/SidebarItemMenu.tsx)
+for local search/title/group/pin/mute/recoverable removal. Source comments,
+[third-party notices](../THIRD_PARTY_NOTICES.md) and the distributed `OPENBOT-LICENSE.txt` retain MIT
+attribution. Upstream Server identities, channel state, downloads and persistence are not reused.
+
+The material import/library and session history/store are independently implemented against moyyi's
+runtime ports and existing immutable blobs. `owner_files.py`, `attachment_references.py` and
+`attachment_purge_files.py` informed original-byte retention, reference protection and cleanup
+failure cases; their service/SQL implementation is not copied. New schema3 metadata/material tables
+retain transcript/effect format1. Current selection is separate from conservative references;
+recycling does not erase history, revoke workspace reads or release references. Missing workspaces
+still permit text-history inspection. No second loop, permission store or database is introduced.
+
+Local PNG/JPEG previews require native bounds and remain display-only. Office/PDF preview shows
+identity, with body reading left to the existing tools. There is no OCR, image model input, raw HTML
+execution, remote image request or automatic fact check. Result saving does not yet implement the
+inventory's arbitrary-original/template-save breadth. Message copy/quoted-reply and remaining global
+preferences are still pending. Focused checks, installed-copy fixtures, native interaction and real
+task acceptance must be recorded separately; this adaptation note does not claim those gates passed.
+See [ADR0044](decisions/0044-desktop-material-library-and-history.md) and
+[M6 operation/limits](desktop.md#materials-previews-and-complete-history-m6-candidate).
+
 ## Complete transfer inventory
 
 The owner requested a plan on2026-10-28 to transfer all applicable personal-agent capabilities.
 This inventory replaces the earlier UI-only candidate list as the coverage index; the copied-code
 table above remains the record of **actual** reuse. Delivery order/acceptance live only in the
-[roadmap](roadmap.md#openbot-reuse-within-this-sequence). These rows are plans and source findings,
-not claims of implemented or tested moyyi support.
+[roadmap](roadmap.md#openbot-reuse-within-this-sequence). Rows without an implementation status
+remain plans/source findings. M6 statuses below mean **candidate implemented, acceptance pending**;
+they do not claim installed acceptance or complete transfer of all upstream behavior.
 
 Source: OpenBot `010439bb9002fabb7e1facd8450ee85edbafa309` (MIT), inspected through fixed Git objects.
 `W/` = [apps/web/src](https://github.com/Peerframe/openbot/tree/010439bb9002fabb7e1facd8450ee85edbafa309/apps/web/src),
@@ -211,12 +247,12 @@ Every new discovery gets a row here rather than an untracked optional backlog.
 | C02 Public source text | `S/public_source.py`, `S/work_product_web.py`: bounded public HTTPS text and separately configured search | **Covered** for HTML lessons/fetch/M5; desktop search is P15. Keep current web capability and source records. |
 | C03 Approvals, operation history and results | `W/components/{ApprovalCard,ArtifactCard,TaskSteps,WorkTasksScreen}.tsx` | **Covered** partial view adaptations in desktop renderer, with own policy/receipts; extend only remaining P01–P06 behavior. |
 | C04 Loop and execution guarantees | `P/harness/src/openbot_agent_runtime/{executor,guard,catalog}.py`, `S/work_corrections.py`, `S/work_reconciliation.py`, `S/work_product_result.py` | **Covered by own core**: reuse relevant cancellation, budget, revoke, late-result and unknown-effect cases. Do not add another loop/reviewer or treat model result review as fact certification. |
-| P01 External file selection/import | `W/components/ComposerAttachmentPicker.tsx`, `W/composer-context.ts`, `S/owner_files.py`, `S/product_attachment_routes.py`: picker/drop/image paste, cancellation and bounded original bytes | **Adapt + reimplement boundary**, M6: desktop input/main plus runtime-owned snapshot import. Explicit selected files only; immutable original/hash, no upload or parent-directory permission from selection. |
-| P02 Managed materials and retention | `W/components/{AttachmentsManager,SettingsStorage}.tsx`, `S/attachment_references.py`, `S/attachment_purge_files.py`, `S/storage_service.py` | **Adapt + reimplement boundary**, M6: imported-copy library/reference store, recoverable removal and explicit cleanup; retain the optional age-based housekeeping setting disabled by default, limited to unreferenced managed recycled copies. Never apply storage cleanup to arbitrary workspace files. |
-| P03 Readable rich output and images | `W/components/{RichMessage,AttachmentPreview,ArtifactCard}.tsx`: limited Markdown and PNG/JPEG preview; not a general Office/PDF renderer | **Adapt**, M6: renderer over validated local result identities; inert HTML, bounded decoding, no implicit remote image fetch; retain actual receipt/hash checks. |
-| P04 Save original/result | `D/report-save.ts`, `D/attachment-save-dialog.ts`, `W/components/ShareConversationDialog.tsx`: original/PNG/Markdown/template saving, not hosted conversation sharing | **Adapt + reimplement boundary**, M6: native Save dialog, exact selected bytes/digest, exclusive destination creation and cancel. Not a public-share feature. |
-| P05 Complete history and organization | `W/sidebar-organization.ts`, `W/components/{SidebarItemMenu,ChannelWorkspace}.tsx`: pin/group/hide/mute/name search, revision-bound rename and cursor history | **Adapt + reimplement boundary**, M6: local session metadata/history paging, rename and recoverable removal with reference protection. Name search is not full-text indexing; hidden/muted does not mean erased. No channel/member identity model. |
-| P06 Message and task conveniences | `W/components/{MessageActionBar,TaskActions,ApprovalStack}.tsx`: copy, quoted reply, details and cancellation/correction UI | **Adapt where missing**, M6/M13: own recorded message/effect IDs, draft-only actions where required, no automatic retry or social/team reaction subsystem. |
+| P01 External file selection/import | `W/components/ComposerAttachmentPicker.tsx`, `W/composer-context.ts`, `S/owner_files.py`, `S/product_attachment_routes.py`: picker/drop/image paste, cancellation and bounded original bytes | **Candidate implemented, acceptance pending (M6)**: native picker/drop/explicit clipboard PNG and host import over runtime-owned blobs. Immutable original/hash plus unique workspace copy; no upload, model call or parent-directory permission from selection. |
+| P02 Managed materials and retention | `W/components/{AttachmentsManager,SettingsStorage}.tsx`, `S/attachment_references.py`, `S/attachment_purge_files.py`, `S/storage_service.py` | **Candidate implemented, acceptance pending (M6)**: library/current selections/conservative references, recycle/restore and guarded unreferenced purge. Optional30-day housekeeping defaults off and only soft-recycles eligible unreferenced materials; it never deletes arbitrary project files or shared blobs. |
+| P03 Readable rich output and images | `W/components/{RichMessage,AttachmentPreview,ArtifactCard}.tsx`: limited Markdown and PNG/JPEG preview; not a general Office/PDF renderer | **Candidate implemented, acceptance pending (M6)**: escaped Markdown and host-checked bounded local PNG/JPEG; inert HTML/links/remote images and actual report receipt/hash checks. Seven-format material preview is identity-only; no OCR or image model input. |
+| P04 Save original/result | `D/report-save.ts`, `D/attachment-save-dialog.ts`, `W/components/ShareConversationDialog.tsx`: original/PNG/Markdown/template saving, not hosted conversation sharing | **Candidate implemented, acceptance pending (M6 result-save subset)**: receipt-backed native Save dialog, fresh bytes/digest, exclusive creation and cancel. Original/template saving remains pending for M13; no hosted sharing. |
+| P05 Complete history and organization | `W/sidebar-organization.ts`, `W/components/{SidebarItemMenu,ChannelWorkspace}.tsx`: pin/group/hide/mute/name search, revision-bound rename and cursor history | **Candidate implemented, acceptance pending (M6)**: local metadata, complete display-history pages/long-message chunks, revision-checked organization and recoverable removal; references retained. Name/prompt-excerpt search is not full-text indexing; mute is app completion-announcement only. No channel/member identity model. |
+| P06 Message and task conveniences | `W/components/{MessageActionBar,TaskActions,ApprovalStack}.tsx`: copy, quoted reply, details and cancellation/correction UI | **Partly covered; remaining adaptation pending (M6/M13)**: existing cancellation/draft actions retain own record/effect IDs; M6 adds long-message inspection. Copy/quoted reply is not implemented by that inspection. No automatic retry or social/team reactions. |
 | P07 Model connection management | `W/components/{ModelConnectionsDialog,ModelSelector,SettingsModelServices}.tsx`, `S/model_connections.py`, `S/model_presets.py` | **Adapt UX + reimplement boundary**, M7: desktop/settings and Keychain-backed named connections. Fixed presets have implementation, not proof every service works. Endpoint discovery and completion tests remain distinct. |
 | P08 Model protocol adapters | `S/product_model.py`, `S/work_product_model.py`, `S/work_openai_model.py`: actual SDK single-step adapters behind11 presets | **Reimplement only missing compatibility**, M7: existing ModelClient/provider plugins, explicit API/capability fixtures. Preserve reasoning/tool IDs/usage/stream termination; never import Python SDK loop or infer all11 endpoints are live-qualified. Flash remains default. |
 | P09 Personal instructions/preferences | `W/components/{EmployeeDescriptionForm,EmployeeProfileView}.tsx`, `S/owner_preferences.py` | **Adapt + reimplement boundary**, M7: one local personal configuration/context source, source/version visible. Description/appearance cannot grant capabilities; no Bot identity graph. |
@@ -232,10 +268,10 @@ Every new discovery gets a row here rather than an untracked optional backlog.
 | P19 Interactive MCP Apps | `W/components/PluginAppFrame.tsx`, `W/plugin-app-sandbox.ts`, `S/plugin_service.py` | **Adapt + reimplement isolated host**, M11 after P18: source AppBridge wires bounded resource reads and denies unwired host capabilities; preserve that scope. Separate frame and identity/origin validation, no default device/network/privileged IPC. Broader in-frame tool execution is new work, not inherited support. A demo or refusal-only path does not pass success acceptance. |
 | P20 Fixed-interval schedules | `W/components/AutomationsScreen.tsx`, `S/automation_store.py`, `S/work_product_service.py` | **Adapt views/algorithms + local persistence**, M12: one scheduler client submitting through runtime; durable claim/non-overlap/coalescing/pause/cancel distinctions. No calendar cron/DST guarantee, second loop or implied tool authority. |
 | P21 Desktop notifications | `D/desktop-notifications.ts`, `W/system-notifications.ts`: bounded nonforeground notices and navigation | **Adapt**, M12: explicit preference and sensitive-text policy; click opens actual run, never grants approval. Include foreground/background and denial checks. |
-| P22 Preferences, menus and accessible dialogs | `W/workspace-preferences.ts`, `W/components/{Dialog,DesktopSettingsScreen,SettingsGeneral,SettingsSearch}.tsx`, `W/components/useModalDialog.ts`, `D/navigation-menu.ts`, `D/platform-preferences.ts` | **Adapt**, M6 affected dialogs then M13 remaining preferences: font/density/send key/focus/reduced motion, side panels,12/24-hour format,Dock badge/native menus and shortcut conflict handling. Login/background startup opt-in and actual platform-gated; no untested theme/platform claims. |
+| P22 Preferences, menus and accessible dialogs | `W/workspace-preferences.ts`, `W/components/{Dialog,DesktopSettingsScreen,SettingsGeneral,SettingsSearch}.tsx`, `W/components/useModalDialog.ts`, `D/navigation-menu.ts`, `D/platform-preferences.ts` | **M6 affected native import/save controls: candidate implemented, acceptance pending**. M13 preferences remain planned: font/density/send key/focus/reduced motion, side panels,12/24-hour format,Dock badge/native menus and shortcuts. Login/background startup stays opt-in/platform-gated; no untested theme/platform claims. |
 | P23 First-run diagnostics/help | `W/components/{Onboarding,DesktopInstallScreen,DesktopConnectionScreen}.tsx`, `D/desktop-support-links.ts` | **Covered + adapt gaps**, M7/M13: local connection/runtime diagnostics and bounded safe help; exclude Server/PostgreSQL/login install flow. Startup success is not model acceptance. |
 | P24 Audit inspection/export | `W/components/SettingsSections.tsx`, `S/audit_records.py` | **Adapt views + own event projection**, M13: filters/paging, bounded CSV with formula escaping and content/privacy controls. No invented historical events, raw reasoning or secrets. |
-| P25 Maintenance/data recovery | `D/{profile-compatibility,restricted-json-file,local-content,bounded-response}.ts`, related tests | **Covered + adapt gaps**, M13: current local backup/restore/rollback expanded for newly introduced stores. Old snapshots readable; incompatible settings/packages fail clearly; preserve user data. |
+| P25 Maintenance/data recovery | `D/{profile-compatibility,restricted-json-file,local-content,bounded-response}.ts`, related tests | **Covered + M6 schema3 extension candidate implemented, acceptance pending**: backup includes material blobs; private-copy restore and schema-compatible software rollback preserve data. M13 extends qualification to later stores. An older schema2 app requires its pre-upgrade data backup, never an implicit downgrade. |
 | P26 Execution helpers and reusable failure tests | `S/work_product_commands.py`, `S/work_command_*.py`, `apps/node/src/command-*.ts`, `experiments/linux-execution/protected_host.py` | **Covered + selectively port cases** across stages: fixed Linux/input/output offline execution is not a general local PTY. Retain moyyi file/shell/undo implementations; useful deadline/lost-ACK/output integrity cases can strengthen them without remote signing/control-plane dependencies. |
 | P27 Shared utilities, schemas and contributor tooling | `P/{config,logging,domain,protocol,work-contract-generator,provider-sdk,provider-conformance-runner,windows-secret-acl}`, source tests/CI/scripts/notices | **Selective helper/test reuse**, each affected stage/M13 final sweep. Inspect exact file/license and consumer; target moyyi's existing contracts/checks. Do not import entire packages, generated old DTOs, maintenance frameworks or Windows support claims from a useful helper. |
 

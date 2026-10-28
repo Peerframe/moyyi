@@ -33,6 +33,13 @@ const legacySchema = `CREATE TABLE metadata (key TEXT PRIMARY KEY, value INTEGER
         CREATE TABLE workspace_leases (
           workspace_root TEXT PRIMARY KEY, run_id TEXT NOT NULL UNIQUE REFERENCES runs(id)
         ) STRICT;`;
+// Exact schema-2 addition; do not replace this fixture with current generated DDL.
+const legacySnapshots = `CREATE TABLE workspace_snapshots (
+          ordinal INTEGER PRIMARY KEY, id TEXT NOT NULL UNIQUE,
+          effect_id TEXT NOT NULL UNIQUE REFERENCES effects(id),
+          run_id TEXT NOT NULL REFERENCES runs(id),
+          restore_of TEXT REFERENCES workspace_snapshots(id), payload TEXT NOT NULL
+        ) STRICT;`;
 const roots: string[] = [];
 const stores: SqliteSessionStore[] = [];
 function legacy() {
@@ -68,11 +75,81 @@ function open(directory: string) {
   stores.push(store);
   return store;
 }
+
+function legacyTwo() {
+  const fixture = legacy();
+  const db = new DatabaseSync(fixture.file);
+  db.exec(legacySnapshots);
+  db.exec("PRAGMA user_version=2");
+  db.close();
+  return fixture;
+}
 afterEach(() => {
   for (const store of stores.splice(0)) store.close();
   for (const root of roots.splice(0)) rmSync(root, { recursive: true, force: true });
 });
-describe("additive schema 1 to 2 migration", () => {
+
+describe("additive schema 2 to 3 migration", () => {
+  it("adds management/material tables while retaining exact old transcript bytes", async () => {
+    const f = legacyTwo();
+    const store = open(f.directory);
+    expect(store.diagnostics()).toMatchObject({ schemaVersion: 3, persistedFormat: 1 });
+    expect((await store.sessionManagement.list()).items[0]?.metadata.revision).toBe(0);
+    expect((await store.loadSession("legacy-session" as never))?.entries).toEqual([f.entry]);
+    store.close();
+    const db = new DatabaseSync(f.file);
+    expect(db.prepare("SELECT payload FROM entries").get()?.payload).toBe(JSON.stringify(f.entry));
+    expect(db.prepare("PRAGMA user_version").get()?.user_version).toBe(3);
+    for (const table of [
+      "session_metadata",
+      "material_assets",
+      "material_references",
+      "material_selections",
+      "material_settings",
+    ])
+      expect(db.prepare("SELECT name FROM sqlite_schema WHERE name=?").get(table)).toBeDefined();
+    db.close();
+  });
+
+  it("rolls back all schema-3 additions atomically and preserves a reusable schema-2 backup", () => {
+    const f = legacyTwo();
+    expect(
+      () =>
+        new SqliteSessionStore(f.directory, {
+          checkpoint(point) {
+            if (point === "migration:before_commit") throw Error("schema 3 fault");
+          },
+        }),
+    ).toThrow("schema 3 fault");
+    const db = new DatabaseSync(f.file);
+    expect(db.prepare("PRAGMA user_version").get()?.user_version).toBe(2);
+    expect(db.prepare("SELECT payload FROM entries").get()?.payload).toBe(JSON.stringify(f.entry));
+    for (const table of [
+      "session_metadata",
+      "material_assets",
+      "material_references",
+      "material_selections",
+      "material_settings",
+    ])
+      expect(db.prepare("SELECT name FROM sqlite_schema WHERE name=?").get(table)).toBeUndefined();
+    expect(
+      db.prepare("SELECT name FROM sqlite_schema WHERE name='workspace_snapshots'").get(),
+    ).toBeDefined();
+    db.close();
+    expect(open(f.directory).diagnostics().schemaVersion).toBe(3);
+  });
+
+  it("refuses a damaged schema-2 database before adding any new table", () => {
+    const f = legacyTwo();
+    const db = new DatabaseSync(f.file);
+    db.exec("DROP INDEX one_active_run");
+    db.close();
+    const before = readFileSync(f.file);
+    expect(() => open(f.directory)).toThrow("damaged database schema");
+    expect(readFileSync(f.file)).toEqual(before);
+  });
+});
+describe("additive legacy schema migration", () => {
   it("restores a schema-1 backup with referenced user blobs and migrates only that copy", async () => {
     const f = legacy();
     const bytes = Buffer.from("Synthetic legacy user attachment");
@@ -101,7 +178,7 @@ describe("additive schema 1 to 2 migration", () => {
     if (!sessionId) throw Error("Missing restored session");
     expect((await restored.loadSession(sessionId))?.entries).toEqual([f.entry, user]);
     expect(await restored.getBlob(ref)).toEqual(bytes);
-    expect(restored.diagnostics()).toMatchObject({ schemaVersion: 2, persistedFormat: 1 });
+    expect(restored.diagnostics()).toMatchObject({ schemaVersion: 3, persistedFormat: 1 });
     const original = new DatabaseSync(f.file);
     expect(original.prepare("PRAGMA user_version").get()?.user_version).toBe(1);
     expect(
@@ -114,7 +191,7 @@ describe("additive schema 1 to 2 migration", () => {
     const f = legacy();
     const store = open(f.directory);
     expect(store.diagnostics()).toMatchObject({
-      schemaVersion: 2,
+      schemaVersion: 3,
       persistedFormat: 1,
       synchronous: 2,
       integrity: "ok",
@@ -128,7 +205,7 @@ describe("additive schema 1 to 2 migration", () => {
     store.close();
     const db = new DatabaseSync(f.file);
     expect(db.prepare("SELECT payload FROM entries").get()?.payload).toBe(JSON.stringify(f.entry));
-    expect(db.prepare("PRAGMA user_version").get()?.user_version).toBe(2);
+    expect(db.prepare("PRAGMA user_version").get()?.user_version).toBe(3);
     db.close();
   });
 
@@ -149,7 +226,7 @@ describe("additive schema 1 to 2 migration", () => {
     ).toBeUndefined();
     expect(db.prepare("SELECT payload FROM entries").get()?.payload).toBe(JSON.stringify(f.entry));
     db.close();
-    expect(open(f.directory).diagnostics().schemaVersion).toBe(2);
+    expect(open(f.directory).diagnostics().schemaVersion).toBe(3);
   });
 
   it.each([

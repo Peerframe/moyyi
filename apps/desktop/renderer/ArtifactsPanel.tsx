@@ -1,6 +1,8 @@
 import { useLayoutEffect, useRef } from "react";
 import type { DesktopArtifact, DesktopState } from "../shared.ts";
 import { ArtifactCard } from "./ArtifactCard.tsx";
+import { BoundedImage } from "./BoundedImage.tsx";
+import { RichMessage } from "./RichMessage.tsx";
 import { formatBytes } from "./view-state.ts";
 
 export function ArtifactsPanel({
@@ -11,6 +13,7 @@ export function ArtifactsPanel({
   onOpen,
   onReveal,
   onClose,
+  onSave,
 }: {
   artifacts: DesktopState["artifacts"];
   preview: DesktopState["artifactPreview"];
@@ -19,6 +22,7 @@ export function ArtifactsPanel({
   onOpen(artifact: DesktopArtifact): Promise<void>;
   onReveal(artifact: DesktopArtifact): Promise<void>;
   onClose(): void;
+  onSave?(artifact: DesktopArtifact): Promise<void>;
 }) {
   const previewSection = useRef<HTMLElement>(null);
   const previewEffectId = preview?.effectId;
@@ -52,6 +56,7 @@ export function ArtifactsPanel({
             busy={busy}
             onOpen={() => onOpen(artifact)}
             onReveal={() => onReveal(artifact)}
+            {...(onSave ? { onSave: () => onSave(artifact) } : {})}
           />
         ))
       ) : (
@@ -93,13 +98,21 @@ export function ArtifactsPanel({
             {preview.path} · {formatBytes(preview.sourceBytes)}
           </p>
           <p className="hash-label">读取时 SHA-256：{preview.sha256}</p>
-          <p className="panel-note">以下为本次打开时读取的纯文本，不会执行其中的 HTML 或链接。</p>
+          <p className="panel-note">
+            以下内容来自本次核对哈希后的文件；HTML、链接和远程图片不会执行或加载。
+          </p>
           {preview.truncated ? (
             <p className="preview-warning" role="status">
               正文显示已截断，以下不是完整文件内容。
             </p>
           ) : null}
-          <pre>{preview.text}</pre>
+          {preview.image ? (
+            <BoundedImage key={preview.sha256} image={preview.image} name={preview.path} />
+          ) : preview.path.toLowerCase().endsWith(".md") ? (
+            <RichMessage content={preview.text} />
+          ) : (
+            <pre>{preview.text}</pre>
+          )}
         </section>
       ) : null}
     </section>

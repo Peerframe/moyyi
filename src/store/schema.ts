@@ -1,7 +1,9 @@
 import type { DatabaseSync } from "node:sqlite";
 import { PERSISTED_FORMAT_VERSION } from "../contracts/persisted/index.ts";
+import { MATERIALS_SQL } from "./materials.ts";
+import { SESSION_METADATA_SQL } from "./session-management.ts";
 
-export const SCHEMA_VERSION = 2;
+export const SCHEMA_VERSION = 3;
 const APPLICATION_ID = 0x4d4f5959;
 
 const SCHEMA_V1_SQL = `CREATE TABLE metadata (key TEXT PRIMARY KEY, value INTEGER NOT NULL) STRICT;
@@ -37,7 +39,9 @@ const SNAPSHOT_SQL = `CREATE TABLE workspace_snapshots (
           run_id TEXT NOT NULL REFERENCES runs(id),
           restore_of TEXT REFERENCES workspace_snapshots(id), payload TEXT NOT NULL
         ) STRICT;`;
-const SCHEMA_SQL = `${SCHEMA_V1_SQL}\n${SNAPSHOT_SQL}`;
+const SCHEMA_V2_SQL = `${SCHEMA_V1_SQL}\n${SNAPSHOT_SQL}`;
+const SCHEMA_V3_ADDITIONS = `${SESSION_METADATA_SQL}\n${MATERIALS_SQL}`;
+const SCHEMA_SQL = `${SCHEMA_V2_SQL}\n${SCHEMA_V3_ADDITIONS}`;
 
 function validateSchema(db: DatabaseSync, sql: string): void {
   // Validate before migrating: adding a table must never repair missing prior guarantees.
@@ -88,11 +92,12 @@ export function migrate(db: DatabaseSync, beforeCommit: () => void): void {
       db.exec("ROLLBACK");
       throw error;
     }
-  } else if (version === 1 && app === APPLICATION_ID) {
-    validateSchema(db, SCHEMA_V1_SQL);
+  } else if ((version === 1 || version === 2) && app === APPLICATION_ID) {
+    validateSchema(db, version === 1 ? SCHEMA_V1_SQL : SCHEMA_V2_SQL);
     db.exec("BEGIN IMMEDIATE");
     try {
-      db.exec(SNAPSHOT_SQL);
+      if (version === 1) db.exec(SNAPSHOT_SQL);
+      db.exec(SCHEMA_V3_ADDITIONS);
       db.exec(`PRAGMA user_version = ${SCHEMA_VERSION}`);
       beforeCommit();
       db.exec("COMMIT");

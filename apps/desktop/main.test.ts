@@ -1,4 +1,17 @@
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { createHash } from "node:crypto";
+import {
+  existsSync,
+  mkdirSync,
+  mkdtempSync,
+  readdirSync,
+  readFileSync,
+  realpathSync,
+  rmSync,
+  writeFileSync,
+} from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 const native = vi.hoisted(() => {
   const contents = {
@@ -24,6 +37,8 @@ const native = vi.hoisted(() => {
     picker: vi.fn(),
     maintenance: vi.fn(),
     maintenanceClose: vi.fn(),
+    clipboardRead: vi.fn(),
+    tempDirectory: "",
   };
 });
 vi.mock("electron", () => ({
@@ -34,6 +49,7 @@ vi.mock("electron", () => ({
     on: vi.fn(),
     whenReady: () => Promise.resolve(),
     getAppPath: () => "/installed/app",
+    getPath: () => native.tempDirectory,
     quit: vi.fn(),
   },
   BrowserWindow: class {
@@ -65,6 +81,7 @@ vi.mock("electron", () => ({
     },
   },
   shell: { showItemInFolder: vi.fn() },
+  clipboard: { read: native.clipboardRead },
 }));
 vi.mock("./bridge.ts", () => ({
   DesktopProcess: class {
@@ -121,9 +138,243 @@ beforeEach(async () => {
   });
   native.maintenance.mockReset().mockResolvedValue({ kind: "backup", path: "/selected/backup" });
   native.maintenanceClose.mockReset().mockResolvedValue(undefined);
+  native.clipboardRead.mockReset().mockResolvedValue([]);
   await import("./main.ts");
   await vi.waitFor(() => expect(native.handlers.has("moyyi:permissions")).toBe(true));
   expect(native.error).not.toHaveBeenCalled();
+});
+
+const temporary: string[] = [];
+afterEach(() => {
+  for (const path of temporary.splice(0)) rmSync(path, { recursive: true, force: true });
+});
+function files() {
+  const directory = realpathSync(mkdtempSync(join(tmpdir(), "moyyi-native-m6-")));
+  temporary.push(directory);
+  const workspace = join(directory, "workspace");
+  const temp = join(directory, "temporary");
+  mkdirSync(workspace);
+  mkdirSync(temp);
+  native.tempDirectory = temp;
+  native.state.workspaceRoot = workspace;
+  return { directory, workspace, temp };
+}
+const png = Buffer.from(
+  "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAusB9Y9ZC8sAAAAASUVORK5CYII=",
+  "base64",
+);
+function clipboardPng(bytes: Buffer = png) {
+  const getType = vi
+    .fn()
+    .mockResolvedValue(new Blob([new Uint8Array(bytes)], { type: "image/png" }));
+  native.clipboardRead.mockResolvedValue([{ types: ["image/png"], getType }]);
+  return getType;
+}
+
+describe("native M6 materials and saving", () => {
+  const selected = { sessionId: "session_current" };
+  const drop = { ...selected, paths: ["/external/source.md"] };
+  it("keeps imports behind native entry points and rejected confirmations inert", async () => {
+    await expect(call("moyyi:act", { type: "materials.import", ...drop })).rejects.toThrow(
+      "原生入口",
+    );
+    native.confirm.mockResolvedValueOnce({ response: 0 });
+    await call("moyyi:import-files", drop);
+    expect(native.confirm.mock.calls[0]?.[1]).toMatchObject({ defaultId: 0, cancelId: 0 });
+    expect(native.confirm.mock.calls[0]?.[1].detail).toContain(drop.paths[0]);
+    expect(native.send).not.toHaveBeenCalled();
+    native.picker.mockResolvedValueOnce({ canceled: true });
+    await call("moyyi:documents", selected);
+    expect(native.send).not.toHaveBeenCalled();
+    await call("moyyi:import-files", drop);
+    expect(native.send).toHaveBeenCalledExactlyOnceWith({ type: "materials.import", ...drop });
+  });
+  it("claims the drop gate before another selection or generic action can start", async () => {
+    let finish: ((value: { response: number }) => void) | undefined;
+    native.confirm.mockImplementationOnce(
+      () =>
+        new Promise((resolve) => {
+          finish = resolve;
+        }),
+    );
+    const first = call("moyyi:import-files", drop);
+    const rejected = expect(call("moyyi:documents", selected)).rejects.toThrow("当前选择");
+    await vi.waitFor(() => expect(finish).toBeTypeOf("function"));
+    await expect(
+      call("moyyi:act", { type: "start", ...selected, text: "not admitted" }),
+    ).rejects.toThrow("当前选择");
+    finish?.({ response: 0 });
+    await Promise.all([first, rejected]);
+    expect(native.send).not.toHaveBeenCalled();
+    await call("moyyi:act", { type: "list", offset: 0 });
+    expect(native.send).toHaveBeenCalledOnce();
+  });
+  it("allows only material cancellation through the action gate while native selection is pending", async () => {
+    let finish: ((value: { response: number }) => void) | undefined;
+    native.confirm.mockImplementationOnce(
+      () =>
+        new Promise((resolve) => {
+          finish = resolve;
+        }),
+    );
+    const first = call("moyyi:import-files", drop);
+    await vi.waitFor(() => expect(finish).toBeTypeOf("function"));
+    await call("moyyi:act", { type: "material.cancel", ...selected });
+    expect(native.send).toHaveBeenCalledExactlyOnceWith({ type: "material.cancel", ...selected });
+    await expect(call("moyyi:act", { type: "list", offset: 0 })).rejects.toThrow("当前选择");
+    finish?.({ response: 0 });
+    await first;
+    expect(native.send).toHaveBeenCalledOnce();
+  });
+  it("invalidates the file picker after a session switch instead of importing into the next session", async () => {
+    native.picker.mockImplementationOnce(async () => {
+      native.state.activeSessionId = "session_other";
+      return { canceled: false, filePaths: drop.paths };
+    });
+    await expect(call("moyyi:documents", selected)).rejects.toThrow("会话已变化");
+    expect(native.send).not.toHaveBeenCalled();
+  });
+  it.each([
+    { activeSessionId: "other_session" },
+    { workspaceRoot: "/other-workspace" },
+    { run: { id: "late_run" } },
+    { status: "closed" },
+    { historyOnly: true },
+  ])("rejects a drop confirmation after state changes to %j", async (change) => {
+    native.confirm.mockImplementationOnce(async () => {
+      Object.assign(native.state, change);
+      return { response: 1 };
+    });
+    await expect(call("moyyi:import-files", drop)).rejects.toThrow("会话已变化");
+    expect(native.send).not.toHaveBeenCalled();
+  });
+  it("reads only the clipboard Blob and cancels before any staging file or worker import", async () => {
+    const f = files();
+    const getType = clipboardPng();
+    await expect(
+      call("moyyi:paste-image", { ...selected, bytes: png.toString("base64") }),
+    ).rejects.toThrow();
+    expect(native.clipboardRead).not.toHaveBeenCalled();
+    native.confirm.mockResolvedValueOnce({ response: 0 });
+    await call("moyyi:paste-image", selected);
+    expect(getType).toHaveBeenCalledExactlyOnceWith("image/png");
+    expect(native.send).not.toHaveBeenCalled();
+    expect(readdirSync(f.temp)).toEqual([]);
+  });
+  it("stages exactly the accepted clipboard PNG, waits for import and removes staging", async () => {
+    const f = files();
+    clipboardPng();
+    let staged = "";
+    native.send.mockImplementationOnce(async (command) => {
+      expect(command).toMatchObject({ type: "materials.import", ...selected });
+      expect(command.paths).toHaveLength(1);
+      staged = command.paths[0];
+      expect(readFileSync(staged)).toEqual(png);
+      expect(staged.startsWith(`${f.temp}/moyyi-paste-`)).toBe(true);
+      return structuredClone(native.state);
+    });
+    await call("moyyi:paste-image", selected);
+    expect(native.send).toHaveBeenCalledOnce();
+    expect(existsSync(staged)).toBe(false);
+    expect(readdirSync(f.temp)).toEqual([]);
+  });
+  it("rejects oversized clipboard blobs before confirmation, allocation or import", async () => {
+    const f = files();
+    const arrayBuffer = vi.fn();
+    native.clipboardRead.mockResolvedValue([
+      { types: ["image/png"], getType: async () => ({ size: 524289, arrayBuffer }) },
+    ]);
+    await expect(call("moyyi:paste-image", selected)).rejects.toThrow("512KiB");
+    expect(arrayBuffer).not.toHaveBeenCalled();
+    expect(native.confirm).not.toHaveBeenCalled();
+    expect(native.send).not.toHaveBeenCalled();
+    expect(readdirSync(f.temp)).toEqual([]);
+  });
+  it.each([{ activeSessionId: "other_session" }, { status: "closed" }, { historyOnly: true }])(
+    "rejects a paste after confirmation changes state to %j",
+    async (change) => {
+      const f = files();
+      clipboardPng();
+      native.confirm.mockImplementationOnce(async () => {
+        Object.assign(native.state, change);
+        return { response: 1 };
+      });
+      await expect(call("moyyi:paste-image", selected)).rejects.toThrow("会话已变化");
+      expect(native.send).not.toHaveBeenCalled();
+      expect(readdirSync(f.temp)).toEqual([]);
+    },
+  );
+  it("saves receipt-matched bytes and refuses changed source or an existing destination", async () => {
+    const f = files();
+    const source = join(f.workspace, "report.md");
+    const destination = join(f.directory, "saved.md");
+    writeFileSync(source, "recorded result");
+    const preview = {
+      effectId: "effect_report",
+      path: "report.md",
+      sha256: createHash("sha256").update("recorded result").digest("hex"),
+      sourceBytes: 15,
+      text: "recorded result",
+      truncated: false,
+    };
+    native.send.mockImplementation(async (command) => {
+      expect(command).toEqual({ type: "artifact.open", ...selected, effectId: preview.effectId });
+      return { ...native.state, artifactPreview: preview };
+    });
+    native.picker.mockResolvedValue({ canceled: false, filePath: destination });
+    await call("moyyi:save-artifact", { ...selected, effectId: preview.effectId });
+    expect(readFileSync(destination, "utf8")).toBe("recorded result");
+    writeFileSync(destination, "user destination");
+    await expect(
+      call("moyyi:save-artifact", { ...selected, effectId: preview.effectId }),
+    ).rejects.toThrow();
+    expect(readFileSync(destination, "utf8")).toBe("user destination");
+    const second = join(f.directory, "second.md");
+    native.picker.mockResolvedValue({ canceled: false, filePath: second });
+    writeFileSync(source, "changed source");
+    await expect(
+      call("moyyi:save-artifact", { ...selected, effectId: preview.effectId }),
+    ).rejects.toThrow("changed");
+    expect(existsSync(second)).toBe(false);
+    await expect(
+      call("moyyi:save-artifact", { ...selected, effectId: preview.effectId, path: source }),
+    ).rejects.toThrow("Invalid");
+  });
+  it("does not show a save picker for a mismatched receipt identity", async () => {
+    native.send.mockResolvedValueOnce({
+      ...native.state,
+      artifactPreview: { effectId: "other_receipt" },
+    });
+    await expect(
+      call("moyyi:save-artifact", { ...selected, effectId: "effect_report" }),
+    ).rejects.toThrow("成果已变化");
+    expect(native.picker).not.toHaveBeenCalled();
+  });
+  it("keeps cancelled or stale save pickers from writing a result copy", async () => {
+    const f = files();
+    const destination = join(f.directory, "not-saved.md");
+    writeFileSync(join(f.workspace, "report.md"), "recorded");
+    const preview = {
+      effectId: "effect_report",
+      path: "report.md",
+      sha256: createHash("sha256").update("recorded").digest("hex"),
+      sourceBytes: 8,
+      text: "recorded",
+      truncated: false,
+    };
+    native.send.mockImplementation(async () => ({ ...native.state, artifactPreview: preview }));
+    native.picker.mockResolvedValueOnce({ canceled: true, filePath: destination });
+    await call("moyyi:save-artifact", { ...selected, effectId: preview.effectId });
+    expect(existsSync(destination)).toBe(false);
+    native.picker.mockImplementationOnce(async () => {
+      native.state.status = "closed";
+      return { canceled: false, filePath: destination };
+    });
+    await expect(
+      call("moyyi:save-artifact", { ...selected, effectId: preview.effectId }),
+    ).rejects.toThrow("会话已变化");
+    expect(existsSync(destination)).toBe(false);
+  });
 });
 
 describe("native web permission entry", () => {

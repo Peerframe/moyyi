@@ -128,8 +128,9 @@ Enforced by [tests/boundaries.ts](../tests/boundaries.ts):
 - Only `runtime` and `evals` import plugins.
 - Desktop TypeScript and TSX are checked too. `apps/desktop/renderer` imports only its own
   views/styles, React's browser entry points and `shared.ts`; it cannot import Node, Electron,
-  runtime/contracts packages or any `src` internals. Model and document content remains plain
-  text, never executable markup or an authority grant.
+  runtime/contracts packages or any `src` internals. Model and document text uses escaped React
+  nodes, including the bounded M6 Markdown subset; raw HTML, links and remote images remain inert.
+  Only host-checked bounded local PNG/JPEG bytes enter image previews. Content never grants authority.
 - `shared.ts` is a data-only contract without external imports. `security.ts` is likewise pure;
   `wire.ts` can use only shared data and security validation. `preload.ts` imports only these
   three modules and Electron, exposing named methods rather than generic IPC or Node access.
@@ -186,6 +187,55 @@ to supply bounded UTF-8 plain text. Missing/changed/unavailable reports never be
 preview. Finder receives only the inspected receipt path and does not execute the file; its
 invocation is not a confirmed user-visible selection. Historical receipts certify recorded
 execution, not current bytes or answer correctness. No persisted core/session schema changes.
+
+### Desktop M6 local materials and history
+
+[ADR 0044](decisions/0044-desktop-material-library-and-history.md) adds trusted local management
+without changing the agent loop, persisted transcript/effect format or layer import rules.
+`shared.ts` remains an import-free DTO contract; renderer imports remain own modules, React and
+shared data only. Named preload/main operations validate the owning frame, current session and
+native-confirmed source/destination. Generic actions cannot grant arbitrary external path access.
+Clipboard PNG and dropped disk files join the same native-confirmed import boundary, not renderer
+filesystem or clipboard authority.
+
+`host/managed-materials.ts` preserves bounded originals in the existing blob store and publishes
+unique workspace copies. `src/store/materials.ts` owns assets, revisions, current selections and
+conservative historical references. Importing adds no tool grant; documents/text still enter model
+context through normal tools, policy and recording. Seven-format preview shows identity only;
+PNG/JPEG preview is local and adds neither OCR nor model image input. Recycling preserves bytes
+and references; purging requires an unreferenced recycled asset and verified managed copy and
+never unlinks shared blobs. Optional housekeeping is off by default and only soft-recycles eligible
+unreferenced materials after30 days.
+
+The public runtime exposes host-only management ports alongside the unchanged client protocol:
+
+| Port | Bounded operation and authority |
+|---|---|
+| `Runtime.sessions.list(query)` | Name/prompt-excerpt search, group/recycle filters and catalog pages; continuation binds query and catalog generation. |
+| `Runtime.sessions.history(query)` / `readMessage(query)` | Older display pages and full-text chunks using stable session/entry identities. No reasoning, provider replay or request blobs; no workspace existence requirement. |
+| `Runtime.sessions.update(update)` | Revision-checked title/group/pin/mute/recoverable removal. Removal refuses active work/unsettled effects/leases; removed sessions cannot start new work until restored. |
+| `Runtime.materials` | Optional store-backed material list/get/find/create/activate, selection/reference attachment, read/recycle/restore/purge and housekeeping setting. No model-accessible tool or implicit permission grant. |
+
+These APIs share runtime idle admission, close lifecycle and the single store writer. Sequential
+calls release admission before resolving; concurrent management/run/reload requests cannot bypass
+it. Existing CLI session commands retain their interface. Metadata is local organization, not
+model context or authority. Missing-workspace and recycled sessions remain inspectable read-only;
+new work still requires the actual workspace, active session and current permissions.
+
+SQLite schema3 adds session metadata and material assets/references/selections/settings. Validated
+schema1/2 stores migrate transactionally; transcript/effect format1 and existing entries are unchanged.
+Backup traverses material blob references as well as transcript/snapshot references, including
+recycled originals. Restore upgrades a private verified copy. Software rollback requires the old
+package's declared schema to match current data, otherwise the pre-upgrade app and data backup must
+be used together after rescuing current state; no deletion or implicit downgrade makes it fit.
+
+`RichMessage.tsx` renders a bounded Markdown subset with escaped React nodes. `host/image-preview.ts`
+checks PNG/JPEG headers, encoded size and dimensions before exposing a data-image DTO; the renderer
+validates the DTO and handles decode failure. HTML, navigation and remote images remain inert.
+`host/save-result.ts` freshly checks receipt-selected bytes/hash and uses exclusive creation at a
+native-selected destination; cancel and existing-file refusal do not overwrite user files.
+See [desktop use and limits](desktop.md#materials-previews-and-complete-history-m6-candidate).
+This is **candidate implemented, acceptance pending**, not installed or semantic acceptance.
 
 ### Desktop M3 controlled workflows
 

@@ -130,7 +130,7 @@ it("retains sessions and schema across close/reopen without changing heads or re
     expect(await reopened.listSessionSummaries({ offset: 0, limit: 1 })).toEqual(page);
     expect(await reopened.loadSession("persisted" as SessionId)).toEqual(before);
     expect(reopened.diagnostics()).toMatchObject({
-      schemaVersion: 2,
+      schemaVersion: 3,
       persistedFormat: 1,
       integrity: "ok",
     });

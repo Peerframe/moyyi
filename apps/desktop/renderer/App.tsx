@@ -10,6 +10,7 @@ import { ApprovalCard } from "./ApprovalCard.tsx";
 import { ArtifactsPanel } from "./ArtifactsPanel.tsx";
 import { EffectsPanel } from "./EffectsPanel.tsx";
 import { appendReviewDraft, CHECK_DRAFT, permissionLabel } from "./effects-state.ts";
+import { HistoryPanel } from "./HistoryPanel.tsx";
 import { MaintenanceDialog } from "./MaintenanceDialog.tsx";
 import { MaterialsPanel } from "./MaterialsPanel.tsx";
 import { MessageList } from "./MessageList.tsx";
@@ -180,6 +181,9 @@ export function App({ bridge }: { bridge: DesktopBridge }) {
       </main>
     );
 
+  const activeMetadata =
+    state.activeMetadata ??
+    state.sessions.items.find((s) => s.sessionId === state.activeSessionId)?.metadata;
   const busy = pending || state.run !== null || state.status !== "ready";
   const configuring = newSession || !state.activeSessionId;
   const error = viewError ?? state.error;
@@ -192,6 +196,7 @@ export function App({ bridge }: { bridge: DesktopBridge }) {
     !permissionsOpen &&
     !webAccessOpen &&
     state.connection.ready &&
+    !state.historyOnly &&
     draft.trim().length > 0;
   const requestBudget =
     state.budgets.maxRequests === null
@@ -220,6 +225,8 @@ export function App({ bridge }: { bridge: DesktopBridge }) {
         }}
         onLoad={(id) => void loadSession(id)}
         onList={(offset) => act({ type: "list", offset })}
+        onQuery={(query) => act({ type: "catalog", query })}
+        onUpdate={(update) => act({ type: "session.update", update })}
       />
       <main className="conversation">
         <header className="conversation-header">
@@ -322,7 +329,59 @@ export function App({ bridge }: { bridge: DesktopBridge }) {
                     当前权限以上方状态为准；已停止不代表已撤销，结果未知时需先检查。
                   </p>
                 ) : null}
+                {state.importing ? (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      void bridge
+                        .act({
+                          type: "material.cancel",
+                          sessionId: state.activeSessionId as string,
+                        })
+                        .catch((cause) => setViewError(errorMessage(cause)));
+                    }}
+                  >
+                    取消导入
+                  </button>
+                ) : null}
                 <MaterialsPanel
+                  library={state.library}
+                  preview={state.materialPreview}
+                  onLibrary={(offset) =>
+                    act({ type: "library", sessionId: state.activeSessionId as string, offset })
+                  }
+                  onManage={(item, action) =>
+                    act({
+                      type: `material.${action}`,
+                      sessionId: state.activeSessionId as string,
+                      id: item.id,
+                      revision: item.revision,
+                    })
+                  }
+                  onAttach={(ids) =>
+                    act({
+                      type: "material.select",
+                      sessionId: state.activeSessionId as string,
+                      ids,
+                    })
+                  }
+                  onHousekeeping={(enabled) =>
+                    act({
+                      type: "material.housekeeping",
+                      sessionId: state.activeSessionId as string,
+                      enabled,
+                    })
+                  }
+                  onDrop={(files) =>
+                    void perform(() =>
+                      bridge.importFiles({ sessionId: state.activeSessionId as string, files }),
+                    )
+                  }
+                  onPaste={() =>
+                    void perform(() =>
+                      bridge.pasteImage({ sessionId: state.activeSessionId as string }),
+                    )
+                  }
                   materials={state.materials}
                   reportTarget={state.reportTarget}
                   permissions={state.permissions}
@@ -355,12 +414,40 @@ export function App({ bridge }: { bridge: DesktopBridge }) {
                     <p>说明要分析的问题，moyyi 会在本轮预算内读取文件并回答。</p>
                   </section>
                 ) : null}
-                <MessageList
-                  messages={state.messages}
-                  historyTruncated={state.historyTruncated}
-                  streamText={state.streamText}
-                  running={state.run !== null}
+                {state.historyOnly ? (
+                  <p role="status">
+                    会话在回收站或工作目录不可用。当前只能查看完整历史，不能继续任务。
+                  </p>
+                ) : null}
+                <HistoryPanel
+                  key={state.activeSessionId}
+                  state={state}
+                  busy={busy}
+                  onPage={(cursor) =>
+                    act({
+                      type: "history",
+                      sessionId: state.activeSessionId as string,
+                      ...(cursor ? { cursor } : {}),
+                    })
+                  }
+                  onMessage={(messageId, offset) =>
+                    act({
+                      type: "history.message",
+                      sessionId: state.activeSessionId as string,
+                      messageId,
+                      offset,
+                    })
+                  }
+                  onClose={() => act({ type: "history.close" })}
                 />
+                {!state.history ? (
+                  <MessageList
+                    messages={state.messages}
+                    historyTruncated={state.historyTruncated}
+                    streamText={state.streamText}
+                    running={state.run !== null}
+                  />
+                ) : null}
                 {state.pendingApproval && state.run?.state === "running" ? (
                   <ApprovalCard
                     key={approvalIdentity(state.pendingApproval)}
@@ -370,7 +457,11 @@ export function App({ bridge }: { bridge: DesktopBridge }) {
                   />
                 ) : null}
                 {state.outcome && !state.run ? (
-                  <p className="outcome" role="status">
+                  <p
+                    className="outcome"
+                    role={activeMetadata?.muted ? undefined : "status"}
+                    aria-live={activeMetadata?.muted ? "off" : "polite"}
+                  >
                     {outcomeLabel(state.outcome)}
                   </p>
                 ) : null}
@@ -401,6 +492,15 @@ export function App({ bridge }: { bridge: DesktopBridge }) {
                   onDraft={prepareDraft}
                 />
                 <ArtifactsPanel
+                  onSave={async (artifact) => {
+                    const result = await perform(() =>
+                      bridge.saveArtifact({
+                        sessionId: state.activeSessionId as string,
+                        effectId: artifact.effectId,
+                      }),
+                    );
+                    if (!result) throw Error("保存未完成");
+                  }}
                   artifacts={state.artifacts}
                   preview={state.artifactPreview}
                   busy={busy}

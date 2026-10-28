@@ -186,7 +186,7 @@ describe("real process interruption (not a physical power-loss test)", () => {
     await kill(child);
     const store = open(paths.directory);
     expect(store.diagnostics()).toMatchObject({
-      schemaVersion: 2,
+      schemaVersion: 3,
       persistedFormat: 1,
       integrity: "ok",
     });

@@ -1,10 +1,12 @@
-import { readFileSync, realpathSync, statSync } from "node:fs";
-import { dirname, join, relative } from "node:path";
+import { mkdtempSync, readFileSync, realpathSync, rmSync, statSync, writeFileSync } from "node:fs";
+import { basename, dirname, join, relative } from "node:path";
 import { pathToFileURL } from "node:url";
-import { app, BrowserWindow, dialog, ipcMain, Menu, session, shell } from "electron";
+import { app, BrowserWindow, clipboard, dialog, ipcMain, Menu, session, shell } from "electron";
 import { DesktopProcess } from "./bridge.ts";
+import { imagePreview } from "./host/image-preview.ts";
 import type { MaintenanceRequest } from "./host/maintenance.ts";
 import { MaintenanceProcess } from "./host/maintenance-client.ts";
+import { saveReceiptFile } from "./host/save-result.ts";
 import { parseDesktopCommand } from "./host/validation.ts";
 import { isTrustedSender, pickerOptions } from "./security.ts";
 
@@ -242,13 +244,15 @@ else {
       ipcMain.handle("moyyi:act", async (event, value: unknown) => {
         trusted(event);
         const command = parseDesktopCommand(value);
-        if (selecting || quitting) throw Error("请先完成或取消当前选择。 ");
+        if ((selecting && command.type !== "material.cancel") || quitting)
+          throw Error("请先完成或取消当前选择。 ");
         if (
           [
             "create",
             "close",
             "configure",
             "materials",
+            "materials.import",
             "report.target",
             "permissions",
             "web.permissions",
@@ -284,6 +288,7 @@ else {
           selecting ||
           quitting ||
           state.run ||
+          state.historyOnly ||
           state.status !== "ready" ||
           state.activeSessionId !== sessionId ||
           !state.workspaceRoot
@@ -356,6 +361,8 @@ else {
           const current = await host.getState();
           if (
             current.status !== "ready" ||
+            current.historyOnly ||
+            quitting ||
             current.run ||
             current.activeSessionId !== command.sessionId ||
             current.workspaceRoot !== state.workspaceRoot
@@ -396,6 +403,8 @@ else {
           const current = await host.getState();
           if (
             current.status !== "ready" ||
+            current.historyOnly ||
+            quitting ||
             current.run ||
             current.activeSessionId !== command.sessionId ||
             current.workspaceRoot !== state.workspaceRoot
@@ -413,15 +422,30 @@ else {
         claimSelection();
         try {
           const selected = await dialog.showOpenDialog(ownedWindow, {
-            title: "选择工作目录内的文档",
+            title: "导入文档或图片",
             defaultPath: state.workspaceRoot as string,
             message:
-              "只选择当前工作目录内的文件，每份最多10MiB，最多8份；选择不会自动上传或调用模型。",
+              "可选择工作目录外的材料；每份最多10MiB、最多8份。原件保留，工作目录创建副本；不自动上传或调用模型。",
             properties: ["openFile", "multiSelections", "noResolveAliases"],
             filters: [
               {
                 name: "支持的文档",
-                extensions: ["pdf", "docx", "xlsx", "pptx", "odt", "ods", "odp"],
+                extensions: [
+                  "pdf",
+                  "docx",
+                  "xlsx",
+                  "pptx",
+                  "odt",
+                  "ods",
+                  "odp",
+                  "txt",
+                  "md",
+                  "csv",
+                  "json",
+                  "png",
+                  "jpg",
+                  "jpeg",
+                ],
               },
             ],
             buttonLabel: "选择文档",
@@ -431,14 +455,142 @@ else {
           if (
             current.activeSessionId !== sessionId ||
             current.workspaceRoot !== state.workspaceRoot ||
-            current.run
+            current.run ||
+            current.status !== "ready" ||
+            current.historyOnly ||
+            quitting
           )
             throw Error("会话已变化，请重新选择文档。");
           return host.send({
-            type: "materials",
+            type: "materials.import",
             sessionId,
-            paths: selected.filePaths.map((p) => relative(state.workspaceRoot as string, p)),
+            paths: selected.filePaths,
           });
+        } finally {
+          selecting = false;
+        }
+      });
+      ipcMain.handle("moyyi:import-files", async (event, value: unknown) => {
+        trusted(event);
+        if (
+          !value ||
+          typeof value !== "object" ||
+          Array.isArray(value) ||
+          Object.keys(value).sort().join() !== "paths,sessionId"
+        )
+          throw Error("Invalid dropped files");
+        const command = parseDesktopCommand({ ...value, type: "materials.import" });
+        if (command.type !== "materials.import") throw Error("Invalid dropped files");
+        const state = await currentSession(command.sessionId);
+        claimSelection();
+        try {
+          const consent = await dialog.showMessageBox(ownedWindow, {
+            type: "question",
+            title: "导入外部材料",
+            message: "将这些文件复制到当前工作目录？",
+            detail: `${state.workspaceRoot}\n\n${command.paths.join("\n")}\n\n保留原件并保存哈希；不会上传或调用模型，也不开放模型写入权限。`,
+            buttons: ["取消", "导入副本"],
+            defaultId: 0,
+            cancelId: 0,
+            noLink: true,
+          });
+          if (consent.response !== 1) return host.getState();
+          const current = await host.getState();
+          if (
+            current.activeSessionId !== command.sessionId ||
+            current.workspaceRoot !== state.workspaceRoot ||
+            current.run ||
+            current.status !== "ready" ||
+            current.historyOnly ||
+            quitting
+          )
+            throw Error("会话已变化，请重新导入。");
+          return host.send(command);
+        } finally {
+          selecting = false;
+        }
+      });
+      ipcMain.handle("moyyi:paste-image", async (event, value: unknown) => {
+        trusted(event);
+        const sessionId = identity(value);
+        const state = await currentSession(sessionId);
+        claimSelection();
+        let temporary: string | undefined;
+        try {
+          const items = await clipboard.read();
+          const item = items.find((item) => item.types.includes("image/png"));
+          if (!item) throw Error("剪贴板没有 PNG 图片。");
+          const blob = await item.getType("image/png");
+          if (blob.size > 524288) throw Error("粘贴图片最多512KiB；大图片请通过文件选择导入原件。");
+          const bytes = Buffer.from(await blob.arrayBuffer());
+          const size = imagePreview(bytes, "png");
+          const consent = await dialog.showMessageBox(ownedWindow, {
+            type: "question",
+            title: "粘贴图片",
+            message: "保存剪贴板图片到当前工作目录？",
+            detail: `${size.width} × ${size.height} · ${bytes.length} 字节\n\n${state.workspaceRoot}\n只保存和预览，不上传、OCR或调用模型。`,
+            buttons: ["取消", "保存图片"],
+            defaultId: 0,
+            cancelId: 0,
+            noLink: true,
+          });
+          if (consent.response !== 1) return host.getState();
+          temporary = realpathSync(mkdtempSync(join(app.getPath("temp"), "moyyi-paste-")));
+          const path = join(temporary, "clipboard.png");
+          writeFileSync(path, bytes, { mode: 0o600, flag: "wx" });
+          const current = await host.getState();
+          if (
+            current.activeSessionId !== sessionId ||
+            current.workspaceRoot !== state.workspaceRoot ||
+            current.run ||
+            current.status !== "ready" ||
+            current.historyOnly ||
+            quitting
+          )
+            throw Error("会话已变化，请重新粘贴。");
+          return await host.send({ type: "materials.import", sessionId, paths: [path] });
+        } finally {
+          if (temporary) rmSync(temporary, { recursive: true, force: true });
+          selecting = false;
+        }
+      });
+      ipcMain.handle("moyyi:save-artifact", async (event, value: unknown) => {
+        trusted(event);
+        if (
+          !value ||
+          typeof value !== "object" ||
+          Array.isArray(value) ||
+          Object.keys(value).sort().join() !== "effectId,sessionId"
+        )
+          throw Error("Invalid result selection");
+        const command = parseDesktopCommand({ ...value, type: "artifact.open" });
+        if (command.type !== "artifact.open") throw Error("Invalid result selection");
+        await currentSession(command.sessionId);
+        claimSelection();
+        try {
+          const state = await host.send(command),
+            preview = state.artifactPreview;
+          if (!preview || preview.effectId !== command.effectId || !state.workspaceRoot)
+            throw Error("成果已变化或不可用。");
+          const selected = await dialog.showSaveDialog(ownedWindow, {
+            title: "另存成果副本",
+            defaultPath: basename(preview.path),
+            message: "仅保存当前核对哈希的内容，不覆盖已有文件。",
+            buttonLabel: "另存副本",
+          });
+          if (selected.canceled || !selected.filePath) return host.getState();
+          const current = await host.getState();
+          if (
+            current.activeSessionId !== command.sessionId ||
+            current.workspaceRoot !== state.workspaceRoot ||
+            current.run ||
+            current.status !== "ready" ||
+            current.historyOnly ||
+            quitting
+          )
+            throw Error("会话已变化。");
+          saveReceiptFile(state.workspaceRoot, preview.path, preview.sha256, selected.filePath, []);
+          return host.getState();
         } finally {
           selecting = false;
         }
@@ -462,7 +614,10 @@ else {
           if (
             current.activeSessionId !== sessionId ||
             current.workspaceRoot !== state.workspaceRoot ||
-            current.run
+            current.run ||
+            current.status !== "ready" ||
+            current.historyOnly ||
+            quitting
           )
             throw Error("会话已变化，请重新选择报告位置。");
           return host.send({
