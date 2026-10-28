@@ -186,6 +186,7 @@ describe("native M6 materials and saving", () => {
     native.picker.mockResolvedValueOnce({ canceled: true });
     await call("moyyi:documents", selected);
     expect(native.send).not.toHaveBeenCalled();
+    expect(native.picker.mock.calls.at(-1)?.[1].filters).toBeUndefined();
     await call("moyyi:import-files", drop);
     expect(native.send).toHaveBeenCalledExactlyOnceWith({ type: "materials.import", ...drop });
   });

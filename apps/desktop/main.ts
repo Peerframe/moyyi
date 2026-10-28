@@ -427,27 +427,9 @@ else {
             message:
               "可选择工作目录外的材料；每份最多10MiB、最多8份。原件保留，工作目录创建副本；不自动上传或调用模型。",
             properties: ["openFile", "multiSelections", "noResolveAliases"],
-            filters: [
-              {
-                name: "支持的文档",
-                extensions: [
-                  "pdf",
-                  "docx",
-                  "xlsx",
-                  "pptx",
-                  "odt",
-                  "ods",
-                  "odp",
-                  "txt",
-                  "md",
-                  "csv",
-                  "json",
-                  "png",
-                  "jpg",
-                  "jpeg",
-                ],
-              },
-            ],
+            // Electron 45 maps extension filters to macOS type registration. A valid DOCX may
+            // otherwise be unselectable without an associated app. The host validates formats,
+            // bounded bytes and authority after selection; the picker is never that boundary.
             buttonLabel: "选择文档",
           });
           if (selected.canceled) return host.getState();

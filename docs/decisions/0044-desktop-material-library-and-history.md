@@ -75,3 +75,13 @@ shared blob retention, collision/replacement/cancel/deny/reference/restore, safe
 long history/chunks and narrow supported windows. Record synthetic/offline and live tasks separately;
 keep Flash + Responses + low and all previous rubric/budget/failure records unchanged. No public
 release is authorized by M6.
+
+### Native type-filter compatibility
+
+The first actual macOS package allowed PDF selection but disabled an existing supported DOCX.
+[Electron45's pinned native implementation](https://github.com/electron/electron/blob/v45.0.0/shell/browser/ui/file_dialog_mac.mm)
+passes extensions to macOS `setAllowedFileTypes`; the [official dialog API](https://www.electronjs.org/docs/latest/api/dialog)
+permits omitting filters. M6 omits the advisory native filter so unregistered Office types remain
+selectable. The host's extension allowlist, descriptor/symlink/protected-path checks and resource
+limits still reject unsupported or unsafe inputs. This does not add a format or permission.
+The native regression must be rechecked on the rebuilt package, not inferred from the mock.
