@@ -101,7 +101,7 @@ fixture corrections and actual check history. No new request was made to repair 
 original source-analysis FAILs remain unchanged. Final integration and owner installation are
 recorded separately in [PR #46](https://github.com/Peerframe/moyyi/pull/46); M4 is not claimed.
 
-Keep the [roadmap's fixed PR28 workflow](../roadmap.md#quality-lane-independent-progress-explicit-final-gate):
+Keep the [roadmap's fixed PR28 workflow](../tasks/2026-10-29-roadmap-archive.md#quality-lane-independent-progress-explicit-final-gate):
 two runs, each8 requests/180 seconds/8192 output, shared12 HTTP and zero retries, original
 listener-leak source/checker, functional repair and two byte/mode-exact undos. Native denial,
 stale approval, cancellation/reopen and no-replay checks are additional interaction evidence.

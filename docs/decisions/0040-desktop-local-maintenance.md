@@ -69,7 +69,7 @@ Older M2/M3 apps reject the high field. Software rollback therefore refuses inco
 settings and tells the owner to select Flash and save first; it does not silently rewrite them.
 High is labelled unverified. Historical Flash/Kimi low source failures and the high429 remain
 sealed. A settings connection or synthetic wire test cannot satisfy the six-item source rubric;
-the original task and conditional public tasks retain the [roadmap gates](../roadmap.md#quality-lane-independent-progress-explicit-final-gate).
+the original task and conditional public tasks retain the [roadmap gates](../tasks/2026-10-29-roadmap-archive.md#quality-lane-independent-progress-explicit-final-gate).
 
 ## Evidence and limits
 

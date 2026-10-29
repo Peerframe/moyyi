@@ -7,6 +7,14 @@ Owner 已授权先做整体计划，再针对已证实的缺口优化。本计�
 
 ## 持续交付：日常任务闭环（当前）
 
+### 2026-10-29：转入 M6 之后的计划 v2
+
+M6 已合并并作为日常版本安装（[PR #50](https://github.com/Peerframe/moyyi/pull/50)）。之后的交付由
+[M6 之后的计划 v2](2026-10-28-post-m6-plan.md) 负责：DeepSeek Harness 为第一参照，合并为交付零至
+交付四，交付结束统一验收、集中修复；质量门任务集已冻结。system overview 当天改写为只写现状，
+改写前全文原样保存在[存档](2026-10-29-system-overview-archive.md)，其中的历史段落以存档为准，
+本记录中的各次运行记录不变。
+
 ### M4 整体验收与本地维护（2026-10-28，实现中，未验收）
 
 实际安装基线已核对为 M3 source `6eb2993` / main `85873c7`，安装回执已确认 native launch 与
@@ -174,8 +182,8 @@ entry/effect逐项相同，新增请求0；完整工具结果与下一次模型�
 Owner要求制定计划、设定目标，以总体性思考。**总目标：把moyyi做成在本机打开后就能连续使用的
 个人单Agent产品。** 能配置模型、选择工作区和材料、交代任务、理解进度、控制执行、打开成果，
 并在重启后继续；不再把底层测试通过数量当作产品完成度。完整执行顺序以
-[roadmap](../roadmap.md#current-target-a-usable-personal-desktop-candidate)为准；当前状态只维护在
-[系统总览](../system-overview.md#current-delivery-and-next-boundary)，本节是Owner说明，不另开待办体系。
+[roadmap](2026-10-29-roadmap-archive.md#current-target-a-usable-personal-desktop-candidate)为准；当前状态只维护在
+[系统总览](2026-10-29-system-overview-archive.md#current-delivery-and-next-boundary)，本节是Owner说明，不另开待办体系。
 
 **本轮只完成规划与记录，不实现GUI、不发模型请求、不改安装版、不公开发布。** 原来的“GUI后置”
 调整为下一个产品交付重点。自研核心、单Agent、D1–D6、Flash默认、权限和原验收标准全部保留。
