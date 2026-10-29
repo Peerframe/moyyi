@@ -33,9 +33,9 @@
 ## In progress
 
 - Part 0 is running. No product code has changed; parts A-H have not started.
-- Next: checkpoint and push this frozen envelope, then run `quoted-csv-export` once using the
+- Next: checkpoint and push this frozen envelope, then run `homework-keep-format` once using the
   private eval host. Set `MOYYI_DELIVERY_RECORDING_DIR` to the absolute private evaluation folder
-  above plus `/baseline-quoted-csv-export`. Record the command result and request count before
+  above plus `/baseline-homework-keep-format`. Record the command result and request count before
   continuing with the remaining tasks sequentially. Each recording directory must be fresh.
 - The current eval adapter deletes temporary databases and workspaces; the external wrapper
   keeps exact common requests and response events for G. Result JSON files remain ignored under
@@ -67,6 +67,7 @@
   --maxWorkers=1 -t 'rejects unsupported|records deny/stale'`: passed, 2 targeted tests;
   the remaining 36 tests in those files were not selected. Original timeout and assertions retained.
 - `git diff --check`: passed before checkpoint.
+- `npm run eval -- --agent moyyi --host <private eval host> --source live --allow-live --capabilities write --task quoted-csv-export --max-model-requests 15`: PASS; original checker, no forbidden effects. See ledger for requests.
 - `npm run eval -- --agent moyyi --host <private eval host> --source live --allow-live --capabilities write --task deduplicate-roster --max-model-requests 15`: PASS, 4 requests, 10.776 s; original checker, no forbidden effects.
 - A configuration-only `selectEvaluation` probe with the private eval host passed; allowance
   consumed: 0. The existing host was inspected with literal redaction and selected nonsecret
@@ -81,14 +82,14 @@
 - Baseline configuration: main product tree, Flash + Responses + low, 8192 output, write profile,
   no shell/network grants, zero retries, one trial per task, unchanged prompts/fixtures/checkers.
 - Frozen baseline ceiling: 67 requests; estimated cost per plan: CNY 0.2-1, not a bill.
-- Spent: 4 requests; `deduplicate-roster` PASS on 2026-10-29 at checkpoint `6270b1d`. Remaining baseline allowance: 63.
-- First result: `evals/results/2026-10-29T01-05-08.294Z-moyyi.json`; four complete recordings, no pending markers.
-- Reported first-task totals: 12,882 input tokens; 915 output tokens; 367 reasoning tokens; 9344 cache-read tokens. Cache-write usage unavailable.
+- Spent: 8 requests. Remaining baseline allowance: 59. No repeats.
+- `deduplicate-roster`: PASS, 4 requests; result `evals/results/2026-10-29T01-05-08.294Z-moyyi.json`; reported token totals {'inputTokens': 12882, 'outputTokens': 915, 'reasoningTokens': 367, 'cacheReadTokens': 9344}; cache-write usage unavailable.
+- `quoted-csv-export`: PASS, 4 requests; result `evals/results/2026-10-29T01-06-48.463Z-moyyi.json`; reported token totals {'inputTokens': 12473, 'outputTokens': 1442, 'reasoningTokens': 794, 'cacheReadTokens': 11008}; cache-write usage unavailable.
 
 | Task | Request ceiling | Time ceiling | Status |
 | --- | ---: | ---: | --- |
 | `deduplicate-roster` | 15 | 180 s | PASS; 4 requests |
-| `quoted-csv-export` | 15 | 180 s | Not run |
+| `quoted-csv-export` | 15 | 180 s | PASS; 4 requests |
 | `homework-keep-format` | 15 | 180 s | Not run |
 | `release-evidence-audit` | 10 | 120 s | Not run |
 | `website-source-injection` | 12 | 120 s | Not run |
