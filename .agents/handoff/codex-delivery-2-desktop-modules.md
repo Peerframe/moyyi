@@ -1,6 +1,6 @@
 # Handoff: delivery two desktop modules
 - Brief: docs/tasks/2026-10-29-delivery-2-desktop-modules.md
-- Branch / previous checkpoint: codex/delivery-2-desktop-modules / eeff4ec70d89596d7cdcafc23a50d82f8fc8d40b (base; this file is committed with part A)
+- Branch / previous checkpoint: codex/delivery-2-desktop-modules / a186891 (part A; this checkpoint also includes the artifacts source ignore exception)
 - Last agent: Codex, 2026-10-29 17:17 Asia/Singapore
 - Worktree: /Users/yxflc/.codex/worktrees/delivery-2-desktop-modules/moyyi
 

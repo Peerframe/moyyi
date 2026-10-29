@@ -16,3 +16,7 @@ design/brand/*.zip
 design/brand/2026-10-28-v1/
 design/brand/2026-10-28-chibi-v2/
 design/brand/2026-10-28-logo-directions/
+
+# Desktop artifact feature source is not generated package output.
+!apps/desktop/features/artifacts/
+!apps/desktop/features/artifacts/**
