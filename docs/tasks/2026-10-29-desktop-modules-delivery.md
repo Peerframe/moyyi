@@ -4,6 +4,7 @@
 `eeff4ec70d89596d7cdcafc23a50d82f8fc8d40b` 建立 `codex/delivery-2-desktop-modules`。
 实际工作树：`/Users/yxflc/.codex/worktrees/delivery-2-desktop-modules/moyyi`。
 原目录的 `docs/tasks/2026-10-26-optimization-plan.md` 既有未提交改动保持原样。
+唯一交付 PR：[PR #52](https://github.com/Peerframe/moyyi/pull/52)，由 Claude 审查与验收。
 
 ## 当前结果
 
