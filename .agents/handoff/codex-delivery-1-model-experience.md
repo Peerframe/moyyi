@@ -198,7 +198,7 @@
   document-report-seven-formats 4/120s with `--include-documents`. Total ceiling 71 requests.
 - Estimated gate cost per accepted plan: CNY 0.2–1, not a bill. Baseline allowance is separate.
 - Candidate spent: 27/71; no ordinary-failure repeats.
-- Next paid task: none yet; guide-writing acceptance is still being prepared and must be frozen before dispatch.
+- Next paid task reserved: `model-experience-user-guide-six-topics`, once, max 8 requests / 180 seconds. Inspect its private live reservation/result before any restart.
 - Each next-task line is a pre-dispatch reservation. If interrupted, inspect that task's private
   recording directory, aggregate result and live process before any restart; never assume unspent.
 - Fresh external recording directories: private eval root `/candidate-<task-id>`.
@@ -243,9 +243,23 @@
 
 - Six-task candidate gate: all PASS, 27 total requests, zero forbidden effects; no regression
   rerun needed. None of the six recordings contains `todo_write`; acceptance 5 is still open.
-- A separate real guide-writing task is being prepared without paid calls. If needed it will use
-  at most eight of the unspent 44 candidate-validation requests, keeping the existing 71 total
-  ceiling. It will not change or repeat any frozen gate task or the original question.
+- Supplementary acceptance 5 task frozen after the six gate tasks sealed: a practical English
+  user guide based on six real delivery README/ADR documents, six explicit topics, relative
+  citations, unchanged supplied files and a saved-file readback. The prompt asks to organize and
+  check requirements but never names todo/todo_write or constrains tool choice.
+- Private runner: `/Users/yxflc/.moyyi/acceptance/delivery-1-model-experience-guide-preparation-2026-10-29/live.mjs`.
+  Prompt SHA-256 `622eb824466f604842f87e41fe0bc1a8e76dd53726b47629272e3590bca7c84b`;
+  runner/task/source fingerprints in `live-envelope.json`. Same checked product `04df514`.
+- Flash / Responses / low / 8192, write profile, no shell/web, zero retries, one trial,
+  8 requests / 180 seconds. Uses at most 8 of 44 remaining candidate-validation requests:
+  overall ceiling stays 71 (27 spent + 8 reserved <= 71), original comparison is separate.
+  Accepted round estimate remains CNY 0.2–1, not a bill; no larger monetary allowance assumed.
+- Offline before dispatch: 12 checker probes PASS, null correctly FAIL, synthetic real runtime
+  PASS in 4 requests, actual disk artifact capture verified. Live configuration-only preflight
+  PASS with zero paid requests. Sources are disposable copies; their integrity is checked,
+  not misrepresented as an exact-path pre-execution write deny. No task or checker changed
+  after this freeze. No ordinary-failure repeat will follow.
+
 
 
 ## Decisions taken / waiting for the owner
