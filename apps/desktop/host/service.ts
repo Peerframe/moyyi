@@ -1,99 +1,55 @@
-import { Buffer } from "node:buffer";
-import { realpath, stat } from "node:fs/promises";
+import { initializationError } from "./initialization.ts";
+import type { DesktopHost, DesktopHostOptions } from "./types.ts";
+
+export { DesktopInitializationError } from "./initialization.ts";
+export type { DesktopHost, DesktopHostOptions } from "./types.ts";
+
+import type { ClientCommand, RuntimeEvent, SessionId, SessionQuery } from "moyyi/contracts";
+import type { Runtime, RuntimeOptions } from "moyyi/runtime";
 import type {
-  ActionDigest,
-  ClientCommand,
-  EffectId,
-  RunId,
-  RuntimeEvent,
-  SessionId,
-  SessionQuery,
-  TranscriptEntry,
-} from "moyyi/contracts";
-import {
-  createRuntime,
-  discoverNodeToolchain,
-  type Runtime,
-  type RuntimeOptions,
-  WebPolicy,
-} from "moyyi/runtime";
-import {
-  DEFAULT_DESKTOP_SETTINGS,
-  type DesktopApproval,
-  type DesktopCommand,
-  type DesktopMessage,
-  type DesktopPermissions,
-  type DesktopSessionSummary,
-  type DesktopSettings,
-  type DesktopState,
-  type DesktopWebAccess,
+  DesktopApproval,
+  DesktopCommand,
+  DesktopPermissions,
+  DesktopSessionSummary,
+  DesktopState,
+  DesktopWebAccess,
 } from "../shared.ts";
-import { inspectEffectFile } from "./effects.ts";
-import { imagePreview } from "./image-preview.ts";
+import { BoundaryError, type HostContext, HostFeatures } from "./feature.ts";
+import { hostFeatures } from "./feature-registry.ts";
+import { changeReport, openRuntime, reloadSelected } from "./lifecycle.ts";
 import { ManagedMaterials } from "./managed-materials.ts";
-import { FileBoundaryError, inspectMaterials } from "./materials.ts";
-import { DesktopPolicy } from "./permissions.ts";
-import { inspectReport, reportTarget } from "./reports.ts";
+import { FileBoundaryError } from "./materials.ts";
+import { initialState } from "./state.ts";
+import { type HostTransition, transitionPatch } from "./transitions.ts";
 import { parseDesktopCommand } from "./validation.ts";
-import {
-  appendWebSource,
-  EMPTY_WEB_ACCESS,
-  normalizeDesktopWebAccess,
-  projectWebSource,
-} from "./web.ts";
+import { EMPTY_WEB_ACCESS } from "./web.ts";
 
-export interface DesktopHostOptions {
-  readonly runtimeOptions: () => RuntimeOptions | Promise<RuntimeOptions>;
-  readonly maxOutputTokens?: number;
-  readonly connection?: DesktopState["connection"];
-  readonly settings?: DesktopSettings;
-  readonly configure?: (
-    settings: DesktopSettings,
-    apiKey?: string,
-  ) => Promise<{
-    settings: DesktopSettings;
-    runtimeOptions: RuntimeOptions;
-    connection: DesktopState["connection"];
-  }>;
-}
-
-export interface DesktopHost {
-  getState(): DesktopState;
-  subscribe(listener: (state: DesktopState) => void): () => void;
-  /** Resolves on command handling, not run completion; rejected commands also update state.error. */
-  dispatch(command: unknown): Promise<DesktopState>;
-  close(): Promise<void>;
-}
-
-const DISPLAY_TEXT = 16_384;
-const MESSAGE_BYTES = 262_144;
-const clip = (text: string, maximum = DISPLAY_TEXT) =>
-  text.length <= maximum
-    ? text
-    : `${text.slice(0, maximum)}\n[Display truncated; full text remains in history.]`;
-
-class Host implements DesktopHost {
-  private runtime: Runtime | undefined;
-  private materialAbort: AbortController | undefined;
-  private unsubscribe: (() => void) | undefined;
-  private readonly listeners = new Set<(state: DesktopState) => void>();
-  private readonly knownSessions = new Map<string, DesktopSessionSummary>();
-  private readonly approvals = new Map<string, DesktopApproval>();
-  private readonly replying = new Set<string>();
-  private readonly effectRuns = new Map<string, string>();
-  private readonly toolNames = new Map<string, string>();
-  private readonly entryIds = new Set<string>();
-  private operation: Promise<void> | undefined;
-  private closing: Promise<void> | undefined;
-  private pendingWorkspace: string | undefined;
-  private expectedSession: string | undefined;
-  private commandError: string | null = null;
-  private pluginWarning: string | null = null;
-  private state: DesktopState;
-  private options: RuntimeOptions;
-  private readonly configure: DesktopHostOptions["configure"];
-  private refresh: Promise<void> | undefined;
-  private resultsDestination: "both" | "artifacts" | "effects" = "both";
+class Host implements DesktopHost, HostContext {
+  readonly features = new HostFeatures(hostFeatures);
+  runtime: Runtime | undefined;
+  materialAbort: AbortController | undefined;
+  unsubscribe: (() => void) | undefined;
+  eventDepth = 0;
+  eventChanged = false;
+  readonly listeners = new Set<(state: DesktopState) => void>();
+  readonly knownSessions = new Map<string, DesktopSessionSummary>();
+  readonly approvals = new Map<string, DesktopApproval>();
+  readonly replying = new Set<string>();
+  readonly effectRuns = new Map<string, string>();
+  readonly toolNames = new Map<string, string>();
+  readonly entryIds = new Set<string>();
+  operation: Promise<void> | undefined;
+  closing: Promise<void> | undefined;
+  pendingWorkspace: string | undefined;
+  expectedSession: string | undefined;
+  commandError: string | null = null;
+  pluginWarning: string | null = null;
+  state: DesktopState;
+  eventState: DesktopState;
+  options: RuntimeOptions;
+  readonly configure: DesktopHostOptions["configure"];
+  refresh: Promise<void> | undefined;
+  resultsDestination: "both" | "artifacts" | "effects" = "both";
 
   constructor(
     options: RuntimeOptions,
@@ -101,38 +57,8 @@ class Host implements DesktopHost {
   ) {
     this.options = options;
     this.configure = display.configure;
-    this.state = {
-      status: "ready",
-      connection: display.connection ?? { ready: true },
-      settings: display.settings ?? DEFAULT_DESKTOP_SETTINGS,
-      materials: [],
-      reportTarget: null,
-      permissions: { writes: false, checks: false },
-      webAccess: EMPTY_WEB_ACCESS,
-      sources: { items: [], truncated: false },
-      openedHistory: false,
-      effects: { items: [], offset: 0, hasMore: false },
-      effectInspection: null,
-      artifacts: { items: [], offset: 0, hasMore: false },
-      artifactPreview: null,
-      sessions: { items: [], offset: 0, hasMore: false },
-      activeSessionId: null,
-      workspaceRoot: null,
-      model: options.model ? { ...options.model } : null,
-      budgets: {
-        maxRequests: options.limits?.maxModelRequests ?? null,
-        timeoutMs: options.limits?.timeoutMs ?? null,
-        maxOutputTokens: display.maxOutputTokens ?? null,
-      },
-      askEachRead: false,
-      messages: [],
-      historyTruncated: false,
-      streamText: "",
-      run: null,
-      outcome: null,
-      pendingApproval: null,
-      error: null,
-    };
+    this.state = initialState(options, display);
+    this.eventState = this.state;
   }
 
   async initialize(): Promise<void> {
@@ -150,8 +76,20 @@ class Host implements DesktopHost {
     return () => this.listeners.delete(listener);
   }
 
-  private update(change: Partial<DesktopState>): void {
+  transition(name: HostTransition, change: Partial<DesktopState>): void {
+    this.update({ ...transitionPatch(name), ...change });
+  }
+
+  update(change: Partial<DesktopState>): void {
     this.state = { ...this.state, ...change };
+    if (this.eventDepth) {
+      this.eventChanged = true;
+      return;
+    }
+    this.publish();
+  }
+
+  publish(): void {
     for (const listener of this.listeners) {
       try {
         listener(this.getState());
@@ -161,77 +99,21 @@ class Host implements DesktopHost {
     }
   }
 
-  private fail(message: string): never {
+  fail(message: string): never {
     this.update({ error: message });
     throw Error(message);
   }
 
-  private async open(
+  open(
     askEachRead: boolean,
     target: string | null = null,
     permissions: DesktopPermissions = { writes: false, checks: false },
     webAccess: DesktopWebAccess = EMPTY_WEB_ACCESS,
   ): Promise<void> {
-    const access = normalizeDesktopWebAccess(webAccess);
-    this.update({ webAccess: EMPTY_WEB_ACCESS });
-    if (this.runtime) {
-      await this.runtime.close();
-      this.unsubscribe?.();
-      this.runtime = undefined;
-    }
-    if (this.state.status !== "ready") throw Error("Desktop host is closing");
-    // Connection composition never supplies effect grants; only explicit desktop actions can.
-    const {
-      policy: _policy,
-      workspaceWrites: _writes,
-      workspaceProcesses: _processes,
-      web: _web,
-      developmentPlugins: _development,
-      ...base
-    } = this.options;
-    const runtime = await createRuntime({
-      ...base,
-      ...((target || permissions.writes) && this.state.workspaceRoot
-        ? { workspaceWrites: { roots: [this.state.workspaceRoot], approval: "ask" as const } }
-        : {}),
-      ...(permissions.checks && this.state.workspaceRoot
-        ? {
-            workspaceProcesses: {
-              roots: [this.state.workspaceRoot],
-              approval: "ask" as const,
-              workspaceAccess: "read-only" as const,
-              ...(await discoverNodeToolchain()),
-            },
-          }
-        : {}),
-      ...(access.allowedOrigins.length ? { web: { ...access, approval: "ask" as const } } : {}),
-      policy: access.allowedOrigins.length
-        ? new WebPolicy({
-            previous: new DesktopPolicy(permissions, askEachRead, target),
-            fetch: true,
-            approval: "ask",
-          })
-        : new DesktopPolicy(permissions, askEachRead, target),
-    });
-    if (this.state.status !== "ready") {
-      await runtime.close();
-      throw Error("Desktop host is closing");
-    }
-    this.runtime = runtime;
-    this.unsubscribe = runtime.subscribe((event) => this.event(event));
-    this.pluginWarning = runtime.plugins.some((plugin) => plugin.state === "failed")
-      ? "A runtime plugin is unavailable; some capabilities may not work"
-      : null;
-    this.update({
-      askEachRead,
-      reportTarget: target,
-      permissions,
-      webAccess: access,
-      error: this.pluginWarning,
-    });
+    return openRuntime(this, askEachRead, target, permissions, webAccess);
   }
 
-  private async send(command: ClientCommand): Promise<void> {
+  async send(command: ClientCommand): Promise<void> {
     if (!this.runtime) throw Error("Desktop runtime is unavailable");
     this.commandError = null;
     await this.runtime.send(command);
@@ -247,12 +129,11 @@ class Host implements DesktopHost {
       return this.fail("Invalid desktop command");
     }
     if (command.type === "material.cancel") {
-      this.selected(command.sessionId);
-      this.materialAbort?.abort();
+      await this.features.action(this, command);
       return this.getState();
     }
     if (command.type === "close") {
-      await this.close();
+      await this.features.action(this, command);
       return this.getState();
     }
     if (this.state.status !== "ready") return this.fail("Desktop host is closed");
@@ -278,26 +159,26 @@ class Host implements DesktopHost {
     return this.getState();
   }
 
-  private safeError(error: unknown): string {
+  safeError(error: unknown): string {
     return error instanceof BoundaryError || error instanceof FileBoundaryError
       ? error.message
       : "Desktop operation failed safely";
   }
 
-  private excluded(): readonly string[] {
+  excluded(): readonly string[] {
     return [
       ...(this.options.protectedPaths ?? []),
       ...(this.options.dataDirectory ? [this.options.dataDirectory] : []),
     ];
   }
 
-  private selected(sessionId: string): string {
+  selected(sessionId: string): string {
     if (sessionId !== this.state.activeSessionId || !this.state.workspaceRoot)
       throw new BoundaryError("Session is not selected");
     return this.state.workspaceRoot;
   }
 
-  private async refreshArtifacts(
+  async refreshArtifacts(
     offset: number,
     destination: "both" | "artifacts" | "effects" = "both",
   ): Promise<void> {
@@ -313,7 +194,7 @@ class Host implements DesktopHost {
     });
   }
 
-  private scheduleArtifacts(): void {
+  scheduleArtifacts(): void {
     if (this.state.status !== "ready" || !this.runtime) return;
     const runtime = this.runtime,
       session = this.state.activeSessionId;
@@ -336,302 +217,32 @@ class Host implements DesktopHost {
     this.refresh = task;
   }
 
-  private async reloadSelected(): Promise<void> {
-    const sessionId = this.state.activeSessionId,
-      workspace = this.state.workspaceRoot;
-    if (!sessionId || !workspace) {
-      await this.send({ type: "session.list", offset: 0, limit: 20 });
-      return;
-    }
-    this.entryIds.clear();
-    this.toolNames.clear();
-    this.pendingWorkspace = workspace;
-    this.expectedSession = sessionId;
-    this.update({
-      messages: [],
-      sources: { items: [], truncated: false },
-      streamText: "",
-      historyTruncated: false,
-      artifactPreview: null,
-      effectInspection: null,
-      pendingApproval: null,
-    });
-    try {
-      await this.send({ type: "session.load", sessionId: sessionId as SessionId });
-    } finally {
-      this.pendingWorkspace = undefined;
-      this.expectedSession = undefined;
-    }
-    await this.refreshArtifacts(0);
+  reloadSelected(): Promise<void> {
+    return reloadSelected(this);
   }
 
-  private async changeReport(target: string | null): Promise<void> {
-    try {
-      await this.open(
-        this.state.askEachRead,
-        target,
-        { writes: false, checks: false },
-        this.state.webAccess,
-      );
-      await this.reloadSelected();
-    } catch {
-      this.update({ reportTarget: null });
-      if (this.state.status === "ready") {
-        await this.open(this.state.askEachRead);
-        await this.reloadSelected();
-      }
-      throw new BoundaryError(
-        "Report permission could not be changed; no report permission was retained",
-      );
-    }
+  changeReport(target: string | null): Promise<void> {
+    return changeReport(this, target);
   }
 
-  private materialManager(): ManagedMaterials {
+  materialManager(): ManagedMaterials {
     if (!this.runtime?.materials) throw new FileBoundaryError("Managed materials are unavailable");
     return new ManagedMaterials(this.runtime.materials, { excluded: this.excluded() });
   }
-  private async refreshMaterials(offset = 0): Promise<void> {
-    const sessionId = this.state.activeSessionId,
-      workspaceRoot = this.state.workspaceRoot;
-    if (!sessionId || !workspaceRoot || !this.runtime?.materials) return;
-    const manager = this.materialManager();
-    await manager.housekeeping({ workspaceRoot });
-    const rows = await manager.list(workspaceRoot);
-    const project = ({
-      workspaceRoot: _workspace,
-      ...row
-    }: Awaited<ReturnType<typeof manager.list>>[number]) => row;
-    const selected = await manager.selected({ sessionId, workspaceRoot });
-    this.update({
-      library: {
-        items: rows.slice(offset, offset + 20).map(project),
-        offset,
-        hasMore: rows.length > offset + 20,
-        housekeeping: await this.runtime.materials.housekeeping(workspaceRoot),
-      },
-      materials: selected.map(({ path, format, sourceBytes, sha256 }) => ({
-        path,
-        format,
-        sourceBytes,
-        sha256,
-      })),
-    });
+  async refreshMaterials(offset = 0): Promise<void> {
+    await this.features.refreshMaterials(this, offset);
   }
 
-  private async catalog(query: SessionQuery = {}): Promise<void> {
-    if (!this.runtime) throw new BoundaryError("Session store is unavailable");
-    const page = await this.runtime.sessions.list(query);
-    this.knownSessions.clear();
-    for (const item of page.items) this.knownSessions.set(item.sessionId, item);
-    this.update({
-      sessions: { items: page.items, offset: 0, hasMore: page.nextCursor !== null },
-      catalog: { query, nextCursor: page.nextCursor },
-    });
+  async catalog(query: SessionQuery = {}): Promise<void> {
+    await this.features.catalog(this, query);
   }
 
-  private async perform(command: Exclude<DesktopCommand, { type: "close" }>): Promise<void> {
+  async perform(command: Exclude<DesktopCommand, { type: "close" }>): Promise<void> {
     if (command.type !== "approve" && command.type !== "cancel") {
       await this.refresh;
       // run.finished is emitted just before core cleanup settles. Do not race the next admission.
       await this.runtime?.idle();
       if (this.state.status !== "ready") throw new BoundaryError("Desktop host is closing");
-    }
-    if (command.type === "catalog") {
-      await this.catalog(command.query);
-      return;
-    }
-    if (command.type === "session.update") {
-      if (!this.runtime || !this.knownSessions.has(command.update.sessionId))
-        throw new BoundaryError("Select a listed session first");
-      const changed = await this.runtime.sessions.update({
-        ...command.update,
-        sessionId: command.update.sessionId as SessionId,
-      });
-      if (changed.sessionId === this.state.activeSessionId)
-        this.update({ activeMetadata: changed.metadata });
-      if (changed.sessionId === this.state.activeSessionId && changed.metadata.removedAt) {
-        await this.open(this.state.askEachRead);
-        this.update({
-          activeSessionId: null,
-          activeMetadata: null,
-          workspaceRoot: null,
-          messages: [],
-          materials: [],
-          history: null,
-          messageDetail: null,
-          historyOnly: false,
-          library: { items: [], offset: 0, hasMore: false, housekeeping: false },
-          materialPreview: null,
-          artifactPreview: null,
-          effects: { items: [], offset: 0, hasMore: false },
-          artifacts: { items: [], offset: 0, hasMore: false },
-          sources: { items: [], truncated: false },
-          outcome: null,
-        });
-      }
-      const { cursor: _cursor, ...query } = this.state.catalog?.query ?? {};
-      await this.catalog(query);
-      return;
-    }
-    if (command.type === "history.close") {
-      this.update({ history: null, messageDetail: null });
-      return;
-    }
-    if (command.type === "history" || command.type === "history.message") {
-      this.selected(command.sessionId);
-      if (!this.runtime) throw new BoundaryError("Session history is unavailable");
-      if (command.type === "history")
-        this.update({
-          history: await this.runtime.sessions.history({
-            sessionId: command.sessionId as SessionId,
-            ...(command.cursor ? { cursor: command.cursor } : {}),
-            limit: 20,
-          }),
-          messageDetail: null,
-        });
-      else {
-        this.update({ messageDetail: null });
-        const chunk = await this.runtime.sessions.readMessage({
-          sessionId: command.sessionId as SessionId,
-          messageId: command.messageId,
-          offset: command.offset,
-        });
-        this.update({
-          messageDetail: { ...chunk, messageId: command.messageId, offset: command.offset },
-        });
-      }
-      return;
-    }
-    if (command.type === "create" || command.type === "load") {
-      const record =
-        command.type === "load" ? this.knownSessions.get(command.sessionId) : undefined;
-      if (command.type === "load" && record?.metadata?.removedAt && this.runtime) {
-        await this.open(command.askEachRead);
-        this.update({
-          activeSessionId: command.sessionId,
-          activeMetadata: record?.metadata ?? null,
-          workspaceRoot: record.workspaceRoot,
-          historyOnly: true,
-          history: await this.runtime.sessions.history({
-            sessionId: command.sessionId as SessionId,
-          }),
-          messageDetail: null,
-          messages: [],
-          streamText: "",
-          materials: [],
-          library: { items: [], offset: 0, hasMore: false, housekeeping: false },
-          materialPreview: null,
-          outcome: null,
-          openedHistory: true,
-          effects: { items: [], offset: 0, hasMore: false },
-          artifacts: { items: [], offset: 0, hasMore: false },
-          artifactPreview: null,
-          effectInspection: null,
-          sources: { items: [], truncated: false },
-        });
-        return;
-      }
-      if (command.type === "load" && !record)
-        throw new BoundaryError("Select a listed session first");
-      const selected =
-        command.type === "create"
-          ? command.workspaceRoot
-          : (record as DesktopSessionSummary).workspaceRoot;
-      let workspace: string;
-      try {
-        workspace = await realpath(selected);
-        if (!(await stat(workspace)).isDirectory()) throw Error();
-        if (command.type === "load" && workspace !== selected) throw Error();
-      } catch {
-        if (command.type !== "load" || !this.runtime)
-          throw new BoundaryError("The selected workspace is missing or has changed");
-        await this.open(command.askEachRead);
-        const history = await this.runtime.sessions.history({
-          sessionId: command.sessionId as SessionId,
-          limit: 20,
-        });
-        this.update({
-          activeSessionId: command.sessionId,
-          activeMetadata: record?.metadata ?? null,
-          workspaceRoot: selected,
-          historyOnly: true,
-          library: { items: [], offset: 0, hasMore: false, housekeeping: false },
-          materialPreview: null,
-          history,
-          messageDetail: null,
-          messages: [],
-          streamText: "",
-          materials: [],
-          reportTarget: null,
-          permissions: { writes: false, checks: false },
-          webAccess: EMPTY_WEB_ACCESS,
-          sources: { items: [], truncated: false },
-          openedHistory: true,
-          effects: { items: [], offset: 0, hasMore: false },
-          effectInspection: null,
-          artifacts: { items: [], offset: 0, hasMore: false },
-          artifactPreview: null,
-          pendingApproval: null,
-          outcome: null,
-        });
-        return;
-      }
-      if (this.state.status !== "ready") throw new BoundaryError("Desktop host is closing");
-      if (
-        !this.runtime ||
-        command.askEachRead !== this.state.askEachRead ||
-        this.state.reportTarget !== null ||
-        this.state.permissions.writes ||
-        this.state.permissions.checks ||
-        this.state.webAccess.allowedOrigins.length > 0 ||
-        this.state.webAccess.dns !== "system"
-      )
-        await this.open(command.askEachRead);
-      this.approvals.clear();
-      this.effectRuns.clear();
-      this.toolNames.clear();
-      this.entryIds.clear();
-      this.pendingWorkspace = workspace;
-      this.expectedSession = command.type === "load" ? command.sessionId : undefined;
-      this.update({
-        messages: [],
-        streamText: "",
-        historyTruncated: false,
-        pendingApproval: null,
-        outcome: null,
-        materials: [],
-        reportTarget: null,
-        permissions: { writes: false, checks: false },
-        webAccess: EMPTY_WEB_ACCESS,
-        sources: { items: [], truncated: false },
-        library: { items: [], offset: 0, hasMore: false, housekeeping: false },
-        materialPreview: null,
-        history: null,
-        messageDetail: null,
-        historyOnly: false,
-        openedHistory: command.type === "load",
-        effects: { items: [], offset: 0, hasMore: false },
-        effectInspection: null,
-        artifacts: { items: [], offset: 0, hasMore: false },
-        artifactPreview: null,
-      });
-      try {
-        await this.send(
-          command.type === "create"
-            ? { type: "session.create", workspaceRoot: workspace }
-            : { type: "session.load", sessionId: command.sessionId as SessionId },
-        );
-      } finally {
-        this.pendingWorkspace = undefined;
-        this.expectedSession = undefined;
-      }
-      await this.refreshArtifacts(0);
-      if (command.type === "load" && this.state.catalog) {
-        const { cursor: _cursor, ...query } = this.state.catalog.query;
-        await this.catalog(query);
-      }
-      await this.refreshMaterials();
-      return;
     }
     if (
       this.state.historyOnly &&
@@ -642,681 +253,44 @@ class Host implements DesktopHost {
       throw new BoundaryError(
         "This session is open for history only; restore it and reopen an available workspace first",
       );
-    if (command.type === "configure") {
-      if (!this.configure)
-        throw new BoundaryError("Desktop settings cannot be changed by this host");
-      const previous = this.options;
-      const previousSettings = this.state.settings,
-        previousConnection = this.state.connection;
-      await this.runtime?.close();
-      this.unsubscribe?.();
-      this.runtime = undefined;
-      this.update({
-        reportTarget: null,
-        permissions: { writes: false, checks: false },
-        pendingApproval: null,
-        artifactPreview: null,
-        effectInspection: null,
-      });
-      this.update({ webAccess: EMPTY_WEB_ACCESS });
-      let saved = false;
-      try {
-        const configured = await this.configure(command.settings, command.apiKey);
-        saved = true;
-        this.update({ settings: configured.settings });
-        if (
-          !configured.runtimeOptions.dataDirectory ||
-          configured.runtimeOptions.dataDirectory !== previous.dataDirectory ||
-          configured.runtimeOptions.store
-        )
-          throw Error("Configuration changed store ownership");
-        this.options = configured.runtimeOptions;
-        this.update({
-          settings: configured.settings,
-          connection: configured.connection,
-          model: this.options.model ? { ...this.options.model } : null,
-          budgets: {
-            maxRequests: this.options.limits?.maxModelRequests ?? null,
-            timeoutMs: this.options.limits?.timeoutMs ?? null,
-            maxOutputTokens: this.state.budgets.maxOutputTokens,
-          },
-        });
-        await this.open(this.state.askEachRead);
-        await this.reloadSelected();
-      } catch {
-        if (saved) {
-          this.update({
-            connection: {
-              ready: false,
-              message: "Settings were saved, but the runtime must be reopened",
-            },
-          });
-          throw new BoundaryError(
-            "Settings were saved, but the runtime could not reopen; existing conversations were retained",
-          );
-        }
-        this.options = previous;
-        this.update({
-          settings: previousSettings,
-          connection: previousConnection,
-          model: previous.model ? { ...previous.model } : null,
-          budgets: {
-            maxRequests: previous.limits?.maxModelRequests ?? null,
-            timeoutMs: previous.limits?.timeoutMs ?? null,
-            maxOutputTokens: this.state.budgets.maxOutputTokens,
-          },
-        });
-        if (this.state.status === "ready") {
-          try {
-            await this.open(this.state.askEachRead);
-            await this.reloadSelected();
-          } catch {
-            this.update({
-              connection: { ready: false, message: "Desktop runtime must be reopened" },
-            });
-          }
-        }
-        throw new BoundaryError(
-          "Desktop settings could not be applied; existing conversations were retained",
-        );
-      }
-      return;
+    await this.features.action(this, command);
+  }
+
+  event(event: RuntimeEvent): void {
+    if (event.type === "entry.appended") {
+      if (event.entry.sessionId !== this.state.activeSessionId || this.entryIds.has(event.entry.id))
+        return;
+      this.entryIds.add(event.entry.id);
     }
-    if (command.type === "permissions") {
-      this.selected(command.sessionId);
-      this.update({
-        reportTarget: null,
-        permissions: { writes: false, checks: false },
-        pendingApproval: null,
-        effectInspection: null,
-      });
-      try {
-        await this.open(
-          this.state.askEachRead,
-          null,
-          {
-            writes: command.writes,
-            checks: command.checks,
-          },
-          this.state.webAccess,
-        );
-        await this.reloadSelected();
-      } catch {
-        this.update({ permissions: { writes: false, checks: false } });
-        if (this.state.status === "ready") {
-          await this.open(this.state.askEachRead);
-          await this.reloadSelected();
-        }
-        throw new BoundaryError(
-          "Desktop permissions could not be enabled; no effect permissions were retained",
-        );
-      }
-      return;
-    }
-    if (command.type === "web.permissions") {
-      this.selected(command.sessionId);
-      const access = normalizeDesktopWebAccess({
-        allowedOrigins: command.allowedOrigins,
-        dns: command.dns,
-      });
-      const target = this.state.reportTarget;
-      const permissions = this.state.permissions;
-      this.update({ webAccess: EMPTY_WEB_ACCESS, pendingApproval: null });
-      try {
-        await this.open(this.state.askEachRead, target, permissions, access);
-        await this.reloadSelected();
-      } catch {
-        this.update({ webAccess: EMPTY_WEB_ACCESS });
-        if (this.state.status === "ready") {
-          await this.open(this.state.askEachRead, target, permissions);
-          await this.reloadSelected();
-        }
-        throw new BoundaryError(
-          "Web access could not be changed; no network permission was retained",
-        );
-      }
-      return;
-    }
-    if (command.type === "effects") {
-      this.selected(command.sessionId);
-      await this.refreshArtifacts(command.offset, "effects");
-      return;
-    }
-    if (command.type === "effect.inspect") {
-      const workspace = this.selected(command.sessionId);
-      this.update({ effectInspection: null });
-      const effect = this.state.effects.items.find((item) => item.effectId === command.effectId);
-      if (!effect) throw new BoundaryError("Select a recorded operation first");
-      this.update({ effectInspection: inspectEffectFile(workspace, effect, this.excluded()) });
-      return;
-    }
-    if (
-      command.type === "materials.import" ||
-      command.type === "library" ||
-      command.type === "material.select" ||
-      command.type === "material.recycle" ||
-      command.type === "material.restore" ||
-      command.type === "material.purge" ||
-      command.type === "material.preview" ||
-      command.type === "material.housekeeping"
-    ) {
-      const workspaceRoot = this.selected(command.sessionId),
-        sessionId = command.sessionId;
-      if (this.state.historyOnly)
-        throw new BoundaryError("Open the available workspace before managing materials");
-      const manager = this.materialManager();
-      this.update({ materialPreview: null });
-      if (command.type === "materials.import") {
-        const controller = new AbortController();
-        this.materialAbort = controller;
-        this.update({ importing: true });
-        try {
-          await manager.importFiles({
-            sessionId,
-            workspaceRoot,
-            paths: command.paths,
-            signal: controller.signal,
-          });
-        } catch (error) {
-          if (controller.signal.aborted)
-            throw new FileBoundaryError(
-              "Import cancelled; any saved originals remain recoverable in the library",
-            );
-          throw error;
-        } finally {
-          this.materialAbort = undefined;
-          this.update({ importing: false });
-        }
-      } else if (command.type === "material.select") {
-        const selected = await manager.selected({ sessionId, workspaceRoot });
-        await manager.attach({
-          sessionId,
-          workspaceRoot,
-          ids: [...new Set([...selected.map((r) => r.id), ...command.ids])],
-        });
-      } else if (command.type === "material.housekeeping") {
-        await manager.setHousekeeping(workspaceRoot, command.enabled);
-        await manager.housekeeping({ workspaceRoot });
-      } else if (command.type !== "library") {
-        const operation = { workspaceRoot, id: command.id, revision: command.revision };
-        if (command.type === "material.preview") {
-          const record = (await manager.list(workspaceRoot)).find(
-            (r) => r.id === command.id && r.revision === command.revision && r.state === "active",
-          );
-          if (!record) throw new FileBoundaryError("Select a current material first");
-          const bytes = await manager.read(operation);
-          const image = ["png", "jpg", "jpeg"].includes(record.format)
-            ? imagePreview(bytes, record.format)
-            : undefined;
-          const isText = ["txt", "text", "md", "json", "csv"].includes(record.format);
-          const text = isText
-            ? new TextDecoder("utf-8", { fatal: true }).decode(bytes)
-            : image
-              ? ""
-              : "原件已保留。此处显示文件身份；正文需在发送任务后通过受控文档工具读取，不是版式预览。";
-          this.update({
-            materialPreview: {
-              effectId: record.id,
-              path: record.path,
-              sha256: record.sha256,
-              sourceBytes: record.sourceBytes,
-              text: text.slice(0, 65536),
-              truncated: text.length > 65536,
-              ...(image ? { image } : {}),
-            },
-          });
-        } else if (command.type === "material.recycle") await manager.recycle(operation);
-        else if (command.type === "material.restore") await manager.restore(operation);
-        else await manager.purge(operation);
-      }
-      await this.refreshMaterials(command.type === "library" ? command.offset : 0);
-      return;
-    }
-    if (command.type === "materials") {
-      const workspace = this.selected(command.sessionId);
-      if (command.paths.length)
-        this.update({ materials: inspectMaterials(workspace, command.paths, this.excluded()) });
-      return;
-    }
-    if (command.type === "material.remove") {
-      this.selected(command.sessionId);
-      if (this.runtime?.materials) {
-        const workspaceRoot = this.selected(command.sessionId),
-          manager = this.materialManager();
-        const selected = await manager.selected({ sessionId: command.sessionId, workspaceRoot });
-        await manager.attach({
-          sessionId: command.sessionId,
-          workspaceRoot,
-          ids: selected.filter((r) => r.path !== command.path).map((r) => r.id),
-        });
-      }
-      this.update({
-        materials: this.state.materials.filter((item) => item.path !== command.path),
-        materialPreview: null,
-      });
-      await this.refreshMaterials();
-      return;
-    }
-    if (command.type === "report.target" || command.type === "report.clear") {
-      const workspace = this.selected(command.sessionId);
-      if (command.type === "report.target" && command.path === null) return;
-      const target =
-        command.type === "report.clear"
-          ? null
-          : reportTarget(workspace, command.path as string, this.excluded());
-      await this.changeReport(target);
-      return;
-    }
-    if (command.type === "artifacts") {
-      this.selected(command.sessionId);
-      await this.refreshArtifacts(command.offset, "artifacts");
-      return;
-    }
-    if (command.type === "artifact.close") {
-      this.update({ artifactPreview: null });
-      return;
-    }
-    if (command.type === "artifact.open") {
-      const workspace = this.selected(command.sessionId);
-      const artifact = this.state.artifacts.items.find(
-        (item) => item.effectId === command.effectId,
-      );
-      this.update({ artifactPreview: null });
-      if (!artifact) throw new BoundaryError("Select a recorded report first");
-      const checked = inspectReport(workspace, artifact, this.excluded());
-      this.update({
-        artifacts: {
-          ...this.state.artifacts,
-          items: this.state.artifacts.items.map((item) =>
-            item.effectId === artifact.effectId ? { ...item, state: checked.state } : item,
-          ),
-        },
-        artifactPreview: checked.preview ?? null,
-      });
-      if (checked.state !== "current")
-        throw new BoundaryError(`Report is ${checked.state}; the recorded version was not opened`);
-      return;
-    }
-    if (command.type === "list") {
-      await this.send({ type: "session.list", offset: command.offset, limit: 20 });
-      return;
-    }
-    if (command.type === "start") {
-      if (this.state.historyOnly)
-        throw new BoundaryError("Workspace is unavailable; this session is open for history only");
-      this.update({ history: null, messageDetail: null });
-      const workspace = this.selected(command.sessionId);
-      if (!this.state.connection.ready)
-        throw new BoundaryError("The model connection is unavailable");
-      const input = [{ type: "text" as const, text: command.text }];
-      if (this.state.materials.length) {
-        const current = inspectMaterials(
-          workspace,
-          this.state.materials.map((item) => item.path),
-          this.excluded(),
-        );
-        if (JSON.stringify(current) !== JSON.stringify(this.state.materials))
-          throw new BoundaryError("Selected documents changed; select them again before sending");
-        input.push({
-          type: "text",
-          text: `Selected workspace materials (file identity only; contents have not been extracted). Use read_document for Office/PDF, read for text. PNG/JPEG are local preview only; do not claim to have seen their contents:\n${JSON.stringify(current)}`,
-        });
-      }
-      if (this.state.reportTarget)
-        input.push({
-          type: "text",
-          text: `Selected new report destination: ${JSON.stringify(this.state.reportTarget)}. Only create at this exact relative path is enabled, with approval; existing files cannot be edited or overwritten.`,
-        });
-      if (Buffer.byteLength(JSON.stringify(input)) > (this.options.limits?.maxInputBytes ?? 65_536))
-        throw new BoundaryError("Message exceeds the configured input limit");
-      await this.send({ type: "run.start", sessionId: command.sessionId as SessionId, input });
-      return;
-    }
-    if (command.type === "cancel") {
-      if (command.runId !== this.state.run?.id) throw new BoundaryError("Run is not active");
-      this.update({ run: { id: command.runId, state: "cancelling" } });
-      await this.send({ type: "run.cancel", runId: command.runId as RunId });
-      return;
-    }
-    if (command.type !== "approve") throw new BoundaryError("Unknown desktop action");
-    const pending = this.state.pendingApproval;
-    if (
-      this.state.run?.state !== "running" ||
-      pending?.effectId !== command.effectId ||
-      pending.digest !== command.digest ||
-      this.replying.has(command.effectId)
-    )
-      throw new BoundaryError("Approval is unknown, stale or already being handled");
-    this.replying.add(command.effectId);
+    this.eventState = this.state;
+    this.eventDepth += 1;
     try {
-      await this.send({
-        type: "approval.respond",
-        effectId: command.effectId as EffectId,
-        digest: command.digest as ActionDigest,
-        decision: command.decision,
-      });
-      if (this.approvals.get(command.effectId)?.digest === command.digest)
-        this.approvals.delete(command.effectId);
-      this.update({ pendingApproval: this.approvals.values().next().value ?? null });
+      this.features.event(this, event);
+      switch (event.type) {
+        case "command.rejected":
+          this.commandError =
+            event.reason ===
+            "Evidence answer requires a new session. Disable it to continue this conversation; history was not changed."
+              ? "独立证据成文仅适用于新会话。请新建会话，或在模型设置中关闭后继续；历史未修改。"
+              : event.reason ===
+                  "Evidence answer cannot accept steering. Cancel and start a new self-contained session."
+                ? "独立证据成文不支持追加指令。请取消后在新会话提出完整问题；没有补发请求。"
+                : "The runtime rejected this command; refresh the current state before trying again";
+          this.update({ error: this.commandError });
+          break;
+        case "plugin.status":
+          if (event.state === "failed") {
+            this.pluginWarning = "A runtime plugin is unavailable; some capabilities may not work";
+            this.update({ error: this.pluginWarning });
+          }
+          break;
+      }
     } finally {
-      this.replying.delete(command.effectId);
-    }
-  }
-
-  private add(message: DesktopMessage): void {
-    const text = clip(message.text);
-    const messages = [...this.state.messages, { ...message, text }];
-    let truncated = this.state.historyTruncated || text !== message.text;
-    while (messages.length > 100 || Buffer.byteLength(JSON.stringify(messages)) > MESSAGE_BYTES) {
-      messages.shift();
-      truncated = true;
-    }
-    this.update({ messages, historyTruncated: truncated });
-  }
-
-  private entry(entry: TranscriptEntry): void {
-    if (entry.sessionId !== this.state.activeSessionId || this.entryIds.has(entry.id)) return;
-    this.entryIds.add(entry.id);
-    const body = entry.body;
-    const summary = this.knownSessions.get(entry.sessionId);
-    // Loading replays historical entries; keep the catalog's current summary during replay.
-    if (summary && !this.expectedSession) {
-      let preview = summary.promptPreview;
-      if (body.kind === "user_message") {
-        preview = body.content.find((part) => part.type === "text")?.text.slice(0, 160) ?? null;
-        if (preview && /[\uD800-\uDBFF]$/u.test(preview)) preview = preview.slice(0, -1);
+      this.eventDepth -= 1;
+      if (this.eventDepth === 0 && this.eventChanged) {
+        this.eventChanged = false;
+        this.publish();
       }
-      const next = { ...summary, promptPreview: preview, lastActivityAt: entry.createdAt };
-      this.knownSessions.set(entry.sessionId, next);
-      this.update({
-        sessions: {
-          ...this.state.sessions,
-          items: this.state.sessions.items.map((item) =>
-            item.sessionId === entry.sessionId ? next : item,
-          ),
-        },
-      });
-    }
-    if (body.kind === "user_message" || body.kind === "assistant_message") {
-      const role = body.kind === "user_message" ? "user" : "assistant";
-      for (const [index, part] of body.content.entries()) {
-        const id = `${entry.id}:${index}`;
-        if (part.type === "text" || part.type === "refusal")
-          this.add({ id, role, text: part.text });
-        else if (part.type === "tool_call") {
-          this.toolNames.set(part.callId, part.name);
-          this.add({
-            id,
-            role: "tool",
-            tool: part.name,
-            state: "requested",
-            text: `${part.name} ${part.rawArguments}`,
-          });
-        } else if (part.type === "image")
-          this.add({
-            id,
-            role: "notice",
-            text: "An image is retained in history; this text view does not display it.",
-          });
-        // Reasoning, replay and request blob references stay in the private runtime/store.
-      }
-      if (body.kind === "assistant_message") {
-        this.update({ streamText: "" });
-        if (body.stopReason === "interrupted")
-          this.add({
-            id: `${entry.id}:interrupted`,
-            role: "notice",
-            state: "interrupted",
-            text: body.content.some(
-              (part) => (part.type === "text" || part.type === "refusal") && part.text.trim(),
-            )
-              ? "This response was interrupted. The text above is partial, not a completed answer."
-              : "This response was interrupted before an answer was received.",
-          });
-        if (body.stopReason === "max_tokens")
-          this.add({
-            id: `${entry.id}:partial`,
-            role: "notice",
-            state: "partial",
-            text: "The model reached its output limit. Any answer above is partial; no continuation was started.",
-          });
-      }
-    } else if (body.kind === "tool_results") {
-      for (const result of body.results) {
-        const source = projectWebSource(
-          entry.id,
-          entry.createdAt,
-          result,
-          this.toolNames.get(result.callId),
-        );
-        if (source) this.update({ sources: appendWebSource(this.state.sources, source) });
-        else if (this.toolNames.get(result.callId) === "web_fetch" && result.status === "succeeded")
-          this.update({ sources: { ...this.state.sources, truncated: true } });
-      }
-      for (const [index, result] of body.results.entries())
-        this.add({
-          id: `${entry.id}:${index}`,
-          role: "tool",
-          tool: this.toolNames.get(result.callId) ?? "tool",
-          state: result.status,
-          text: result.content
-            .filter((part) => part.type === "text")
-            .map((part) => part.text)
-            .join("\n"),
-        });
-    } else if (body.kind === "notice")
-      this.add({
-        id: entry.id,
-        role: "notice",
-        text:
-          body.code === "evidence_answer"
-            ? "调查阶段结束，正在用原问题和实际工具证据独立成文。先前回答保留为调查记录；仍使用本轮原预算，完成后也需核对事实。"
-            : body.text,
-      });
-    else if (body.kind === "compaction")
-      this.add({
-        id: entry.id,
-        role: "notice",
-        text: "Earlier conversation was summarized; original entries remain in history.",
-      });
-  }
-
-  private event(event: RuntimeEvent): void {
-    switch (event.type) {
-      case "session.ready": {
-        if (
-          !this.pendingWorkspace ||
-          (this.expectedSession && event.sessionId !== this.expectedSession)
-        )
-          return;
-        const listed = this.knownSessions.get(event.sessionId);
-        // Filtering the catalog must not reset the selected session when grants rebuild its runtime.
-        const metadata = listed?.metadata ??
-          (event.sessionId === this.state.activeSessionId ? this.state.activeMetadata : null) ?? {
-            title: null,
-            group: null,
-            pinned: false,
-            muted: false,
-            removedAt: null,
-            revision: 0,
-          };
-        const summary = listed
-          ? { ...listed, metadata }
-          : {
-              sessionId: event.sessionId,
-              workspaceRoot: this.pendingWorkspace,
-              lastActivityAt: null,
-              promptPreview: null,
-              metadata,
-            };
-        this.knownSessions.set(event.sessionId, summary);
-        let sessions = this.state.sessions;
-        if (!this.expectedSession && sessions.offset === 0) {
-          const items = [
-            summary,
-            ...sessions.items.filter((item) => item.sessionId !== event.sessionId),
-          ];
-          sessions = {
-            ...sessions,
-            items: items.slice(0, 20),
-            hasMore: sessions.hasMore || items.length > 20,
-          };
-        }
-        this.update({
-          activeSessionId: event.sessionId,
-          activeMetadata: summary.metadata ?? null,
-          workspaceRoot: this.pendingWorkspace,
-          sessions,
-        });
-        break;
-      }
-      case "session.listed":
-        for (const session of event.page.sessions)
-          this.knownSessions.set(session.sessionId, session);
-        this.update({
-          sessions: {
-            items: event.page.sessions,
-            offset: event.page.offset,
-            hasMore: event.page.hasMore,
-          },
-        });
-        break;
-      case "run.started":
-        if (event.sessionId !== this.state.activeSessionId) return;
-        this.update({
-          run: { id: event.runId, state: "running" },
-          outcome: null,
-          streamText: "",
-          artifactPreview: null,
-          effectInspection: null,
-        });
-        break;
-      case "assistant.delta":
-        if (event.runId !== this.state.run?.id) return;
-        this.update({ streamText: clip(this.state.streamText + event.text, 32_768) });
-        break;
-      case "entry.appended":
-        this.entry(event.entry);
-        break;
-      case "effect.updated":
-        if (event.effect.runId !== this.state.run?.id) return;
-        this.effectRuns.set(event.effect.id, event.effect.runId);
-        if (this.state.effects.offset === 0) {
-          const previous = this.state.effects.items;
-          const projected = {
-            effectId: event.effect.id,
-            runId: event.effect.runId,
-            tool: event.effect.tool,
-            state: event.effect.state,
-            updatedAt: event.effect.updatedAt,
-            receipt: null,
-          };
-          const items = [
-            projected,
-            ...previous.filter((item) => item.effectId !== projected.effectId),
-          ];
-          this.update({
-            effects: {
-              offset: 0,
-              hasMore: this.state.effects.hasMore || items.length > 20,
-              items: items.slice(0, 20),
-            },
-          });
-        }
-        if (event.effect.state !== "awaiting_approval") {
-          this.approvals.delete(event.effect.id);
-          this.update({ pendingApproval: this.approvals.values().next().value ?? null });
-        }
-        break;
-      case "approval.requested":
-        if (!this.state.run || this.effectRuns.get(event.effectId) !== this.state.run.id) return;
-        this.approvals.set(event.effectId, {
-          effectId: event.effectId,
-          digest: event.digest,
-          summary: clip(event.summary),
-          ...(event.preview === undefined ? {} : { preview: event.preview }),
-        });
-        this.update({ pendingApproval: this.approvals.values().next().value ?? null });
-        break;
-      case "run.finished":
-        if (event.runId !== this.state.run?.id) return;
-        this.approvals.clear();
-        this.effectRuns.clear();
-        this.update({
-          run: null,
-          pendingApproval: null,
-          outcome: {
-            kind: event.outcome.kind,
-            ...(event.outcome.kind === "failed"
-              ? { detail: clip(event.outcome.reason, 1024) }
-              : event.outcome.kind === "budget_exhausted"
-                ? { detail: event.outcome.budget }
-                : {}),
-          },
-        });
-        this.scheduleArtifacts();
-        break;
-      case "command.rejected":
-        this.commandError =
-          event.reason ===
-          "Evidence answer requires a new session. Disable it to continue this conversation; history was not changed."
-            ? "独立证据成文仅适用于新会话。请新建会话，或在模型设置中关闭后继续；历史未修改。"
-            : event.reason ===
-                "Evidence answer cannot accept steering. Cancel and start a new self-contained session."
-              ? "独立证据成文不支持追加指令。请取消后在新会话提出完整问题；没有补发请求。"
-              : "The runtime rejected this command; refresh the current state before trying again";
-        this.update({ error: this.commandError });
-        break;
-      case "plugin.status":
-        if (event.state === "failed") {
-          this.pluginWarning = "A runtime plugin is unavailable; some capabilities may not work";
-          this.update({ error: this.pluginWarning });
-        }
-        break;
-      case "session.results":
-        if (
-          event.page.sessionId !== this.state.activeSessionId ||
-          event.page.workspaceRoot !== this.state.workspaceRoot
-        )
-          return;
-        this.update({
-          ...(this.resultsDestination !== "artifacts"
-            ? {
-                effects: {
-                  offset: event.page.offset,
-                  hasMore: event.page.hasMore,
-                  items: event.page.effects,
-                },
-                effectInspection: null,
-              }
-            : {}),
-          ...(this.resultsDestination !== "effects"
-            ? {
-                artifacts: {
-                  offset: event.page.offset,
-                  hasMore: event.page.hasMore,
-                  items: event.page.effects.flatMap((effect) =>
-                    effect.tool === "create" &&
-                    effect.state === "succeeded" &&
-                    effect.receipt?.kind === "file" &&
-                    effect.receipt.beforeHash === null &&
-                    effect.receipt.afterHash !== null
-                      ? [
-                          {
-                            effectId: effect.effectId,
-                            path: effect.receipt.path,
-                            afterHash: effect.receipt.afterHash,
-                            state: "unchecked" as const,
-                          },
-                        ]
-                      : [],
-                  ),
-                },
-                artifactPreview: null,
-              }
-            : {}),
-        });
-        break;
     }
   }
 
@@ -1345,30 +319,6 @@ class Host implements DesktopHost {
     })();
     return this.closing;
   }
-}
-
-class BoundaryError extends Error {}
-
-export class DesktopInitializationError extends Error {
-  readonly kind: "locked" | "unavailable";
-  constructor(kind: "locked" | "unavailable") {
-    super(
-      kind === "locked"
-        ? "Desktop store is locked by another process"
-        : "Desktop runtime initialization failed",
-    );
-    this.name = "DesktopInitializationError";
-    this.kind = kind;
-  }
-}
-
-function initializationError(error: unknown): DesktopInitializationError {
-  const sqlite = error as { code?: unknown; errcode?: unknown } | null;
-  return new DesktopInitializationError(
-    sqlite?.code === "ERR_SQLITE_ERROR" && (sqlite.errcode === 5 || sqlite.errcode === 6)
-      ? "locked"
-      : "unavailable",
-  );
 }
 
 export async function createDesktopHost(options: DesktopHostOptions): Promise<DesktopHost> {

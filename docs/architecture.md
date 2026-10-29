@@ -85,6 +85,22 @@ retaining store/session/policy and unaffected provider clients. A failed replace
 See [CLI usage](cli.md) and [ADR 0011](decisions/0011-interactive-cli-and-development-reload.md).
 Development reload is incompatible with recording/replay and refreshes only explicit ESM entries.
 
+### Desktop feature composition
+
+[ADR 0045](decisions/0045-desktop-feature-modules.md) implements the desktop UI slots planned
+in ADR 0005. `apps/desktop/feature-list.json` generates separate static contract, host, native and
+renderer registries. Modules in `features/<id>` may import shared foundation code and their own
+files, never another feature. Contracts are browser-safe and may use shared pure validation;
+feature renderer imports are limited to React, shared design/bridge DTOs and its own views.
+Feature host/native code retains the public runtime boundary. Only native entry points use Electron.
+
+The host owns serialization, runtime/grant lifecycle and publication. Commands route to one
+registered owner, unknown/duplicate actions fail, and runtime events reach every interested
+projection. Each feature writes only its declared state slice; cross-feature resets belong to
+fixed shared lifecycle transitions. Renderer features contribute declarative sidebar, right-panel,
+dialog, settings-section and keyed conversation-node slots; the shell only places them. This is
+build-time repository composition, not third-party loading or new execution authority.
+
 ### Trust
 
 [ADR 0027](decisions/0027-bounded-workspace-navigation.md) adds explicitly enabled, path-only

@@ -104,8 +104,9 @@ Every screen and card defines each state it can reach:
 
 ## Layout, accessibility and motion
 
-- Minimum window width is 560 px; below 800 px the layout switches to the narrow arrangement
-  already in `styles.css`. Every screen must remain usable at 560 px.
+- The accepted native window minimum is 780 px (M6); its narrow capture is 780 × 560 px.
+  The renderer CSS supports 560 px and switches below 800 px. Check that CSS width separately;
+  it does not change the native window minimum.
 - Every control is reachable by keyboard and shows the `--focus` outline.
 - Respect `prefers-reduced-motion`; motion is short and never required to understand state.
 - Text from models, documents and web pages is always escaped text.
