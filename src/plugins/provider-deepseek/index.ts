@@ -84,7 +84,7 @@ export function createDeepSeekClient(
             ? "auth"
             : response.status === 429
               ? "rate_limited"
-              : [500, 503].includes(response.status)
+              : response.status >= 500 && response.status < 600
                 ? "overloaded"
                 : [400, 404, 413, 422].includes(response.status)
                   ? "invalid_request"

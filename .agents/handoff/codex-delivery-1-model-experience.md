@@ -56,6 +56,9 @@
 - Part A implementation files checkpointed in this `wip:` commit; shared wiring and final
   acceptance remain in progress.
 
+- Part F implementation files checkpointed in this `wip:` commit; shared wiring and final
+  acceptance remain in progress.
+
 ## In progress
 
 - All A-H code exists. Root owns integration and all writes; subagents now perform read-only risk

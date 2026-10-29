@@ -52,16 +52,47 @@ Framing accepts chunked UTF-8 and SSE comments/line endings, rejects duplicate J
 unfinished events, and caps the wire at 8 MiB and each event at 1 MiB. Semantic assembly checks
 sequence order, identities, lifecycle, completed content consistency and usage. EOF without a
 terminal is `stream_interrupted`; partial output is retained and never retried here. Failed responses
-and HTTP errors expose fixed diagnostics, not raw server error bodies. Unknown usage remains null.
+and HTTP errors expose fixed diagnostics, not raw server error bodies. Every HTTP 5xx response
+is classified as `overloaded`, including gateway failures such as 502 and 504. Unknown usage
+remains null.
 
 `fixtures.ts` builds handwritten synthetic lifecycles, not recordings from DeepSeek. The provider's
 wire and common-event tests use these fixtures. Owner-authorized minimal probes identified the
 auxiliary-field, final-answer-phase and commentary rejections. An earlier complete response decodes
-offline to `OK`, `end_turn` and final usage. The latest read-task prefix now advances beyond commentary
+offline to `OK`, `end_turn` and final usage. The historical read-task prefix advances beyond commentary
 and correctly reports interruption at EOF; no terminal or tool result is fabricated.
-Synthetic complete tool flows exercise real files, SQLite and recording/replay, not service quality;
-real tool continuation remains unverified. See the
+Synthetic complete tool flows exercise real files, SQLite and recording/replay. The subsequent #19
+installation passed one bounded live file-read/tool-continuation task and offline replay, recorded
+in [the provider guide](../../../docs/deepseek.md); broader task quality has separate acceptance.
+See the retained
 [follow-up evidence](../../../docs/tasks/2026-10-25-deepseek-compatibility.md).
 For runtime configuration, record/replay and owner smoke instructions see
 [docs/deepseek.md](../../../docs/deepseek.md). Design evidence is in
 [ADR 0010](../../../docs/decisions/0010-deepseek-transport-and-recording.md).
+
+## Model experience
+
+The adapter adds no prompt prose. It sends the context builder's system sections, ordered tools,
+full visible text/reasoning history and paired function calls/results to the Responses endpoint.
+It preserves every complete assistant turn's actual visible reasoning, including turns without
+tools. Each tool result begins with `Tool result status: <status>` and retains its original text
+parts. Unsupported history fails before transport. Partial or failed output cannot authorize a
+tool call or become a completed answer.
+
+Input-token cost follows the complete rendered request, including retained reasoning and schemas.
+The 8192 output-token cap includes reasoning. Reported `input_tokens_details.cached_tokens` is
+recorded as a subset of total input; unknown cache writes remain `null`. Usage is attached to
+each attempt, so replay and inspection do not need a second provider call.
+
+An unchanged assembled prefix can be reused by the provider. Stable tool order and
+`static → session → turn` sections help preserve it; changing a prior section, schema or history
+changes the prefix from that point. Tool calls and results normally append to history. The
+adapter adds no changing timestamps or telemetry to model input. Model/provider changes select a
+different cache domain. Cache hit counters are evidence of actual reuse; stable formatting alone
+does not guarantee a hit.
+
+HTTP failures return `DeepSeek HTTP <status>` with the existing normalized error kind; HTTP 402
+returns `DeepSeek account balance is unavailable`. Neither response bodies nor credentials are
+included. The provider performs one request per invocation and never retries. The fixed-source
+[DSH comparison](../../../docs/deepseek.md#deepseek-harness-comparison) records the Messages
+differences, source pointers and the 5xx classification correction.

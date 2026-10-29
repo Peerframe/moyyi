@@ -68,7 +68,11 @@ describe("DeepSeek provider", () => {
     [422, "invalid_request"],
     [429, "rate_limited"],
     [500, "overloaded"],
+    [502, "overloaded"],
     [503, "overloaded"],
+    [504, "overloaded"],
+    [599, "overloaded"],
+    [600, "protocol"],
     [302, "protocol"],
   ] as const)("classifies HTTP %i without retries or echoing its body", async (status, kind) => {
     const { transport, close } = wire(
