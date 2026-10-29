@@ -72,12 +72,26 @@
 
 - All A-H code exists. Root owns integration and all writes; subagents now perform read-only risk
   review and recovery of the original source task's frozen envelope. No paid run is active.
-- Next: full check, affected offline conformance, external CLI and desktop acceptance, then freeze
+- Next: finish the running full check, affected offline conformance, external CLI and desktop acceptance, then freeze
   and run the six-task candidate gate once (71 maximum requests, zero retries).
-- Original source comparison still unstarted. Recover exact original prompt/workspace/runner and
-  budget before its once-only run. Verify actual spontaneous todo use from live records.
-- Original checkout's unrelated user modification is untouched. Uncommitted work belongs to this delivery. Root owns integration; baseline_preflight owns the
-  final reminder-boundary fix and two old-test updates. Focused tests may still be running.
+- Original source comparison is prepared and remains unstarted. Private candidate runner:
+  `/Users/yxflc/.moyyi/acceptance/delivery-1-source-investigation-2026-10-29/run.mjs`.
+  Exact original prompt, 140-file archive, six-item rubric and all budgets verified by SHA-256.
+  Original Flash Responses low / 8192 / 8 requests / 300 seconds / zero retries retained, with
+  read/list/search only (new todo is explicitly denied). Offline-01 passed without credentials or
+  HTTP. Re-run offline after current source fixes, freeze after product commit, then run once. Verify actual spontaneous todo use from live records.
+- Original checkout's unrelated user modification is untouched. Uncommitted work belongs to this delivery. Root owns integration. All subagents have stopped writing and their processes ended;
+  the full check is running under root.
+
+- Parts B/C/D and shared runtime wiring are checkpointed together because result processing,
+  cancellation and typed publication share one executor contract. All implementation is committed.
+- Final risk review found and fixed BOM loss at range boundaries and reminder-only overflow.
+  Latest focused: runtime output 26, navigation 24, web 6, executor/runtime 127 all PASS.
+  Small-cap observations now retain priority; advice shortens or is omitted without raising limits.
+- Updated old conformance expectations for session facts, tool-owned guidance and spilled web
+  output. The 10000-context synthetic CLI case still fails closed at that unchanged cap; an
+  ordinary 100000-context fixture additionally verifies successful explicit host loading.
+- No active child writer or paid process remains.
 
 ## Collected problems (fix pass)
 
@@ -96,6 +110,13 @@
   Prefix ordering, cache-read token recording and complete visible-reasoning continuation already
   exist; Messages signatures/in-history system changes and DSH's larger output cap remain
   protocol/product differences. The comparison and fix are implemented.
+
+- Initial candidate full check: 3072/3077 PASS; five assertions in four files expected old
+  prompt/path/truncation behavior or a tiny synthetic context to fit the expanded catalog.
+  Expectations now test the new contract while retaining relative source labels, original
+  budgets, complete blob bytes/hash, display truncation and actual host loading.
+- A subsequent check stopped in typecheck on a missing ContentPart discriminator in the revised
+  instruction scenario; fixed. Final full check is currently running, not yet claimed PASS.
 
 ## Commands run
 
@@ -174,5 +195,5 @@ source-analysis comparison are not started; recover their frozen configuration b
 - Keep one final PR for the complete delivery. No PR has been opened during preparation.
 - Per brief section 5, leave system overview and the existing delivery record for Claude's
   acceptance update; this file holds the current execution ledger.
-- Implementation subagents finished; two read-only reviews are active. Root is the sole writer.
+- Implementation and review subagents finished. Root is the sole writer.
   No paid run is in progress. Keep the worktree and private recordings for continuation.

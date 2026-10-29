@@ -98,6 +98,14 @@ Retain both previous programs and their pre-upgrade data backup as one rollback 
 downgrade cannot read schema3, and restoring old data deliberately replaces newer history, so first
 preserve the current store separately. Host configuration and model defaults need not change.
 
+Delivery one's output-spill candidate also upgrades persisted transcript format 1 to format 2,
+while keeping SQL schema 3. Old CLI/desktop programs reject format 2 even though the schema number
+matches. Upgrade the paired programs together. To return to an old program, first rescue the
+current store, then use the matching pre-upgrade data backup and programs. Rollback checks both
+schema and persisted format; it never drops output references to manufacture compatibility.
+Restoring a format 1 backup migrates a private copy and leaves that backup unchanged. See
+[ADR 0045](decisions/0045-recorded-tool-output.md).
+
 ```sh
 npm uninstall --global --prefix /absolute/private/moyyi-prefix moyyi
 ```

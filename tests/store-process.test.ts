@@ -187,7 +187,7 @@ describe("real process interruption (not a physical power-loss test)", () => {
     const store = open(paths.directory);
     expect(store.diagnostics()).toMatchObject({
       schemaVersion: 3,
-      persistedFormat: 1,
+      persistedFormat: 2,
       integrity: "ok",
     });
     expect(await store.loadSession("session_base" as SessionId)).toBeNull();

@@ -4,7 +4,7 @@
  * migration in the store, and add new fixtures. Never edit fixtures of earlier versions.
  * See docs/recipes/change-persisted-format.md.
  */
-export const PERSISTED_FORMAT_VERSION = 1;
+export const PERSISTED_FORMAT_VERSION = 2;
 
 export type * from "./content.ts";
 export * from "./effects.ts";

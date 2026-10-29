@@ -1,3 +1,4 @@
+import { createHash } from "node:crypto";
 import { mkdirSync, mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
@@ -95,13 +96,13 @@ async function harness(
   const store = new SqliteSessionStore(join(directory, "store"));
   const scripted = scriptedProvider(responses);
   const events: RuntimeEvent[] = [];
-  let deadline: (() => void) | undefined;
+  const deadlines = new Set<() => void>();
   const scheduler: Scheduler = {
     sleep: vi.fn(async () => {}),
     deadline: (_milliseconds, callback) => {
-      deadline = callback;
+      deadlines.add(callback);
       return () => {
-        deadline = undefined;
+        deadlines.delete(callback);
       };
     },
   };
@@ -131,6 +132,8 @@ async function harness(
   if (ready?.type !== "session.ready") throw Error("Session creation failed");
   const sessionId = ready.sessionId;
   return {
+    directory,
+    workspace,
     runtime,
     store,
     events,
@@ -138,7 +141,8 @@ async function harness(
     client: scripted.client,
     scheduler,
     sessionId,
-    expire: () => deadline?.(),
+    // The run deadline is registered before any per-tool deadline.
+    expire: () => deadlines.values().next().value?.(),
     async start() {
       await runtime.send({
         type: "run.start",
@@ -186,6 +190,284 @@ afterEach(async () => {
     store.close();
     rmSync(directory, { recursive: true, force: true });
   }
+});
+
+describe("model experience runtime integration", () => {
+  it("resets repeat reminders when a new user message arrives during execution", async () => {
+    const selected = syntheticTool();
+    const secondStarted = Promise.withResolvers<void>();
+    const continueSecond = Promise.withResolvers<void>();
+    let count = 0;
+    selected.execute = async () => {
+      if (++count === 2) {
+        secondStarted.resolve();
+        await continueSecond.promise;
+      }
+      return { status: "succeeded", content: [{ type: "text", text: "Observed evidence" }] };
+    };
+    const test = await harness(
+      [toolTurn(call("first")), toolTurn(call("second")), toolTurn(call("third")), finalTurn()],
+      [selected],
+    );
+    const runId = await test.start();
+    await secondStarted.promise;
+    await test.runtime.send({
+      type: "run.steer",
+      runId,
+      input: [{ type: "text", text: "Please inspect it again with my new requirement" }],
+    });
+    continueSecond.resolve();
+    expect(await test.finish()).toEqual({ kind: "completed" });
+    expect(count).toBe(3);
+    const snapshot = await test.snapshot();
+    expect(results(snapshot)).toHaveLength(3);
+    expect(JSON.stringify(results(snapshot))).not.toContain("Runtime reminder");
+    expect(JSON.stringify(test.client.requests[2]?.messages)).toContain("my new requirement");
+  });
+
+  it("records the third identical call's reminder even when parallel results finish in reverse order", async () => {
+    const selected = syntheticTool();
+    const finishes = Array.from({ length: 3 }, () => Promise.withResolvers<void>());
+    let started = 0;
+    selected.execute = async () => {
+      const index = started++;
+      await finishes[index]?.promise;
+      return { status: "succeeded", content: [{ type: "text", text: `Evidence ${index + 1}` }] };
+    };
+    const test = await harness(
+      [toolTurn(call("one"), call("two"), call("three")), finalTurn()],
+      [selected],
+      {
+        limits: { maxParallelReads: 3, maxToolOutputBytes: 1024 },
+      },
+    );
+    await test.start();
+    await vi.waitFor(() => expect(started).toBe(3));
+    for (const index of [2, 1, 0]) {
+      finishes[index]?.resolve();
+      await vi.waitFor(async () => expect(results(await test.snapshot())).toHaveLength(3 - index));
+    }
+    expect(await test.finish()).toEqual({ kind: "completed" });
+    const snapshot = await test.snapshot();
+    const observations = results(snapshot);
+    expect(observations.map((result) => result.callId)).toEqual(["three", "two", "one"]);
+    expect(
+      observations
+        .filter((result) => JSON.stringify(result).includes("Runtime reminder"))
+        .map((result) => result.callId),
+    ).toEqual(["three"]);
+    const next = test.client.requests[1];
+    for (const result of observations)
+      expect(next?.messages.flatMap((message) => message.content)).toContainEqual(result);
+    const final = snapshot.entries.findLast(
+      (entry) => entry.body.kind === "assistant_message",
+    )?.body;
+    if (final?.kind !== "assistant_message") throw Error("Expected recorded request");
+    const messages = await Promise.all(
+      final.request.messages.map(async (blob) => {
+        const bytes = await test.store.getBlob(blob);
+        if (!bytes) throw Error("Missing recorded request");
+        return JSON.parse(new TextDecoder().decode(bytes));
+      }),
+    );
+    expect(messages).toEqual(next?.messages);
+  });
+
+  it("spills full evidence, retrieves a middle range through the real tool, and rejects a second session", async () => {
+    const text = `HEAD ${"begin ".repeat(500)}MIDDLE-EVIDENCE${" end".repeat(500)} TAIL`;
+    const handle = `tool-output:${createHash("sha256").update(text).digest("hex")}`;
+    const argumentsJson = canonicalizeJson({
+      handle,
+      offset: Buffer.byteLength(text.slice(0, text.indexOf("MIDDLE"))),
+      length: 15,
+    });
+    const selected = syntheticTool();
+    selected.execute = async () => ({ status: "succeeded", content: [{ type: "text", text }] });
+    const test = await harness(
+      [
+        toolTurn(call("spill")),
+        toolTurn(call("retrieve", "read_tool_output", argumentsJson)),
+        finalTurn(),
+        toolTurn(call("foreign", "read_tool_output", argumentsJson)),
+        finalTurn(),
+      ],
+      [selected],
+      { limits: { maxToolOutputBytes: 512 } },
+    );
+    await test.start();
+    expect(await test.finish()).toEqual({ kind: "completed" });
+    const snapshot = await test.snapshot();
+    const spill = snapshot.entries.find(
+      (entry) => entry.body.kind === "tool_results" && entry.body.outputBlobs?.length,
+    )?.body;
+    if (spill?.kind !== "tool_results" || !spill.outputBlobs?.[0])
+      throw Error("Expected persisted spill");
+    const ref = spill.outputBlobs[0];
+    expect(Buffer.from((await test.store.getBlob(ref.blob)) ?? []).toString("utf8")).toBe(text);
+    expect(ref.bytes).toBe(Buffer.byteLength(text));
+    expect(spill.results[0]?.content[0]).toMatchObject({
+      type: "text",
+      text: expect.stringContaining("HEAD"),
+    });
+    expect(JSON.stringify(spill.results)).toContain("TAIL");
+    expect(JSON.stringify(spill.results)).toContain(handle);
+    const retrieval = results(snapshot).find((result) => result.callId === "retrieve");
+    expect(retrieval?.status).toBe("succeeded");
+    expect(JSON.stringify(retrieval)).toContain("MIDDLE-EVIDENCE");
+    expect(JSON.stringify(test.client.requests[2]?.messages)).toContain("MIDDLE-EVIDENCE");
+    expect(JSON.stringify(test.client.requests[1]?.messages)).not.toContain("MIDDLE-EVIDENCE");
+    const effect = snapshot.effects.find((effect) => effect.callId === "spill");
+    expect(effect?.state).toBe("succeeded");
+    await test.runtime.send({ type: "session.create", workspaceRoot: test.workspace });
+    const ready = test.events.findLast((event) => event.type === "session.ready");
+    if (ready?.type !== "session.ready") throw Error("Expected second session");
+    await test.runtime.send({
+      type: "run.start",
+      sessionId: ready.sessionId,
+      input: [{ type: "text", text: "Try the guessed handle" }],
+    });
+    expect(await test.finish()).toEqual({ kind: "completed" });
+    const other = await test.store.loadSession(ready.sessionId);
+    if (!other) throw Error("Expected second session");
+    expect(results(other)[0]).toMatchObject({
+      status: "failed",
+      content: [{ type: "text", text: expect.stringContaining("unavailable in this session") }],
+    });
+    expect(JSON.stringify(test.client.requests.at(-1)?.messages)).not.toContain("MIDDLE-EVIDENCE");
+  });
+
+  it("uses a persisted handle after closing and reopening both runtime and SQLite", async () => {
+    const text = `REOPENED-EVIDENCE ${"recorded ".repeat(200)}`;
+    const handle = `tool-output:${createHash("sha256").update(text).digest("hex")}`;
+    const selected = syntheticTool();
+    selected.execute = async () => ({ status: "succeeded", content: [{ type: "text", text }] });
+    const test = await harness([toolTurn(call("spill")), finalTurn()], [selected], {
+      limits: { maxToolOutputBytes: 512 },
+    });
+    await test.start();
+    expect(await test.finish()).toEqual({ kind: "completed" });
+    await test.runtime.close();
+    test.store.close();
+    const store = new SqliteSessionStore(join(test.directory, "store"));
+    const scripted = scriptedProvider([
+      toolTurn(
+        call(
+          "after-reopen",
+          "read_tool_output",
+          canonicalizeJson({ handle, offset: 0, length: 17 }),
+        ),
+      ),
+      finalTurn(),
+    ]);
+    const runtime = await createRuntime({
+      store,
+      model: { provider: "scripted", model: "scripted" },
+      plugins: [{ plugin: scripted.plugin }],
+      limits: { maxToolOutputBytes: 512 },
+    });
+    const disposable = disposables.find((entry) => entry.runtime === test.runtime);
+    if (!disposable) throw Error("Missing cleanup owner");
+    disposable.runtime = runtime;
+    disposable.store = store;
+    await runtime.send({ type: "session.load", sessionId: test.sessionId });
+    await runtime.send({
+      type: "run.start",
+      sessionId: test.sessionId,
+      input: [{ type: "text", text: "Continue from the saved output" }],
+    });
+    await runtime.idle();
+    const snapshot = await store.loadSession(test.sessionId);
+    if (!snapshot) throw Error("Expected reopened session");
+    expect(results(snapshot).find((result) => result.callId === "after-reopen")).toMatchObject({
+      status: "succeeded",
+    });
+    expect(JSON.stringify(scripted.client.requests.at(-1)?.messages)).toContain(
+      "REOPENED-EVIDENCE",
+    );
+  });
+
+  it.each([false, true])(
+    "runs todo_write through policy and records the list (denied=%s)",
+    async (denied) => {
+      const todos = [
+        { content: "Inspect evidence", status: "completed" },
+        { content: "Verify result", status: "in_progress" },
+      ];
+      const policy = new ReadOnlyPolicy({ requireApproval: denied ? ["todo_write"] : [] });
+      const test = await harness(
+        [toolTurn(call("todo", "todo_write", canonicalizeJson({ todos }))), finalTurn()],
+        [],
+        { policy },
+      );
+      await test.start();
+      if (denied) {
+        const asked = await approval(test);
+        await test.runtime.send({
+          type: "approval.respond",
+          effectId: asked.effectId,
+          digest: asked.digest,
+          decision: "deny",
+        });
+      }
+      expect(await test.finish()).toEqual({ kind: "completed" });
+      const snapshot = await test.snapshot();
+      const outcome = results(snapshot)[0];
+      expect(outcome?.status).toBe(denied ? "denied" : "succeeded");
+      expect(snapshot.effects[0]?.state).toBe(denied ? "denied" : "succeeded");
+      if (!denied)
+        expect(outcome?.content).toEqual([
+          { type: "text", text: "Updated todo list: 0 pending, 1 in progress, 1 completed." },
+        ]);
+      else expect(JSON.stringify(outcome)).not.toContain("Updated todo list");
+      expect(test.client.requests[0]?.tools.some((tool) => tool.name === "todo_write")).toBe(true);
+      expect(
+        test.client.requests[1]?.messages.flatMap((message) => message.content),
+      ).toContainEqual(call("todo", "todo_write", canonicalizeJson({ todos })));
+    },
+  );
+
+  it("records the fixed read deadline only after cooperative cleanup, then lets the model continue", async () => {
+    let expireRead: (() => void) | undefined;
+    const cleanup = Promise.withResolvers<void>();
+    const cancelled = Promise.withResolvers<void>();
+    const started = Promise.withResolvers<void>();
+    const selected = syntheticTool();
+    selected.execute = async (_action, context) => {
+      context.signal.addEventListener("abort", () => cancelled.resolve(), { once: true });
+      started.resolve();
+      await cancelled.promise;
+      await cleanup.promise;
+      context.signal.throwIfAborted();
+      throw Error("unreachable");
+    };
+    const scheduler: Scheduler = {
+      sleep: async () => {},
+      deadline(milliseconds, callback) {
+        if (milliseconds === 37) expireRead = callback;
+        return () => {};
+      },
+    };
+    const test = await harness([toolTurn(call("slow")), finalTurn()], [selected], {
+      scheduler,
+      readToolTimeoutMs: 37,
+    });
+    await test.start();
+    await started.promise;
+    expect(expireRead).toBeDefined();
+    expireRead?.();
+    await cancelled.promise;
+    expect(results(await test.snapshot())).toEqual([]);
+    expect(test.client.requests).toHaveLength(1);
+    cleanup.resolve();
+    expect(await test.finish()).toEqual({ kind: "completed" });
+    expect(results(await test.snapshot())[0]).toMatchObject({
+      status: "failed",
+      content: [{ type: "text", text: "tool call timed out after 37ms" }],
+    });
+    expect(JSON.stringify(test.client.requests[1]?.messages)).toContain(
+      "tool call timed out after 37ms",
+    );
+  });
 });
 
 describe("runtime core with real SQLite persistence", () => {

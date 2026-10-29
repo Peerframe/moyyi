@@ -3,8 +3,17 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { DatabaseSync } from "node:sqlite";
 import { afterEach, describe, expect, it } from "vitest";
+import type {
+  EntryId,
+  RunId,
+  SessionId,
+  Timestamp,
+  ToolCallId,
+  TranscriptEntry,
+} from "../contracts/persisted/index.ts";
 import { BlobStore } from "./files.ts";
 import { SqliteSessionStore } from "./index.ts";
+import { restoreLocalStore } from "./maintenance.ts";
 
 // Exact schema-1 DDL from the merged batch-3 implementation. Keep this historical fixture fixed.
 const legacySchema = `CREATE TABLE metadata (key TEXT PRIMARY KEY, value INTEGER NOT NULL) STRICT;
@@ -40,6 +49,36 @@ const legacySnapshots = `CREATE TABLE workspace_snapshots (
           run_id TEXT NOT NULL REFERENCES runs(id),
           restore_of TEXT REFERENCES workspace_snapshots(id), payload TEXT NOT NULL
         ) STRICT;`;
+// Exact schema-3 additions from eeff4ec; a future DDL change must not rewrite this fixture.
+const legacyManagement = `CREATE TABLE session_metadata (
+          session_id TEXT PRIMARY KEY REFERENCES sessions(id),
+          title TEXT, group_name TEXT,
+          pinned INTEGER NOT NULL CHECK (pinned IN (0, 1)),
+          muted INTEGER NOT NULL CHECK (muted IN (0, 1)),
+          removed_at TEXT, revision INTEGER NOT NULL CHECK (revision > 0)
+        ) STRICT;
+CREATE TABLE material_assets (
+  id TEXT PRIMARY KEY, workspace_root TEXT NOT NULL, path TEXT NOT NULL,
+  name TEXT NOT NULL, format TEXT NOT NULL, source_bytes INTEGER NOT NULL,
+  sha256 TEXT NOT NULL, blob_ref TEXT NOT NULL, created_at TEXT NOT NULL,
+  state TEXT NOT NULL CHECK(state IN ('pending','active','recycled','purged')),
+  revision INTEGER NOT NULL, recycled_at TEXT,
+  UNIQUE(workspace_root,path)
+) STRICT;
+CREATE UNIQUE INDEX material_content ON material_assets(workspace_root,sha256,format) WHERE state <> 'purged';
+CREATE TABLE material_references (
+  material_id TEXT NOT NULL REFERENCES material_assets(id),
+  session_id TEXT NOT NULL REFERENCES sessions(id),
+  PRIMARY KEY(material_id,session_id)
+) STRICT;
+CREATE TABLE material_selections (
+  session_id TEXT NOT NULL REFERENCES sessions(id),
+  material_id TEXT NOT NULL REFERENCES material_assets(id),
+  PRIMARY KEY(session_id,material_id)
+) STRICT;
+CREATE TABLE material_settings (
+  workspace_root TEXT PRIMARY KEY, housekeeping INTEGER NOT NULL CHECK(housekeeping IN (0,1))
+) STRICT;`;
 const roots: string[] = [];
 const stores: SqliteSessionStore[] = [];
 function legacy() {
@@ -84,16 +123,146 @@ function legacyTwo() {
   db.close();
   return fixture;
 }
+function legacyThree() {
+  const fixture = legacyTwo();
+  const db = new DatabaseSync(fixture.file);
+  db.exec(legacyManagement);
+  db.exec("PRAGMA user_version=3");
+  db.close();
+  return fixture;
+}
 afterEach(() => {
   for (const store of stores.splice(0)) store.close();
   for (const root of roots.splice(0)) rmSync(root, { recursive: true, force: true });
+});
+
+describe("persisted format 1 to 2 migration", () => {
+  it("restores a format-1 backup without changing it and can then persist a typed output", async () => {
+    const f = legacyThree();
+    mkdirSync(join(f.directory, "blobs"));
+    const before = readFileSync(f.file);
+    const target = join(f.root, "restored-format-two");
+    open(target).close();
+    const receipt = await restoreLocalStore({
+      dataDirectory: target,
+      backupDirectory: f.directory,
+      rescueDestination: join(f.root, "before-legacy-restore"),
+    });
+    expect(receipt).toMatchObject({ schemaVersion: 3, persistedFormat: 2 });
+    expect(readFileSync(f.file)).toEqual(before);
+    const restored = open(target);
+    const bytes = Buffer.from("New full tool output after migration. 中文");
+    const blob = await restored.putBlob(bytes);
+    const entry: TranscriptEntry = {
+      ...f.entry,
+      id: "migrated-output" as EntryId,
+      sessionId: f.entry.sessionId as SessionId,
+      runId: f.entry.runId as RunId,
+      parentId: f.entry.id as EntryId,
+      createdAt: f.entry.createdAt as Timestamp,
+      body: {
+        kind: "tool_results",
+        results: [
+          {
+            type: "tool_result",
+            callId: "new-call" as ToolCallId,
+            status: "succeeded",
+            content: [{ type: "text", text: "preview" }],
+          },
+        ],
+        outputBlobs: [{ callId: "new-call" as ToolCallId, blob, bytes: bytes.length }],
+      },
+    };
+    await restored.commit({ entries: [entry], effects: [], durability: "normal" });
+    expect((await restored.loadSession("legacy-session" as never))?.entries).toEqual([
+      f.entry,
+      entry,
+    ]);
+    expect(await restored.getBlob(blob)).toEqual(bytes);
+    restored.close();
+    const db = new DatabaseSync(join(target, "data.sqlite"));
+    expect(db.prepare("SELECT payload FROM entries WHERE id=?").get(f.entry.id)?.payload).toBe(
+      JSON.stringify(f.entry),
+    );
+    db.close();
+  });
+
+  it("updates only the format marker for schema 3 and preserves original payload bytes", async () => {
+    const f = legacyThree();
+    const store = open(f.directory);
+    expect(store.diagnostics()).toMatchObject({ schemaVersion: 3, persistedFormat: 2 });
+    expect((await store.loadSession("legacy-session" as never))?.entries).toEqual([f.entry]);
+    store.close();
+    const db = new DatabaseSync(f.file);
+    expect(db.prepare("SELECT payload FROM entries").get()?.payload).toBe(JSON.stringify(f.entry));
+    expect(db.prepare("PRAGMA user_version").get()?.user_version).toBe(3);
+    expect(db.prepare("SELECT value FROM metadata WHERE key='persisted_format'").get()?.value).toBe(
+      2,
+    );
+    db.close();
+    expect(open(f.directory).diagnostics().persistedFormat).toBe(2);
+  });
+
+  it("rolls the marker back on interruption and allows a later migration", () => {
+    const f = legacyThree();
+    expect(
+      () =>
+        new SqliteSessionStore(f.directory, {
+          checkpoint(point) {
+            if (point === "migration:before_commit") throw Error("format fault");
+          },
+        }),
+    ).toThrow("format fault");
+    const db = new DatabaseSync(f.file);
+    expect(db.prepare("SELECT value FROM metadata WHERE key='persisted_format'").get()?.value).toBe(
+      1,
+    );
+    expect(db.prepare("SELECT payload FROM entries").get()?.payload).toBe(JSON.stringify(f.entry));
+    db.close();
+    expect(open(f.directory).diagnostics().persistedFormat).toBe(2);
+  });
+
+  it.each([0, 3, 99])("refuses unknown format %i without changing the old database", (format) => {
+    const f = legacyThree();
+    const db = new DatabaseSync(f.file);
+    db.prepare("UPDATE metadata SET value=?").run(format);
+    db.close();
+    const before = readFileSync(f.file);
+    expect(() => open(f.directory)).toThrow("Unsupported persisted format");
+    expect(readFileSync(f.file)).toEqual(before);
+  });
+
+  it.each([legacy, legacyTwo])("rejects format 2 paired with a pre-schema-3 store", (make) => {
+    const f = make();
+    const db = new DatabaseSync(f.file);
+    db.exec("UPDATE metadata SET value=2");
+    db.close();
+    const before = readFileSync(f.file);
+    expect(() => open(f.directory)).toThrow("Unsupported persisted format");
+    expect(readFileSync(f.file)).toEqual(before);
+  });
+
+  it("validates legacy records before changing their format marker", () => {
+    const f = legacyThree();
+    const db = new DatabaseSync(f.file);
+    db.prepare("UPDATE entries SET payload=?").run(
+      JSON.stringify({ ...f.entry, unexpected: true }),
+    );
+    db.close();
+    expect(() => open(f.directory)).toThrow("unknown fields");
+    const after = new DatabaseSync(f.file);
+    expect(
+      after.prepare("SELECT value FROM metadata WHERE key='persisted_format'").get()?.value,
+    ).toBe(1);
+    after.close();
+  });
 });
 
 describe("additive schema 2 to 3 migration", () => {
   it("adds management/material tables while retaining exact old transcript bytes", async () => {
     const f = legacyTwo();
     const store = open(f.directory);
-    expect(store.diagnostics()).toMatchObject({ schemaVersion: 3, persistedFormat: 1 });
+    expect(store.diagnostics()).toMatchObject({ schemaVersion: 3, persistedFormat: 2 });
     expect((await store.sessionManagement.list()).items[0]?.metadata.revision).toBe(0);
     expect((await store.loadSession("legacy-session" as never))?.entries).toEqual([f.entry]);
     store.close();
@@ -178,7 +347,7 @@ describe("additive legacy schema migration", () => {
     if (!sessionId) throw Error("Missing restored session");
     expect((await restored.loadSession(sessionId))?.entries).toEqual([f.entry, user]);
     expect(await restored.getBlob(ref)).toEqual(bytes);
-    expect(restored.diagnostics()).toMatchObject({ schemaVersion: 3, persistedFormat: 1 });
+    expect(restored.diagnostics()).toMatchObject({ schemaVersion: 3, persistedFormat: 2 });
     const original = new DatabaseSync(f.file);
     expect(original.prepare("PRAGMA user_version").get()?.user_version).toBe(1);
     expect(
@@ -192,7 +361,7 @@ describe("additive legacy schema migration", () => {
     const store = open(f.directory);
     expect(store.diagnostics()).toMatchObject({
       schemaVersion: 3,
-      persistedFormat: 1,
+      persistedFormat: 2,
       synchronous: 2,
       integrity: "ok",
     });

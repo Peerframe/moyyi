@@ -1,9 +1,10 @@
 import { mkdirSync, mkdtempSync, readFileSync, realpathSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
+import { DatabaseSync } from "node:sqlite";
 import { createRuntime } from "moyyi/runtime";
 import { afterEach, describe, expect, it } from "vitest";
-import { parseMaintenanceRequest, runDataMaintenance } from "./maintenance.ts";
+import { hashFile, parseMaintenanceRequest, runDataMaintenance } from "./maintenance.ts";
 
 const roots: string[] = [];
 afterEach(() => {
@@ -40,7 +41,13 @@ describe("desktop data maintenance", () => {
     const f = await fixture();
     const destination = join(f.home, "selected-backup");
     const backup = await runDataMaintenance(f.home, { mode: "backup", destination });
-    expect(backup).toMatchObject({ kind: "backup", credentialsExported: false, sessionCount: 1 });
+    expect(backup).toMatchObject({
+      kind: "backup",
+      credentialsExported: false,
+      sessionCount: 1,
+      schemaVersion: 3,
+      persistedFormat: 2,
+    });
     expect(readFileSync(join(destination, "settings.json"), "utf8")).toBe(f.settings);
     const runtime = await createRuntime({
       model: { provider: "deepseek", model: "deepseek-flash" },
@@ -56,6 +63,7 @@ describe("desktop data maintenance", () => {
     const changed = f.settings.replace('"maxRequests":3', '"maxRequests":4');
     writeFileSync(join(f.settingsDir, "settings.json"), changed);
     const restored = await runDataMaintenance(f.home, { mode: "restore", backupPath: destination });
+    expect(restored).toMatchObject({ schemaVersion: 3, persistedFormat: 2 });
     expect(restored.sessionCount).toBe(1);
     expect(readFileSync(join(f.settingsDir, "settings.json"), "utf8")).toBe(changed);
     expect(restored.rescuePath).not.toBeNull();
@@ -65,6 +73,53 @@ describe("desktop data maintenance", () => {
     });
     expect(rescue.sessionCount).toBe(2);
   });
+
+  it("restores an unchanged format-1 backup through migration and keeps a format-2 rescue", async () => {
+    const f = await fixture();
+    const destination = join(f.home, "legacy-backup");
+    await runDataMaintenance(f.home, { mode: "backup", destination });
+    const database = join(destination, "store/data.sqlite");
+    const db = new DatabaseSync(database);
+    db.exec("UPDATE metadata SET value=1 WHERE key='persisted_format'");
+    db.close();
+    const manifestPath = join(destination, "manifest.json");
+    const manifest = JSON.parse(readFileSync(manifestPath, "utf8"));
+    manifest.persistedFormat = 1;
+    manifest.files = manifest.files.map((file: { path: string }) =>
+      file.path === "store/data.sqlite" ? { path: file.path, ...hashFile(database) } : file,
+    );
+    writeFileSync(manifestPath, JSON.stringify(manifest));
+    const before = readFileSync(database);
+    const restored = await runDataMaintenance(f.home, { mode: "restore", backupPath: destination });
+    expect(restored).toMatchObject({ schemaVersion: 3, persistedFormat: 2, sessionCount: 1 });
+    expect(readFileSync(database)).toEqual(before);
+    const rescue = JSON.parse(
+      readFileSync(join(restored.rescuePath as string, "manifest.json"), "utf8"),
+    );
+    expect(rescue).toMatchObject({ schemaVersion: 3, persistedFormat: 2 });
+  });
+
+  it.each([
+    [2, 2],
+    [3, 3],
+    [1, 1],
+  ])(
+    "rejects unsupported backup pair schema %i / format %i",
+    async (schemaVersion, persistedFormat) => {
+      const f = await fixture();
+      const destination = join(f.home, "invalid-version-backup");
+      await runDataMaintenance(f.home, { mode: "backup", destination });
+      const manifestPath = join(destination, "manifest.json");
+      const manifest = JSON.parse(readFileSync(manifestPath, "utf8"));
+      writeFileSync(manifestPath, JSON.stringify({ ...manifest, schemaVersion, persistedFormat }));
+      const data = join(f.home, ".moyyi/deepseek-data/data.sqlite");
+      const before = readFileSync(data);
+      await expect(
+        runDataMaintenance(f.home, { mode: "restore", backupPath: destination }),
+      ).rejects.toThrow("Unsupported backup manifest");
+      expect(readFileSync(data)).toEqual(before);
+    },
+  );
   it("rejects a changed backup without losing newer conversations", async () => {
     const f = await fixture();
     const destination = join(f.home, "backup");

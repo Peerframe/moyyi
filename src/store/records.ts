@@ -4,6 +4,7 @@ import {
   type ContentPart,
   type EffectRecord,
   effectTransitions,
+  PERSISTED_FORMAT_VERSION,
   type TranscriptEntry,
 } from "../contracts/persisted/index.ts";
 import { canonicalizeJson, checkReplayEnvelopeShape } from "../contracts/replay.ts";
@@ -21,8 +22,13 @@ const usageFields = [
   "reasoningTokens",
 ];
 
-/** Validates the locked v1 shape, without interpreting provider-private replay payloads. */
-export function encodeEntry(entry: TranscriptEntry): string {
+/** Legacy validation is used only during migration; old payload bytes are never rewritten. */
+export function encodeEntry(
+  entry: TranscriptEntry,
+  formatVersion = PERSISTED_FORMAT_VERSION,
+): string {
+  if (formatVersion !== 1 && formatVersion !== PERSISTED_FORMAT_VERSION)
+    throw new TypeError("Unsupported persisted record format");
   const encoded = encodeJson(entry);
   const value = object(entry, ["id", "sessionId", "parentId", "runId", "createdAt", "body"]);
   identifier(value.id);
@@ -30,7 +36,7 @@ export function encodeEntry(entry: TranscriptEntry): string {
   nullableIdentifier(value.parentId);
   nullableIdentifier(value.runId);
   timestamp(value.createdAt);
-  body(value.body);
+  body(value.body, formatVersion);
   return encoded;
 }
 
@@ -67,7 +73,10 @@ export function entryBlobRefs(entry: TranscriptEntry): readonly BlobRef[] {
     refs.push(value.request.system, value.request.tools, ...value.request.messages);
     content(value.content);
   } else if (value.kind === "user_message") content(value.content);
-  else if (value.kind === "tool_results") content(value.results);
+  else if (value.kind === "tool_results") {
+    content(value.results);
+    for (const output of value.outputBlobs ?? []) refs.push(output.blob);
+  }
   return refs;
 }
 
@@ -80,7 +89,7 @@ function encodeJson(value: unknown): string {
   return encoded;
 }
 
-function body(input: unknown): void {
+function body(input: unknown, formatVersion: number): void {
   const kind = record(input).kind;
   switch (kind) {
     case "user_message": {
@@ -122,8 +131,32 @@ function body(input: unknown): void {
       return;
     }
     case "tool_results": {
-      const value = object(input, ["kind", "results"]);
-      array(value.results).forEach(toolResult);
+      const value = object(input, ["kind", "results"], formatVersion >= 2 ? ["outputBlobs"] : []);
+      const results = array(value.results);
+      results.forEach(toolResult);
+      if ("outputBlobs" in value) {
+        const outputs = array(value.outputBlobs);
+        if (outputs.length === 0) invalid("Empty tool output reference list");
+        const calls = new Set<string>();
+        for (const output of outputs) {
+          const reference = object(output, ["callId", "blob", "bytes"]);
+          identifier(reference.callId);
+          blob(reference.blob);
+          if (
+            !Number.isSafeInteger(reference.bytes) ||
+            (reference.bytes as number) < 0 ||
+            (reference.bytes as number) > 64 * 1024 * 1024
+          )
+            invalid("Invalid tool output byte length");
+          const callId = reference.callId as string;
+          if (calls.has(callId)) invalid("Duplicate tool output reference");
+          calls.add(callId);
+          const matching = results.filter((result) => record(result).callId === callId);
+          if (matching.length !== 1) invalid("Tool output reference requires one matching result");
+          if (array(record(matching[0]).content).some((part) => record(part).type !== "text"))
+            invalid("Full tool output references require text-only results");
+        }
+      }
       return;
     }
     case "compaction": {

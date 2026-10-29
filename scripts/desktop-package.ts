@@ -12,6 +12,7 @@ import {
   writeFileSync,
 } from "node:fs";
 import { join } from "node:path";
+import { PERSISTED_FORMAT_VERSION } from "../src/contracts/persisted/index.ts";
 import { SCHEMA_VERSION } from "../src/store/schema.ts";
 import { buildCandidate, command, repository } from "./packaging.ts";
 
@@ -141,7 +142,7 @@ const manifest = {
   publicRelease: false,
   maintenanceCompatibility: {
     schemaVersion: SCHEMA_VERSION,
-    persistedFormat: 1,
+    persistedFormat: PERSISTED_FORMAT_VERSION,
     settingsFormat: 1,
     settingsKeys: ["preset", "maxRequests", "timeoutMs", "kimiReasoningEffort", "evidenceAnswer"],
   },

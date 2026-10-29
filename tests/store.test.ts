@@ -117,7 +117,7 @@ describe("SQLite transactions and frozen v1 records", () => {
     const { store } = setup();
     expect(store.diagnostics()).toMatchObject({
       schemaVersion: 3,
-      persistedFormat: 1,
+      persistedFormat: 2,
       journalMode: "wal",
       synchronous: 2,
       fullfsync: 1,

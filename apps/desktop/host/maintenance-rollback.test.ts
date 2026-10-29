@@ -25,7 +25,11 @@ afterEach(() => {
 const currentRevision = "a".repeat(40);
 const previousRevision = "6eb299340768daf807edf5b223a84f046a16b140";
 const sha = (bytes: string | Buffer) => createHash("sha256").update(bytes).digest("hex");
-function app(path: string, revision: string) {
+interface StoreVersion {
+  readonly schemaVersion: number;
+  readonly persistedFormat: number;
+}
+function app(path: string, revision: string, version?: StoreVersion) {
   const resources = join(path, "Contents/Resources");
   const directory = join(resources, "app");
   mkdirSync(directory, { recursive: true, mode: 0o755 });
@@ -40,10 +44,25 @@ function app(path: string, revision: string) {
       node: "26.12.1",
       desktopBundleSha256: sha(`main.mjs${contents}`),
       runtime: { revision, dirty: false, sha256: sha(revision) },
+      ...(version
+        ? {
+            maintenanceCompatibility: {
+              ...version,
+              settingsFormat: 1,
+              settingsKeys: [
+                "preset",
+                "maxRequests",
+                "timeoutMs",
+                "kimiReasoningEffort",
+                "evidenceAnswer",
+              ],
+            },
+          }
+        : {}),
     }),
   );
 }
-function fixture(high = false) {
+function fixture(high = false, versions?: { data: StoreVersion; target: StoreVersion }) {
   const home = realpathSync(mkdtempSync(join(tmpdir(), "moyyi-rollback-")));
   roots.push(home);
   const root = join(home, ".moyyi");
@@ -54,8 +73,9 @@ function fixture(high = false) {
   for (const path of [backup, packages, desktop, data, join(home, "Applications")])
     mkdirSync(path, { recursive: true, mode: 0o700 });
   const target = join(home, "Applications/Moyyi.app");
-  app(target, currentRevision);
-  app(join(backup, "Moyyi.app"), previousRevision);
+  const previous = versions ? "b".repeat(40) : previousRevision;
+  app(target, currentRevision, versions?.data);
+  app(join(backup, "Moyyi.app"), previous, versions?.target);
   const archive = join(packages, "previous.zip");
   writeFileSync(archive, "synthetic archive");
   const receiptPath = join(root, "desktop-installation.json");
@@ -71,7 +91,7 @@ function fixture(high = false) {
         readFileSync(join(backup, "Moyyi.app/Contents/Resources/candidate.json"), "utf8"),
       ),
       app: target,
-      sourceHead: previousRevision,
+      sourceHead: previous,
       nativeLaunchVerified: true,
       historyReopenVerified: true,
       archivePath: archive,
@@ -98,6 +118,10 @@ function fixture(high = false) {
   db.exec(
     "PRAGMA application_id=1297045849; PRAGMA user_version=2; CREATE TABLE metadata(key TEXT,value INTEGER); INSERT INTO metadata VALUES('persisted_format',1)",
   );
+  if (versions) {
+    db.exec(`PRAGMA user_version=${versions.data.schemaVersion}`);
+    db.prepare("UPDATE metadata SET value=?").run(versions.data.persistedFormat);
+  }
   db.close();
   const lock = new DatabaseSync(join(data, "writer-lock.sqlite"));
   lock.close();
@@ -109,12 +133,77 @@ function fixture(high = false) {
     }
     return "";
   });
-  return { home, root, target, data, archive, receiptPath, settingsPath };
+  return { home, root, target, data, archive, receiptPath, settingsPath, previous };
 }
 
 describe.skipIf(process.platform !== "darwin" || process.arch !== "arm64")(
   "software rollback coordination (native calls mocked)",
   () => {
+    it("retains format-2 data and reports its actual format when the target matches", async () => {
+      const version = { schemaVersion: 3, persistedFormat: 2 };
+      const f = fixture(false, { data: version, target: version });
+      const before = readFileSync(join(f.data, "data.sqlite"));
+      const prepared = await prepareRollback(f.home, currentRevision);
+      expect(prepared.result).toMatchObject(version);
+      const result = await prepared.commit();
+      expect(result).toMatchObject({ ...version, targetRevision: f.previous });
+      expect(readFileSync(join(f.data, "data.sqlite"))).toEqual(before);
+      expect(existsSync(result.rescuePath as string)).toBe(true);
+    });
+
+    it.each([
+      [2, 1],
+      [1, 2],
+    ])(
+      "refuses same-schema format %i data with format %i software",
+      async (dataFormat, targetFormat) => {
+        const f = fixture(false, {
+          data: { schemaVersion: 3, persistedFormat: dataFormat },
+          target: { schemaVersion: 3, persistedFormat: targetFormat },
+        });
+        const data = readFileSync(join(f.data, "data.sqlite"));
+        const installed = readFileSync(join(f.target, "Contents/Resources/candidate.json"));
+        await expect(prepareRollback(f.home, currentRevision)).rejects.toThrow("ROLLBACK_DATA");
+        expect(readFileSync(join(f.data, "data.sqlite"))).toEqual(data);
+        expect(readFileSync(join(f.target, "Contents/Resources/candidate.json"))).toEqual(
+          installed,
+        );
+      },
+    );
+
+    it.each([
+      { schemaVersion: 2, persistedFormat: 2 },
+      { schemaVersion: 3, persistedFormat: 3 },
+    ])("rejects unsupported current or declared version pairs %j", async (version) => {
+      const current = fixture(false, {
+        data: version,
+        target: { schemaVersion: 3, persistedFormat: 2 },
+      });
+      await expect(prepareRollback(current.home, currentRevision)).rejects.toThrow(
+        "current data format",
+      );
+      const target = fixture(false, {
+        data: { schemaVersion: 3, persistedFormat: 2 },
+        target: version,
+      });
+      await expect(prepareRollback(target.home, currentRevision)).rejects.toThrow(
+        "compatibility is not recorded",
+      );
+    });
+
+    it("rechecks the persisted format after preparation before replacing software", async () => {
+      const version = { schemaVersion: 3, persistedFormat: 1 };
+      const f = fixture(false, { data: version, target: version });
+      const prepared = await prepareRollback(f.home, currentRevision);
+      const installed = readFileSync(join(f.target, "Contents/Resources/candidate.json"));
+      const db = new DatabaseSync(join(f.data, "data.sqlite"));
+      db.exec("UPDATE metadata SET value=2");
+      db.close();
+      await expect(prepared.commit()).rejects.toThrow("ROLLBACK_DATA");
+      expect(readFileSync(join(f.target, "Contents/Resources/candidate.json"))).toEqual(installed);
+      prepared.abort();
+    });
+
     it("holds the existing store lock while prepared and cancels without replacing the app", async () => {
       const f = fixture();
       const before = readFileSync(join(f.target, "Contents/Resources/candidate.json"));

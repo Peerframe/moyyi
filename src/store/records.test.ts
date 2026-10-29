@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { UNKNOWN_USAGE } from "../contracts/model-conformance.ts";
 import { effects, entries } from "../contracts/persisted/fixtures/v1.ts";
+import { entries as v2Entries } from "../contracts/persisted/fixtures/v2.ts";
 import type { BlobRef, EffectRecord, TranscriptEntry } from "../contracts/persisted/index.ts";
 import { canonicalizeJson } from "../contracts/replay.ts";
 import { encodeEffect, encodeEntry, entryBlobRefs, MAX_RECORD_BYTES } from "./records.ts";
@@ -324,6 +325,46 @@ describe("record byte bounds", () => {
 });
 
 describe("entryBlobRefs", () => {
+  it("recognizes typed full output references without changing the locked v1 shapes", () => {
+    const value = v2Entries[0] as TranscriptEntry;
+    expect(JSON.parse(encodeEntry(value))).toEqual(value);
+    expect(entryBlobRefs(value)).toEqual([`sha256:${"1".repeat(64)}`]);
+    expect(() => encodeEntry(value, 1)).toThrow("unknown fields");
+    for (const entry of entries) expect(encodeEntry(entry, 1)).toBe(encodeEntry(entry));
+    expect(() => encodeEntry(value, 3)).toThrow("Unsupported persisted record format");
+  });
+
+  it.each([
+    [],
+    null,
+    [{ callId: "call_1", blob: ref(9), bytes: -1 }],
+    [{ callId: "call_1", blob: ref(9), bytes: 1.5 }],
+    [{ callId: "call_1", blob: ref(9), bytes: 64 * 1024 * 1024 + 1 }],
+    [{ callId: "call_1", blob: "not-a-hash", bytes: 1 }],
+    [{ callId: "missing", blob: ref(9), bytes: 1 }],
+    [{ callId: "call_1", blob: ref(9), bytes: 1, extra: true }],
+    [
+      { callId: "call_1", blob: ref(9), bytes: 1 },
+      { callId: "call_1", blob: ref(9), bytes: 1 },
+    ],
+  ])("rejects malformed or unbound full output references %#", (outputBlobs) => {
+    expect(() =>
+      encodeEntry(
+        withBody({
+          kind: "tool_results",
+          results: [{ ...result, content: [{ type: "text", text: "preview" }] }],
+          outputBlobs,
+        }),
+      ),
+    ).toThrow(TypeError);
+  });
+
+  it("rejects ambiguous calls and image content for a text output reference", () => {
+    const outputBlobs = [{ callId: "call_1", blob: ref(9), bytes: 1 }];
+    for (const results of [[result], [result, result]])
+      expect(() => encodeEntry(withBody({ kind: "tool_results", results, outputBlobs }))).toThrow();
+  });
+
   it("finds request, image and nested result blobs in order for both message roles", () => {
     const content = [image, result];
     const user = withContent(content);

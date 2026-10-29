@@ -14,13 +14,16 @@ import type {
   EffectRecord,
   ImagePart,
   RunId,
+  SessionId,
   TextPart,
   Timestamp,
   ToolCallPart,
+  ToolOutputRef,
   ToolResultPart,
 } from "../contracts/persisted/index.ts";
 import type { PermissionPolicy, PolicyDecision } from "../contracts/ports.ts";
 import { canonicalizeJson } from "../contracts/replay.ts";
+import type { ReadToolDeadlines, ToolOutputReaderFactory } from "../contracts/tool-output.ts";
 import type {
   PreparedAction,
   ToolContext,
@@ -30,6 +33,7 @@ import type {
 
 export interface ExecutionHost {
   readonly runId: RunId;
+  readonly sessionId?: SessionId;
   readonly workspaceRoot: string;
   readonly signal: AbortSignal;
   /** Stops new work without cancelling an execution whose effects still need settlement. */
@@ -45,11 +49,17 @@ export interface ExecutionHost {
   readonly processes?: WorkspaceProcessesFactory;
   readonly writes?: WorkspaceWritesFactory;
   readonly web?: WebAccessFactory;
+  readonly toolOutputs?: ToolOutputReaderFactory;
+  readonly readToolDeadlines?: ReadToolDeadlines;
+  readonly processResult?: (result: ToolResultPart) => Promise<{
+    readonly result: ToolResultPart;
+    readonly outputBlob?: ToolOutputRef;
+  }>;
   now(): Timestamp;
   nextEffectId(): EffectId;
-  record(effect: EffectRecord, result?: ToolResultPart): Promise<void>;
+  record(effect: EffectRecord, result?: ToolResultPart, outputBlob?: ToolOutputRef): Promise<void>;
   ensureLease(): Promise<void>;
-  approve(effect: EffectRecord, action: PreparedAction): Promise<boolean>;
+  approve(effect: EffectRecord, action: PreparedAction, signal?: AbortSignal): Promise<boolean>;
 }
 
 type Output = readonly (TextPart | ImagePart)[];
@@ -128,9 +138,9 @@ export async function executeCalls(
       signal: AbortSignal.any([host.signal, failed.signal]),
       now: () => host.now(),
       nextEffectId: () => host.nextEffectId(),
-      record: (effect, result) => host.record(effect, result),
+      record: (effect, result, outputBlob) => host.record(effect, result, outputBlob),
       ensureLease: () => host.ensureLease(),
-      approve: (effect, action) => host.approve(effect, action),
+      approve: (effect, action, signal) => host.approve(effect, action, signal),
     };
     let cursor = 0;
     let failure: unknown;
@@ -158,11 +168,62 @@ export async function executeCalls(
 }
 
 async function executeCall(call: ToolCallPart, host: ExecutionHost): Promise<ToolResultPart> {
+  const read = host.tools.find((tool) => tool.name === call.name)?.effect.class === "read";
+  const deadline = read ? host.readToolDeadlines?.start(call.name, host.signal) : undefined;
+  let processed:
+    | { readonly result: ToolResultPart; readonly outputBlob?: ToolOutputRef }
+    | undefined;
+  const finalize = async (raw: ToolResultPart) => {
+    if (processed) return processed;
+    const result =
+      deadline?.timeoutMessage && !host.signal.aborted
+        ? {
+            ...raw,
+            status: "failed" as const,
+            content: [{ type: "text" as const, text: deadline.timeoutMessage }],
+          }
+        : raw;
+    const transformed = host.processResult ? await host.processResult(result) : { result };
+    processed = {
+      ...transformed,
+      result: {
+        ...transformed.result,
+        content: boundOutput(transformed.result.content, host.limits.maxToolOutputBytes),
+      },
+    };
+    return processed;
+  };
+  try {
+    const result = await executeCallBody(call, {
+      ...host,
+      ...(deadline ? { signal: deadline.signal } : {}),
+      approve: (effect, action) =>
+        host.approve(
+          effect,
+          action,
+          AbortSignal.any([deadline?.signal ?? host.signal, host.admissionSignal ?? host.signal]),
+        ),
+      record: async (effect, result) => {
+        if (!result) return host.record(effect);
+        const final = await finalize(result);
+        await host.record(effect, final.result, final.outputBlob);
+      },
+    });
+    return (await finalize(result)).result;
+  } finally {
+    deadline?.dispose();
+  }
+}
+
+async function executeCallBody(call: ToolCallPart, host: ExecutionHost): Promise<ToolResultPart> {
   const reply = (status: ToolResultPart["status"], content: Output): ToolResultPart => ({
     type: "tool_result",
     callId: call.callId,
     status,
-    content: boundOutput(content, host.limits.maxToolOutputBytes),
+    content: boundOutput(
+      content,
+      host.processResult ? Number.MAX_SAFE_INTEGER : host.limits.maxToolOutputBytes,
+    ),
   });
   const say = (status: ToolResultPart["status"], message: string) =>
     reply(status, [{ type: "text", text: message }]);
@@ -186,6 +247,7 @@ async function executeCall(call: ToolCallPart, host: ExecutionHost): Promise<Too
   }
   const context: ToolContext = {
     runId: host.runId,
+    ...(host.sessionId ? { sessionId: host.sessionId } : {}),
     workspaceRoot: host.workspaceRoot,
     signal: host.signal,
     limits: { maxOutputBytes: host.limits.maxToolOutputBytes },
@@ -241,6 +303,12 @@ async function executeCall(call: ToolCallPart, host: ExecutionHost): Promise<Too
     };
     const scoped: ToolContext = {
       ...invocationContext,
+      ...(host.toolOutputs &&
+      phase === "execute" &&
+      profile.class === "read" &&
+      tool.name === "read_tool_output"
+        ? { toolOutputs: host.toolOutputs.create(invocationContext, guard) }
+        : {}),
       ...(host.files && profile.class !== "external"
         ? { files: host.files.create(invocationContext, guard) }
         : {}),
@@ -480,7 +548,10 @@ async function executeCall(call: ToolCallPart, host: ExecutionHost): Promise<Too
       stopped();
       if (outcome.status !== "succeeded" && outcome.status !== "failed")
         throw new TypeError("Invalid tool outcome");
-      const content = boundOutput(outcome.content, host.limits.maxToolOutputBytes);
+      const content = boundOutput(
+        outcome.content,
+        host.processResult ? Number.MAX_SAFE_INTEGER : host.limits.maxToolOutputBytes,
+      );
       const evidence = outcome.evidence;
       if (evidence !== undefined && typeof evidence !== "string")
         throw new TypeError("Invalid tool evidence");

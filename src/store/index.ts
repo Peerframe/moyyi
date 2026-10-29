@@ -357,7 +357,7 @@ export class SqliteSessionStore implements SessionStore, WorkspaceSnapshotStore 
 
   #entry(entry: TranscriptEntry): void {
     const payload = encodeEntry(entry);
-    for (const ref of entryBlobRefs(entry)) this.#blobs.assert(ref);
+    this.#assertEntryBlobs(entry);
     const previous = this.#db.prepare("SELECT payload FROM entries WHERE id = ?").get(entry.id);
     if (previous) {
       if (previous.payload !== payload) throw new Error("Transcript entries are immutable");
@@ -368,6 +368,25 @@ export class SqliteSessionStore implements SessionStore, WorkspaceSnapshotStore 
         "INSERT INTO entries(id, session_id, parent_id, run_id, payload) VALUES (?, ?, ?, ?, ?)",
       )
       .run(entry.id, entry.sessionId, entry.parentId, entry.runId, payload);
+  }
+
+  #assertEntryBlobs(entry: TranscriptEntry): void {
+    const outputs = entry.body.kind === "tool_results" ? (entry.body.outputBlobs ?? []) : [];
+    for (const ref of entryBlobRefs(entry)) {
+      const output = outputs.filter((value) => value.blob === ref);
+      if (output.length === 0) this.#blobs.assert(ref);
+      else {
+        const bytes = this.#blobs.get(ref);
+        if (bytes === null) throw new Error(`Missing blob: ${ref}`);
+        if (output.some((value) => value.bytes !== bytes.byteLength))
+          throw new Error("Tool output blob length does not match its reference");
+        try {
+          new TextDecoder("utf-8", { fatal: true, ignoreBOM: true }).decode(bytes);
+        } catch {
+          throw new Error("Tool output blob is not valid UTF-8");
+        }
+      }
+    }
   }
 
   #entryRelations(entry: TranscriptEntry): void {
@@ -539,7 +558,7 @@ export class SqliteSessionStore implements SessionStore, WorkspaceSnapshotStore 
     // Validate records read from disk as well as writes. Opaque payload bytes remain uninterpreted.
     for (const entry of entries) {
       encodeEntry(entry);
-      for (const ref of entryBlobRefs(entry)) this.#blobs.assert(ref);
+      this.#assertEntryBlobs(entry);
     }
     for (const effect of effects) encodeEffect(effect);
     for (const snapshot of this.#db
@@ -745,6 +764,7 @@ export class SqliteSessionStore implements SessionStore, WorkspaceSnapshotStore 
       for (const row of this.#db.prepare("SELECT payload FROM entries").all()) {
         const entry = JSON.parse(row.payload as string) as TranscriptEntry;
         encodeEntry(entry);
+        this.#assertEntryBlobs(entry);
         for (const ref of entryBlobRefs(entry)) refs.add(ref);
       }
       for (const row of this.#db.prepare("SELECT id FROM workspace_snapshots").all()) {
