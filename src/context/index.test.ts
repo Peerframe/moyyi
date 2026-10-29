@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { ContextInput, ModelProfile, TranscriptEntry } from "../contracts/index.ts";
+import { toolOutputHandle } from "../contracts/index.ts";
 import { effects, entries } from "../contracts/persisted/fixtures/v1.ts";
 import { ContextCapacityError, MinimalContextBuilder } from "./index.ts";
 
@@ -31,6 +32,156 @@ const input = (change: Partial<ContextInput> = {}): ContextInput => ({
   unsettledEffects: effects,
   ...change,
 });
+
+function spillPath() {
+  const template = textPath[0];
+  if (!template) throw Error("fixture");
+  const output = (id: string, preview: string, withReference: boolean): TranscriptEntry => {
+    const callId = `call-${id}` as import("../contracts/index.ts").ToolCallId;
+    const ref = {
+      callId,
+      blob: `sha256:${"a".repeat(64)}` as import("../contracts/index.ts").BlobRef,
+      bytes: 20_000,
+    };
+    return {
+      ...template,
+      id: id as TranscriptEntry["id"],
+      body: {
+        kind: "tool_results",
+        results: [
+          {
+            type: "tool_result",
+            callId,
+            status: "succeeded",
+            content: [{ type: "text", text: preview }],
+          },
+        ],
+        ...(withReference ? { outputBlobs: [ref] } : {}),
+      },
+    };
+  };
+  return [
+    template,
+    output("old-spill", `OLD-HEAD ${"evidence ".repeat(1000)} OLD-TAIL`, true),
+    output("plain", "Unreferenced observation must remain intact", false),
+    output("latest-spill", `LATEST ${"recent ".repeat(100)} LATEST-END`, true),
+  ];
+}
+
+describe("context projection of spilled output", () => {
+  it("keeps full recorded previews without capacity pressure", () => {
+    const path = spillPath();
+    const before = canonical(path);
+    const built = new MinimalContextBuilder().build(input({ path, unsettledEffects: [] }));
+    for (const entry of path)
+      if (entry.body.kind === "tool_results") {
+        expect(built.request.messages.flatMap((message) => message.content)).toContainEqual(
+          entry.body.results[0],
+        );
+      }
+    expect(built.report.notes?.join(" ")).not.toContain("previews shortened");
+    expect(canonical(path)).toBe(before);
+  });
+
+  it("prunes only earlier referenced output before removing optional context, without changing records", () => {
+    const path = spillPath();
+    const before = canonical(path);
+    const builder = new MinimalContextBuilder();
+    const base = input({
+      path,
+      unsettledEffects: [],
+      sections: [
+        {
+          id: "optional",
+          stability: "turn",
+          optional: true,
+          content: [{ type: "text", text: "Keep useful navigation" }],
+        },
+      ],
+    });
+    const original = builder.build(base).report.estimatedTokens;
+    if (!original) throw Error("Expected budget");
+    const built = builder.build({
+      ...base,
+      profile: { ...profile, contextWindowTokens: original - 1000 },
+    });
+    const rendered = canonical(built.request);
+    expect(rendered).toContain("earlier preview shortened; full output 20000 bytes");
+    expect(rendered).toContain("OLD-HEAD");
+    expect(rendered).toContain("OLD-TAIL");
+    const old = path[1]?.body;
+    if (old?.kind !== "tool_results" || !old.outputBlobs?.[0]) throw Error("Expected reference");
+    expect(rendered).toContain(toolOutputHandle(old.outputBlobs[0]));
+    expect(built.request.system).toContainEqual({ type: "text", text: "Keep useful navigation" });
+    for (const entry of path.slice(2))
+      if (entry.body.kind === "tool_results") {
+        expect(built.request.messages.flatMap((message) => message.content)).toContainEqual(
+          entry.body.results[0],
+        );
+      }
+    expect(built.report.includedEntryIds).toEqual(path.map((entry) => entry.id));
+    expect(built.report.summarizedEntryIds).toEqual([]);
+    expect(built.report.notes?.join(" ")).not.toContain("Optional context omitted");
+    expect(canonical(path)).toBe(before);
+  });
+
+  it("retains the output tail and a separate repeat reminder under pressure", () => {
+    const path = spillPath();
+    const old = path[1];
+    if (old?.body.kind !== "tool_results" || !old.body.results[0]) throw Error("fixture");
+    const callId = old.body.results[0].callId;
+    const reminder = {
+      type: "text" as const,
+      text: `Repeated call advice: ${"review ".repeat(30)}`,
+    };
+    path[1] = {
+      ...old,
+      body: {
+        ...old.body,
+        results: [{ ...old.body.results[0], content: [...old.body.results[0].content, reminder] }],
+      },
+    };
+    const builder = new MinimalContextBuilder();
+    const base = input({ path, unsettledEffects: [] });
+    const original = builder.build(base).report.estimatedTokens;
+    if (!original) throw Error("Expected budget");
+    const built = builder.build({
+      ...base,
+      profile: { ...profile, contextWindowTokens: original - 1000 },
+    });
+    const projected = built.request.messages
+      .flatMap((message) => message.content)
+      .find((part) => part.type === "tool_result" && part.callId === callId);
+    if (projected?.type !== "tool_result") throw Error("Expected result");
+    expect(projected.content[0]).toMatchObject({
+      type: "text",
+      text: expect.stringContaining("OLD-TAIL"),
+    });
+    expect(projected.content[1]).toEqual(reminder);
+  });
+
+  it("preserves unsettled output and still reports required overflow", () => {
+    const path = spillPath();
+    const older = path[1]?.body;
+    const effect = effects[0];
+    if (older?.kind !== "tool_results" || !older.results[0] || !effect) throw Error("fixture");
+    const base = input({
+      path,
+      unsettledEffects: [{ ...effect, callId: older.results[0].callId }],
+    });
+    const builder = new MinimalContextBuilder();
+    const original = builder.build(base).report.estimatedTokens;
+    if (!original) throw Error("Expected budget");
+    expect(() =>
+      builder.build({ ...base, profile: { ...profile, contextWindowTokens: original - 1 } }),
+    ).toThrow(ContextCapacityError);
+    expect(canonical(path)).not.toContain("earlier preview shortened");
+  });
+});
+
+function canonical(value: unknown) {
+  return JSON.stringify(value);
+}
 
 describe("MinimalContextBuilder", () => {
   it("extends user turns with durable budget notices without rewriting earlier prefixes", () => {

@@ -1,5 +1,5 @@
 import type { ContentPart, ModelOrigin, TextPart, ToolResultPart } from "./content.ts";
-import type { BlobRef, EntryId, RunId, SessionId, Timestamp } from "./ids.ts";
+import type { BlobRef, EntryId, RunId, SessionId, Timestamp, ToolCallId } from "./ids.ts";
 import type { JsonValue, ReplayEnvelope } from "./replay.ts";
 
 /**
@@ -53,6 +53,15 @@ export interface AssistantMessageBody {
 export interface ToolResultsBody {
   readonly kind: "tool_results";
   readonly results: readonly ToolResultPart[];
+  /** Runtime-owned full text; each reference belongs to one result in this entry. */
+  readonly outputBlobs?: readonly ToolOutputRef[];
+}
+
+/** UTF-8 tool text captured before presentation clipping; never a model-supplied blob grant. */
+export interface ToolOutputRef {
+  readonly callId: ToolCallId;
+  readonly blob: BlobRef;
+  readonly bytes: number;
 }
 
 /**

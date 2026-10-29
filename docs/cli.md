@@ -130,7 +130,7 @@ remain without a matched receipt. `/results SESSION_ID 2` shows the next page; C
 To continue, use `/resume SESSION_ID`. Writes and commands still require the current host's
 explicit grants; restart with the appropriate workspace and startup flags when necessary.
 
-Add `--approve-reads` to require execution approval for read/list/search/document tools. It cannot replace a
+Add `--approve-reads` to require execution approval for read/list/search/document and recorded-output tools. It cannot replace a
 custom host policy or authorize a forbidden effect. Multiple approvals have separate IDs/digests;
 a stale response is rejected and never retried automatically. In one-shot mode approvals are
 explicitly denied, so unattended input cannot authorize them or leave the process waiting forever.

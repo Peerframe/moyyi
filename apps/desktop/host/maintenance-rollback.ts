@@ -13,6 +13,7 @@ import {
 import { dirname, isAbsolute, join, relative, resolve } from "node:path";
 import {
   hashFile,
+  isSupportedStoreVersion,
   type MaintenanceResult,
   preserved,
   privateDirectory,
@@ -176,18 +177,26 @@ function preserveDirectoryModes(source: string, target: string): void {
   }
 }
 
-async function compatibility(home: string, target: Candidate): Promise<number> {
+async function compatibility(
+  home: string,
+  target: Candidate,
+): Promise<{ schemaVersion: number; persistedFormat: number }> {
   const { DatabaseSync } = await import("node:sqlite");
   const db = new DatabaseSync(join(home, ".moyyi/deepseek-data/data.sqlite"), { readOnly: true });
   let schemaVersion = 0;
+  let persistedFormat = 0;
   try {
     schemaVersion = Number(db.prepare("PRAGMA user_version").get()?.user_version);
+    const format = db
+      .prepare("SELECT value FROM metadata WHERE key='persisted_format'")
+      .get()?.value;
     if (
       db.prepare("PRAGMA application_id").get()?.application_id !== 0x4d4f5959 ||
-      ![2, 3].includes(schemaVersion) ||
-      db.prepare("SELECT value FROM metadata WHERE key='persisted_format'").get()?.value !== 1
+      typeof format !== "number" ||
+      !isSupportedStoreVersion(schemaVersion, format)
     )
       throw Error("Rollback cannot read the current data format");
+    persistedFormat = format;
   } finally {
     db.close();
   }
@@ -198,13 +207,15 @@ async function compatibility(home: string, target: Candidate): Promise<number> {
   const declared = target.maintenanceCompatibility;
   if (
     !legacy &&
-    (![2, 3].includes(declared?.schemaVersion ?? 0) ||
-      declared?.persistedFormat !== 1 ||
+    (!isSupportedStoreVersion(declared?.schemaVersion, declared?.persistedFormat) ||
       declared?.settingsFormat !== 1 ||
       !Array.isArray(declared?.settingsKeys))
   )
     throw Error("Rollback compatibility is not recorded");
-  if (schemaVersion !== (legacy ? 2 : declared?.schemaVersion))
+  if (
+    schemaVersion !== (legacy ? 2 : declared?.schemaVersion) ||
+    persistedFormat !== (legacy ? 1 : declared?.persistedFormat)
+  )
     throw Error(
       "ROLLBACK_DATA: 当前会话库已升级，旧软件不能读取。请保留当前数据救援备份后，使用升级前的数据和软件成对回退；不会自动降级或丢弃新记录。",
     );
@@ -223,7 +234,7 @@ async function compatibility(home: string, target: Candidate): Promise<number> {
     throw Error(
       "ROLLBACK_SETTINGS: 请先在模型设置中切回 Flash 并保存，再回退软件；当前设置不会被自动修改。",
     );
-  return schemaVersion;
+  return { schemaVersion, persistedFormat };
 }
 
 async function holdWriterLock(home: string): Promise<() => void> {
@@ -290,7 +301,7 @@ export async function prepareRollback(
   let committed = false;
   const releaseStore = await holdWriterLock(home);
   try {
-    const schemaVersion = await compatibility(home, previousCandidate);
+    const { schemaVersion, persistedFormat } = await compatibility(home, previousCandidate);
     mkdirSync(operation, { mode: 0o700 });
     const originalTree = tree(source);
     const extracted = extractRecordedArchive(previous.archivePath, join(operation, "archive"));
@@ -316,7 +327,7 @@ export async function prepareRollback(
       rescuePath: join(operation, "Moyyi.app"),
       sessionCount: null,
       schemaVersion,
-      persistedFormat: 1,
+      persistedFormat,
       targetRevision: previous.sourceHead,
       ...preserved,
     };

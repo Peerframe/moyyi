@@ -102,16 +102,28 @@ describe("CLI process through actual runtime", () => {
     expect(bad.stderr).toContain("Initialization failed");
     expect(bad.stdout + bad.stderr).not.toContain("synthetic-secret");
   });
-  it("loads only an explicit trusted host with a synthetic model", () => {
-    const f = fixture();
-    const host = join(f.root, "host.mjs");
-    writeFileSync(
-      host,
-      `const usage={status:'unknown',inputTokens:null,outputTokens:null,cacheReadTokens:null,cacheWriteTokens:null,reasoningTokens:null};
-export default {model:{provider:'local-fixture',model:'fixture'},plugins:[{plugin:{name:'host-fixture',apiVersion:1,setup(host){host.registerModelProvider({id:'local-fixture',models:[{origin:{provider:'local-fixture',model:'fixture'},contextWindowTokens:10000,maxOutputTokens:100,parallelToolCalls:false,reasoning:'none',promptCache:'none',editFormat:'search_replace'}],createClient(){return{async *stream(){yield{type:'part_completed',index:0,part:{type:'text',text:'Explicit offline host'}};yield{type:'completed',stopReason:'end_turn',providerStopReason:null,usage};}};}});}}}]};`,
-    );
-    const result = run(["--host", host, "-C", f.workspace, "--data", f.data, "Hello"]);
-    expect(result.status).toBe(0);
-    expect(result.stdout).toContain("Explicit offline host");
-  });
+  it.each([10_000, 100_000])(
+    "loads an explicit trusted host and enforces its %i context capacity",
+    (capacity) => {
+      const f = fixture();
+      const host = join(f.root, "host.mjs");
+      writeFileSync(
+        host,
+        `const usage={status:'unknown',inputTokens:null,outputTokens:null,cacheReadTokens:null,cacheWriteTokens:null,reasoningTokens:null};
+export default {model:{provider:'local-fixture',model:'fixture'},plugins:[{plugin:{name:'host-fixture',apiVersion:1,setup(host){host.registerModelProvider({id:'local-fixture',models:[{origin:{provider:'local-fixture',model:'fixture'},contextWindowTokens:${capacity},maxOutputTokens:100,parallelToolCalls:false,reasoning:'none',promptCache:'none',editFormat:'search_replace'}],createClient(){return{async *stream(){yield{type:'part_completed',index:0,part:{type:'text',text:'Explicit offline host'}};yield{type:'completed',stopReason:'end_turn',providerStopReason:null,usage};}};}});}}}]};`,
+      );
+      const result = run(["--host", host, "-C", f.workspace, "--data", f.data, "Hello"]);
+      // The expanded default tool catalog no longer fits this deliberately small profile.
+      // Keep its existing limit and fail closed; the ordinary profile exercises successful loading.
+      if (capacity === 10_000) {
+        expect(result.status).toBe(1);
+        expect(result.stdout).toContain("Context capacity exceeded");
+        expect(result.stdout).toContain("available 10000");
+        expect(result.stdout).not.toContain("Explicit offline host");
+      } else {
+        expect(result.status).toBe(0);
+        expect(result.stdout).toContain("Explicit offline host");
+      }
+    },
+  );
 });

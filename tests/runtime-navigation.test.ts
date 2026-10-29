@@ -1,6 +1,6 @@
 import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
-import { join } from "node:path";
+import { isAbsolute, join } from "node:path";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { runWorkspaceNavigationScenario } from "../evals/instructions/navigation.ts";
 import {
@@ -117,10 +117,16 @@ describe("opt-in navigation through the real runtime", () => {
   it("puts relative paths into the first request and refreshes on the next request", async () => {
     const h = await harness();
     expect(await h.turn()).toEqual({ kind: "completed" });
-    expect(navigation(h.requests[0] as ModelRequest).paths).toContain("src/main.ts");
+    const firstNavigation = navigation(h.requests[0] as ModelRequest);
+    expect(firstNavigation.paths).toContain("src/main.ts");
     expect(text(h.requests[0] as ModelRequest)).not.toContain("SOURCE_CONTENT_CANARY");
     expect(text(h.requests[0] as ModelRequest)).not.toContain("PRIVATE_CANARY");
-    expect(text(h.requests[0] as ModelRequest)).not.toContain(h.workspace);
+    // Session facts include the trusted working directory; the optional navigation section
+    // still contains only relative names, never source contents or absolute file paths.
+    expect(JSON.stringify(firstNavigation)).not.toContain(h.workspace);
+    expect(
+      firstNavigation.paths.every((path) => !isAbsolute(path) && !path.split("/").includes("..")),
+    ).toBe(true);
     rmSync(join(h.workspace, "src/main.ts"));
     writeFileSync(join(h.workspace, "src/new.ts"), "NEW_CONTENT_CANARY");
     expect(await h.turn()).toEqual({ kind: "completed" });

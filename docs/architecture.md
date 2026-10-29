@@ -50,6 +50,8 @@ cli / desktop host ─┐   (future: automation — also a client)
 | `project-instructions` (workspace root AGENTS.md only) | context source | implemented; refreshed per request |
 | `workspace-navigation` (opt-in bounded file paths) | context source | implemented; refreshed per request; real-model quality unverified |
 | `fs` (read, list, search; create, edit, undo) | tools | read-only merged in batch 5; writes merged in phase 2 |
+| `todo` | read-class planning tool | whole-list task updates in recorded calls; no second context copy |
+| `tool-output` | read-only session output retrieval | typed format 2 references; runtime owns blobs and session confinement |
 | `documents` (seven-format body text) | read-only tool; dedicated runtime parser port | implemented candidate; two fixed live document tasks passed once; broader quality unmeasured |
 | `shell` | tools | merged in phase 3 |
 | `provider-anthropic` | model provider | merged in phase 5; live acceptance pending |
@@ -104,6 +106,14 @@ dialog, settings-section and keyed conversation-node slots; the shell only place
 build-time repository composition, not third-party loading or new execution authority.
 
 ### Trust
+
+[ADR 0046](decisions/0046-recorded-tool-output.md) adds a trusted result-processing port and a
+session-bound output reader. Core commits typed full-output references with results/effects;
+runtime owns storage and retrieval. Context projects older previews only under pressure and never
+mutates records. Format 2 is distinct from the unchanged SQL schema 3. Backup and rollback validate
+both dimensions. [ADR 0047](decisions/0047-read-tool-deadlines.md) supplies cooperative read deadlines
+through runtime ports and records advisory repeat-call text before returning results to the model.
+Neither feature lets plugins intercept the loop, grant authority or raise existing output bounds.
 
 [ADR 0027](decisions/0027-bounded-workspace-navigation.md) adds explicitly enabled, path-only
 workspace navigation through the context-source port. Runtime authorizes directory listing and

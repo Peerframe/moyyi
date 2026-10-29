@@ -9,6 +9,19 @@ task quality are different evidence; one does not establish the others.
 npm run eval -- --agent null --trials 1
 ```
 
+The seven-format document tasks are an explicit addition to the default public corpus:
+
+```bash
+npm run eval -- --include-documents --task document-report-seven-formats --agent null
+```
+
+`--include-documents` adds the unchanged tasks from `documents/tasks.ts` before the optional
+private corpus. It does not enable live requests, load a host or grant write access. Without
+the flag, those task IDs are not selected. Result metadata names the selected corpora separately.
+
+`npm run check` also runs the [delivery-one recorded-response replay](replay/README.md) through
+the real runtime and original task checkers without credentials or network access.
+
 ## Task format
 
 One directory per task under `evals/tasks/<id>/`:

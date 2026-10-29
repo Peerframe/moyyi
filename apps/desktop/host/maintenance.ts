@@ -58,6 +58,14 @@ interface Manifest {
   files: FileRecord[];
 }
 
+/** Supported historic desktop stores plus the typed tool-output format; no implicit downgrade. */
+export function isSupportedStoreVersion(schemaVersion: unknown, persistedFormat: unknown): boolean {
+  return (
+    ((schemaVersion === 2 || schemaVersion === 3) && persistedFormat === 1) ||
+    (schemaVersion === 3 && persistedFormat === 2)
+  );
+}
+
 export function parseMaintenanceRequest(value: unknown): MaintenanceRequest {
   if (!value || typeof value !== "object" || Array.isArray(value))
     throw Error("Invalid maintenance request");
@@ -235,8 +243,7 @@ function validateBackup(root: string): Manifest {
     value.format !== 1 ||
     value.kind !== "moyyi-local-backup" ||
     value.credentialsExported !== false ||
-    ![2, 3].includes(value.schemaVersion) ||
-    value.persistedFormat !== 1 ||
+    !isSupportedStoreVersion(value.schemaVersion, value.persistedFormat) ||
     !Number.isSafeInteger(value.sessionCount) ||
     value.sessionCount < 0 ||
     typeof value.createdAt !== "string" ||

@@ -20,6 +20,7 @@ import {
   type PermissionPolicy,
   type PreconditionVerifier,
   type PreparedAction,
+  type ReadToolDeadlines,
   type RenderedRequestRef,
   type RunId,
   type RunLimits,
@@ -31,7 +32,10 @@ import {
   type SessionStore,
   type ToolCallPart,
   type ToolDefinition,
+  type ToolOutputReaderFactory,
+  type ToolOutputRef,
   type ToolResultPart,
+  type ToolResultProcessor,
   type TranscriptEntry,
   type WebAccessFactory,
   type WorkspaceDocumentsFactory,
@@ -70,6 +74,7 @@ export interface CoreDeps {
   readonly collect?: (
     workspaceRoot: string,
     signal: AbortSignal,
+    sessionId: SessionId,
   ) => Promise<readonly ContextSection[]>;
   readonly limits?: Partial<RunLimits>;
   /** Experimental fresh-session evidence-only final answer; shares the existing run budget. */
@@ -81,6 +86,9 @@ export interface CoreDeps {
   readonly processes?: WorkspaceProcessesFactory;
   readonly writes?: WorkspaceWritesFactory;
   readonly web?: WebAccessFactory;
+  readonly toolResults?: ToolResultProcessor;
+  readonly toolOutputs?: ToolOutputReaderFactory;
+  readonly readToolDeadlines?: ReadToolDeadlines;
 }
 
 interface Running {
@@ -451,7 +459,7 @@ export class AgentCore {
 
   async #collect(run: Running, signal = run.controller.signal): Promise<readonly ContextSection[]> {
     try {
-      return (await this.#deps.collect?.(run.workspaceRoot, signal)) ?? [];
+      return (await this.#deps.collect?.(run.workspaceRoot, signal, run.sessionId)) ?? [];
     } catch (error) {
       if (run.controller.signal.aborted) return [];
       if (signal.aborted && error instanceof Error && error.name === "AbortError") return [];
@@ -918,8 +926,12 @@ export class AgentCore {
         return { kind: "completed" };
       }
       retries = 0;
+      const processor = this.#deps.toolResults;
+      processor?.begin(run.id, calls);
+      const outputBlobs = new Map<string, ToolOutputRef>();
       const host: ExecutionHost = {
         runId: run.id,
+        sessionId: run.sessionId,
         workspaceRoot: run.workspaceRoot,
         signal: run.controller.signal,
         ...(run.investigation ? { admissionSignal: run.investigation.signal } : {}),
@@ -934,15 +946,41 @@ export class AgentCore {
         ...(this.#deps.documents ? { documents: this.#deps.documents } : {}),
         ...(this.#deps.writes ? { writes: this.#deps.writes } : {}),
         ...(this.#deps.web ? { web: this.#deps.web } : {}),
+        ...(this.#deps.toolOutputs ? { toolOutputs: this.#deps.toolOutputs } : {}),
+        ...(this.#deps.readToolDeadlines
+          ? { readToolDeadlines: this.#deps.readToolDeadlines }
+          : {}),
+        ...(processor
+          ? {
+              processResult: async (result: ToolResultPart) => {
+                const processed = await processor.process({
+                  runId: run.id,
+                  sessionId: run.sessionId,
+                  result,
+                  maxOutputBytes: this.#limits.maxToolOutputBytes,
+                });
+                if (processed.outputBlob) outputBlobs.set(result.callId, processed.outputBlob);
+                return processed;
+              },
+            }
+          : {}),
         now: () => this.#deps.clock.now(),
         nextEffectId: () => this.#deps.ids.next("effect") as EffectId,
-        record: (effect, result) => this.#record(run, effect, result),
+        record: (effect, result, outputBlob) => this.#record(run, effect, result, outputBlob),
         ensureLease: () => this.#ensureLease(run),
-        approve: (effect, action) => this.#approve(run, effect, action, run.investigation?.signal),
+        approve: (effect, action, signal) =>
+          this.#approve(run, effect, action, signal ?? run.investigation?.signal),
       };
       const results = await executeCalls(calls, host);
       const missing = results.filter((result) => !run.resultIds.has(result.callId));
-      if (missing.length) await this.#append(run, { kind: "tool_results", results: missing });
+      if (missing.length) {
+        const refs = missing.flatMap((result) => outputBlobs.get(result.callId) ?? []);
+        await this.#append(run, {
+          kind: "tool_results",
+          results: missing,
+          ...(refs.length ? { outputBlobs: refs } : {}),
+        });
+      }
       if (results.some((result) => result.status === "unknown"))
         return { kind: "failed", reason: "Tool outcome unknown; verify before retrying" };
     }
@@ -984,10 +1022,19 @@ export class AgentCore {
       this.#emit({ type: "entry.appended", entry });
     });
   }
-  #record(run: Running, effect: EffectRecord, result?: ToolResultPart): Promise<void> {
+  #record(
+    run: Running,
+    effect: EffectRecord,
+    result?: ToolResultPart,
+    outputBlob?: ToolOutputRef,
+  ): Promise<void> {
     return this.#serialize(run, async () => {
       const entry = result
-        ? this.#entry(run, { kind: "tool_results", results: [result] })
+        ? this.#entry(run, {
+            kind: "tool_results",
+            results: [result],
+            ...(outputBlob ? { outputBlobs: [outputBlob] } : {}),
+          })
         : undefined;
       await this.#deps.store.commit({
         entries: entry ? [entry] : [],

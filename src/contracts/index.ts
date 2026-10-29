@@ -13,5 +13,6 @@ export * from "./receipts.ts";
 export type * from "./recording.ts";
 export * from "./replay.ts";
 export { parseStrictJson } from "./strict-json.ts";
+export * from "./tool-output.ts";
 export type * from "./tools.ts";
 export type * from "./web.ts";

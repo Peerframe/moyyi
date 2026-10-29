@@ -51,6 +51,8 @@ import {
 } from "../plugins/provider-kimi/index.ts";
 import { createShellPlugin } from "../plugins/shell/index.ts";
 import { skillsPlugin } from "../plugins/skills/index.ts";
+import { todoPlugin } from "../plugins/todo/index.ts";
+import { toolOutputPlugin } from "../plugins/tool-output/index.ts";
 import { createWebPlugin } from "../plugins/web/index.ts";
 import { workspaceNavigationPlugin } from "../plugins/workspace-navigation/index.ts";
 import {
@@ -72,7 +74,9 @@ import { FileRecordingSink, RecordingModelClient, ReplayModelClient } from "./mo
 import { type PluginEntry, PluginRegistry, type PluginStatus } from "./plugins.ts";
 import { WorkspacePreconditions } from "./preconditions.ts";
 import { NodeWorkspaceProcesses } from "./processes.ts";
+import { sessionFacts } from "./session-facts.ts";
 import { type SkillSelection, selectSkills } from "./skills.ts";
+import { RuntimeToolResults, readToolDeadlines } from "./tool-results.ts";
 import { AjvArgumentValidator } from "./validation.ts";
 import { NodeWebAccess, type WebAccessOptions } from "./web.ts";
 import type { WebHttpDependencies } from "./web-http.ts";
@@ -136,6 +140,9 @@ export interface DevelopmentPlugin {
 }
 
 export interface RuntimeOptions {
+  /** Runtime-only call reminders and cooperative read deadlines; not persisted user settings. */
+  readonly repeatToolThresholds?: readonly number[];
+  readonly readToolTimeoutMs?: number;
   /** Fixed offline document extraction uses the read grant; false disables the tool and port. */
   readonly documents?: false;
   /** Explicit trusted library root and activated names; no automatic scanning or installation. */
@@ -363,6 +370,8 @@ export async function createRuntime(
   const plugins: PluginStatus[] = [];
   const startup = [
     { plugin: defaultInstructionsPlugin },
+    { plugin: todoPlugin },
+    { plugin: toolOutputPlugin },
     ...(options.projectInstructions === false ? [] : [{ plugin: projectInstructionsPlugin }]),
     ...(skills?.enabled.length ? [{ plugin: skillsPlugin }] : []),
     ...(workspaceNavigation ? [{ plugin: workspaceNavigationPlugin }] : []),
@@ -405,7 +414,9 @@ export async function createRuntime(
   let reloading = false;
   let inspecting = false;
   let closing: Promise<void> | undefined;
+  let toolResults: RuntimeToolResults | undefined;
   const emit = (event: RuntimeEvent) => {
+    toolResults?.observe(event);
     if (event.type === "run.started") activeRuns.add(event.runId);
     if (event.type === "run.finished") activeRuns.delete(event.runId);
     // Observers receive an immutable copy, so mutating a displayed approval cannot alter work.
@@ -572,6 +583,11 @@ export async function createRuntime(
       : undefined;
     const files = new NodeWorkspaceFiles(excluded);
     const documents = documentsEnabled ? new NodeWorkspaceDocuments(files) : undefined;
+    toolResults = new RuntimeToolResults(store, options.repeatToolThresholds);
+    const facts = sessionFacts(
+      store,
+      options.clock ?? { now: () => new Date().toISOString() as Timestamp },
+    );
     core = new AgentCore({
       model: selectedClient,
       ...(recorder ? { settleModel: recorder.flush.bind(recorder) } : {}),
@@ -583,6 +599,12 @@ export async function createRuntime(
       validator: new AjvArgumentValidator(),
       preconditions: options.preconditions ?? new WorkspacePreconditions(),
       files,
+      toolResults,
+      toolOutputs: toolResults,
+      readToolDeadlines: readToolDeadlines(
+        options.scheduler ?? nodeScheduler,
+        options.readToolTimeoutMs,
+      ),
       ...(documents ? { documents } : {}),
       ...(web ? { web } : {}),
       ...(processes ? { processes } : {}),
@@ -609,8 +631,9 @@ export async function createRuntime(
       clock: options.clock ?? { now: () => new Date().toISOString() as Timestamp },
       ids: options.ids ?? { next: (prefix) => `${prefix}_${randomUUID()}` },
       emit,
-      collect: (workspaceRoot, signal) =>
-        collectContext(
+      collect: async (workspaceRoot, signal, sessionId) => [
+        await facts(sessionId, workspaceRoot, profile),
+        ...(await collectContext(
           registry.contextSources,
           files,
           policy,
@@ -620,7 +643,8 @@ export async function createRuntime(
           options.projectInstructions !== false,
           skills,
           workspaceNavigation,
-        ),
+        )),
+      ],
       ...(options.limits === undefined ? {} : { limits: options.limits }),
       ...(evidenceAnswer ? { evidenceAnswer } : {}),
     });

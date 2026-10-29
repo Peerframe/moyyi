@@ -121,3 +121,22 @@ text under a separate read grant. The presenter bounds UTF-8 body bytes and the 
 JSON, distinguishes absence from empty text, and reports unavailable/truncated observations.
 See [write observations](../../../docs/decisions/0035-verified-write-observations.md); they verify
 observed bytes, not task correctness.
+
+## Model experience
+
+The model receives six stable tool schemas with the arguments and limits described above. The
+`read` description owns guidance to inspect ranges around search hits, group independent reads,
+and avoid treating truncation as proof of absence. The `search` description tells the model to
+inspect hits and gaps with `read startLine/maxLines`; its truncated/skipped warning remains.
+These instructions live beside the tools and are not repeated in the default system prompt.
+Tool registration order, schemas, execution and result boundaries are unchanged by this wording.
+
+Descriptions and schemas have a fixed per-request token cost while the tool set is unchanged.
+Tool-call arguments and returned source, metadata, hits, receipts or failures add tokens according
+to their bounded size. `read` emits source once, with numbered lines; a verified post-write
+observation reports bytes and does not certify factual correctness. Existing failures remain
+visible as failed outcomes.
+
+Calls and results append to the recorded history and preserve its earlier reusable prefix.
+Changing a tool description or schema changes the prefix from that definition; ordinary file
+results do not rewrite old messages. No context source or extra model call is introduced.

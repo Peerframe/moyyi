@@ -1,6 +1,11 @@
 import type { DatabaseSync } from "node:sqlite";
-import { PERSISTED_FORMAT_VERSION } from "../contracts/persisted/index.ts";
+import {
+  type EffectRecord,
+  PERSISTED_FORMAT_VERSION,
+  type TranscriptEntry,
+} from "../contracts/persisted/index.ts";
 import { MATERIALS_SQL } from "./materials.ts";
+import { encodeEffect, encodeEntry } from "./records.ts";
 import { SESSION_METADATA_SQL } from "./session-management.ts";
 
 export const SCHEMA_VERSION = 3;
@@ -43,7 +48,7 @@ const SCHEMA_V2_SQL = `${SCHEMA_V1_SQL}\n${SNAPSHOT_SQL}`;
 const SCHEMA_V3_ADDITIONS = `${SESSION_METADATA_SQL}\n${MATERIALS_SQL}`;
 const SCHEMA_SQL = `${SCHEMA_V2_SQL}\n${SCHEMA_V3_ADDITIONS}`;
 
-function validateSchema(db: DatabaseSync, sql: string): void {
+function validateSchema(db: DatabaseSync, sql: string, formatVersion: number): void {
   // Validate before migrating: adding a table must never repair missing prior guarantees.
   const expected = sql
     .split(";")
@@ -59,7 +64,7 @@ function validateSchema(db: DatabaseSync, sql: string): void {
     throw new Error("Unsupported or damaged database schema; refusing automatic repair");
   if (
     db.prepare("SELECT value FROM metadata WHERE key = 'persisted_format'").get()?.value !==
-    PERSISTED_FORMAT_VERSION
+    formatVersion
   )
     throw new Error("Unsupported persisted format; a migration is required");
   if (
@@ -67,6 +72,17 @@ function validateSchema(db: DatabaseSync, sql: string): void {
     db.prepare("PRAGMA foreign_key_check").all().length !== 0
   )
     throw new Error("Damaged database integrity; refusing automatic repair");
+}
+
+/** Format 2 adds optional output references; every format-1 payload remains byte-identical. */
+function migrateRecords(db: DatabaseSync): void {
+  for (const row of db.prepare("SELECT payload FROM entries").iterate())
+    encodeEntry(JSON.parse(row.payload as string) as TranscriptEntry, 1);
+  for (const row of db.prepare("SELECT payload FROM effects").iterate())
+    encodeEffect(JSON.parse(row.payload as string) as EffectRecord);
+  db.prepare("UPDATE metadata SET value=? WHERE key='persisted_format'").run(
+    PERSISTED_FORMAT_VERSION,
+  );
 }
 
 /** Schema migrations are separate from the version of the JSON records they contain. */
@@ -92,12 +108,21 @@ export function migrate(db: DatabaseSync, beforeCommit: () => void): void {
       db.exec("ROLLBACK");
       throw error;
     }
-  } else if ((version === 1 || version === 2) && app === APPLICATION_ID) {
-    validateSchema(db, version === 1 ? SCHEMA_V1_SQL : SCHEMA_V2_SQL);
+  } else if ((version === 1 || version === 2 || version === 3) && app === APPLICATION_ID) {
+    const format = db
+      .prepare("SELECT value FROM metadata WHERE key='persisted_format'")
+      .get()?.value;
+    const sql = version === 1 ? SCHEMA_V1_SQL : version === 2 ? SCHEMA_V2_SQL : SCHEMA_SQL;
+    if (format === PERSISTED_FORMAT_VERSION && version === SCHEMA_VERSION) {
+      validateSchema(db, SCHEMA_SQL, PERSISTED_FORMAT_VERSION);
+      return;
+    }
+    validateSchema(db, sql, 1);
     db.exec("BEGIN IMMEDIATE");
     try {
       if (version === 1) db.exec(SNAPSHOT_SQL);
-      db.exec(SCHEMA_V3_ADDITIONS);
+      if (version < 3) db.exec(SCHEMA_V3_ADDITIONS);
+      migrateRecords(db);
       db.exec(`PRAGMA user_version = ${SCHEMA_VERSION}`);
       beforeCommit();
       db.exec("COMMIT");
@@ -108,5 +133,5 @@ export function migrate(db: DatabaseSync, beforeCommit: () => void): void {
   } else if (version !== SCHEMA_VERSION || app !== APPLICATION_ID) {
     throw new Error(`Unsupported database schema/application: ${String(version)}/${String(app)}`);
   }
-  validateSchema(db, SCHEMA_SQL);
+  validateSchema(db, SCHEMA_SQL, PERSISTED_FORMAT_VERSION);
 }

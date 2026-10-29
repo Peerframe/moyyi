@@ -1,6 +1,7 @@
 import { readdirSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 import * as v1 from "./fixtures/v1.ts";
+import * as v2 from "./fixtures/v2.ts";
 import { type ContentPart, type EntryBody, PERSISTED_FORMAT_VERSION } from "./index.ts";
 
 describe("persisted format", () => {
@@ -13,9 +14,22 @@ describe("persisted format", () => {
   it("round-trips through JSON without loss", () => {
     // The store writes JSON; anything that does not survive this (Dates, Maps, undefined
     // values in arrays) must not appear in persisted shapes.
-    for (const record of [...v1.entries, ...v1.effects]) {
+    for (const record of [...v1.entries, ...v1.effects, ...v2.entries]) {
       expect(JSON.parse(JSON.stringify(record))).toEqual(record);
     }
+  });
+
+  it("keeps full output references outside provider-neutral result content", () => {
+    const body = v2.entries[0]?.body;
+    if (body?.kind !== "tool_results") throw Error("Missing tool output fixture");
+    expect(body.outputBlobs).toHaveLength(1);
+    expect(body.outputBlobs?.[0]?.callId).toBe(body.results[0]?.callId);
+    expect(Object.keys(body.results[0] ?? {}).sort()).toEqual([
+      "callId",
+      "content",
+      "status",
+      "type",
+    ]);
   });
 
   it("covers every transcript entry kind", () => {

@@ -11,6 +11,7 @@ import type {
 } from "../contracts/persisted/index.ts";
 import { canTransition } from "../contracts/persisted/index.ts";
 import { canonicalizeJson } from "../contracts/replay.ts";
+import type { ToolDeadline, ToolOutputReader } from "../contracts/tool-output.ts";
 import type { PreparedAction, ToolDefinition } from "../contracts/tools.ts";
 import type { WebAccess } from "../contracts/web.ts";
 import { boundOutput, type ExecutionHost, executeCalls } from "./executor.ts";
@@ -115,6 +116,220 @@ function setup(selected = tool()) {
     },
   };
 }
+
+function controlledDeadline(parent: AbortSignal) {
+  const controller = new AbortController();
+  let expired = false;
+  const value: ToolDeadline = {
+    signal: AbortSignal.any([parent, controller.signal]),
+    get timeoutMessage() {
+      return expired ? "tool call timed out after 37ms" : undefined;
+    },
+    dispose: vi.fn(),
+  };
+  return {
+    value,
+    expire() {
+      expired = true;
+      controller.abort();
+    },
+  };
+}
+
+describe("cooperative read deadlines and output authority", () => {
+  it("waits for cancellation cleanup before recording or returning the fixed timeout", async () => {
+    const test = setup();
+    const deadline = controlledDeadline(test.controller.signal);
+    const started = Promise.withResolvers<void>();
+    const cleanup = Promise.withResolvers<void>();
+    const cancelled = Promise.withResolvers<void>();
+    test.selected.execute = async (_action, context) => {
+      context.signal.addEventListener("abort", () => cancelled.resolve(), { once: true });
+      started.resolve();
+      await cancelled.promise;
+      await cleanup.promise;
+      context.signal.throwIfAborted();
+      throw Error("unreachable");
+    };
+    let returned = false;
+    const pending = executeCalls([call()], {
+      ...test.host,
+      readToolDeadlines: { start: () => deadline.value },
+    }).then((results) => {
+      returned = true;
+      return results;
+    });
+    await started.promise;
+    deadline.expire();
+    await cancelled.promise;
+    await Promise.resolve();
+    expect(returned).toBe(false);
+    expect(test.records.at(-1)?.state).toBe("started");
+    expect(test.settled).toEqual([]);
+    expect(deadline.value.dispose).not.toHaveBeenCalled();
+    cleanup.resolve();
+    const [result] = await pending;
+    expect(result).toMatchObject({
+      status: "failed",
+      content: [{ type: "text", text: "tool call timed out after 37ms" }],
+    });
+    expect(test.settled).toEqual([result]);
+    expect(test.records.at(-1)?.state).toBe("failed");
+    expect(deadline.value.dispose).toHaveBeenCalledOnce();
+  });
+
+  it("does not turn parent cancellation during read cleanup into a deadline failure", async () => {
+    const test = setup();
+    const deadline = controlledDeadline(test.controller.signal);
+    const started = Promise.withResolvers<void>();
+    const cleanup = Promise.withResolvers<void>();
+    test.selected.execute = async (_action, context) => {
+      started.resolve();
+      await cleanup.promise;
+      context.signal.throwIfAborted();
+      return { status: "succeeded", content: [] };
+    };
+    const pending = executeCalls([call()], {
+      ...test.host,
+      readToolDeadlines: { start: () => deadline.value },
+    });
+    await started.promise;
+    deadline.expire();
+    test.controller.abort();
+    cleanup.resolve();
+    const [result] = await pending;
+    expect(JSON.stringify(result)).not.toContain("tool call timed out");
+    expect(test.settled).toEqual([result]);
+    expect(deadline.value.dispose).toHaveBeenCalledOnce();
+  });
+
+  it("does not prepare or execute denied reads and always disposes their deadline", async () => {
+    const test = setup();
+    const deadline = controlledDeadline(test.controller.signal);
+    const [result] = await executeCalls([call()], {
+      ...test.host,
+      policy: {
+        beforePrepare: () => ({ kind: "deny", reason: "revoked" }),
+        beforeExecute: () => ({ kind: "allow" }),
+      },
+      readToolDeadlines: { start: () => deadline.value },
+    });
+    expect(result?.status).toBe("denied");
+    expect(test.selected.prepare).not.toHaveBeenCalled();
+    expect(test.selected.execute).not.toHaveBeenCalled();
+    expect(test.records).toEqual([]);
+    expect(deadline.value.dispose).toHaveBeenCalledOnce();
+  });
+
+  it.each(["workspace_write", "process", "external"] as const)(
+    "does not wrap %s work in a read deadline",
+    async (kind) => {
+      const test = setup(tool(kind));
+      const start = vi.fn();
+      const [result] = await executeCalls([call()], { ...test.host, readToolDeadlines: { start } });
+      expect(result?.status).toBe("succeeded");
+      expect(start).not.toHaveBeenCalled();
+    },
+  );
+
+  it("settles an interrupted read before propagating a concurrent recording failure", async () => {
+    const test = setup();
+    const firstStarted = Promise.withResolvers<void>();
+    const secondStarted = Promise.withResolvers<void>();
+    const cleanup = Promise.withResolvers<void>();
+    const cancelled = Promise.withResolvers<void>();
+    let invocation = 0;
+    let cleaned = false;
+    test.selected.execute = async (_action, context) => {
+      if (++invocation === 1) {
+        firstStarted.resolve();
+        await secondStarted.promise;
+        return { status: "succeeded", content: [] };
+      }
+      context.signal.addEventListener("abort", () => cancelled.resolve(), { once: true });
+      secondStarted.resolve();
+      await cancelled.promise;
+      await cleanup.promise;
+      cleaned = true;
+      context.signal.throwIfAborted();
+      throw Error("unreachable");
+    };
+    let rejected = false;
+    const pending = executeCalls([call("test", "first"), call("test", "second")], {
+      ...test.host,
+      readToolDeadlines: { start: (_name, signal) => controlledDeadline(signal).value },
+      record: async (effect, result) => {
+        if (result?.callId === "first") throw Error("recording interrupted");
+        await test.host.record(effect, result);
+      },
+    }).catch((error: unknown) => {
+      rejected = true;
+      return error;
+    });
+    await firstStarted.promise;
+    await cancelled.promise;
+    expect(cleaned).toBe(false);
+    expect(rejected).toBe(false);
+    cleanup.resolve();
+    expect(await pending).toEqual(Error("recording interrupted"));
+    expect(cleaned).toBe(true);
+    expect(test.settled[0]?.callId).toBe("second");
+  });
+
+  it.each(["revoke", "cancel", "return"] as const)(
+    "expires a retained output reader after %s",
+    async (ending) => {
+      const test = setup(tool("read", "read_tool_output"));
+      let retained: ToolOutputReader | undefined;
+      const accessed: string[] = [];
+      test.selected.prepare = async (_args, context) => {
+        expect(context.toolOutputs).toBeUndefined();
+        return {
+          digest: "claim" as ActionDigest,
+          summary: "Read output",
+          preconditions: [],
+          payload: {},
+        };
+      };
+      test.selected.execute = async (_action, context) => {
+        retained = context.toolOutputs;
+        assert(retained);
+        expect(test.records.at(-1)?.state).toBe("started");
+        expect(await retained.read("handle", 0, 1)).toBe("evidence");
+        if (ending === "revoke") test.revoke();
+        if (ending === "cancel") test.controller.abort();
+        if (ending !== "return")
+          await expect(retained.read("handle", 0, 1)).rejects.toThrow(/expired|cancelled|revoked/);
+        return { status: "succeeded", content: [] };
+      };
+      const create = vi.fn<NonNullable<ExecutionHost["toolOutputs"]>["create"]>(
+        (_context, guard) => ({
+          async read(handle) {
+            guard();
+            accessed.push(handle);
+            return "evidence";
+          },
+        }),
+      );
+      await executeCalls([call("read_tool_output")], { ...test.host, toolOutputs: { create } });
+      assert(retained);
+      await expect(retained.read("handle", 0, 1)).rejects.toThrow(/expired|cancelled|revoked/);
+      expect(accessed).toEqual(["handle"]);
+      expect(create).toHaveBeenCalledOnce();
+    },
+  );
+
+  it("does not give unrelated read tools access to stored output", async () => {
+    const test = setup();
+    test.selected.execute = async (_action, context) => {
+      expect(context.toolOutputs).toBeUndefined();
+      return { status: "succeeded", content: [] };
+    };
+    const create = vi.fn();
+    await executeCalls([call()], { ...test.host, toolOutputs: { create } });
+    expect(create).not.toHaveBeenCalled();
+  });
+});
 
 describe("tool execution pipeline", () => {
   it("supplies document authority only after durable start and expires retained reads", async () => {

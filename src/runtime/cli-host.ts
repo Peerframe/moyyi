@@ -179,7 +179,9 @@ export async function configureCliHost(
   if (!approveReads) return configured;
   // Keep all independently configured grants while requiring approval for reads. Custom host
   // policies are rejected above instead of being silently replaced by a more permissive policy.
-  const reads = { requireApproval: ["read", "list", "search", "read_document"] };
+  const reads = {
+    requireApproval: ["read", "list", "search", "read_document", "read_tool_output"],
+  };
   const files = configured.workspaceWrites
     ? new WorkspaceWritePolicy({ ...reads, approval: configured.workspaceWrites.approval ?? "ask" })
     : new ReadOnlyPolicy(reads);

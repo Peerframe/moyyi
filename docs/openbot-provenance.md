@@ -342,8 +342,36 @@ with the DSH commit and path in the same change.
 | 2026-10-27 | `1f81c047` | Provider source check only; no code | [Harness comparison](research/harness-comparison.md#dsh-preview-source-check-2026-10-27) |
 | 2026-10-29 | `f3803c96` | Skill structure and wording ideas for `moyyi-model-experience`, `moyyi-desktop-ui` and `moyyi-check` (from `agent-experience`, `dsh-client-ui-ux`, `dsh-pre-push-checks`), rewritten; AGENTS.md layout | [`.agents/skills`](../.agents/skills/), [AGENTS.md](../AGENTS.md) |
 
-Planned adaptations (not yet taken) are listed in the
-[delivery one brief](tasks/2026-10-29-delivery-1-dsh-model-experience.md) and the
-[delivery two brief](tasks/2026-10-29-delivery-2-desktop-modules.md); each adds its row here when
-implemented.
+Delivery one adaptations are recorded below. Remaining planned adaptations are listed in the
+[delivery two brief](tasks/2026-10-29-delivery-2-desktop-modules.md).
 
+### Delivery one source map (2026-10-29)
+
+All rows use `deepseek-ai/deepseek-harness` commit
+`f3803c96974ad4a94195fb97e5c637e9c2a3afe3`, MIT. The full license is carried in
+`THIRD_PARTY_NOTICES.md` (packaged) and `src/plugins/todo/DEEPSEEK-LICENSE.txt`.
+No upstream code was executed and no DSH dependency was installed. This map describes adaptation,
+not evidence that the candidate improves task quality.
+
+| moyyi file | Pinned DSH source | Adaptation |
+| --- | --- | --- |
+| `src/plugins/todo/index.ts` | `packages/todo/tool-todo/src/index.ts` | Whole-list schema, trimmed unique content, single active task and count summary, rewritten for the tool contract |
+| `src/plugins/todo/index.test.ts` | `packages/todo/tool-todo/tests/tool-todo.spec.ts` | Validation and whole-list failure cases rewritten |
+| `src/plugins/todo/README.md` | `packages/todo/tool-todo/README.md` | Model experience and documented constraints |
+| `src/runtime/tool-results.ts` | `packages/guard/repeat-tool-reminder/src/index.ts`, `packages/guard/timeout-policy/src/index.ts`, `packages/spill/spill-policy/src/index.ts` | Canonical repeated calls, cooperative deadline and capture ideas; core/runtime ports replace waterfalls |
+| `src/contracts/tool-output.ts` | `packages/spill/spill-policy/src/retention.ts`, `src/notice.ts`; `packages/compaction/compaction-tool-result-pruner/src/index.ts` | Bounded head/tail presentation, discoverable handle and older-result projection design |
+| `src/plugins/tool-output/index.ts` | `packages/spill/spill/README.md` | Session ownership and bounded retrieval; new moyyi capability, not filesystem path authority |
+| `src/plugins/tool-output/README.md` | `packages/spill/spill-policy/README.md`, `packages/compaction/compaction-tool-result-pruner/README.md` | Model/token/cache/limit documentation |
+| `src/core/executor.ts`, `src/core/index.ts` | `packages/guard/timeout-policy/src/index.ts`, `packages/spill/spill/README.md` | Cancellation settlement and publication ordering design; new core guarantees and typed references, not copied loop implementation |
+| `src/context/index.ts` | `packages/compaction/compaction-tool-result-pruner/src/index.ts`, `packages/todo/tool-todo/README.md` | Pressure-only projection and retaining a todo summary; original log unchanged |
+| `src/plugins/default-instructions/index.ts`, `README.md`, `index.test.ts` | `packages/core/system-prompt/README.md`, `packages/context/agent-instructions/README.md`, `packages/preset/persona/README.md` | Separate stable identity/safety sections; no ancestor/global instruction discovery |
+| `src/plugins/fs/index.ts`, `README.md` | `packages/core/system-prompt/README.md` | Tool guidance belongs in descriptions; no execution logic copied |
+| `src/runtime/session-facts.ts` | `packages/context/time-context/README.md` | Session snapshot of host facts; no per-step clock injection |
+| `src/plugins/provider-deepseek/index.ts`, `index.test.ts` | `packages/llm/llm-deepseek/src/transport.ts` | All 5xx classified as server unavailability; no retries added |
+| `src/plugins/provider-deepseek/README.md`, `docs/deepseek.md` | `packages/llm/llm-deepseek/README.md`, `src/serialize.ts`, `src/translate.ts`, `src/replay.ts`, `src/defaults.ts`; `packages/llm/token-meter/README.md`, `src/turn-usage.ts`, `src/usage-projection.ts`; `docs/deepseek-llm-api-wire-extensions.md` | Protocol comparison; Responses, existing limits and recorded usage remain authoritative |
+
+| `evals/replay/sequence-client.ts`, `sequence-client.test.ts`, `README.md` | `packages/test-support/llm-replay/README.md` | Eval-only ordered responses and separate request-difference diagnostics; production strict replay unchanged |
+| `evals/replay/replay.test.ts` | `packages/test-support/agent-loop-testkit/README.md` | Real-runtime task/result conformance with public recordings; original task checkers retained |
+
+The typed persisted reference, SQL migration, desktop version pairing and session access checks
+are original moyyi integration. They are covered by ADR 0046 rather than copied from a DSH store.

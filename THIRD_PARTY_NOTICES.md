@@ -80,3 +80,32 @@ tesseract.js-core 7.0.0 (Apache-2.0) remain transitive dependencies even though 
 No OCR language package is added. Optional canvas platform dependencies retain their package
 licenses. `package-lock.json` fixes the source closure; candidate installation verifies the actual
 closure and keeps these original dependency licenses. No upstream copyright is transferred to moyyi.
+
+## DeepSeek Harness: model-experience components
+
+Whole-list todo validation, repeat-call advice, cooperative timeout handling and tool-output
+retention/pruning designs are adapted from DeepSeek Harness, fixed revision
+`f3803c96974ad4a94195fb97e5c637e9c2a3afe3`. Implementations use moyyi contracts and ports; no upstream
+framework or package is included. Per-file origins are recorded in `docs/openbot-provenance.md`.
+
+MIT License
+
+Copyright (c) 2026 DeepSeek
+
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the "Software"), to deal
+in the Software without restriction, including without limitation the rights
+to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+copies of the Software, and to permit persons to whom the Software is
+furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in all
+copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+SOFTWARE.

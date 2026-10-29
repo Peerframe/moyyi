@@ -181,7 +181,7 @@ describe("durable workspace snapshots", () => {
     expect(await reopened.getSnapshot(value.id)).toEqual(value);
     expect(reopened.diagnostics()).toMatchObject({
       schemaVersion: 3,
-      persistedFormat: 1,
+      persistedFormat: 2,
       synchronous: 2,
     });
     expect((await reopened.loadSession(sessionId))?.effects[0]?.state).toBe("succeeded");

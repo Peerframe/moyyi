@@ -5,6 +5,7 @@ import {
   mkdirSync,
   mkdtempSync,
   readFileSync,
+  realpathSync,
   rmSync,
   symlinkSync,
   unlinkSync,
@@ -225,7 +226,14 @@ export async function runInstructionScenario(scenario: InstructionScenario): Pro
       assert(rendered.includes("ROOT_RULE_CANARY"));
       assert(rendered.includes("AGENTS.md"));
       assert(rendered.includes(hash(rootText)));
-      assert(!rendered.includes(workspace), "Project source labels must not disclose host paths");
+      const project = h.client.requests[0]?.system.filter(
+        (part) => part.type === "text" && part.text.includes("ROOT_RULE_CANARY"),
+      );
+      assert(!JSON.stringify(project).includes(workspace), "Project source labels remain relative");
+      assert(
+        rendered.includes(`Workspace: ${realpathSync(workspace)}`),
+        "The session snapshot identifies its workspace",
+      );
       await h.runtime.send({ type: "session.load", sessionId: h.sessionId });
       const assistant = h.events.findLast(
         (event) => event.type === "entry.appended" && event.entry.body.kind === "assistant_message",
@@ -583,13 +591,27 @@ export async function runInstructionScenario(scenario: InstructionScenario): Pro
       assert.equal(h.client.requests.length, 3);
       const rendered = system(h.client.requests[0]);
       for (const anchor of [
-        "map the user's questions to the claims that need evidence",
-        "entry point through transformations to its consumer and error handling",
-        "payload transmission, permission decisions, and refresh lifetimes",
-        "check each requested conclusion against the evidence actually returned",
+        "Check each user requirement against the evidence actually returned",
+        "Separate observed, simulated and unverified results",
+        "Tool availability does not grant permission",
       ])
         assert(rendered.includes(anchor), `Missing evidence workflow: ${anchor}`);
+      assert(
+        !rendered.includes("payload transmission, permission decisions, and refresh lifetimes"),
+      );
+      const definitions = h.client.requests[0]?.tools;
+      assert(
+        definitions
+          ?.find((tool) => tool.name === "read")
+          ?.description.includes("Use ranges around search hits"),
+      );
+      assert(
+        definitions
+          ?.find((tool) => tool.name === "search")
+          ?.description.includes("Inspect hits and gaps with read"),
+      );
       for (const request of h.client.requests) assert.equal(system(request), rendered);
+      for (const request of h.client.requests) assert.deepEqual(request.tools, definitions);
       const located = resultValue(h.client.requests[1], "locate-consumer");
       assert.equal(located.status, "succeeded");
       assert.deepEqual(located.value.matches, [

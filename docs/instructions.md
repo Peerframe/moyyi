@@ -102,3 +102,14 @@ still does not fit fails as before. Context reports identify omitted optional se
 requests retain exactly the admitted context. The offline instruction eval includes a four-request
 scripted read/create/verify/final workflow with the original public checker; this does not measure
 real-model accuracy. See [ADR 0027](decisions/0027-bounded-workspace-navigation.md).
+
+## Stable runtime facts
+
+Runtime contributes a `session` section between static identity/safety and turn-level sources.
+It states the session date, host IANA time zone, operating system, selected workspace and actual
+provider/model. The date comes from the first recorded entry, so reopening does not silently
+turn it into a new session. The label says this is a stable snapshot, not a live clock. Host
+facts are captured once for the current session/model composition; no environment variables,
+credentials, home-directory inventory or inferred capabilities are included. The exact section
+is included in every recorded model request. Changing model or host environment can change this
+section; ordinary next-step requests preserve its prefix.

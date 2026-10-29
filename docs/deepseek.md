@@ -132,6 +132,41 @@ still goes through the ordinary policy and journal. Changed files, policy or can
 change the outcome; this is not an instruction to retry an unknown effect after a crash. Integrity
 hashes are not signatures and do not make a hostile recording trusted.
 
+## DeepSeek Harness comparison
+
+Delivery one compares this adapter with DeepSeek Harness (DSH), MIT, fixed commit
+[`f3803c96974ad4a94195fb97e5c637e9c2a3afe3`](https://github.com/deepseek-ai/deepseek-harness/tree/f3803c96974ad4a94195fb97e5c637e9c2a3afe3).
+This is a source-level capability comparison. The delivery's frozen quality gate separately
+measures task results. DSH uses Anthropic Messages; moyyi retains Responses, the daily/gate low
+effort setting, 8192 output tokens, existing budgets and zero retries.
+
+| Concern | DSH at the fixed commit | moyyi behavior and decision |
+| --- | --- | --- |
+| Request prefix | Stable prompt/history can reuse the cache. Messages can append system updates on a declared `in-history` route and supports tool-change blocks. | Context keeps `static → session → turn` sections and sorts tools by name. Budget notices and ordinary tool observations append to history. Changed earlier sections or schemas can still invalidate the later prefix. Messages-specific system/tool updates are recorded as a protocol difference. |
+| Cache accounting | Messages reports uncached `input_tokens`, `cache_read_input_tokens` and `cache_creation_input_tokens`; the token meter adds these buckets to obtain the prompt total. | Responses `input_tokens` already includes cache reads. The codec records `input_tokens_details.cached_tokens` as a subcount; `cacheWriteTokens` stays `null` when unavailable. Every attempt's usage is persisted. Adding cache counts to input again would double-count; retain the existing contract. |
+| Reasoning between tools | All retained assistant reasoning is passed back, with model-bound Messages thinking signatures when valid. | All actual visible reasoning from complete assistant turns is passed back, with or without tools. Incomplete assistant history is rejected. Auxiliary encrypted metadata and phase annotations are validated and discarded under the existing plaintext Responses profile; Messages signature replay is a protocol difference. |
+| End of stream | Requires settled content blocks, a stop reason and `message_stop`; unexpected EOF fails. Empty successful output is rejected. | Requires a consistent Responses terminal and output lifecycle. EOF fails with `stream_interrupted`, retaining partial output and known usage. Core rejects empty/incomplete answers and treats `max_tokens` as output-budget exhaustion. No automatic continuation or retry is added. |
+| Errors | Auth, quota, rate limit, context, request, transport and server failures have stable categories; all HTTP 5xx are server failures. | Existing categories and redacted diagnostics remain. Delivery one fixes 502/504 and other 5xx falling through to `protocol`: HTTP 500–599 now maps to `overloaded`. One transport invocation, cleanup and the zero-retry setting remain unchanged. |
+| Output limit | Default `maxTokens` is 256000; an explicit request or model cap takes precedence. | The existing 8192-token cap includes reasoning and answer tokens and is validated before transport. This is the chosen local limit; no increase is adopted. |
+
+Source map for the comparison:
+
+- DSH `packages/llm/llm-deepseek`: `README.md`, `src/serialize.ts` (history and request limits),
+  `src/translate.ts` (terminal and cache accounting), `src/replay.ts` (thinking signatures),
+  `src/transport.ts` (failure categories), and `src/defaults.ts` (output/idle defaults).
+- DSH `packages/llm/token-meter`: `README.md`, `src/turn-usage.ts` and `src/usage-projection.ts`.
+  Its exact turn totals require available counters; estimated pressure is separate from billing.
+- moyyi: [`codec.ts`](../src/plugins/provider-deepseek/codec.ts),
+  [`index.ts`](../src/plugins/provider-deepseek/index.ts),
+  [`context`](../src/context/index.ts), [`core`](../src/core/index.ts), and the existing
+  [`Usage` contract](../src/contracts/persisted/transcript.ts).
+
+DSH's [`deepseek-llm-api-wire-extensions.md`](https://github.com/deepseek-ai/deepseek-harness/blob/f3803c96974ad4a94195fb97e5c637e9c2a3afe3/docs/deepseek-llm-api-wire-extensions.md)
+describes identity headers, `dsh_session_log` and `dsh_plugin_packages`. These fields are outside
+model input and expose additional session/package metadata to the endpoint. This delivery does
+not add them, Files API uploads, catalog discovery or DSH's retry policy. No new external service,
+credential, transcript format or authority is needed for the adopted 5xx classification rule.
+
 ## Owner-only live smoke (acceptance incomplete)
 
 This procedure requires explicit owner authorization and a bounded paid-call budget. One later

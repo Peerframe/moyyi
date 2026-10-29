@@ -6,10 +6,12 @@ import type {
   EffectRecord,
   ImagePart,
   RunId,
+  SessionId,
   TextPart,
   ToolResultStatus,
 } from "./persisted/index.ts";
 import type { WorkspaceProcesses } from "./processes.ts";
+import type { ToolOutputReader } from "./tool-output.ts";
 import type { WebAccess } from "./web.ts";
 
 /** JSON Schema as sent to models; it is the single source of truth for tool arguments. */
@@ -68,6 +70,8 @@ export type ReconcileOutcome =
  */
 export interface ToolContext {
   readonly runId: RunId;
+  /** Present in the real core; never inferred from a model-provided handle. */
+  readonly sessionId?: SessionId;
   readonly workspaceRoot: string;
   readonly signal: AbortSignal;
   /** Output limits the tool must enforce; oversized output is truncated, not dropped. */
@@ -82,4 +86,6 @@ export interface ToolContext {
   readonly processes?: WorkspaceProcesses;
   /** Separate outbound tool grant; never includes provider credentials or local file access. */
   readonly web?: WebAccess;
+  /** Session-bound recorded output retrieval; only supplied to read_tool_output execution. */
+  readonly toolOutputs?: ToolOutputReader;
 }

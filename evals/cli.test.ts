@@ -23,13 +23,47 @@ const host = {
 
 describe("evaluation command selection", () => {
   it("defaults to public-only/null without loading a host or private corpus", async () => {
-    const loaders = { host: vi.fn(), privateTasks: vi.fn() };
+    const loaders = { host: vi.fn(), privateTasks: vi.fn(), documentTasks: vi.fn() };
     const selection = await selectEvaluation([], tasks, loaders);
     expect(selection.agent.name).toBe("null");
     expect(selection.tasks).toEqual(tasks);
     expect(selection.metadata.corpus).toBe("public");
     expect(loaders.host).not.toHaveBeenCalled();
     expect(loaders.privateTasks).not.toHaveBeenCalled();
+    expect(loaders.documentTasks).not.toHaveBeenCalled();
+    await selection.close();
+  });
+
+  it("adds the real seven-format document tasks only with explicit opt-in", async () => {
+    await expect(
+      selectEvaluation(["--task", "document-report-seven-formats"], tasks),
+    ).rejects.toThrow(/No selected tasks/);
+    const selected = await selectEvaluation(
+      ["--include-documents", "--task", "document-report-seven-formats"],
+      tasks,
+    );
+    expect(selected.tasks.map((task) => task.id)).toEqual(["document-report-seven-formats"]);
+    expect(selected.metadata.corpus).toBe("public+documents");
+    await selected.close();
+  });
+
+  it("combines optional corpora and validates arguments before loading documents", async () => {
+    const documentTasks = vi.fn(async () => [{ id: "document-task" }] as EvalTask[]);
+    const privateTasks = vi.fn(async () => [{ id: "private-task" }] as EvalTask[]);
+    await expect(
+      selectEvaluation(["--include-documents", "--trials", "NaN"], tasks, { documentTasks }),
+    ).rejects.toThrow(/positive integer/);
+    expect(documentTasks).not.toHaveBeenCalled();
+    const selection = await selectEvaluation(["--include-documents", "--include-private"], tasks, {
+      documentTasks,
+      privateTasks,
+    });
+    expect(selection.tasks.map((task) => task.id)).toEqual([
+      "public-task",
+      "document-task",
+      "private-task",
+    ]);
+    expect(selection.metadata.corpus).toBe("public+documents+private");
     await selection.close();
   });
 
