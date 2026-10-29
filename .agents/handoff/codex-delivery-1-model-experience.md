@@ -72,8 +72,8 @@
 
 - All A-H code exists. Root owns integration and all writes; subagents now perform read-only risk
   review and recovery of the original source task's frozen envelope. No paid run is active.
-- Next: finish affected offline conformance, external CLI and desktop acceptance, then freeze
-  and run the six-task candidate gate once (71 maximum requests, zero retries).
+- Next: run the frozen candidate gate below once, then the original source comparison and inspect
+  spontaneous todo use. Offline and external package acceptance are complete.
 - Original source comparison is prepared and remains unstarted. Private candidate runner:
   `/Users/yxflc/.moyyi/acceptance/delivery-1-source-investigation-2026-10-29/run.mjs`.
   Exact original prompt, 140-file archive, six-item rubric and all budgets verified by SHA-256.
@@ -81,7 +81,7 @@
   read/list/search only (new todo is explicitly denied). Offline-01 passed without credentials or
   HTTP. Re-run offline after current source fixes, freeze after product commit, then run once. Verify actual spontaneous todo use from live records.
 - Original checkout's unrelated user modification is untouched. Uncommitted work belongs to this delivery. Root owns integration. All subagents have stopped writing and their processes ended;
-  the offline conformance batch is running under root.
+  no offline process remains. The first candidate paid run is checkpointed below.
 
 - Parts B/C/D and shared runtime wiring are checkpointed together because result processing,
   cancellation and typed publication share one executor contract. All implementation is committed.
@@ -119,6 +119,19 @@
   instruction scenario; fixed. After adding the discriminator and formatting that scenario, the final full check passed.
 
 ## Commands run
+
+- All 13 affected offline suites PASS: `npm run eval:core`, `eval:files`, `eval:documents`,
+  `eval:deepseek`, `eval:shell`, `eval:long-sessions`, `eval:anthropic`, `eval:kimi`, `eval:web`,
+  `eval:instructions`, `eval:runtime`, `eval:skills`, `eval:writes`.
+  Logs `/tmp/moyyi-delivery-1-eval-<suite>.log`; aggregate `/tmp/moyyi-delivery-1-offline.json`.
+- `npm run verify:package -- --offline`: PASS, external copied consumer, installed types, bounded
+  tools, confinement, seven PTY cases and isolated uninstall. No model or credential access.
+- `npm run desktop:package` and `npm run verify:desktop`: PASS. External copied application,
+  bundled Node, synthetic host/material/report/web/maintenance checks and confinement passed.
+  Candidate product `04df514` (same src as `7a5538b`); app ZIP SHA-256
+  `79d6a1efc5770e54395073096acd072adaa0d71cbd3d514091e9769ff1d252ad`.
+  No visible UI change or daily installation was part of this delivery.
+
 
 - Final `npm run check`: PASS, typecheck + Biome (440 files) + 156 test files / 3087 tests.
   Log: `/tmp/moyyi-delivery-1-check-final.log`; unchanged product limits and timeouts.
@@ -175,8 +188,21 @@
 | `release-evidence-audit` | 10 | 120 s | PASS; 5 requests |
 | `website-source-injection` | 12 | 120 s | PASS; 5 requests |
 
-The seven-format document task joins the gate only after part H. Candidate runs and the original
-source-analysis comparison are not started; recover their frozen configuration before use.
+## Frozen candidate gate
+
+- Product candidate: `04df514` (src tree unchanged from `7a5538b`); following checkpoint commits
+  only update this ledger. All checks and external acceptance above passed before paid use.
+- Same private host as baseline; Flash + Responses + low, 8192 output, write profile, no shell/web,
+  zero retries, one trial per task. Original instructions/fixtures/checkers/budgets unchanged.
+- Six tasks: roster 15/180s, quoted CSV 15/180s, homework 15/180s, audit 10/120s, website 12/120s,
+  document-report-seven-formats 4/120s with `--include-documents`. Total ceiling 71 requests.
+- Estimated gate cost per accepted plan: CNY 0.2–1, not a bill. Baseline allowance is separate.
+- Candidate spent: 0/71. No candidate task has run; no retries authorized for ordinary failure.
+- Next paid task: `deduplicate-roster`, max 15 requests / 180 seconds.
+- Fresh external recording directories: private eval root `/candidate-<task-id>`.
+
+Original comparison is separate: existing frozen 8-request / 300-second envelope, no monetary
+estimate in original materials; do not borrow the gate's amount as its price. It remains unrun.
 
 ## Decisions taken / waiting for the owner
 
