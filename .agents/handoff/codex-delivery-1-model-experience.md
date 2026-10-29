@@ -32,11 +32,17 @@
 
 ## In progress
 
-- Part 0 is running. No product code has changed; parts A-H have not started.
-- Next: checkpoint and push this frozen envelope, then run `homework-keep-format` once using the
-  private eval host. Set `MOYYI_DELIVERY_RECORDING_DIR` to the absolute private evaluation folder
-  above plus `/baseline-homework-keep-format`. Record the command result and request count before
-  continuing with the remaining tasks sequentially. Each recording directory must be fresh.
+- **Stopped under brief section 7, awaiting the owner's decision about D's persisted reference.**
+  No product code has changed; parts A-H have not started. Two baseline tasks passed; the third
+  has not started. Do not repeat the two completed paid trials.
+- Proposed decision: authorize a formal tool-output blob reference and the necessary persisted
+  compatibility work, preserving old data and all existing permission/output/blob bounds;
+  otherwise the owner must revise D's cross-version backup/restore guarantee. No implementation
+  or format change has been made in anticipation of approval.
+- After the decision is recorded, finish part 0 before changing product code. The next task is
+  `homework-keep-format`, using the private eval host and `MOYYI_DELIVERY_RECORDING_DIR` set to the
+  private evaluation folder above plus `/baseline-homework-keep-format`. Record each result and
+  request count before continuing. Each recording directory must be fresh.
 - The current eval adapter deletes temporary databases and workspaces; the external wrapper
   keeps exact common requests and response events for G. Result JSON files remain ignored under
   `evals/results/`. Review recordings for privacy before committing any replay fixture.
@@ -54,6 +60,12 @@
   inventing a larger total delivery allowance.
 - `deepSeekEvalHost()` defaults to high effort when omitted. The baseline host must explicitly
   select `reasoningEffort: "low"`; a desktop default does not configure this separate helper.
+- Read-only F comparison found 502/504 classified as `protocol` while 500/503 are `overloaded`
+  (`src/plugins/provider-deepseek/index.ts:87`). DSH classifies all 5xx as server failures. The
+  future F implementation can fix this narrow issue and test it without changing retry policy.
+  Prefix ordering, cache-read token recording and complete visible-reasoning continuation already
+  exist; Messages signatures/in-history system changes and DSH's larger output cap remain
+  protocol/product differences. No provider change has been made.
 
 ## Commands run
 
@@ -72,6 +84,10 @@
 - A configuration-only `selectEvaluation` probe with the private eval host passed; allowance
   consumed: 0. The existing host was inspected with literal redaction and selected nonsecret
   metadata only. No key, credential command output or HTTP header was read or printed.
+- `loadModelRecordings` accepted all 8 baseline request/event recordings, including integrity
+  hashes and shape validation; no pending write markers remain.
+- Fetched DSH into scratch `/tmp/moyyi-delivery-1-dsh.2nA4yj`, checked out fixed commit
+  `f3803c96974ad4a94195fb97e5c637e9c2a3afe3`. No upstream scripts or dependencies were run.
 - Setup probes found the login Node 22 and a nonexistent guessed npm path; resolved by using
   `/opt/homebrew/opt/node@26/bin` on PATH. No repository configuration was changed.
 
@@ -99,6 +115,21 @@ source-analysis comparison are not started; recover their frozen configuration b
 
 ## Decisions taken / waiting for the owner
 
+- **D requires owner decision (brief section 7):** `ToolResultPart.content` has only text and
+  image variants (`src/contracts/persisted/content.ts:65`). `entryBlobRefs` only recognizes image
+  and actual model-request blob references (`src/store/records.ts:57`); backup additionally
+  collects workspace snapshots and material assets (`src/store/index.ts:744`). A plain-text
+  handle does not keep its output blob in backup/restore.
+- Rejected evasions: an image would misrepresent text; a notice code containing a descriptor is
+  a new persisted indexing convention that older backups still ignore; `material_assets` creates
+  user-visible managed materials and attaching changes current material selection, so it is not
+  a neutral session-output index (`src/store/materials.ts:162,211,297`). Direct software rollback
+  retains live blobs, but later old-version backup/restore still loses unrecognized references.
+- Recommended scope after approval: a typed output reference, authenticated session/call binding,
+  existing blob storage with durable publication before result commit, reference traversal in
+  backup/restore, explicit version/rollback handling, and old-fixture/reopen/isolation/backup tests.
+  Context remains a pure projection and original results stay intact. Follow the persisted-format
+  recipe; never edit old fixtures, widen bounds or fake request/material records.
 - Host-path clarification resolved by the user's instruction to locate it. Reused the existing
   Keychain callback and added only a repository-external adapter for the existing eval interface.
 - Preserve the original checkout's unrelated change by working in the attached worktree.
@@ -107,5 +138,5 @@ source-analysis comparison are not started; recover their frozen configuration b
 - Keep one final PR for the complete delivery. No PR has been opened during preparation.
 - Per brief section 5, leave system overview and the existing delivery record for Claude's
   acceptance update; this file holds the current execution ledger.
-- The read-only preflight subagent and all local check processes have finished. There are no
-  other implementation writers or paid runs in progress.
+- Both read-only subagents and all local processes have finished. There are no implementation
+  writers or paid runs in progress. Keep the worktree and private recordings for continuation.
