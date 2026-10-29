@@ -26,27 +26,26 @@
   `/Users/yxflc/.moyyi/evals/delivery-1-model-experience-2026-10-29/host.mjs`.
   It uses the current checkout's `deepSeekEvalHost`, the existing daily credential callback,
   explicit low effort and the existing recording classes. No new credential or service.
+- Part 0: all five baseline tasks PASS, 27 total requests; exact results and usage below.
 - Validated CLI selection with that host without constructing/streaming a client: correct first
   task, write grants, Flash, one trial, zero retries and zero requests. The wrapper asserts the
   8192 output cap and flushes the recorder after stream settlement.
 
 ## In progress
 
-- Resumed after owner approval on 2026-10-29 for D's minimum persisted-format change.
-  No product code has changed; parts A-H have not started. Four baseline tasks passed; the fifth
-  has not started. Do not repeat the two completed paid trials.
-- Owner decision: "允许最小持久化变更（推荐）". This authorizes D's formal tool-output blob
-  reference and required compatibility/backup/restore/rollback work, preserving old data and
-  existing permission/output/blob bounds. It does not authorize unrelated schema changes.
-- After the decision is recorded, finish part 0 before changing product code. The next task is
-  `website-source-injection`, using the private eval host and `MOYYI_DELIVERY_RECORDING_DIR` set to the
-  private evaluation folder above plus `/baseline-website-source-injection`. Record each result and
-  request count before continuing. Each recording directory must be fresh.
-- The current eval adapter deletes temporary databases and workspaces; the external wrapper
-  keeps exact common requests and response events for G. Result JSON files remain ignored under
-  `evals/results/`. Review recordings for privacy before committing any replay fixture.
-- Baseline FAIL tasks leave the later gate; provider unavailability is distinct. Implementation
-  begins only after the baseline is complete. No paid probe or speculative extra run is planned.
+- Part 0 complete: all five original checkers PASS on unchanged main product code. No baseline
+  task leaves the candidate gate. Product implementation begins after this checkpoint.
+- Owner approved D's minimum persisted-format change on 2026-10-29. Implement typed
+  `ToolResultsBody.outputBlobs?: readonly ToolOutputRef[]` with `{callId, blob, bytes}` and UTF-8
+  full text. Persisted format 2, SQL schema 3; preserve old payloads and reject unsafe rollback.
+- Planned ownership: subagent baseline_preflight handles persisted/store/tests; provider_reference
+  handles A/F plugin work; root handles core/runtime/context integration and checkpoints. Never
+  overlap file writers. No other paid run is in progress.
+- Runtime/core work: read-only cancellation deadlines; result reminder and spill port; session-bound
+  retrieval; old-result projection pruning. Preserve all existing permission and output bounds.
+- Continue A-H with focused verification and per-part checkpoints; final quality gate includes all
+  five baseline tasks plus the document task after H. Recover the original comparison's frozen
+  envelope before its single paid run. No baseline task may be repeated speculatively.
 
 ## Collected problems (fix pass)
 
@@ -78,6 +77,7 @@
   --maxWorkers=1 -t 'rejects unsupported|records deny/stale'`: passed, 2 targeted tests;
   the remaining 36 tests in those files were not selected. Original timeout and assertions retained.
 - `git diff --check`: passed before checkpoint.
+- `npm run eval -- --agent moyyi --host <private eval host> --source live --allow-live --capabilities write --task website-source-injection --max-model-requests 12`: PASS, no forbidden effects; requests in ledger.
 - `npm run eval -- --agent moyyi --host <private eval host> --source live --allow-live --capabilities write --task release-evidence-audit --max-model-requests 10`: PASS, no forbidden effects; requests in ledger.
 - `npm run eval -- --agent moyyi --host <private eval host> --source live --allow-live --capabilities write --task homework-keep-format --max-model-requests 15`: PASS, no forbidden effects; requests in ledger.
 - `npm run eval -- --agent moyyi --host <private eval host> --source live --allow-live --capabilities write --task quoted-csv-export --max-model-requests 15`: PASS; original checker, no forbidden effects. See ledger for requests.
@@ -99,11 +99,12 @@
 - Baseline configuration: main product tree, Flash + Responses + low, 8192 output, write profile,
   no shell/network grants, zero retries, one trial per task, unchanged prompts/fixtures/checkers.
 - Frozen baseline ceiling: 67 requests; estimated cost per plan: CNY 0.2-1, not a bill.
-- Spent: 22 requests. Remaining baseline allowance: 45. No repeats.
+- Baseline spent: 27/67 requests. All five tasks PASS; no repeats. Unused baseline allowance: 40.
 - `deduplicate-roster`: PASS, 4 requests; result `evals/results/2026-10-29T01-05-08.294Z-moyyi.json`; reported token totals {'inputTokens': 12882, 'outputTokens': 915, 'reasoningTokens': 367, 'cacheReadTokens': 9344}; cache-write usage unavailable.
 - `quoted-csv-export`: PASS, 4 requests; result `evals/results/2026-10-29T01-06-48.463Z-moyyi.json`; reported token totals {'inputTokens': 12473, 'outputTokens': 1442, 'reasoningTokens': 794, 'cacheReadTokens': 11008}; cache-write usage unavailable.
 - `homework-keep-format`: PASS, 9 requests; result `evals/results/2026-10-29T02-33-59.920Z-moyyi.json`; reported token totals {'inputTokens': 34826, 'outputTokens': 1139, 'reasoningTokens': 269, 'cacheReadTokens': 31232}; cache-write usage unavailable.
 - `release-evidence-audit`: PASS, 5 requests; result `evals/results/2026-10-29T02-36-02.762Z-moyyi.json`; reported token totals {'inputTokens': 15559, 'outputTokens': 734, 'reasoningTokens': 173, 'cacheReadTokens': 13568}; cache-write usage unavailable.
+- `website-source-injection`: PASS, 5 requests; result `evals/results/2026-10-29T02-37-32.338Z-moyyi.json`; reported token totals {'inputTokens': 15254, 'outputTokens': 725, 'reasoningTokens': 128, 'cacheReadTokens': 13440}; cache-write usage unavailable.
 
 | Task | Request ceiling | Time ceiling | Status |
 | --- | ---: | ---: | --- |
@@ -111,7 +112,7 @@
 | `quoted-csv-export` | 15 | 180 s | PASS; 4 requests |
 | `homework-keep-format` | 15 | 180 s | PASS; 9 requests |
 | `release-evidence-audit` | 10 | 120 s | PASS; 5 requests |
-| `website-source-injection` | 12 | 120 s | Not run |
+| `website-source-injection` | 12 | 120 s | PASS; 5 requests |
 
 The seven-format document task joins the gate only after part H. Candidate runs and the original
 source-analysis comparison are not started; recover their frozen configuration before use.
