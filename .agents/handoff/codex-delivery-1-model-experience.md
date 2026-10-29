@@ -72,7 +72,7 @@
 
 - All A-H code exists. Root owns integration and all writes; subagents now perform read-only risk
   review and recovery of the original source task's frozen envelope. No paid run is active.
-- Next: finish the running full check, affected offline conformance, external CLI and desktop acceptance, then freeze
+- Next: finish affected offline conformance, external CLI and desktop acceptance, then freeze
   and run the six-task candidate gate once (71 maximum requests, zero retries).
 - Original source comparison is prepared and remains unstarted. Private candidate runner:
   `/Users/yxflc/.moyyi/acceptance/delivery-1-source-investigation-2026-10-29/run.mjs`.
@@ -81,7 +81,7 @@
   read/list/search only (new todo is explicitly denied). Offline-01 passed without credentials or
   HTTP. Re-run offline after current source fixes, freeze after product commit, then run once. Verify actual spontaneous todo use from live records.
 - Original checkout's unrelated user modification is untouched. Uncommitted work belongs to this delivery. Root owns integration. All subagents have stopped writing and their processes ended;
-  the full check is running under root.
+  the offline conformance batch is running under root.
 
 - Parts B/C/D and shared runtime wiring are checkpointed together because result processing,
   cancellation and typed publication share one executor contract. All implementation is committed.
@@ -116,9 +116,17 @@
   Expectations now test the new contract while retaining relative source labels, original
   budgets, complete blob bytes/hash, display truncation and actual host loading.
 - A subsequent check stopped in typecheck on a missing ContentPart discriminator in the revised
-  instruction scenario; fixed. Final full check is currently running, not yet claimed PASS.
+  instruction scenario; fixed. After adding the discriminator and formatting that scenario, the final full check passed.
 
 ## Commands run
+
+- Final `npm run check`: PASS, typecheck + Biome (440 files) + 156 test files / 3087 tests.
+  Log: `/tmp/moyyi-delivery-1-check-final.log`; unchanged product limits and timeouts.
+- Original-question offline-02: PASS on product `7a5538b`; 11 gate checks and nine synthetic
+  requests (8 normal + HTTP 503), zero credential reads/network. Product tree SHA-256
+  `ae79c4afbb358029ecdeb7dbaaed2c4913ff9cc9b14859bdd9abecc88c25127a`.
+  Original source envelope contains no monetary estimate, only its frozen request/resource budget.
+
 
 - `git fetch origin`: passed; main is `eeff4ec` (PR #51 merged).
 - `git switch -c codex/delivery-1-model-experience`: passed in the new managed worktree.

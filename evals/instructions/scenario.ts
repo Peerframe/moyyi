@@ -226,8 +226,8 @@ export async function runInstructionScenario(scenario: InstructionScenario): Pro
       assert(rendered.includes("ROOT_RULE_CANARY"));
       assert(rendered.includes("AGENTS.md"));
       assert(rendered.includes(hash(rootText)));
-      const project = h.client.requests[0]?.system.filter((part) =>
-        part.type === "text" && part.text.includes("ROOT_RULE_CANARY"),
+      const project = h.client.requests[0]?.system.filter(
+        (part) => part.type === "text" && part.text.includes("ROOT_RULE_CANARY"),
       );
       assert(!JSON.stringify(project).includes(workspace), "Project source labels remain relative");
       assert(
