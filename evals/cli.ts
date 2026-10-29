@@ -27,6 +27,7 @@ export async function selectEvaluation(
   loaders: {
     readonly host?: (path: string) => Promise<unknown>;
     readonly privateTasks?: () => Promise<readonly EvalTask[]>;
+    readonly documentTasks?: () => Promise<readonly EvalTask[]>;
   } = {},
 ): Promise<EvalSelection> {
   const { values } = parseArgs({
@@ -41,6 +42,7 @@ export async function selectEvaluation(
       "max-model-requests": { type: "string" },
       "allow-live": { type: "boolean", default: false },
       "include-private": { type: "boolean", default: false },
+      "include-documents": { type: "boolean", default: false },
     },
   });
   if (values.agent !== "null" && values.agent !== "moyyi")
@@ -69,10 +71,13 @@ export async function selectEvaluation(
     throw Error("Model and capability options require --agent moyyi");
   }
   // Validate all options before touching a private corpus or executing trusted host code.
+  const documentTasks = values["include-documents"]
+    ? await (loaders.documentTasks ?? loadDocumentTasks)()
+    : [];
   const privateTasks = values["include-private"]
     ? await (loaders.privateTasks ?? loadPrivateTasks)()
     : [];
-  const tasks = [...publicTasks, ...privateTasks].filter(
+  const tasks = [...publicTasks, ...documentTasks, ...privateTasks].filter(
     (task) => values.task === undefined || task.id === values.task,
   );
   if (tasks.length === 0)
@@ -113,7 +118,11 @@ export async function selectEvaluation(
       source: values.source ?? "none",
       measurement: values.source === "live" ? "live-task-attempt" : "synthetic-conformance",
       model,
-      corpus: values["include-private"] ? "public+private" : "public",
+      corpus: [
+        "public",
+        ...(values["include-documents"] ? ["documents"] : []),
+        ...(values["include-private"] ? ["private"] : []),
+      ].join("+"),
       capabilities: values.agent === "moyyi" ? capabilities : "none",
       maxModelRequests: values.agent === "moyyi" ? maxModelRequests : null,
       maxRetries: 0,
@@ -133,4 +142,8 @@ async function loadPrivateTasks(): Promise<readonly EvalTask[]> {
   const path = resolve(import.meta.dirname, "private", "index.ts");
   if (!existsSync(path)) throw Error("No private task module is configured");
   return (await import(pathToFileURL(path).href)).tasks;
+}
+
+async function loadDocumentTasks(): Promise<readonly EvalTask[]> {
+  return (await import("./documents/tasks.ts")).documentTasks;
 }
