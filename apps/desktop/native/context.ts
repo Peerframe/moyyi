@@ -1,5 +1,5 @@
 import type { DesktopProcess } from "../bridge.ts";
-import type { FeatureContract } from "./contract.ts";
+import type { FeatureContract, IpcChannel } from "./contract.ts";
 
 /** Main-owned lifetime and native selection gate; features never bypass the sending-window check. */
 export interface NativeContext {
@@ -13,9 +13,16 @@ export interface NativeContext {
   startWorker(): DesktopProcess;
   releaseWorker(): void;
 }
-export interface NativeFeature {
-  readonly contract: FeatureContract;
-  readonly handlers: Record<string, (context: NativeContext, value: unknown) => Promise<unknown>>;
+export interface NativeFeature<Contract extends FeatureContract> {
+  readonly contract: Contract;
+  readonly handlers: {
+    [Method in keyof Contract["channels"]]: (
+      context: NativeContext,
+      value: Contract["channels"][Method] extends IpcChannel
+        ? ReturnType<Contract["channels"][Method]["validate"]>
+        : never,
+    ) => Promise<unknown>;
+  };
 }
 export async function currentSession(context: NativeContext, sessionId: string) {
   const state = await context.host.getState();

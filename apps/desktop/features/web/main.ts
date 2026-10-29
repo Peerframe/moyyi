@@ -1,12 +1,10 @@
 import { dialog } from "electron";
-import { parseDesktopCommand } from "../../host/validation.ts";
 import { claimSelection, currentSession, type NativeFeature } from "../../native/context.ts";
 import { contract } from "./contract.ts";
 export const nativeFeature = {
   contract,
   handlers: {
-    async configureWebAccess(context, value) {
-      const command = contract.channels.configureWebAccess.validate(value, parseDesktopCommand);
+    async configureWebAccess(context, command) {
       const state = await currentSession(context, command.sessionId);
       claimSelection(context);
       try {
@@ -39,4 +37,4 @@ export const nativeFeature = {
       }
     },
   },
-} satisfies NativeFeature;
+} satisfies NativeFeature<typeof contract>;

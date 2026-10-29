@@ -3,16 +3,10 @@ import { dirname, join } from "node:path";
 import { app, dialog } from "electron";
 import type { MaintenanceRequest } from "../../host/maintenance.ts";
 import { MaintenanceProcess } from "../../host/maintenance-client.ts";
-import { parseDesktopCommand } from "../../host/validation.ts";
 import type { NativeContext, NativeFeature } from "../../native/context.ts";
 import { contract } from "./contract.ts";
 
-async function maintain(
-  context: NativeContext,
-  value: unknown,
-  mode: "backup" | "restore" | "rollback",
-) {
-  contract.channels.createBackup.validate(value, parseDesktopCommand);
+async function maintain(context: NativeContext, mode: "backup" | "restore" | "rollback") {
   if (
     context.selecting ||
     context.quitting ||
@@ -114,8 +108,8 @@ async function maintain(
 export const nativeFeature = {
   contract,
   handlers: {
-    createBackup: (context, value) => maintain(context, value, "backup"),
-    restoreBackup: (context, value) => maintain(context, value, "restore"),
-    rollbackApplication: (context, value) => maintain(context, value, "rollback"),
+    createBackup: (context) => maintain(context, "backup"),
+    restoreBackup: (context) => maintain(context, "restore"),
+    rollbackApplication: (context) => maintain(context, "rollback"),
   },
-} satisfies NativeFeature;
+} satisfies NativeFeature<typeof contract>;

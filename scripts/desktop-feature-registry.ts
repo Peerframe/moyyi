@@ -75,8 +75,6 @@ for (const target of [
     entry: "main.ts",
     symbol: "nativeFeature",
     name: "nativeFeatures",
-    type: "NativeFeature",
-    from: "./context.ts",
   },
   {
     file: "host/feature-registry.ts",

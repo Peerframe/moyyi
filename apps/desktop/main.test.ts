@@ -174,6 +174,23 @@ function clipboardPng(bytes: Buffer = png) {
 describe("native M6 materials and saving", () => {
   const selected = { sessionId: "session_current" };
   const drop = { ...selected, paths: ["/external/source.md"] };
+  it("validates IPC inputs before handlers and passes only the validated result", async () => {
+    vi.resetModules();
+    const { nativeFeature } = await import("./features/materials/main.ts");
+    const handle = vi
+      .spyOn(nativeFeature.handlers, "selectDocuments")
+      .mockImplementation(async (context) => context.host.getState());
+    const previous = native.handlers.get("moyyi:documents");
+    await import("./main.ts");
+    await vi.waitFor(() => expect(native.handlers.get("moyyi:documents")).not.toBe(previous));
+
+    await expect(call("moyyi:documents", { ...selected, paths: [] })).rejects.toThrow(
+      "Invalid session selection",
+    );
+    expect(handle).not.toHaveBeenCalled();
+    await call("moyyi:documents", selected);
+    expect(handle).toHaveBeenCalledExactlyOnceWith(expect.anything(), selected.sessionId);
+  });
   it("keeps imports behind native entry points and rejected confirmations inert", async () => {
     await expect(call("moyyi:act", { type: "materials.import", ...drop })).rejects.toThrow(
       "原生入口",

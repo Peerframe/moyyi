@@ -8,8 +8,7 @@ import { nativeFeature as feature6 } from "../features/permissions/main.ts";
 import { nativeFeature as feature0 } from "../features/sessions/main.ts";
 import { nativeFeature as feature5 } from "../features/settings/main.ts";
 import { nativeFeature as feature4 } from "../features/web/main.ts";
-import type { NativeFeature } from "./context.ts";
-export const nativeFeatures: readonly NativeFeature[] = [
+export const nativeFeatures = [
   feature0,
   feature1,
   feature2,

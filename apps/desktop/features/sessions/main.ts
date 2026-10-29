@@ -1,6 +1,5 @@
 import { realpathSync, statSync } from "node:fs";
 import { dialog } from "electron";
-import { parseDesktopCommand } from "../../host/validation.ts";
 import type { NativeFeature } from "../../native/context.ts";
 import { contract } from "./contract.ts";
 export const nativeFeature = {
@@ -9,11 +8,7 @@ export const nativeFeature = {
     async getState(context, _value) {
       return context.host.getState();
     },
-    async selectWorkspace(context, value) {
-      const { askEachRead } = contract.channels.selectWorkspace.validate(
-        value,
-        parseDesktopCommand,
-      );
+    async selectWorkspace(context, { askEachRead }) {
       const state = await context.host.getState();
       if (context.selecting || context.quitting || state.run || state.status !== "ready")
         throw Error("请先结束当前任务。");
@@ -33,4 +28,4 @@ export const nativeFeature = {
       }
     },
   },
-} satisfies NativeFeature;
+} satisfies NativeFeature<typeof contract>;

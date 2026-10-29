@@ -2,14 +2,12 @@ import { mkdtempSync, realpathSync, rmSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { app, clipboard, dialog } from "electron";
 import { imagePreview } from "../../host/image-preview.ts";
-import { parseDesktopCommand } from "../../host/validation.ts";
 import { claimSelection, currentSession, type NativeFeature } from "../../native/context.ts";
 import { contract } from "./contract.ts";
 export const nativeFeature = {
   contract,
   handlers: {
-    async selectDocuments(context, value) {
-      const sessionId = contract.channels.selectDocuments.validate(value, parseDesktopCommand);
+    async selectDocuments(context, sessionId) {
       const state = await currentSession(context, sessionId);
       claimSelection(context);
       try {
@@ -44,8 +42,7 @@ export const nativeFeature = {
         context.selecting = false;
       }
     },
-    async importFiles(context, value) {
-      const command = contract.channels.importFiles.validate(value, parseDesktopCommand);
+    async importFiles(context, command) {
       const state = await currentSession(context, command.sessionId);
       claimSelection(context);
       try {
@@ -75,8 +72,7 @@ export const nativeFeature = {
         context.selecting = false;
       }
     },
-    async pasteImage(context, value) {
-      const sessionId = contract.channels.pasteImage.validate(value, parseDesktopCommand);
+    async pasteImage(context, sessionId) {
       const state = await currentSession(context, sessionId);
       claimSelection(context);
       let temporary: string | undefined;
@@ -119,4 +115,4 @@ export const nativeFeature = {
       }
     },
   },
-} satisfies NativeFeature;
+} satisfies NativeFeature<typeof contract>;

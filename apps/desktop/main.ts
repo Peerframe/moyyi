@@ -2,6 +2,7 @@ import { dirname, join } from "node:path";
 import { pathToFileURL } from "node:url";
 import { app, BrowserWindow, dialog, ipcMain, Menu, session } from "electron";
 import { DesktopProcess } from "./bridge.ts";
+import { parseDesktopCommand } from "./host/validation.ts";
 import { stateChannel } from "./native/channels.ts";
 import type { NativeContext } from "./native/context.ts";
 import { nativeFeatures } from "./native/feature-registry.ts";
@@ -168,11 +169,21 @@ else {
       };
       for (const feature of nativeFeatures) {
         for (const [method, channel] of Object.entries(feature.contract.channels)) {
-          const handle = feature.handlers[method];
+          // NativeFeature ties each handler to this channel's validated value. Object.entries
+          // erases that key relationship when iterating the heterogeneous feature registry.
+          const handle = (
+            feature.handlers as Record<
+              string,
+              (
+                context: NativeContext,
+                value: ReturnType<typeof channel.validate>,
+              ) => Promise<unknown>
+            >
+          )[method];
           if (!handle) throw Error(`Missing native handler: ${feature.contract.id}/${method}`);
           ipcMain.handle(channel.name, async (event, value: unknown) => {
             trusted(event);
-            return handle(context, value);
+            return handle(context, channel.validate(value, parseDesktopCommand));
           });
         }
       }

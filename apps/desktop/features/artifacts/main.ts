@@ -1,14 +1,12 @@
 import { basename, join, relative } from "node:path";
 import { dialog, shell } from "electron";
 import { saveReceiptFile } from "../../host/save-result.ts";
-import { parseDesktopCommand } from "../../host/validation.ts";
 import { claimSelection, currentSession, type NativeFeature } from "../../native/context.ts";
 import { contract } from "./contract.ts";
 export const nativeFeature = {
   contract,
   handlers: {
-    async saveArtifact(context, value) {
-      const command = contract.channels.saveArtifact.validate(value, parseDesktopCommand);
+    async saveArtifact(context, command) {
       await currentSession(context, command.sessionId);
       claimSelection(context);
       try {
@@ -39,8 +37,7 @@ export const nativeFeature = {
         context.selecting = false;
       }
     },
-    async selectReportTarget(context, value) {
-      const sessionId = contract.channels.selectReportTarget.validate(value, parseDesktopCommand);
+    async selectReportTarget(context, sessionId) {
       const state = await currentSession(context, sessionId);
       claimSelection(context);
       try {
@@ -72,8 +69,7 @@ export const nativeFeature = {
         context.selecting = false;
       }
     },
-    async revealArtifact(context, value) {
-      const command = contract.channels.revealArtifact.validate(value, parseDesktopCommand);
+    async revealArtifact(context, command) {
       await currentSession(context, command.sessionId);
       const state = await context.host.send(command);
       if (
@@ -88,4 +84,4 @@ export const nativeFeature = {
       return state;
     },
   },
-} satisfies NativeFeature;
+} satisfies NativeFeature<typeof contract>;
