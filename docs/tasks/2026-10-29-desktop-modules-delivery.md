@@ -47,6 +47,7 @@
   [校验记录](assets/2026-10-29-desktop-modules/verification.json)随交付保存。
 - 日常应用、安装记录、用户数据与设置共 235 个受保护文件的前后哈希一致，无新增数据文件。
   两个验收应用均已退出，窄窗用的启动尺寸修改已还原并逐文件核对；临时保持唤醒进程已结束。
+- PR #52 集中修复（源码 `f2ce82e`）：IPC 外壳统一校验并传入已校验类型，新增无校验 handler 仍拒绝非法输入的回归；删除 14 个 Renderer 转导出文件，两个测试仅改导入、断言不变；纠正 Node 22 版本与 `.codex` 内工具链路径引发的环境失败后，系统 Node 26 下 `npm run check` 155 文件、2986 测试通过，`npm run desktop:package` 与 `npm run verify:desktop` 通过；无用户可见行为变化，原生截图证据仍对应上述 `ae2ec18`。
 
 ## 验收口径
 
