@@ -59,7 +59,7 @@
     "eval": "node evals/run.ts",
     "eval:core": "node evals/core/run.ts",
     "demo:scripted": "node scripts/demo-agent.ts",
-    "check": "npm run typecheck && npm run lint && npm run test",
+    "check": "node scripts/desktop-feature-registry.ts --check && npm run typecheck && npm run lint && npm run test",
     "eval:files": "node evals/files/run.ts",
     "eval:documents": "node evals/documents/run.ts",
     "demo:files": "node scripts/demo-files.ts",

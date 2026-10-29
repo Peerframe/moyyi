@@ -1,17 +1,17 @@
 import { createElement } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it, vi } from "vitest";
+import { ArtifactCard } from "../features/artifacts/renderer/ArtifactCard.tsx";
+import { ArtifactsPanel } from "../features/artifacts/renderer/ArtifactsPanel.tsx";
+import { ApprovalCard } from "../features/effects/renderer/ApprovalCard.tsx";
+import { EffectsPanel } from "../features/effects/renderer/EffectsPanel.tsx";
+import { MaterialsPanel } from "../features/materials/renderer/MaterialsPanel.tsx";
+import { PermissionsDialog } from "../features/permissions/renderer/PermissionsDialog.tsx";
+import { SettingsDialog } from "../features/settings/renderer/SettingsDialog.tsx";
+import { SourcesPanel } from "../features/web/renderer/SourcesPanel.tsx";
+import { WebAccessDialog } from "../features/web/renderer/WebAccessDialog.tsx";
 import { DEFAULT_DESKTOP_SETTINGS, type DesktopEffect } from "../shared.ts";
-import { ApprovalCard } from "./ApprovalCard.tsx";
-import { ArtifactCard } from "./ArtifactCard.tsx";
-import { ArtifactsPanel } from "./ArtifactsPanel.tsx";
-import { EffectsPanel } from "./EffectsPanel.tsx";
-import { MaterialsPanel } from "./MaterialsPanel.tsx";
 import { MessageList } from "./MessageList.tsx";
-import { PermissionsDialog } from "./PermissionsDialog.tsx";
-import { SettingsDialog } from "./SettingsDialog.tsx";
-import { SourcesPanel } from "./SourcesPanel.tsx";
-import { WebAccessDialog } from "./WebAccessDialog.tsx";
 
 describe("desktop untrusted content rendering", () => {
   it("renders recorded web bodies, provenance and distinct truncation indicators without navigation", () => {

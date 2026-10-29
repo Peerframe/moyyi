@@ -1,3 +1,5 @@
+import type { DesktopSettings } from "../shared.ts";
+
 /** An action lock is synchronous: two DOM events in one render cannot submit twice. */
 export function createActionGate() {
   let pending = false;
@@ -100,4 +102,10 @@ export function formatBytes(value: number): string {
 
 export function workspaceName(path: string | null): string {
   return path?.split("/").filter(Boolean).at(-1) ?? "未选择工作目录";
+}
+
+export function presetLabel(preset: DesktopSettings["preset"]): string {
+  return { flash: "DeepSeek Flash", "kimi-cn": "Kimi · 中国", "kimi-global": "Kimi · 全球" }[
+    preset
+  ];
 }

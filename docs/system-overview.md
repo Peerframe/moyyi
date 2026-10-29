@@ -122,7 +122,7 @@ Plan: [post-M6 plan v2](tasks/2026-10-28-post-m6-plan.md). Order is owned by the
 | M6 materials, previews, history | Accepted, installed daily | [PR #50](https://github.com/Peerframe/moyyi/pull/50), [receipt](tasks/2026-10-28-desktop-m6.md) |
 | Delivery zero: agent environment | In review | [PR #51](https://github.com/Peerframe/moyyi/pull/51), [brief](tasks/2026-10-29-delivery-0-vibe-coding-env.md) |
 | Delivery one: model experience aligned with DSH | Ready for Codex | [Brief](tasks/2026-10-29-delivery-1-dsh-model-experience.md) |
-| Delivery two: desktop feature modules | Ready for Codex | [Brief](tasks/2026-10-29-delivery-2-desktop-modules.md) |
+| Delivery two: desktop feature modules | Implemented; source, package and native checks passed; in review | [PR #52](https://github.com/Peerframe/moyyi/pull/52), [record](tasks/2026-10-29-desktop-modules-delivery.md) |
 | Delivery three: settings, Skills, search | Planned after one and two | [Plan](tasks/2026-10-28-post-m6-plan.md) |
 | Delivery four: conditional capabilities | Triggered per item | [Plan](tasks/2026-10-28-post-m6-plan.md) |
 

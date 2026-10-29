@@ -1,0 +1,88 @@
+{
+  "packageSource": "ae2ec180db7e19ea85ec293b4589703800dab69e",
+  "archiveSha256": "e6fefdb44ad04a30aef4de3ee5185b353ecabb63ba9053ed67cf4fecccb31f05",
+  "desktopBundleSha256": "e40e160230821d1c11936ee8bb95579b9d4ad2c7d416ac8672188cb6495c9e66",
+  "nativeFlow": "document picker -> actual PDF/DOCX parsing -> exact report approval -> readback -> preview -> native save -> menu quit -> restart -> history -> preview",
+  "windowsPoints": {
+    "normal": [1120, 800],
+    "narrow": [780, 560]
+  },
+  "narrowCaptureMethod": "Initial width/height changed only in disposable copies; original main files restored and hash-checked. No packaged deliverable edits.",
+  "results": {
+    "baseline": {
+      "publicInputsUnchanged": true,
+      "reportAndNativeSaveCopyMatch": true,
+      "reportSha256": "324606a029791b25aea439fcd27837289364e0eac26f3652629be2bb1e25b53c",
+      "materialsAfterRestart": 2,
+      "grantsReadOnlyAfterRestart": true,
+      "requestCountsAfterAllRestarts": {
+        "syntheticRequests": 4,
+        "networkAttempts": 0,
+        "credentialReads": 0,
+        "liveModel": false
+      },
+      "packagedMainPreloadRendererHostRestored": true,
+      "bundleFiles": {
+        "main.mjs": "7d0e702685d31bfb9a8ea52c3b8546266152c5e0570113c2e04f83502d955cb3",
+        "preload.cjs": "f4ffab3dffa5ff05ddd1c3907bd8a3983f36ca2ab3a1b54a28a64e27a5c04912",
+        "renderer.js": "7fc73252256605a274f2620ff4eb5280f93286cf2dbc86c1fe0aa0f77492d13c",
+        "host.mjs": "13d28c7b084a2fa830159ada6d812a71327b850c8fdc57621b8d91b6cb309c90"
+      },
+      "screenshotPixels": {
+        "normal": [2240, 1600],
+        "narrow": [1560, 1120]
+      },
+      "narrowGeometry": {
+        "original": "7d0e702685d31bfb9a8ea52c3b8546266152c5e0570113c2e04f83502d955cb3",
+        "instrumented": "a479887af6140fd7f9777591ba10715461213842868119aabfd1eeaac0920ada",
+        "changes": {
+          "initialWidth": [1120, 780],
+          "initialHeight": [800, 560]
+        },
+        "otherBytesUnchanged": true,
+        "restored": true
+      }
+    },
+    "candidate": {
+      "publicInputsUnchanged": true,
+      "reportAndNativeSaveCopyMatch": true,
+      "reportSha256": "324606a029791b25aea439fcd27837289364e0eac26f3652629be2bb1e25b53c",
+      "materialsAfterRestart": 2,
+      "grantsReadOnlyAfterRestart": true,
+      "requestCountsAfterAllRestarts": {
+        "syntheticRequests": 4,
+        "networkAttempts": 0,
+        "credentialReads": 0,
+        "liveModel": false
+      },
+      "packagedMainPreloadRendererHostRestored": true,
+      "bundleFiles": {
+        "main.mjs": "c30385e5b24423e90069fe3d9891a0b4dbfbb626d82d7152f14b6871a8427dfe",
+        "preload.cjs": "a945cc7486f422edfe641c2e19ccc8d9dd681a046747c705368f2e07772bf231",
+        "renderer.js": "bfd3acb6472025b01e615241de7bbc351e3182428668bd4978fa0d22aa0a60b3",
+        "renderer.css": "290c50a456f14f06330219d6dcb92f98ea355ca3e53981bddd59806ad746d364",
+        "host.mjs": "9403055fb6ecd68f9183bef2b136f1d1ef3626dfa0588ea9eeb853c11ea1e0e9"
+      },
+      "screenshotPixels": {
+        "normal": [2240, 1600],
+        "narrow": [1560, 1120]
+      },
+      "narrowGeometry": {
+        "original": "c30385e5b24423e90069fe3d9891a0b4dbfbb626d82d7152f14b6871a8427dfe",
+        "instrumented": "1ad192394114effa19f1d2c5e3ee2a69c89d56ca3fe9d6b87455a74a8d2a4d06",
+        "changes": {
+          "initialWidth": [1120, 780],
+          "initialHeight": [800, 560]
+        },
+        "otherBytesUnchanged": true,
+        "restored": true
+      }
+    }
+  },
+  "userData": {
+    "protectedFilesChecked": 235,
+    "changedFiles": 0,
+    "addedDataFiles": 0,
+    "dailyAppUnchanged": true
+  }
+}
