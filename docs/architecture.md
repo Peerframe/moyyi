@@ -107,11 +107,11 @@ build-time repository composition, not third-party loading or new execution auth
 
 ### Trust
 
-[ADR 0045](decisions/0045-recorded-tool-output.md) adds a trusted result-processing port and a
+[ADR 0046](decisions/0046-recorded-tool-output.md) adds a trusted result-processing port and a
 session-bound output reader. Core commits typed full-output references with results/effects;
 runtime owns storage and retrieval. Context projects older previews only under pressure and never
 mutates records. Format 2 is distinct from the unchanged SQL schema 3. Backup and rollback validate
-both dimensions. [ADR 0046](decisions/0046-read-tool-deadlines.md) supplies cooperative read deadlines
+both dimensions. [ADR 0047](decisions/0047-read-tool-deadlines.md) supplies cooperative read deadlines
 through runtime ports and records advisory repeat-call text before returning results to the model.
 Neither feature lets plugins intercept the loop, grant authority or raise existing output bounds.
 

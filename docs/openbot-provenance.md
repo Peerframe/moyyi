@@ -374,4 +374,4 @@ not evidence that the candidate improves task quality.
 | `evals/replay/replay.test.ts` | `packages/test-support/agent-loop-testkit/README.md` | Real-runtime task/result conformance with public recordings; original task checkers retained |
 
 The typed persisted reference, SQL migration, desktop version pairing and session access checks
-are original moyyi integration. They are covered by ADR 0045 rather than copied from a DSH store.
+are original moyyi integration. They are covered by ADR 0046 rather than copied from a DSH store.

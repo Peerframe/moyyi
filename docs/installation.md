@@ -104,7 +104,7 @@ matches. Upgrade the paired programs together. To return to an old program, firs
 current store, then use the matching pre-upgrade data backup and programs. Rollback checks both
 schema and persisted format; it never drops output references to manufacture compatibility.
 Restoring a format 1 backup migrates a private copy and leaves that backup unchanged. See
-[ADR 0045](decisions/0045-recorded-tool-output.md).
+[ADR 0046](decisions/0046-recorded-tool-output.md).
 
 ```sh
 npm uninstall --global --prefix /absolute/private/moyyi-prefix moyyi

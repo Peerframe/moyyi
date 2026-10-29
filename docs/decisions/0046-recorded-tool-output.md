@@ -1,4 +1,4 @@
-# ADR 0045: Recorded tool output and pressure-driven projection
+# ADR 0046: Recorded tool output and pressure-driven projection
 
 - Date: 2026-10-29
 - Status: accepted for implementation; the owner explicitly approved the minimum persisted-format

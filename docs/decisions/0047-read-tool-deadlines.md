@@ -1,4 +1,4 @@
-# ADR 0046: Cooperative read-tool deadlines and recorded reminders
+# ADR 0047: Cooperative read-tool deadlines and recorded reminders
 
 - Date: 2026-10-29
 - Status: accepted delivery-one scope; core cancellation changes require explicit documentation
@@ -40,7 +40,7 @@ failed attempts still count. The exact final result is committed before it is se
 model, so a reminder can be reconstructed from request and transcript records.
 
 Normal calls add no reminder tokens. Notices append to new history and preserve the old request
-prefix. They still fit the existing output cap; a large text observation uses ADR 0045's spill
+prefix. They still fit the existing output cap; a large text observation uses ADR 0046's spill
 path. These options are trusted host composition, not a new settings format.
 
 ### 2026-10-29 amendment: advisory output budgeting
@@ -50,7 +50,7 @@ not fit, runtime tries `Runtime reminder: repeated call; check existing evidence
 the reminder. This preserves an already bounded observation without creating a blob or failing
 the run. For a genuinely oversized text observation, runtime stores the full text once and tries
 the complete, short and absent reminder in that order while reserving space for a valid retrieval
-preview. A limit too small for the handle itself still fails explicitly as described in ADR 0045.
+preview. A limit too small for the handle itself still fails explicitly as described in ADR 0046.
 The default output cap keeps the complete reminder; no output cap or permission changes.
 
 ## Reference
