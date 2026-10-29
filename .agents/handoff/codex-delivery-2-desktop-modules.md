@@ -1,7 +1,7 @@
 # Handoff: delivery two desktop modules
 - Brief: docs/tasks/2026-10-29-delivery-2-desktop-modules.md
-- Branch / previous source checkpoint: codex/delivery-2-desktop-modules / 7d74c95
-- Last agent: Codex, 2026-10-29 09:55 Asia/Singapore
+- Branch / package source checkpoint: codex/delivery-2-desktop-modules / ae2ec180db7e19ea85ec293b4589703800dab69e
+- Last agent: Codex, 2026-10-29 10:00 Asia/Singapore
 - Worktree: /Users/yxflc/.codex/worktrees/delivery-2-desktop-modules/moyyi
 
 ## Done
@@ -10,14 +10,15 @@
 - Real isolated extra-module test proves directory plus list entry extension, including typecheck, initialization, state bounds, routing and native-only rejection.
 - Final source check: 155 files / 2985 tests plus typecheck/lint passed. Wire differential: 10,682 inputs identical; 34 state fields / 33 commands / 25 renderer actions / 8 native-only commands unchanged.
 - ADR, recipe, module READMEs, architecture and contributor mechanical checks included.
-- Earlier 00da51e package and external M1–M6 gates passed; final source package must be rebuilt.
+- Final ae2ec18 package and external M1–M6 gates passed. ZIP SHA-256 e6fefdb44ad04a30aef4de3ee5185b353ecabb63ba9053ed67cf4fecccb31f05; desktop bundle e40e160230821d1c11936ee8bb95579b9d4ad2c7d416ac8672188cb6495c9e66.
 - Baseline native import/read/approve/preview/restart/history/save completed with four synthetic requests.
 
 ## In progress
-- Rebuild this clean checkpoint with desktop:package and run verify:desktop.
-- Candidate fixture ~/Applications/moyyi-desktop-modules-candidate still has old 00da51e app and empty store. Replace app before launch, reinstall only fixture worker/config.
+- Final candidate fixture ~/Applications/moyyi-desktop-modules-candidate is prepared with ae2ec18 package and empty store, worker/config installed, hashes in evidence/bundle-hashes.json. It has not yet been launched.
 - Complete candidate native flow and baseline/candidate normal/narrow screenshots; then one PR.
-- Baseline currently runs from ~/Applications/moyyi-desktop-modules-baseline with report preview open. Native copy saved as saved/modules-report.md. Normal HOME fixes the earlier system Save panel disabled by overridden HOME; worker store remains isolated. Use dedicated --user-data-dir=<root>/chromium.
+- Baseline currently runs from ~/Applications/moyyi-desktop-modules-baseline with report preview open (PID 36636, exec session 77651). Native copy saved as saved/modules-report.md, exact expected bytes. Normal HOME fixes the earlier system Save panel disabled by overridden HOME; worker store remains isolated. Use dedicated --user-data-dir=<root>/chromium. Exit through the actual app menu; the keyboard quit attempt did not terminate the previous process.
+- Mac automatically locked again after the first unlock; a second manual-unlock question is pending. Native CUA cannot proceed while locked. Temporary caffeinate session 79467 prevents display sleep for 20 minutes; it cannot unlock and should be terminated when acceptance ends or hands off.
+- Baseline normal.png currently shows the pre-restart preview; recapture post-restart normal to match candidate. Both narrow captures and candidate full workflow remain pending. No geometry-only main modification has yet been made.
 - CUA pointer resize unavailable. Documented fallback: quit, adjust only copied main initial width/height to 780/560, record hashes, capture, quit and restore original main. No source or package mutation.
 - No active code writers or paid runs. Daily app/data untouched; 235 protected file hashes matched. Backup/evidence in ~/.moyyi/reviews/desktop-modules-2026-10-29.
 
@@ -30,7 +31,8 @@
 - Final npm run check: 155 files / 2985 tests, typecheck/lint passed; /tmp/moyyi-delivery2-check-final.log.
 - Renderer: 47 tests; parity 13/13 identical. Final targeted extension/boundary/wire/bridge/service: 59 passed.
 - Prior npm run check: 154 files / 2981 passed after replacing symlink node_modules with actual dependencies. Prior symlink failures did not require sandbox/product/assertion changes.
-- Prior 00da51e desktop:package and verify:desktop passed; logs /tmp/moyyi-delivery2-package-final.log and /tmp/moyyi-delivery2-verify-desktop.log.
+- Final desktop:package and verify:desktop passed; logs /tmp/moyyi-delivery2-package-accepted.log and /tmp/moyyi-delivery2-verify-accepted.log. Package manifest records clean ae2ec18 source.
+- Baseline native-verification.json proves report/save bytes, two retained materials, read-only reopened grants and unchanged four-request ledger. All 235 daily protected files still match after normal-HOME launch.
 - Wire comparison script /tmp/moyyi-wire-parity.mjs retained.
 
 ## Paid usage ledger
