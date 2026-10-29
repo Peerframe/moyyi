@@ -3,7 +3,7 @@
 - Brief: `docs/tasks/2026-10-29-delivery-1-dsh-model-experience.md`
 - Branch: `codex/delivery-1-model-experience`
 - Baseline: `eeff4ec70d89596d7cdcafc23a50d82f8fc8d40b` (`origin/main`, fetched 2026-10-29).
-- Last checkpoint: this preparation commit; resolve with `git log -1 --format=%H`.
+- Last checkpoint: this implementation checkpoint; resolve with `git log -1 --format=%H`.
 - Last agent: Codex, 2026-10-29, Asia/Singapore.
 - Workspace: `/Users/yxflc/.codex/worktrees/delivery-1-model-experience/moyyi`.
 
@@ -31,21 +31,41 @@
   task, write grants, Flash, one trial, zero retries and zero requests. The wrapper asserts the
   8192 output cap and flushes the recorder after stream settlement.
 
+## Implementation checkpoints
+
+- A: todo plugin and runtime registration complete; strict whole-list validation, no extra context,
+  read effect and model-experience README. 20 plugin tests passed.
+- B/C: canonical repeat reminders (3/5/8, run-local reset), cooperative read deadlines, cancellation
+  settlement and record integration complete. ADR 0046 inventories timeouts and exclusions.
+- D: owner-approved typed output references, format 2/schema 3 migration, full UTF-8 blob capture,
+  session-scoped range reader, earlier-output projection and safe desktop version pairing complete.
+  Original v1 fixtures and payloads remain unchanged. Store 269 tests and desktop focused 49 passed.
+- E: static identity/safety sections, stable session facts and fs-owned guidance complete. The README
+  records each moved/removed sentence. Default/fs focused 86 passed; facts/CLI/context 36 passed.
+- F: all HTTP 5xx are overloaded; complete Responses/Messages comparison documented. 106 provider
+  tests passed, with no protocol/default/retry/output-cap change.
+- G: 27 real public baseline exchanges replay through the real runtime and all five original
+  checkers PASS. Request differences are reported separately (27/27 differ), no live fallback.
+- H: `--include-documents` explicitly selects the unchanged document tasks. G/H focused 19 tests,
+  typecheck and scoped Biome passed.
+- Core/runtime/context integration focused 174 tests passed; an additional projection test keeps
+  repeat advice separate from the original output tail (36-test context/facts/CLI run passed).
+- MIT notice and per-file pinned DSH provenance recorded. No system overview or historical delivery
+  record edited, per brief section 5.
+
+- Part A implementation files checkpointed in this `wip:` commit; shared wiring and final
+  acceptance remain in progress.
+
 ## In progress
 
-- Part 0 complete: all five original checkers PASS on unchanged main product code. No baseline
-  task leaves the candidate gate. Product implementation begins after this checkpoint.
-- Owner approved D's minimum persisted-format change on 2026-10-29. Implement typed
-  `ToolResultsBody.outputBlobs?: readonly ToolOutputRef[]` with `{callId, blob, bytes}` and UTF-8
-  full text. Persisted format 2, SQL schema 3; preserve old payloads and reject unsafe rollback.
-- Planned ownership: subagent baseline_preflight handles persisted/store/tests; provider_reference
-  handles A/F plugin work; root handles core/runtime/context integration and checkpoints. Never
-  overlap file writers. No other paid run is in progress.
-- Runtime/core work: read-only cancellation deadlines; result reminder and spill port; session-bound
-  retrieval; old-result projection pruning. Preserve all existing permission and output bounds.
-- Continue A-H with focused verification and per-part checkpoints; final quality gate includes all
-  five baseline tasks plus the document task after H. Recover the original comparison's frozen
-  envelope before its single paid run. No baseline task may be repeated speculatively.
+- All A-H code exists. Root owns integration and all writes; subagents now perform read-only risk
+  review and recovery of the original source task's frozen envelope. No paid run is active.
+- Next: full check, affected offline conformance, external CLI and desktop acceptance, then freeze
+  and run the six-task candidate gate once (71 maximum requests, zero retries).
+- Original source comparison still unstarted. Recover exact original prompt/workspace/runner and
+  budget before its once-only run. Verify actual spontaneous todo use from live records.
+- Original checkout's unrelated user modification is untouched. Uncommitted work belongs to this delivery. Root owns integration; baseline_preflight owns the
+  final reminder-boundary fix and two old-test updates. Focused tests may still be running.
 
 ## Collected problems (fix pass)
 
@@ -60,10 +80,10 @@
   select `reasoningEffort: "low"`; a desktop default does not configure this separate helper.
 - Read-only F comparison found 502/504 classified as `protocol` while 500/503 are `overloaded`
   (`src/plugins/provider-deepseek/index.ts:87`). DSH classifies all 5xx as server failures. The
-  future F implementation can fix this narrow issue and test it without changing retry policy.
+  F fixes this narrow issue with tests, without changing retry policy.
   Prefix ordering, cache-read token recording and complete visible-reasoning continuation already
   exist; Messages signatures/in-history system changes and DSH's larger output cap remain
-  protocol/product differences. No provider change has been made.
+  protocol/product differences. The comparison and fix are implemented.
 
 ## Commands run
 
@@ -85,7 +105,7 @@
 - A configuration-only `selectEvaluation` probe with the private eval host passed; allowance
   consumed: 0. The existing host was inspected with literal redaction and selected nonsecret
   metadata only. No key, credential command output or HTTP header was read or printed.
-- `loadModelRecordings` accepted all 8 baseline request/event recordings, including integrity
+- `loadModelRecordings` accepted all 27 baseline request/event recordings, including integrity
   hashes and shape validation; no pending write markers remain.
 - Fetched DSH into scratch `/tmp/moyyi-delivery-1-dsh.2nA4yj`, checked out fixed commit
   `f3803c96974ad4a94195fb97e5c637e9c2a3afe3`. No upstream scripts or dependencies were run.
@@ -142,5 +162,5 @@ source-analysis comparison are not started; recover their frozen configuration b
 - Keep one final PR for the complete delivery. No PR has been opened during preparation.
 - Per brief section 5, leave system overview and the existing delivery record for Claude's
   acceptance update; this file holds the current execution ledger.
-- Both read-only subagents and all local processes have finished. There are no implementation
-  writers or paid runs in progress. Keep the worktree and private recordings for continuation.
+- Implementation subagents finished; two read-only reviews are active. Root is the sole writer.
+  No paid run is in progress. Keep the worktree and private recordings for continuation.
