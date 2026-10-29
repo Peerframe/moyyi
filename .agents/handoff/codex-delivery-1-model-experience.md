@@ -198,7 +198,7 @@
   document-report-seven-formats 4/120s with `--include-documents`. Total ceiling 71 requests.
 - Estimated gate cost per accepted plan: CNY 0.2–1, not a bill. Baseline allowance is separate.
 - Candidate spent: 27/71; no ordinary-failure repeats.
-- Next paid task: `original-source-comparison`, separate frozen 8-request / 300-second envelope; zero retries.
+- Next paid task: none yet; guide-writing acceptance is still being prepared and must be frozen before dispatch.
 - Each next-task line is a pre-dispatch reservation. If interrupted, inspect that task's private
   recording directory, aggregate result and live process before any restart; never assume unspent.
 - Fresh external recording directories: private eval root `/candidate-<task-id>`.
@@ -230,7 +230,14 @@
   document actions denied. No new authority or service. Existing lazy credential callback.
 - This separate once-only run is reserved now; inspect `live/ledger.json` before any continuation.
   No monetary estimate exists in its original envelope; do not invent or borrow the gate amount.
-  Source comparison spent before dispatch: 0/8. PASS or FAIL is valid; never rerun or retune it.
+  Source comparison spent: 7/8, sealed; one unused request retired. Strict FAIL is valid; never rerun or retune it.
+
+- Original-question outcome: strict FAIL. Criteria 1/2/5 PASS, 3 FAIL, 4/6 PARTIAL.
+  The answer falsely says allowed-tools text is discarded despite exact delivery of `markdown: text`
+  and `text: skill.markdown`; it omits explicit selection-rebuild and reference/script behavior.
+  No rerun/tuning. Full independent review stays private at `live/independent-review.md` beside
+  sealed answer/records. Runtime completed, 18 read calls, source unchanged, seven HTTP 200s.
+- Original-question reported usage: {"cacheReadTokens": 139392, "inputTokens": 191663, "outputTokens": 7512, "reasoningTokens": 2700}; cache-write unavailable.
 
 ## Remaining live acceptance
 
