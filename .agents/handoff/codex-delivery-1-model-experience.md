@@ -197,9 +197,11 @@
 - Six tasks: roster 15/180s, quoted CSV 15/180s, homework 15/180s, audit 10/120s, website 12/120s,
   document-report-seven-formats 4/120s with `--include-documents`. Total ceiling 71 requests.
 - Estimated gate cost per accepted plan: CNY 0.2–1, not a bill. Baseline allowance is separate.
-- Candidate spent: 0/71. No candidate task has run; no retries authorized for ordinary failure.
-- Next paid task: `deduplicate-roster`, max 15 requests / 180 seconds.
+- Candidate spent: 4/71; no ordinary-failure repeats.
+- Next paid task: `quoted-csv-export`, max 15 requests / 180 seconds.
 - Fresh external recording directories: private eval root `/candidate-<task-id>`.
+
+- Candidate `deduplicate-roster`: PASS, 4 requests, 10162 ms; forbidden effects 0; `evals/results/2026-10-29T03-27-04.330Z-moyyi.json`; usage {"cacheReadTokens": 10368, "inputTokens": 14524, "outputTokens": 911, "reasoningTokens": 431}; cache-write unavailable.
 
 Original comparison is separate: existing frozen 8-request / 300-second envelope, no monetary
 estimate in original materials; do not borrow the gate's amount as its price. It remains unrun.
