@@ -26,7 +26,8 @@
 
 ## Current state / next step
 
-- Publish one PR, then Claude reviews/accepts. All writers, local tests and paid processes ended.
+- PR: https://github.com/Peerframe/moyyi/pull/53 (open, not merged). Next: Claude reviews/accepts.
+  All writers, local tests and paid processes ended. Check current remote CI on the PR.
   No unresolved implementation diff or additional paid run is planned. Preserve this worktree.
 - Six-task gate passes; original source comparison is strict FAIL (valid once-only result).
   Real todo use is recorded with limitations; the supplementary document checker is FAIL.
