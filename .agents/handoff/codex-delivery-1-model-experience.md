@@ -32,11 +32,11 @@
 
 ## In progress
 
-- Part 0 has **not run**. No product code has changed; parts A-H have not started.
-- Next: checkpoint and push this frozen envelope, then run `deduplicate-roster` once using the
+- Part 0 is running. No product code has changed; parts A-H have not started.
+- Next: checkpoint and push this frozen envelope, then run `quoted-csv-export` once using the
   private eval host. Set `MOYYI_DELIVERY_RECORDING_DIR` to the absolute private evaluation folder
-  above plus `/baseline-deduplicate-roster`. Record the command result and request count before
-  continuing with the remaining four tasks sequentially. Each recording directory must be fresh.
+  above plus `/baseline-quoted-csv-export`. Record the command result and request count before
+  continuing with the remaining tasks sequentially. Each recording directory must be fresh.
 - The current eval adapter deletes temporary databases and workspaces; the external wrapper
   keeps exact common requests and response events for G. Result JSON files remain ignored under
   `evals/results/`. Review recordings for privacy before committing any replay fixture.
@@ -67,6 +67,7 @@
   --maxWorkers=1 -t 'rejects unsupported|records deny/stale'`: passed, 2 targeted tests;
   the remaining 36 tests in those files were not selected. Original timeout and assertions retained.
 - `git diff --check`: passed before checkpoint.
+- `npm run eval -- --agent moyyi --host <private eval host> --source live --allow-live --capabilities write --task deduplicate-roster --max-model-requests 15`: PASS, 4 requests, 10.776 s; original checker, no forbidden effects.
 - A configuration-only `selectEvaluation` probe with the private eval host passed; allowance
   consumed: 0. The existing host was inspected with literal redaction and selected nonsecret
   metadata only. No key, credential command output or HTTP header was read or printed.
@@ -80,11 +81,13 @@
 - Baseline configuration: main product tree, Flash + Responses + low, 8192 output, write profile,
   no shell/network grants, zero retries, one trial per task, unchanged prompts/fixtures/checkers.
 - Frozen baseline ceiling: 67 requests; estimated cost per plan: CNY 0.2-1, not a bill.
-- Spent: 0 requests. Remaining baseline allowance: 67. No recordings or live results exist yet.
+- Spent: 4 requests; `deduplicate-roster` PASS on 2026-10-29 at checkpoint `6270b1d`. Remaining baseline allowance: 63.
+- First result: `evals/results/2026-10-29T01-05-08.294Z-moyyi.json`; four complete recordings, no pending markers.
+- Reported first-task totals: 12,882 input tokens; 915 output tokens; 367 reasoning tokens; 9344 cache-read tokens. Cache-write usage unavailable.
 
 | Task | Request ceiling | Time ceiling | Status |
 | --- | ---: | ---: | --- |
-| `deduplicate-roster` | 15 | 180 s | Not run |
+| `deduplicate-roster` | 15 | 180 s | PASS; 4 requests |
 | `quoted-csv-export` | 15 | 180 s | Not run |
 | `homework-keep-format` | 15 | 180 s | Not run |
 | `release-evidence-audit` | 10 | 120 s | Not run |
