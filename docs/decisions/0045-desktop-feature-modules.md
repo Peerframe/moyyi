@@ -1,6 +1,6 @@
 # 0045: Desktop feature modules and declarative slots
 
-Status: implemented candidate (2026-10-29); delivery acceptance pending.
+Status: implemented and verified (2026-10-29); owner review and acceptance pending.
 
 ## Decision
 
