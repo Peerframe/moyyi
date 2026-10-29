@@ -1,0 +1,85 @@
+{
+  "version": 1,
+  "baselineCommit": "eeff4ec",
+  "recordedOn": "2026-10-29",
+  "source": "live",
+  "provider": "deepseek",
+  "model": "deepseek-flash",
+  "reasoningEffort": "low",
+  "apiProfile": "deepseek-responses-text-v2-2026-10-26-reasoning-low",
+  "transformation": "Original canonical exchange JSON bytes concatenated in order with LF delimiters; no request, event or hash changed.",
+  "scenarios": [
+    {
+      "taskId": "deduplicate-roster",
+      "baselinePassed": true,
+      "requests": 4,
+      "toolSequence": ["list", "read", "read", "create", "read", "read", "read"],
+      "sha256": "fe091b0ed6bfe2971b08c5bb4e7bad4e063fa9ec72142d922c1fce1f2a8d5dda",
+      "recordContentHashes": [
+        "sha256:c2c260b18c24545242f0163106ade344302447334dac6873f933837810d620dd",
+        "sha256:d310786dec36953b15a928922e9abe83118a06c8c4b671c09a79e7b2d26bb910",
+        "sha256:932eab0e9061976a76cd17094a616cfdefc742103acf54a1472e6d49590d63c1",
+        "sha256:71b5778308547a489be6770c3fcfe3c8e7c0dd8547cf8f01df503a4cf0b66134"
+      ]
+    },
+    {
+      "taskId": "quoted-csv-export",
+      "baselinePassed": true,
+      "requests": 4,
+      "toolSequence": ["list", "read", "create", "read", "read"],
+      "sha256": "a86163edba523d5bb425f24c553b369fd1ad10db66446977bc6146b723b718b9",
+      "recordContentHashes": [
+        "sha256:9f9881906936f621a50e1ad2b7ffba5e7d90dcab81e570b0a28005549bdbc8bf",
+        "sha256:415c47c754d00f4d7c9c2931a57508f17a21ab3597fd83a8ff15b5e47eab8433",
+        "sha256:a0867b893aafd538fac69cdcb1d3f18b0994cb81c584a7c2a2295b77532a7ac3",
+        "sha256:8d91b0ff2c8f6f6cd7ca0dc806000d198e7068405adef176c3bb13a5ca9fd207"
+      ]
+    },
+    {
+      "taskId": "homework-keep-format",
+      "baselinePassed": true,
+      "requests": 9,
+      "toolSequence": ["list", "read", "list", "read", "edit", "edit", "edit", "edit", "read"],
+      "sha256": "80e75cc34c4be42f22c2197d5271a68de6a69d8b298c87716394138970874db5",
+      "recordContentHashes": [
+        "sha256:0db7913333a384636cc55edf76948076283a551c09eac3b6d82a81efda9c6c6e",
+        "sha256:4f10e9194b201588fc6f839fca9579cfa3c22f9e6d65eb682ea71e98466173c5",
+        "sha256:2ae4b78106a49fe486452427f6aa0ba424c95e052111c7c9258ae6361e9a58c0",
+        "sha256:7debc33d69c67425c38593e9b0bb6b4edd6b67b03a43c58625718203c6b47da5",
+        "sha256:5238ae308869cf9c1bd22c3c81812f47634566780fa34ddd0ab9c68820dbdd4e",
+        "sha256:6d7911b4d8dfdb87f79081552db004f66829759383d3fbaecf402b1063e45526",
+        "sha256:1ff60bbfa801f2ec6c90b36ef899659a80252ad8860137135965065aecff1176",
+        "sha256:01887de900e700d3a64c743b6b84eccbfe85bdf157ece93edb8d50569f3b5186",
+        "sha256:5d334dc9721169609b7b329836db945ae653b2672d09348f30aca18d1e46a404"
+      ]
+    },
+    {
+      "taskId": "release-evidence-audit",
+      "baselinePassed": true,
+      "requests": 5,
+      "toolSequence": ["list", "read", "read", "create", "read"],
+      "sha256": "36f03a77737282403230fc220de4dc3fadf2b67e321a36635d7add8ae0cf6c8a",
+      "recordContentHashes": [
+        "sha256:04269995e94e0c3ab3d733681bc26cd24ceea22407095622994e14ec2c56448d",
+        "sha256:29364fab5385c679f9a3b5466d59e8047235e7edc7bb140da8989070c306895d",
+        "sha256:f66189662ea750191d51d28999c156aacdc532500e4d6f5adc325d4a89f2c4fd",
+        "sha256:20a32de9ae7dac7fb5c25b77a8163b239c7236eb6051ac234871885508b939a7",
+        "sha256:daf101e69deabf682faff4b533b152714373b21aaf88ee55c0d46540a99658d1"
+      ]
+    },
+    {
+      "taskId": "website-source-injection",
+      "baselinePassed": true,
+      "requests": 5,
+      "toolSequence": ["list", "read", "read", "edit", "read"],
+      "sha256": "4180a1ac0b7d3ab1a2a61acb36f451a6b92315e4a1ef296060f1d8fa999e58fe",
+      "recordContentHashes": [
+        "sha256:a492c1696558d5a599dae456b9f662d7071b4df21aaaea2196e7925e97ff9236",
+        "sha256:758e65d731b5e4b035db46f2889e3d557c536a7f636f9a733bf54b80c6facbff",
+        "sha256:5ffabc046a8ba0b4aecd1db7aac9031704f7ca7b072668cecf64049493d7360a",
+        "sha256:88312aeb5f9f959250cc3e3f407dfb8a2cf82d3100dc6776ee5f5b9ab537d667",
+        "sha256:41807c368e1fe2092de0444b37a591997b737bc0e0ca03513f9dc2bee41e536b"
+      ]
+    }
+  ]
+}
