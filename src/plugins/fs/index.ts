@@ -71,10 +71,10 @@ const schemas: Record<Operation, JsonSchema> = {
   },
 };
 const descriptions: Record<Operation, string> = {
-  read: "Numbered UTF-8 + metadata. No line args: byte-bounded prefix; either: 1-based startLine/maxLines default 1/200, <=1MiB scan. complete is window-only; nextRead may repeat partial lines.",
+  read: "Numbered UTF-8 + metadata. No line args: byte-bounded prefix; either: 1-based startLine/maxLines default 1/200, <=1MiB scan. Use ranges around search hits; group independent reads. complete is window-only; nextRead may repeat partial lines. Truncation cannot prove absence.",
   list: "List a workspace directory (default .).",
   search:
-    "Literal file/dir search (default .), honoring .gitignore. include/exclude: relative *, **, ?; ** whole segments; dotfiles explicit; exclude wins. mode files: unique paths; content default: hits/context (8 lines/side). maxMatches counts lines/files. Read gaps; truncated/skipped cannot prove absence.",
+    "Literal file/dir search (default .), honoring .gitignore. include/exclude: relative *, **, ?; ** whole segments; dotfiles explicit; exclude wins. mode files: unique paths; content default: hits/context (8 lines/side). maxMatches counts lines/files. Inspect hits and gaps with read startLine/maxLines; truncated/skipped cannot prove absence.",
 };
 
 export const fsPlugin: Plugin = {
