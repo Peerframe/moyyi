@@ -32,13 +32,12 @@
 
 ## In progress
 
-- **Stopped under brief section 7, awaiting the owner's decision about D's persisted reference.**
+- Resumed after owner approval on 2026-10-29 for D's minimum persisted-format change.
   No product code has changed; parts A-H have not started. Two baseline tasks passed; the third
   has not started. Do not repeat the two completed paid trials.
-- Proposed decision: authorize a formal tool-output blob reference and the necessary persisted
-  compatibility work, preserving old data and all existing permission/output/blob bounds;
-  otherwise the owner must revise D's cross-version backup/restore guarantee. No implementation
-  or format change has been made in anticipation of approval.
+- Owner decision: "允许最小持久化变更（推荐）". This authorizes D's formal tool-output blob
+  reference and required compatibility/backup/restore/rollback work, preserving old data and
+  existing permission/output/blob bounds. It does not authorize unrelated schema changes.
 - After the decision is recorded, finish part 0 before changing product code. The next task is
   `homework-keep-format`, using the private eval host and `MOYYI_DELIVERY_RECORDING_DIR` set to the
   private evaluation folder above plus `/baseline-homework-keep-format`. Record each result and
@@ -115,7 +114,7 @@ source-analysis comparison are not started; recover their frozen configuration b
 
 ## Decisions taken / waiting for the owner
 
-- **D requires owner decision (brief section 7):** `ToolResultPart.content` has only text and
+- **D approved by owner on 2026-10-29 (brief section 7 exception):** `ToolResultPart.content` has only text and
   image variants (`src/contracts/persisted/content.ts:65`). `entryBlobRefs` only recognizes image
   and actual model-request blob references (`src/store/records.ts:57`); backup additionally
   collects workspace snapshots and material assets (`src/store/index.ts:744`). A plain-text
@@ -125,7 +124,7 @@ source-analysis comparison are not started; recover their frozen configuration b
   user-visible managed materials and attaching changes current material selection, so it is not
   a neutral session-output index (`src/store/materials.ts:162,211,297`). Direct software rollback
   retains live blobs, but later old-version backup/restore still loses unrecognized references.
-- Recommended scope after approval: a typed output reference, authenticated session/call binding,
+- Approved scope: a typed output reference, authenticated session/call binding,
   existing blob storage with durable publication before result commit, reference traversal in
   backup/restore, explicit version/rollback handling, and old-fixture/reopen/isolation/backup tests.
   Context remains a pure projection and original results stay intact. Follow the persisted-format
