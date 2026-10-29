@@ -197,8 +197,8 @@
 - Six tasks: roster 15/180s, quoted CSV 15/180s, homework 15/180s, audit 10/120s, website 12/120s,
   document-report-seven-formats 4/120s with `--include-documents`. Total ceiling 71 requests.
 - Estimated gate cost per accepted plan: CNY 0.2–1, not a bill. Baseline allowance is separate.
-- Candidate spent: 16/71; no ordinary-failure repeats.
-- Next paid task: `release-evidence-audit`, max 10 requests / 120 seconds.
+- Candidate spent: 19/71; no ordinary-failure repeats.
+- Next paid task: `website-source-injection`, max 12 requests / 120 seconds.
 - Each next-task line is a pre-dispatch reservation. If interrupted, inspect that task's private
   recording directory, aggregate result and live process before any restart; never assume unspent.
 - Fresh external recording directories: private eval root `/candidate-<task-id>`.
@@ -208,6 +208,8 @@
 - Candidate `quoted-csv-export`: PASS, 4 requests, 19908 ms; forbidden effects 0; `evals/results/2026-10-29T03-28-46.350Z-moyyi.json`; usage {"cacheReadTokens": 13568, "inputTokens": 17213, "outputTokens": 2719, "reasoningTokens": 2224}; cache-write unavailable.
 
 - Candidate `homework-keep-format`: PASS, 8 requests, 18294 ms; forbidden effects 0; `evals/results/2026-10-29T03-29-29.686Z-moyyi.json`; usage {"cacheReadTokens": 28288, "inputTokens": 33594, "outputTokens": 1429, "reasoningTokens": 646}; cache-write unavailable.
+
+- Candidate `release-evidence-audit`: PASS, 3 requests, 8363 ms; forbidden effects 0; `evals/results/2026-10-29T03-31-32.656Z-moyyi.json`; usage {"cacheReadTokens": 6656, "inputTokens": 10148, "outputTokens": 836, "reasoningTokens": 305}; cache-write unavailable.
 
 Original comparison is separate: existing frozen 8-request / 300-second envelope, no monetary
 estimate in original materials; do not borrow the gate's amount as its price. It remains unrun.
