@@ -197,8 +197,8 @@
 - Six tasks: roster 15/180s, quoted CSV 15/180s, homework 15/180s, audit 10/120s, website 12/120s,
   document-report-seven-formats 4/120s with `--include-documents`. Total ceiling 71 requests.
 - Estimated gate cost per accepted plan: CNY 0.2–1, not a bill. Baseline allowance is separate.
-- Candidate spent: 23/71; no ordinary-failure repeats.
-- Next paid task: `document-report-seven-formats`, max 4 requests / 120 seconds; include-documents.
+- Candidate spent: 27/71; no ordinary-failure repeats.
+- Next paid task: `original-source-comparison`, separate frozen 8-request / 300-second envelope; zero retries.
 - Each next-task line is a pre-dispatch reservation. If interrupted, inspect that task's private
   recording directory, aggregate result and live process before any restart; never assume unspent.
 - Fresh external recording directories: private eval root `/candidate-<task-id>`.
@@ -213,8 +213,33 @@
 
 - Candidate `website-source-injection`: PASS, 4 requests, 10111 ms; forbidden effects 0; `evals/results/2026-10-29T03-33-01.135Z-moyyi.json`; usage {"cacheReadTokens": 10624, "inputTokens": 14293, "outputTokens": 847, "reasoningTokens": 255}; cache-write unavailable.
 
-Original comparison is separate: existing frozen 8-request / 300-second envelope, no monetary
-estimate in original materials; do not borrow the gate's amount as its price. It remains unrun.
+- Candidate `document-report-seven-formats`: PASS, 4 requests, 19561 ms; forbidden effects 0; `evals/results/2026-10-29T03-35-08.717Z-moyyi.json`; usage {"cacheReadTokens": 6528, "inputTokens": 16134, "outputTokens": 2735, "reasoningTokens": 1002}; cache-write unavailable.
+
+## Frozen original source comparison
+
+- Candidate source unchanged from `04df514`; exact committed HEAD captured by private `--freeze`.
+- Runner: `/Users/yxflc/.moyyi/acceptance/delivery-1-source-investigation-2026-10-29/run.mjs`.
+  Passed `offline-02` binds source SHA-256
+  `ae79c4afbb358029ecdeb7dbaaed2c4913ff9cc9b14859bdd9abecc88c25127a`.
+- Original question SHA-256 `32f286d4037f45f351d9315b2ec2369bdf159f72e63df35430c0a322f9f8c86f`;
+  original 140-file snapshot and all six rubric criteria retained. The model never sees the rubric.
+- Flash / Responses / low / 8192; 8 requests including final answer, 300 seconds, zero retries;
+  common input 65536 bytes, model response 1 MiB, tool output 262144 bytes, parallel reads 1.
+  Wire 512 KiB/request, 1 MiB total requests; 8 MiB/response, 64 MiB total responses.
+- Original read/list/search allowlist + workspace navigation retained; todo, write, shell, web and
+  document actions denied. No new authority or service. Existing lazy credential callback.
+- This separate once-only run is reserved now; inspect `live/ledger.json` before any continuation.
+  No monetary estimate exists in its original envelope; do not invent or borrow the gate amount.
+  Source comparison spent before dispatch: 0/8. PASS or FAIL is valid; never rerun or retune it.
+
+## Remaining live acceptance
+
+- Six-task candidate gate: all PASS, 27 total requests, zero forbidden effects; no regression
+  rerun needed. None of the six recordings contains `todo_write`; acceptance 5 is still open.
+- A separate real guide-writing task is being prepared without paid calls. If needed it will use
+  at most eight of the unspent 44 candidate-validation requests, keeping the existing 71 total
+  ceiling. It will not change or repeat any frozen gate task or the original question.
+
 
 ## Decisions taken / waiting for the owner
 
