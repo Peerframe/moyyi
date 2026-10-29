@@ -4,7 +4,7 @@
 - Branch: `codex/delivery-1-model-experience`
 - Baseline: `eeff4ec70d89596d7cdcafc23a50d82f8fc8d40b` (`origin/main`, fetched 2026-10-29).
 - Last checkpoint: this preparation commit; resolve with `git log -1 --format=%H`.
-- Last agent: Codex, 2026-10-29 09:01, Asia/Singapore.
+- Last agent: Codex, 2026-10-29, Asia/Singapore.
 - Workspace: `/Users/yxflc/.codex/worktrees/delivery-1-model-experience/moyyi`.
 
 ## Done
@@ -20,24 +20,28 @@
 - Full check: typecheck and lint passed; 2959/2961 tests passed, with two 5000 ms timeouts.
   Both timed-out cases passed in a focused single-worker rerun under their unchanged timeout.
   The initial full `npm run check` remains recorded as failed, not retrospectively green.
+- The user asked Codex to locate the existing host. Found the daily CLI host at
+  `/Users/yxflc/.moyyi/deepseek/host.mjs` and verified its lazy Keychain callback without invoking it.
+- Added an external private eval host at
+  `/Users/yxflc/.moyyi/evals/delivery-1-model-experience-2026-10-29/host.mjs`.
+  It uses the current checkout's `deepSeekEvalHost`, the existing daily credential callback,
+  explicit low effort and the existing recording classes. No new credential or service.
+- Validated CLI selection with that host without constructing/streaming a client: correct first
+  task, write grants, Flash, one trial, zero retries and zero requests. The wrapper asserts the
+  8192 output cap and flushes the recorder after stream settlement.
 
 ## In progress
 
 - Part 0 has **not run**. No product code has changed; parts A-H have not started.
-- The user's private host path is still the literal placeholder `<填写路径>` in the request.
-  An asynchronous question asks for the actual absolute path. Do not read or print credentials.
-- Once the host path arrives, validate its `RuntimeEvalHost` export, lazy client construction,
-  explicit low reasoning, Flash/Responses profile and the 8192 output cap without sending a
-  probe request. A CLI `RuntimeOptions` module is not the eval-host contract.
-- Before any baseline request, configure an external private recording wrapper using existing
-  `RecordingModelClient` and `FileRecordingSink`; await `flush()` after each stream is settled.
-  Store public-fixture request/event recordings for part G outside git until privacy review.
-  The current eval adapter deletes its temporary database and workspace after a trial and its
-  JSON result contains aggregates only. Do not discover this after spending the baseline.
-- Freeze the confirmed host configuration, recording location and the per-task manifest below,
-  checkpoint and push, then run the five tasks sequentially once. Record checker results,
-  requests and usage; remove baseline FAIL tasks from the later gate. Only after the baseline
-  completes may implementation start.
+- Next: checkpoint and push this frozen envelope, then run `deduplicate-roster` once using the
+  private eval host. Set `MOYYI_DELIVERY_RECORDING_DIR` to the absolute private evaluation folder
+  above plus `/baseline-deduplicate-roster`. Record the command result and request count before
+  continuing with the remaining four tasks sequentially. Each recording directory must be fresh.
+- The current eval adapter deletes temporary databases and workspaces; the external wrapper
+  keeps exact common requests and response events for G. Result JSON files remain ignored under
+  `evals/results/`. Review recordings for privacy before committing any replay fixture.
+- Baseline FAIL tasks leave the later gate; provider unavailability is distinct. Implementation
+  begins only after the baseline is complete. No paid probe or speculative extra run is planned.
 
 ## Collected problems (fix pass)
 
@@ -63,6 +67,9 @@
   --maxWorkers=1 -t 'rejects unsupported|records deny/stale'`: passed, 2 targeted tests;
   the remaining 36 tests in those files were not selected. Original timeout and assertions retained.
 - `git diff --check`: passed before checkpoint.
+- A configuration-only `selectEvaluation` probe with the private eval host passed; allowance
+  consumed: 0. The existing host was inspected with literal redaction and selected nonsecret
+  metadata only. No key, credential command output or HTTP header was read or printed.
 - Setup probes found the login Node 22 and a nonexistent guessed npm path; resolved by using
   `/opt/homebrew/opt/node@26/bin` on PATH. No repository configuration was changed.
 
@@ -88,8 +95,8 @@ source-analysis comparison are not started; recover their frozen configuration b
 
 ## Decisions taken / waiting for the owner
 
-- Waiting for the actual private host module path. This is missing input, not a request to
-  reapprove the already authorized baseline.
+- Host-path clarification resolved by the user's instruction to locate it. Reused the existing
+  Keychain callback and added only a repository-external adapter for the existing eval interface.
 - Preserve the original checkout's unrelated change by working in the attached worktree.
 - Honor brief section 7 immediately for persisted-format changes, wider authority/limits,
   new external services/credentials or estimated spend exceeding the frozen budget.
