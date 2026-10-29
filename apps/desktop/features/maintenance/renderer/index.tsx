@@ -29,5 +29,6 @@ declare module "../../../renderer/ui.ts" {
 export const rendererFeature: RendererFeature = {
   id: "maintenance",
   useController,
+  blocksComposer: (ui) => ui.maintenanceOpen,
   slots: [{ id: "maintenance.Maintenance", slot: "dialogs", order: 10, Component: Maintenance }],
 };

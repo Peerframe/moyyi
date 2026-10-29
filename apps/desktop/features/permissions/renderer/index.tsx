@@ -81,6 +81,7 @@ declare module "../../../renderer/ui.ts" {
 export const rendererFeature: RendererFeature = {
   id: "permissions",
   useController,
+  blocksComposer: (ui) => ui.permissionsOpen,
   slots: [
     {
       id: "permissions.PermissionsButton",

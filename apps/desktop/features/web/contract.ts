@@ -1,26 +1,6 @@
 import type { CommandParser, FeatureContract } from "../../native/contract.ts";
 import type { DesktopState } from "../../shared.ts";
-export const contract = {
-  id: "web",
-  channels: {
-    configureWebAccess: {
-      name: "moyyi:web-permissions",
-      result: "state",
-      validate: (value: unknown, parse: CommandParser) => {
-        if (
-          !value ||
-          typeof value !== "object" ||
-          Array.isArray(value) ||
-          Object.keys(value).some((key) => !["sessionId", "allowedOrigins", "dns"].includes(key))
-        )
-          throw Error("Invalid web permissions");
-        const command = parse({ ...value, type: "web.permissions" });
-        if (command.type !== "web.permissions") throw Error("Invalid web permissions");
-        return command;
-      },
-    },
-  },
-} satisfies FeatureContract;
+import { initialState, validateState } from "./state.ts";
 
 export interface DesktopWebAccess {
   readonly allowedOrigins: readonly string[];
@@ -60,3 +40,33 @@ export interface FeatureBridge {
     options: DesktopWebAccess & { readonly sessionId: string },
   ): Promise<DesktopState>;
 }
+
+export const actionTypes = [] as const satisfies readonly FeatureCommand["type"][];
+export type FeatureAction = Extract<
+  FeatureCommand,
+  { readonly type: (typeof actionTypes)[number] }
+>;
+export const contract = {
+  id: "web",
+  commands: commandTypes,
+  actions: actionTypes,
+  state: { keys: stateKeys, validate: validateState, initialize: initialState },
+  channels: {
+    configureWebAccess: {
+      name: "moyyi:web-permissions",
+      result: "state",
+      validate: (value: unknown, parse: CommandParser) => {
+        if (
+          !value ||
+          typeof value !== "object" ||
+          Array.isArray(value) ||
+          Object.keys(value).some((key) => !["sessionId", "allowedOrigins", "dns"].includes(key))
+        )
+          throw Error("Invalid web permissions");
+        const command = parse({ ...value, type: "web.permissions" });
+        if (command.type !== "web.permissions") throw Error("Invalid web permissions");
+        return command;
+      },
+    },
+  },
+} satisfies FeatureContract;

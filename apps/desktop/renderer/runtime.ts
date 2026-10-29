@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import type { DesktopBridge, DesktopState } from "../shared.ts";
 import { rendererFeatures } from "./feature-registry.ts";
+import type { RendererFeature } from "./slot-types.ts";
 import type { FeatureUI, RendererBase, RendererUI } from "./ui.ts";
 import { errorMessage } from "./ui.ts";
 import { createActionGate, createSnapshotReceiver } from "./view-state.ts";
@@ -20,6 +21,13 @@ const useControllers = rendererFeatures.reduce<
   },
   () => ({}),
 );
+
+export function isComposerBlocked(
+  features: readonly RendererFeature[],
+  ui: Readonly<FeatureUI>,
+): boolean {
+  return features.some((feature) => feature.blocksComposer?.(ui) === true);
+}
 
 export function useRenderer(bridge: DesktopBridge): RendererUI {
   const [state, setState] = useState<DesktopState | null>(null);
@@ -71,19 +79,17 @@ export function useRenderer(bridge: DesktopBridge): RendererUI {
   const feature = useControllers(base, () => ui) as FeatureUI;
   const busy = pending || state?.run !== null || state?.status !== "ready";
   const configuring = feature.newSession || !state?.activeSessionId;
+  const composerBlocked = isComposerBlocked(rendererFeatures, feature);
   const ui: RendererUI = {
     ...base,
     ...feature,
     busy,
     configuring,
+    composerBlocked,
     canSend:
       !busy &&
       !configuring &&
-      !feature.settingsOpen &&
-      !feature.helpOpen &&
-      !feature.maintenanceOpen &&
-      !feature.permissionsOpen &&
-      !feature.webAccessOpen &&
+      !composerBlocked &&
       !!state?.connection.ready &&
       !state.historyOnly &&
       feature.draft.trim().length > 0,

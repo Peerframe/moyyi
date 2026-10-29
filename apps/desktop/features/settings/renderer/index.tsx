@@ -101,6 +101,7 @@ declare module "../../../renderer/ui.ts" {
 export const rendererFeature: RendererFeature = {
   id: "settings",
   useController,
+  blocksComposer: (ui) => ui.settingsOpen || ui.helpOpen,
   slots: [
     { id: "settings.HelpButton", slot: "header-actions", order: 0, Component: HelpButton },
     { id: "settings.SettingsButton", slot: "header-actions", order: 30, Component: SettingsButton },

@@ -1,15 +1,6 @@
 import type { CommandParser, FeatureContract } from "../../native/contract.ts";
 import type { DesktopAction, DesktopState } from "../../shared.ts";
-export const contract = {
-  id: "conversation",
-  channels: {
-    act: {
-      name: "moyyi:act",
-      result: "state",
-      validate: (value: unknown, parse: CommandParser) => parse(value),
-    },
-  },
-} satisfies FeatureContract;
+import { initialState, validateState } from "./state.ts";
 
 export interface DesktopMessage {
   readonly id: string;
@@ -47,3 +38,22 @@ export const stateKeys = [
 export interface FeatureBridge {
   act(command: DesktopAction): Promise<DesktopState>;
 }
+
+export const actionTypes = ["start", "cancel"] as const satisfies readonly FeatureCommand["type"][];
+export type FeatureAction = Extract<
+  FeatureCommand,
+  { readonly type: (typeof actionTypes)[number] }
+>;
+export const contract = {
+  id: "conversation",
+  commands: commandTypes,
+  actions: actionTypes,
+  state: { keys: stateKeys, validate: validateState, initialize: initialState },
+  channels: {
+    act: {
+      name: "moyyi:act",
+      result: "state",
+      validate: (value: unknown, parse: CommandParser) => parse(value),
+    },
+  },
+} satisfies FeatureContract;

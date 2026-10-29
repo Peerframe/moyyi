@@ -46,7 +46,8 @@ are in [docs/desktop.md](../../docs/desktop.md); the security model is
 - Features never import other features. Contracts remain browser-safe; host/native code and
   renderer code stay in separate static entry graphs. Compatibility re-exports are for existing
   consumers, not a path around feature ownership.
-- Declare action ownership and state fields in the feature contract. Host projections use
+- Declare command ownership, renderer-callable actions, state fields, initialization and validation
+  in the feature contract. Host projections use
   `defineHostFeature`; only shared session/runtime lifecycle coordination invalidates other slices.
 - Register declarative slots and keep functional UI state inside the owning feature. Preserve
   existing identity keys, markup and mounting conditions during refactors.

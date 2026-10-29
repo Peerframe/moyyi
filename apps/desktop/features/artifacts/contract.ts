@@ -1,44 +1,7 @@
 import type { CommandParser, FeatureContract } from "../../native/contract.ts";
 import { sessionIdentity } from "../../native/contract.ts";
 import type { DesktopState } from "../../shared.ts";
-export const contract = {
-  id: "artifacts",
-  channels: {
-    saveArtifact: {
-      name: "moyyi:save-artifact",
-      result: "state",
-      validate: (value: unknown, parse: CommandParser) => {
-        if (
-          !value ||
-          typeof value !== "object" ||
-          Array.isArray(value) ||
-          Object.keys(value).sort().join() !== "effectId,sessionId"
-        )
-          throw Error("Invalid result selection");
-        const command = parse({ ...value, type: "artifact.open" });
-        if (command.type !== "artifact.open") throw Error("Invalid result selection");
-        return command;
-      },
-    },
-    selectReportTarget: { name: "moyyi:report-target", result: "state", validate: sessionIdentity },
-    revealArtifact: {
-      name: "moyyi:reveal-artifact",
-      result: "state",
-      validate: (value: unknown, parse: CommandParser) => {
-        if (
-          !value ||
-          typeof value !== "object" ||
-          Array.isArray(value) ||
-          Object.keys(value).sort().join() !== "effectId,sessionId"
-        )
-          throw Error("Invalid result selection");
-        const command = parse({ ...value, type: "artifact.open" });
-        if (command.type !== "artifact.open") throw Error("Invalid result selection");
-        return command;
-      },
-    },
-  },
-} satisfies FeatureContract;
+import { initialState, validateState } from "./state.ts";
 
 export interface DesktopArtifact {
   readonly effectId: string;
@@ -98,3 +61,55 @@ export interface FeatureBridge {
     readonly effectId: string;
   }): Promise<DesktopState>;
 }
+
+export const actionTypes = [
+  "report.clear",
+  "artifacts",
+  "artifact.open",
+  "artifact.close",
+] as const satisfies readonly FeatureCommand["type"][];
+export type FeatureAction = Extract<
+  FeatureCommand,
+  { readonly type: (typeof actionTypes)[number] }
+>;
+export const contract = {
+  id: "artifacts",
+  commands: commandTypes,
+  actions: actionTypes,
+  state: { keys: stateKeys, validate: validateState, initialize: initialState },
+  channels: {
+    saveArtifact: {
+      name: "moyyi:save-artifact",
+      result: "state",
+      validate: (value: unknown, parse: CommandParser) => {
+        if (
+          !value ||
+          typeof value !== "object" ||
+          Array.isArray(value) ||
+          Object.keys(value).sort().join() !== "effectId,sessionId"
+        )
+          throw Error("Invalid result selection");
+        const command = parse({ ...value, type: "artifact.open" });
+        if (command.type !== "artifact.open") throw Error("Invalid result selection");
+        return command;
+      },
+    },
+    selectReportTarget: { name: "moyyi:report-target", result: "state", validate: sessionIdentity },
+    revealArtifact: {
+      name: "moyyi:reveal-artifact",
+      result: "state",
+      validate: (value: unknown, parse: CommandParser) => {
+        if (
+          !value ||
+          typeof value !== "object" ||
+          Array.isArray(value) ||
+          Object.keys(value).sort().join() !== "effectId,sessionId"
+        )
+          throw Error("Invalid result selection");
+        const command = parse({ ...value, type: "artifact.open" });
+        if (command.type !== "artifact.open") throw Error("Invalid result selection");
+        return command;
+      },
+    },
+  },
+} satisfies FeatureContract;

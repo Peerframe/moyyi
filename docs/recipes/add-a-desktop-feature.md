@@ -6,8 +6,11 @@ Follow [desktop rules](../../apps/desktop/AGENTS.md) and
 
 1. Create `apps/desktop/features/<id>/` with a README describing purpose, status and limits.
 2. Add `contract.ts`: export `contract`, `FeatureCommand`, `commandTypes`, `FeatureState`,
-   `stateKeys` and `FeatureBridge`. Use `never`/empty fields for unused contributions. Contracts
-   are browser-safe plain data and validation; do not import Node, Electron or another feature.
+   `stateKeys`, `FeatureAction`, `actionTypes` and `FeatureBridge`. Explicitly list which commands
+   the renderer may send through `act`; native-only commands stay out of `actionTypes`. Use
+   `never`/empty fields for unused contributions. Declare the state initializer and validator in
+   `contract.state`, usually implemented in a browser-safe `state.ts`. Validate every owned field
+   with the existing exact-key and size limits. Do not import Node, Electron or another feature.
 3. If commands are needed, add `validation.ts` with `validateCommand`; preserve bounded inputs,
    exact-key checks and denial behavior. In `host.ts`, export `hostFeature` using
    `defineHostFeature`, the contract's `commandTypes` and `stateKeys`. Declare interested runtime
@@ -17,7 +20,9 @@ Follow [desktop rules](../../apps/desktop/AGENTS.md) and
    expose a generic file, shell or IPC escape. The common context owns window and operation locks.
 5. Add `renderer/index.tsx` exporting `rendererFeature`. Keep local UI state in the feature and
    contribute existing slot types. A module may declare its shared UI coordination fields through
-   interface augmentation, or keep private state in its own components. Register conversation
+   interface augmentation, or keep private state in its own components. A dialog that blocks message
+   submission declares `blocksComposer` in its renderer contribution. Read `getUI()` only from
+   events or effects, after controller composition has finished. Register conversation
    nodes by tool name or message role; exact tool matches take precedence. Reuse shared design
    primitives. Do not import another feature, including through compatibility view re-exports.
 6. Add one line to `apps/desktop/feature-list.json` and run

@@ -3,8 +3,10 @@ import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it } from "vitest";
 import type { DesktopMessage } from "../shared.ts";
 import { rendererFeatures } from "./feature-registry.ts";
+import { isComposerBlocked } from "./runtime.ts";
 import type { RendererFeature, SlotId } from "./slot-types.ts";
 import { ConversationNode, createSlots } from "./slots.ts";
+import type { FeatureUI } from "./ui.ts";
 
 const Empty = () => null;
 const message: DesktopMessage = {
@@ -112,5 +114,40 @@ describe("build-time desktop slots", () => {
     expect(html).toContain("todo_write · 结果未知");
     expect(html).toContain("&lt;img");
     expect(html).not.toContain("<img");
+  });
+});
+
+describe("feature-owned composer blockers", () => {
+  const openFields = [
+    "settingsOpen",
+    "helpOpen",
+    "maintenanceOpen",
+    "permissionsOpen",
+    "webAccessOpen",
+  ] as const;
+  it("preserves every combination of the five existing dialog guards", () => {
+    for (let mask = 0; mask < 32; mask++) {
+      const state = Object.fromEntries(
+        openFields.map((field, bit) => [field, Boolean(mask & (1 << bit))]),
+      ) as unknown as FeatureUI;
+      expect(isComposerBlocked(rendererFeatures, state)).toBe(mask !== 0);
+    }
+  });
+  it("admits a new module's independent dialog guard without a central case", () => {
+    let extraDialogOpen = false;
+    const extension: RendererFeature = {
+      id: "test-extra-dialog",
+      blocksComposer: () => extraDialogOpen,
+    };
+    const state = Object.fromEntries(
+      openFields.map((field) => [field, false]),
+    ) as unknown as FeatureUI;
+    const extended = [...rendererFeatures, extension];
+    expect(isComposerBlocked(extended, state)).toBe(false);
+    extraDialogOpen = true;
+    expect(isComposerBlocked(extended, state)).toBe(true);
+    expect(isComposerBlocked(rendererFeatures, state)).toBe(false);
+    extraDialogOpen = false;
+    expect(isComposerBlocked(extended, state)).toBe(false);
   });
 });

@@ -90,8 +90,10 @@ Development reload is incompatible with recording/replay and refreshes only expl
 [ADR 0045](decisions/0045-desktop-feature-modules.md) implements the desktop UI slots planned
 in ADR 0005. `apps/desktop/feature-list.json` generates separate static contract, host, native and
 renderer registries. Modules in `features/<id>` may import shared foundation code and their own
-files, never another feature. Contracts are browser-safe and may use shared pure validation;
-feature renderer imports are limited to React, shared design/bridge DTOs and its own views.
+files, never another feature. Contracts and their `state.ts` initializers/validators are browser-safe
+and may use shared pure validation. The wire layer composes the pure contract registry while
+retaining envelope limits and cross-slice identity checks; it cannot import host or renderer code.
+Feature renderer imports are limited to React, shared design/bridge DTOs and its own views.
 Feature host/native code retains the public runtime boundary. Only native entry points use Electron.
 
 The host owns serialization, runtime/grant lifecycle and publication. Commands route to one

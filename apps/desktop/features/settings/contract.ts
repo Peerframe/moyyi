@@ -1,24 +1,6 @@
 import type { CommandParser, FeatureContract } from "../../native/contract.ts";
 import type { DesktopState } from "../../shared.ts";
-export const contract = {
-  id: "settings",
-  channels: {
-    configure: {
-      name: "moyyi:configure",
-      result: "state",
-      validate: (value: unknown, _parse: CommandParser) => {
-        if (
-          !value ||
-          typeof value !== "object" ||
-          Array.isArray(value) ||
-          Object.keys(value).some((k) => !["settings", "apiKey"].includes(k))
-        )
-          throw Error("Invalid model settings");
-        return value;
-      },
-    },
-  },
-} satisfies FeatureContract;
+import { initialState, validateState } from "./state.ts";
 
 export interface DesktopSettings {
   readonly preset: "flash" | "kimi-cn" | "kimi-global";
@@ -60,3 +42,31 @@ export const DEFAULT_DESKTOP_SETTINGS: DesktopSettings = {
   maxRequests: 3,
   timeoutMs: 120_000,
 };
+
+export const actionTypes = [] as const satisfies readonly FeatureCommand["type"][];
+export type FeatureAction = Extract<
+  FeatureCommand,
+  { readonly type: (typeof actionTypes)[number] }
+>;
+export const contract = {
+  id: "settings",
+  commands: commandTypes,
+  actions: actionTypes,
+  state: { keys: stateKeys, validate: validateState, initialize: initialState },
+  channels: {
+    configure: {
+      name: "moyyi:configure",
+      result: "state",
+      validate: (value: unknown, _parse: CommandParser) => {
+        if (
+          !value ||
+          typeof value !== "object" ||
+          Array.isArray(value) ||
+          Object.keys(value).some((k) => !["settings", "apiKey"].includes(k))
+        )
+          throw Error("Invalid model settings");
+        return value;
+      },
+    },
+  },
+} satisfies FeatureContract;

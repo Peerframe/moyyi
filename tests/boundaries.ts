@@ -25,7 +25,7 @@ const allowedLayers: Record<string, readonly string[]> = {
   "desktop:shared": ["desktop:contract"],
   "desktop:contract": ["desktop:shared", "desktop:security"],
   "desktop:security": [],
-  "desktop:wire": ["desktop:shared", "desktop:security"],
+  "desktop:wire": ["desktop:shared", "desktop:contract", "desktop:security"],
   "desktop:preload": ["desktop:shared", "desktop:contract", "desktop:wire", "desktop:security"],
   "desktop:renderer": ["desktop:shared", "desktop:contract"],
   "desktop:host": ["desktop:shared", "desktop:contract", "desktop:wire", "desktop:security"],
@@ -51,15 +51,20 @@ export function layerOf(file: string): string | null {
       const area =
         parts[4] === "renderer"
           ? "renderer"
-          : parts[4]?.replace(/\.test(?=\.tsx?$)/, "") === "contract.ts"
+          : ["contract.ts", "state.ts"].includes(parts[4]?.replace(/\.test(?=\.tsx?$)/, "") ?? "")
             ? "contract"
             : "host";
       return `desktop:feature:${parts[3]}:${area}`;
     }
     if (parts[2] === "native" && parts.length === 4) {
-      return ["contract.ts", "contracts.ts", "channels.ts"].includes(
-        parts[3]?.replace(/\.test(?=\.tsx?$)/, "") ?? "",
-      )
+      return [
+        "contract.ts",
+        "contracts.ts",
+        "channels.ts",
+        "actions.ts",
+        "state-schema.ts",
+        "state-validation.ts",
+      ].includes(parts[3]?.replace(/\.test(?=\.tsx?$)/, "") ?? "")
         ? "desktop:contract"
         : "desktop:host";
     }

@@ -37,6 +37,7 @@ export interface MessageRenderer {
 }
 export interface RendererFeature {
   readonly id: string;
+  readonly blocksComposer?: (ui: Readonly<FeatureUI>) => boolean;
   readonly useController?: (base: RendererBase, getUI: () => RendererUI) => Partial<FeatureUI>;
   readonly slots?: readonly SlotContribution[];
   readonly settingsSections?: readonly {

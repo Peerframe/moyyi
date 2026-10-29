@@ -1,5 +1,10 @@
 /** Renderer DTO composition; module contracts own their slices and never expose runtime payloads. */
-import type { FeatureBridges, FeatureCommands, FeatureStates } from "./shared-feature-types.ts";
+import type {
+  FeatureActions,
+  FeatureBridges,
+  FeatureCommands,
+  FeatureStates,
+} from "./shared-feature-types.ts";
 
 export type { DesktopArtifact, DesktopArtifactPreview } from "./features/artifacts/contract.ts";
 export type { DesktopMessage } from "./features/conversation/contract.ts";
@@ -27,20 +32,7 @@ export interface DesktopState extends FeatureStates {
   readonly error: string | null;
 }
 export type DesktopCommand = FeatureCommands;
-export type DesktopAction = Exclude<
-  DesktopCommand,
-  {
-    readonly type:
-      | "create"
-      | "close"
-      | "configure"
-      | "materials"
-      | "materials.import"
-      | "report.target"
-      | "permissions"
-      | "web.permissions";
-  }
->;
+export type DesktopAction = FeatureActions;
 export interface DesktopBridge extends FeatureBridges {
   subscribe(listener: (state: DesktopState) => void): () => void;
 }

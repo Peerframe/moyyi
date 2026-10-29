@@ -1,22 +1,7 @@
 import type { CommandParser, FeatureContract } from "../../native/contract.ts";
 import { pickerOptions } from "../../security.ts";
 import type { DesktopMessage, DesktopState } from "../../shared.ts";
-export const contract = {
-  id: "sessions",
-  channels: {
-    getState: {
-      name: "moyyi:state",
-      result: "state",
-      input: "none",
-      validate: (_value: unknown, _parse: CommandParser) => undefined,
-    },
-    selectWorkspace: {
-      name: "moyyi:workspace",
-      result: "state",
-      validate: (value: unknown, _parse: CommandParser) => pickerOptions(value),
-    },
-  },
-} satisfies FeatureContract;
+import { initialState, validateState } from "./state.ts";
 
 export interface DesktopSessionMetadata {
   readonly title: string | null;
@@ -123,3 +108,36 @@ export interface FeatureBridge {
   getState(): Promise<DesktopState>;
   selectWorkspace(options: { readonly askEachRead: boolean }): Promise<DesktopState>;
 }
+
+export const actionTypes = [
+  "load",
+  "list",
+  "catalog",
+  "session.update",
+  "history",
+  "history.message",
+  "history.close",
+] as const satisfies readonly FeatureCommand["type"][];
+export type FeatureAction = Extract<
+  FeatureCommand,
+  { readonly type: (typeof actionTypes)[number] }
+>;
+export const contract = {
+  id: "sessions",
+  commands: commandTypes,
+  actions: actionTypes,
+  state: { keys: stateKeys, validate: validateState, initialize: initialState },
+  channels: {
+    getState: {
+      name: "moyyi:state",
+      result: "state",
+      input: "none",
+      validate: (_value: unknown, _parse: CommandParser) => undefined,
+    },
+    selectWorkspace: {
+      name: "moyyi:workspace",
+      result: "state",
+      validate: (value: unknown, _parse: CommandParser) => pickerOptions(value),
+    },
+  },
+} satisfies FeatureContract;

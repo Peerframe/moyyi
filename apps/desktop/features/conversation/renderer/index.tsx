@@ -21,26 +21,12 @@ function useController(base: RendererBase, getUI: () => RendererUI) {
     scrollArea.current.scrollTop = scrollArea.current.scrollHeight;
   }, [scrollMarker]);
   async function send() {
-    const {
-      state,
-      bridge,
-      perform,
-      settingsOpen,
-      helpOpen,
-      maintenanceOpen,
-      permissionsOpen,
-      webAccessOpen,
-      newSession,
-    } = getUI();
+    const { state, bridge, perform, composerBlocked, newSession } = getUI();
     if (
       !state?.activeSessionId ||
       state.run ||
       !state.connection.ready ||
-      settingsOpen ||
-      helpOpen ||
-      maintenanceOpen ||
-      permissionsOpen ||
-      webAccessOpen ||
+      composerBlocked ||
       newSession ||
       !draft.trim()
     )

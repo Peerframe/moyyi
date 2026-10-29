@@ -1,5 +1,5 @@
 import type { FeatureContract } from "../../native/contract.ts";
-export const contract = { id: "effects", channels: {} } satisfies FeatureContract;
+import { initialState, validateState } from "./state.ts";
 
 export interface DesktopEffect {
   readonly effectId: string;
@@ -66,3 +66,20 @@ export const stateKeys = [
   "pendingApproval",
 ] as const satisfies readonly (keyof FeatureState)[];
 export type FeatureBridge = Record<never, never>;
+
+export const actionTypes = [
+  "approve",
+  "effects",
+  "effect.inspect",
+] as const satisfies readonly FeatureCommand["type"][];
+export type FeatureAction = Extract<
+  FeatureCommand,
+  { readonly type: (typeof actionTypes)[number] }
+>;
+export const contract = {
+  id: "effects",
+  commands: commandTypes,
+  actions: actionTypes,
+  state: { keys: stateKeys, validate: validateState, initialize: initialState },
+  channels: {},
+} satisfies FeatureContract;

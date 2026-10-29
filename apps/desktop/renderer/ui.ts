@@ -22,6 +22,7 @@ export interface RendererUI extends RendererBase, FeatureUI {
   busy: boolean;
   configuring: boolean;
   canSend: boolean;
+  composerBlocked: boolean;
 }
 export type ReadyRendererUI = RendererUI & { state: DesktopState };
 export const RendererContext = createContext<ReadyRendererUI | null>(null);

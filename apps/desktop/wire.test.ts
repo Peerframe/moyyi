@@ -1,8 +1,10 @@
 import { describe, expect, it } from "vitest";
+import { desktopStateSchema } from "./native/state-schema.ts";
 import type { DesktopState } from "./shared.ts";
 import { isDesktopState, isWorkerMessage, isWorkerRequest } from "./wire.ts";
 
 const state: DesktopState = {
+  ...desktopStateSchema.initialize({ options: {}, display: {} }),
   status: "ready",
   connection: { ready: true },
   settings: { preset: "flash", maxRequests: 3, timeoutMs: 120_000 },

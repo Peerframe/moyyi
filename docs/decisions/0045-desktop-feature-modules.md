@@ -17,8 +17,10 @@ contracts, host code and renderer code.
 
 ## Ownership
 
-Each feature contract owns its commands, state fields, bridge methods and IPC validation. The
-shared desktop DTO/API compose those types and retain the existing exports. Native handlers use
+Each feature contract owns its commands, renderer-callable action allowlist, state fields,
+initial state, state validation, bridge methods and IPC validation. The shared desktop DTO/API
+compose those types and retain the existing exports. State validation composes registered slices
+while retaining the common size limit, exact top-level keys and cross-slice identity constraints. Native handlers use
 the same trusted window/frame/origin check and the same bounded parser as before. Only native
 pickers and the existing File adapter supply selected paths. The worker revalidates commands.
 
@@ -44,7 +46,8 @@ nodes retain the current markup; this delivery adds no todo or new card renderin
 
 Feature controllers own their local React state. A fixed build-time composition preserves hook
 order; conditional registration is unsupported. Shared bridge hydration, action gating and
-layout coordination remain common infrastructure. Compatibility re-exports keep existing tests
+layout coordination remain common infrastructure. Dialogs declare their own composer-blocking
+predicate; the runtime combines those declarations without a central list of dialog flags. Compatibility re-exports keep existing tests
 and component entry points usable without duplicating views. New features use shared primitives
 and their own code, not another feature's compatibility export.
 

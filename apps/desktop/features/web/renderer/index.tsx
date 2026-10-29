@@ -65,6 +65,7 @@ declare module "../../../renderer/ui.ts" {
 export const rendererFeature: RendererFeature = {
   id: "web",
   useController,
+  blocksComposer: (ui) => ui.webAccessOpen,
   slots: [
     { id: "web.WebButton", slot: "header-actions", order: 10, Component: WebButton },
     { id: "web.Sources", slot: "after-messages", order: 40, Component: Sources },

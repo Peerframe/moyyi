@@ -1,30 +1,7 @@
 import type { CommandParser, FeatureContract } from "../../native/contract.ts";
 import { sessionIdentity } from "../../native/contract.ts";
 import type { DesktopArtifactPreview, DesktopState } from "../../shared.ts";
-export const contract = {
-  id: "materials",
-  channels: {
-    selectDocuments: { name: "moyyi:documents", result: "state", validate: sessionIdentity },
-    importFiles: {
-      name: "moyyi:import-files",
-      result: "state",
-      input: "files",
-      validate: (value: unknown, parse: CommandParser) => {
-        if (
-          !value ||
-          typeof value !== "object" ||
-          Array.isArray(value) ||
-          Object.keys(value).sort().join() !== "paths,sessionId"
-        )
-          throw Error("Invalid dropped files");
-        const command = parse({ ...value, type: "materials.import" });
-        if (command.type !== "materials.import") throw Error("Invalid dropped files");
-        return command;
-      },
-    },
-    pasteImage: { name: "moyyi:paste-image", result: "state", validate: sessionIdentity },
-  },
-} satisfies FeatureContract;
+import { initialState, validateState } from "./state.ts";
 
 export interface DesktopMaterial {
   readonly path: string;
@@ -109,3 +86,46 @@ export interface FeatureBridge {
   }): Promise<DesktopState>;
   pasteImage(options: { readonly sessionId: string }): Promise<DesktopState>;
 }
+
+export const actionTypes = [
+  "material.cancel",
+  "library",
+  "material.select",
+  "material.recycle",
+  "material.restore",
+  "material.purge",
+  "material.preview",
+  "material.housekeeping",
+  "material.remove",
+] as const satisfies readonly FeatureCommand["type"][];
+export type FeatureAction = Extract<
+  FeatureCommand,
+  { readonly type: (typeof actionTypes)[number] }
+>;
+export const contract = {
+  id: "materials",
+  commands: commandTypes,
+  actions: actionTypes,
+  state: { keys: stateKeys, validate: validateState, initialize: initialState },
+  channels: {
+    selectDocuments: { name: "moyyi:documents", result: "state", validate: sessionIdentity },
+    importFiles: {
+      name: "moyyi:import-files",
+      result: "state",
+      input: "files",
+      validate: (value: unknown, parse: CommandParser) => {
+        if (
+          !value ||
+          typeof value !== "object" ||
+          Array.isArray(value) ||
+          Object.keys(value).sort().join() !== "paths,sessionId"
+        )
+          throw Error("Invalid dropped files");
+        const command = parse({ ...value, type: "materials.import" });
+        if (command.type !== "materials.import") throw Error("Invalid dropped files");
+        return command;
+      },
+    },
+    pasteImage: { name: "moyyi:paste-image", result: "state", validate: sessionIdentity },
+  },
+} satisfies FeatureContract;

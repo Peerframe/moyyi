@@ -9,7 +9,8 @@ acceptance evidence is recorded in the [delivery record](../../../../docs/tasks/
 
 ## Structure
 
-- `contract.ts`: owned commands, DTO fields and validated IPC declarations.
+- `contract.ts`: owned commands, renderer-callable actions, DTO fields and validated IPC declarations.
+- `state.ts`: browser-safe initial projection and exact state validation.
 - `validation.ts`: trusted host command validation.
 - `host.ts`: command handling and interested runtime event projections.
 - `renderer/`: existing views, local UI state and declarative contributions.

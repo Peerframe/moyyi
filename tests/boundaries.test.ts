@@ -210,6 +210,37 @@ describe("layer boundaries", () => {
       expect(violations(contract, source)).toHaveLength(1);
   });
 
+  it("keeps feature state schemas and composed validators free of host authority", () => {
+    for (const file of [
+      "features/materials/state.ts",
+      "native/state-schema.ts",
+      "native/state-validation.ts",
+      "native/actions.ts",
+    ]) {
+      const path = join(repo, "apps/desktop", file);
+      for (const source of ['import "node:fs";', 'import "electron";', 'import "moyyi/runtime";'])
+        expect(violations(path, source)).toHaveLength(1);
+    }
+    expect(
+      violations(
+        join(repo, "apps/desktop/features/materials/state.ts"),
+        'import "../settings/state.ts";',
+      ),
+    ).toHaveLength(1);
+    expect(
+      violations(
+        join(repo, "apps/desktop/features/materials/state.ts"),
+        'import "../../host/service.ts";',
+      ),
+    ).toHaveLength(1);
+    expect(
+      violations(
+        join(repo, "apps/desktop/features/materials/state.ts"),
+        'import "./contract.ts"; import "../../native/state-validation.ts";',
+      ),
+    ).toEqual([]);
+  });
+
   it("scans TSX and does not use test support to widen production imports", () => {
     const renderer = join(repo, "apps/desktop/renderer");
     expect(sourceFiles(renderer)).toContain(join(renderer, "App.tsx"));
