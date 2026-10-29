@@ -22,12 +22,13 @@ const allowedLayers: Record<string, readonly string[]> = {
   runtime: ["contracts", "persisted", "core", "store", "context", "policy", "plugin:*"],
   cli: ["contracts", "persisted", "runtime"],
   evals: ["contracts", "persisted", "runtime", "plugin:*"],
-  "desktop:shared": [],
+  "desktop:shared": ["desktop:contract"],
+  "desktop:contract": ["desktop:shared", "desktop:security"],
   "desktop:security": [],
-  "desktop:wire": ["desktop:shared", "desktop:security"],
-  "desktop:preload": ["desktop:shared", "desktop:wire", "desktop:security"],
-  "desktop:renderer": ["desktop:shared"],
-  "desktop:host": ["desktop:shared", "desktop:wire", "desktop:security"],
+  "desktop:wire": ["desktop:shared", "desktop:contract", "desktop:security"],
+  "desktop:preload": ["desktop:shared", "desktop:contract", "desktop:wire", "desktop:security"],
+  "desktop:renderer": ["desktop:shared", "desktop:contract"],
+  "desktop:host": ["desktop:shared", "desktop:contract", "desktop:wire", "desktop:security"],
 };
 
 /** Layers that must stay free of I/O and third-party code outside tests. */
@@ -46,6 +47,28 @@ export function layerOf(file: string): string | null {
   if (parts[0] === "evals" || parts[0] === "tests") return parts[0];
   if (parts[0] === "apps") {
     if (parts[1] !== "desktop") return `app:${parts[1] ?? "unknown"}`;
+    if (parts[2] === "features" && parts.length >= 5) {
+      const area =
+        parts[4] === "renderer"
+          ? "renderer"
+          : ["contract.ts", "state.ts"].includes(parts[4]?.replace(/\.test(?=\.tsx?$)/, "") ?? "")
+            ? "contract"
+            : "host";
+      return `desktop:feature:${parts[3]}:${area}`;
+    }
+    if (parts[2] === "native" && parts.length === 4) {
+      return [
+        "contract.ts",
+        "contracts.ts",
+        "channels.ts",
+        "actions.ts",
+        "state-schema.ts",
+        "state-validation.ts",
+      ].includes(parts[3]?.replace(/\.test(?=\.tsx?$)/, "") ?? "")
+        ? "desktop:contract"
+        : "desktop:host";
+    }
+    if (parts[2] === "shared-feature-types.ts") return "desktop:shared";
     if (parts[2] === "renderer" && parts.length > 3) return "desktop:renderer";
     if (parts[2] === "host" && parts.length > 3) return "desktop:host";
     const name = parts.length === 3 ? parts[2]?.replace(/\.test(?=\.tsx?$)/, "") : "";
@@ -125,7 +148,20 @@ function skipTrivia(source: string, start: number): number {
 }
 
 function rulesFor(layer: string): readonly string[] | undefined {
-  return allowedLayers[layer.startsWith("plugin:") ? "plugin" : layer];
+  return allowedLayers[layer.startsWith("plugin:") ? "plugin" : desktopRole(layer)];
+}
+
+function desktopRole(layer: string): string {
+  return layer.startsWith("desktop:feature:") ? `desktop:${layer.split(":")[3]}` : layer;
+}
+
+function allowsDesktop(source: string, target: string): boolean {
+  const sourceFeature = source.startsWith("desktop:feature:") ? source.split(":")[2] : null;
+  const targetFeature = target.startsWith("desktop:feature:") ? target.split(":")[2] : null;
+  if (sourceFeature && targetFeature && sourceFeature !== targetFeature) return false;
+  const from = desktopRole(source),
+    to = desktopRole(target);
+  return from === to || (allowedLayers[from] ?? []).includes(to);
 }
 
 function allows(allowed: readonly string[], target: string): boolean {
@@ -150,7 +186,10 @@ export function violations(file: string, source: string): string[] {
       const target = layerOf(resolve(dirname(file), specifier));
       if (desktop && (target === null || !target.startsWith("desktop:"))) {
         out.push(`${relative(repo, file)}: desktop must use public package exports (${specifier})`);
-      } else if (target !== null && target !== layer && !allows(allowed, target)) {
+      } else if (
+        target !== null &&
+        (desktop ? !allowsDesktop(layer, target) : target !== layer && !allows(allowed, target))
+      ) {
         out.push(`${relative(repo, file)}: ${layer} may not import ${target} (${specifier})`);
       }
     } else if (desktop && !desktopPackageAllowed(layer, file, specifier, isTest)) {
@@ -170,6 +209,7 @@ function desktopPackageAllowed(
   specifier: string,
   isTest: boolean,
 ): boolean {
+  layer = desktopRole(layer);
   if (isTest && specifier === "vitest") return true;
   if (layer === "desktop:renderer") {
     return (
@@ -184,7 +224,8 @@ function desktopPackageAllowed(
     return (
       isBuiltin(specifier) ||
       ["moyyi/runtime", "moyyi/contracts"].includes(specifier) ||
-      (specifier === "electron" && /[/\\]main(?:\.test)?\.ts$/.test(file))
+      (specifier === "electron" &&
+        (/[/\\]main(?:\.test)?\.ts$/.test(file) || /[/\\]native[/\\]context\.ts$/.test(file)))
     );
   }
   return false;

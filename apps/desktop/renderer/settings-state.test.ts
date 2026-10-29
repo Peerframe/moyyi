@@ -1,12 +1,12 @@
 import { describe, expect, it, vi } from "vitest";
-import { DEFAULT_DESKTOP_SETTINGS, type DesktopSettings } from "../shared.ts";
 import {
   newSettingsDraft,
   saveSettingsDraft,
   selectKimiReasoningEffort,
   selectSettingsPreset,
   validateSettingsDraft,
-} from "./settings-state.ts";
+} from "../features/settings/renderer/settings-state.ts";
+import { DEFAULT_DESKTOP_SETTINGS, type DesktopSettings } from "../shared.ts";
 import { createActionGate } from "./view-state.ts";
 
 describe("desktop settings credential lifetime", () => {

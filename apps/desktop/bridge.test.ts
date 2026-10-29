@@ -1,6 +1,7 @@
 import { EventEmitter } from "node:events";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { DesktopProcess } from "./bridge.ts";
+import { desktopStateSchema } from "./native/state-schema.ts";
 import type { DesktopState } from "./shared.ts";
 
 const pipe = vi.hoisted(() => ({ fork: vi.fn() }));
@@ -23,6 +24,7 @@ class ChildPipe extends EventEmitter {
 }
 
 const initial: DesktopState = {
+  ...desktopStateSchema.initialize({ options: {}, display: {} }),
   status: "ready",
   connection: { ready: true },
   settings: { preset: "flash", maxRequests: 3, timeoutMs: 120_000 },

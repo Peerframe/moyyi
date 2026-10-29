@@ -1,10 +1,6 @@
 import { contextBridge, ipcRenderer, webUtils } from "electron";
-import type {
-  DesktopAction,
-  DesktopBridge,
-  DesktopMaintenanceResult,
-  DesktopState,
-} from "./shared.ts";
+import { channels, stateChannel } from "./native/channels.ts";
+import type { DesktopBridge, DesktopMaintenanceResult, DesktopState } from "./shared.ts";
 import { isDesktopState, isMaintenanceResult } from "./wire.ts";
 
 async function maintenance(channel: string): Promise<DesktopMaintenanceResult | null> {
@@ -12,43 +8,42 @@ async function maintenance(channel: string): Promise<DesktopMaintenanceResult | 
   if (value === null || isMaintenanceResult(value)) return value;
   throw Error("维护服务返回了无效结果。请重新打开应用核对。");
 }
-
 async function state(promise: Promise<unknown>): Promise<DesktopState> {
   const value = await promise;
   if (!isDesktopState(value)) throw Error("桌面服务返回了无效状态。");
   return value;
 }
-const bridge: DesktopBridge = {
-  createBackup: () => maintenance("moyyi:backup"),
-  restoreBackup: () => maintenance("moyyi:restore"),
-  rollbackApplication: () => maintenance("moyyi:rollback"),
-  getState: () => state(ipcRenderer.invoke("moyyi:state")),
-  selectWorkspace: (options: { askEachRead: boolean }) =>
-    state(ipcRenderer.invoke("moyyi:workspace", options)),
-  act: (command: DesktopAction) => state(ipcRenderer.invoke("moyyi:act", command)),
-  configure: (options) => state(ipcRenderer.invoke("moyyi:configure", options)),
-  selectDocuments: (options) => state(ipcRenderer.invoke("moyyi:documents", options)),
-  selectReportTarget: (options) => state(ipcRenderer.invoke("moyyi:report-target", options)),
-  configurePermissions: (options) => state(ipcRenderer.invoke("moyyi:permissions", options)),
-  configureWebAccess: (options) => state(ipcRenderer.invoke("moyyi:web-permissions", options)),
-  importFiles: (options) => {
-    if (!Array.isArray(options.files) || options.files.length < 1 || options.files.length > 8)
-      return Promise.reject(Error("最多导入8份文件。"));
-    const paths = options.files.map((file) => webUtils.getPathForFile(file));
-    if (paths.some((path) => !path)) return Promise.reject(Error("请拖放本机实际文件。"));
-    return state(ipcRenderer.invoke("moyyi:import-files", { sessionId: options.sessionId, paths }));
-  },
-  pasteImage: (options) => state(ipcRenderer.invoke("moyyi:paste-image", options)),
-  saveArtifact: (options) => state(ipcRenderer.invoke("moyyi:save-artifact", options)),
-  revealArtifact: (options) => state(ipcRenderer.invoke("moyyi:reveal-artifact", options)),
+const methods = Object.fromEntries(
+  [...channels].map(([method, channel]) => [
+    method,
+    (options: unknown) => {
+      if (channel.result === "maintenance") return maintenance(channel.name);
+      if (channel.input === "files") {
+        const input = options as Parameters<DesktopBridge["importFiles"]>[0];
+        if (!Array.isArray(input.files) || input.files.length < 1 || input.files.length > 8)
+          return Promise.reject(Error("最多导入8份文件。"));
+        const paths = input.files.map((file) => webUtils.getPathForFile(file));
+        if (paths.some((path) => !path)) return Promise.reject(Error("请拖放本机实际文件。"));
+        return state(ipcRenderer.invoke(channel.name, { sessionId: input.sessionId, paths }));
+      }
+      return state(
+        channel.input === "none"
+          ? ipcRenderer.invoke(channel.name)
+          : ipcRenderer.invoke(channel.name, options),
+      );
+    },
+  ]),
+);
+const bridge = {
+  ...methods,
   subscribe(listener: (snapshot: DesktopState) => void) {
     const handler = (_event: Electron.IpcRendererEvent, value: unknown) => {
       if (isDesktopState(value)) listener(value);
     };
-    ipcRenderer.on("moyyi:state", handler);
+    ipcRenderer.on(stateChannel.name, handler);
     return () => {
-      ipcRenderer.removeListener("moyyi:state", handler);
+      ipcRenderer.removeListener(stateChannel.name, handler);
     };
   },
-};
+} as DesktopBridge;
 contextBridge.exposeInMainWorld("moyyi", bridge);

@@ -181,6 +181,66 @@ describe("layer boundaries", () => {
     expect(violations(join(repo, "apps/other/index.ts"), "")).toHaveLength(1);
   });
 
+  it("isolates desktop features across host, contracts and renderer while retaining trust layers", () => {
+    for (const area of ["host.ts", "contract.ts", "renderer/index.tsx"]) {
+      const file = join(repo, "apps/desktop/features/materials", area);
+      const prefix = area.startsWith("renderer/") ? "../../" : "../";
+      for (const other of ["host.ts", "contract.ts", "renderer/index.tsx"])
+        expect(violations(file, `import "${prefix}web/${other}";`)).toHaveLength(1);
+    }
+    const renderer = join(repo, "apps/desktop/features/materials/renderer/index.tsx");
+    expect(
+      violations(
+        renderer,
+        'import "../contract.ts"; import "../../../renderer/RichMessage.tsx"; import "react";',
+      ),
+    ).toEqual([]);
+    for (const source of [
+      'import "../host.ts";',
+      'import "node:fs";',
+      'import "electron";',
+      'import "moyyi/runtime";',
+    ])
+      expect(violations(renderer, source)).toHaveLength(1);
+    const contract = join(repo, "apps/desktop/features/materials/contract.ts");
+    expect(
+      violations(contract, 'import "../../native/contract.ts"; import "../../shared.ts";'),
+    ).toEqual([]);
+    for (const source of ['import "./host.ts";', 'import "node:buffer";', 'import "electron";'])
+      expect(violations(contract, source)).toHaveLength(1);
+  });
+
+  it("keeps feature state schemas and composed validators free of host authority", () => {
+    for (const file of [
+      "features/materials/state.ts",
+      "native/state-schema.ts",
+      "native/state-validation.ts",
+      "native/actions.ts",
+    ]) {
+      const path = join(repo, "apps/desktop", file);
+      for (const source of ['import "node:fs";', 'import "electron";', 'import "moyyi/runtime";'])
+        expect(violations(path, source)).toHaveLength(1);
+    }
+    expect(
+      violations(
+        join(repo, "apps/desktop/features/materials/state.ts"),
+        'import "../settings/state.ts";',
+      ),
+    ).toHaveLength(1);
+    expect(
+      violations(
+        join(repo, "apps/desktop/features/materials/state.ts"),
+        'import "../../host/service.ts";',
+      ),
+    ).toHaveLength(1);
+    expect(
+      violations(
+        join(repo, "apps/desktop/features/materials/state.ts"),
+        'import "./contract.ts"; import "../../native/state-validation.ts";',
+      ),
+    ).toEqual([]);
+  });
+
   it("scans TSX and does not use test support to widen production imports", () => {
     const renderer = join(repo, "apps/desktop/renderer");
     expect(sourceFiles(renderer)).toContain(join(renderer, "App.tsx"));

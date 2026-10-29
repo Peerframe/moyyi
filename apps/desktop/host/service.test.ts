@@ -1024,3 +1024,82 @@ describe("desktop command validation", () => {
     expect(parseDesktopCommand({ type: "close" })).toEqual({ type: "close" });
   });
 });
+
+describe("desktop feature event publication", () => {
+  it("publishes completed result pages together and clears both old previews before publishing a new run", async () => {
+    const steps: Step[] = [
+      call("create", { path: "report.md", text: "RECORDED_REPORT" }),
+      answer("Report complete"),
+    ];
+    const f = await fixture(steps);
+    await f.host.dispatch({ type: "create", workspaceRoot: f.workspace, askEachRead: false });
+    const sessionId = required(f.host.getState().activeSessionId);
+    await f.host.dispatch({ type: "report.target", sessionId, path: "report.md" });
+    const pages: DesktopState[] = [];
+    const stopPages = f.host.subscribe((state) => pages.push(state));
+    await f.host.dispatch({ type: "start", sessionId, text: "Create the approved report" });
+    const pending = required(
+      (await waitFor(f.host, (state) => state.pendingApproval !== null)).pendingApproval,
+    );
+    await f.host.dispatch({
+      type: "approve",
+      effectId: pending.effectId,
+      digest: pending.digest,
+      decision: "approve",
+    });
+    await waitFor(f.host, (state) => state.artifacts.items.length === 1);
+    stopPages();
+    const receiptPages = pages.filter((state) =>
+      state.effects.items.some(
+        (effect) => effect.effectId === pending.effectId && effect.receipt?.kind === "file",
+      ),
+    );
+    expect(receiptPages.length).toBeGreaterThan(0);
+    for (const state of receiptPages)
+      expect(state.artifacts.items.some((artifact) => artifact.effectId === pending.effectId)).toBe(
+        true,
+      );
+
+    await f.host.dispatch({ type: "artifact.open", sessionId, effectId: pending.effectId });
+    await f.host.dispatch({ type: "effect.inspect", sessionId, effectId: pending.effectId });
+    expect(f.host.getState().artifactPreview?.text).toBe("RECORDED_REPORT");
+    expect(f.host.getState().effectInspection?.state).toBe("current");
+    const nextRun: DesktopState[] = [];
+    const stopRun = f.host.subscribe((state) => nextRun.push(state));
+    steps.push(answer("Next answer"));
+    await f.host.dispatch({ type: "start", sessionId, text: "Continue this conversation" });
+    await waitFor(f.host, (state) => state.outcome?.kind === "completed");
+    stopRun();
+    const running = nextRun.filter((state) => state.run !== null);
+    expect(running.length).toBeGreaterThan(0);
+    for (const state of running) {
+      expect(state.artifactPreview).toBeNull();
+      expect(state.effectInspection).toBeNull();
+    }
+    expect(f.requests).toHaveLength(3);
+  });
+
+  it("never publishes a cancelled outcome with its pending approval still displayed", async () => {
+    const f = await fixture([call("read", { path: "note.txt" })]);
+    await f.host.dispatch({ type: "create", workspaceRoot: f.workspace, askEachRead: true });
+    await f.host.dispatch({
+      type: "start",
+      sessionId: f.host.getState().activeSessionId,
+      text: "Read with approval",
+    });
+    const waiting = await waitFor(f.host, (state) => state.pendingApproval !== null);
+    const snapshots: DesktopState[] = [];
+    const stop = f.host.subscribe((state) => snapshots.push(state));
+    await f.host.dispatch({ type: "cancel", runId: required(waiting.run).id });
+    await waitFor(f.host, (state) => state.outcome?.kind === "cancelled");
+    stop();
+    const finished = snapshots.filter((state) => state.outcome?.kind === "cancelled");
+    expect(finished.length).toBeGreaterThan(0);
+    for (const state of finished) {
+      expect(state.run).toBeNull();
+      expect(state.pendingApproval).toBeNull();
+    }
+    expect(f.requests).toHaveLength(1);
+    expect(readFileSync(join(f.workspace, "note.txt"), "utf8")).toBe("ORIGINAL");
+  });
+});
