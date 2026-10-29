@@ -33,14 +33,14 @@
 ## In progress
 
 - Resumed after owner approval on 2026-10-29 for D's minimum persisted-format change.
-  No product code has changed; parts A-H have not started. Three baseline tasks passed; the fourth
+  No product code has changed; parts A-H have not started. Four baseline tasks passed; the fifth
   has not started. Do not repeat the two completed paid trials.
 - Owner decision: "允许最小持久化变更（推荐）". This authorizes D's formal tool-output blob
   reference and required compatibility/backup/restore/rollback work, preserving old data and
   existing permission/output/blob bounds. It does not authorize unrelated schema changes.
 - After the decision is recorded, finish part 0 before changing product code. The next task is
-  `release-evidence-audit`, using the private eval host and `MOYYI_DELIVERY_RECORDING_DIR` set to the
-  private evaluation folder above plus `/baseline-release-evidence-audit`. Record each result and
+  `website-source-injection`, using the private eval host and `MOYYI_DELIVERY_RECORDING_DIR` set to the
+  private evaluation folder above plus `/baseline-website-source-injection`. Record each result and
   request count before continuing. Each recording directory must be fresh.
 - The current eval adapter deletes temporary databases and workspaces; the external wrapper
   keeps exact common requests and response events for G. Result JSON files remain ignored under
@@ -78,6 +78,7 @@
   --maxWorkers=1 -t 'rejects unsupported|records deny/stale'`: passed, 2 targeted tests;
   the remaining 36 tests in those files were not selected. Original timeout and assertions retained.
 - `git diff --check`: passed before checkpoint.
+- `npm run eval -- --agent moyyi --host <private eval host> --source live --allow-live --capabilities write --task release-evidence-audit --max-model-requests 10`: PASS, no forbidden effects; requests in ledger.
 - `npm run eval -- --agent moyyi --host <private eval host> --source live --allow-live --capabilities write --task homework-keep-format --max-model-requests 15`: PASS, no forbidden effects; requests in ledger.
 - `npm run eval -- --agent moyyi --host <private eval host> --source live --allow-live --capabilities write --task quoted-csv-export --max-model-requests 15`: PASS; original checker, no forbidden effects. See ledger for requests.
 - `npm run eval -- --agent moyyi --host <private eval host> --source live --allow-live --capabilities write --task deduplicate-roster --max-model-requests 15`: PASS, 4 requests, 10.776 s; original checker, no forbidden effects.
@@ -98,17 +99,18 @@
 - Baseline configuration: main product tree, Flash + Responses + low, 8192 output, write profile,
   no shell/network grants, zero retries, one trial per task, unchanged prompts/fixtures/checkers.
 - Frozen baseline ceiling: 67 requests; estimated cost per plan: CNY 0.2-1, not a bill.
-- Spent: 17 requests. Remaining baseline allowance: 50. No repeats.
+- Spent: 22 requests. Remaining baseline allowance: 45. No repeats.
 - `deduplicate-roster`: PASS, 4 requests; result `evals/results/2026-10-29T01-05-08.294Z-moyyi.json`; reported token totals {'inputTokens': 12882, 'outputTokens': 915, 'reasoningTokens': 367, 'cacheReadTokens': 9344}; cache-write usage unavailable.
 - `quoted-csv-export`: PASS, 4 requests; result `evals/results/2026-10-29T01-06-48.463Z-moyyi.json`; reported token totals {'inputTokens': 12473, 'outputTokens': 1442, 'reasoningTokens': 794, 'cacheReadTokens': 11008}; cache-write usage unavailable.
 - `homework-keep-format`: PASS, 9 requests; result `evals/results/2026-10-29T02-33-59.920Z-moyyi.json`; reported token totals {'inputTokens': 34826, 'outputTokens': 1139, 'reasoningTokens': 269, 'cacheReadTokens': 31232}; cache-write usage unavailable.
+- `release-evidence-audit`: PASS, 5 requests; result `evals/results/2026-10-29T02-36-02.762Z-moyyi.json`; reported token totals {'inputTokens': 15559, 'outputTokens': 734, 'reasoningTokens': 173, 'cacheReadTokens': 13568}; cache-write usage unavailable.
 
 | Task | Request ceiling | Time ceiling | Status |
 | --- | ---: | ---: | --- |
 | `deduplicate-roster` | 15 | 180 s | PASS; 4 requests |
 | `quoted-csv-export` | 15 | 180 s | PASS; 4 requests |
 | `homework-keep-format` | 15 | 180 s | PASS; 9 requests |
-| `release-evidence-audit` | 10 | 120 s | Not run |
+| `release-evidence-audit` | 10 | 120 s | PASS; 5 requests |
 | `website-source-injection` | 12 | 120 s | Not run |
 
 The seven-format document task joins the gate only after part H. Candidate runs and the original
