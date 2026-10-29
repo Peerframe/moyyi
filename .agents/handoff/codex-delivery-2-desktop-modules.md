@@ -1,41 +1,42 @@
 # Handoff: delivery two desktop modules
 - Brief: docs/tasks/2026-10-29-delivery-2-desktop-modules.md
-- Branch / previous checkpoint: codex/delivery-2-desktop-modules / 2f61976 (part A; current checkpoint records full source checks)
-- Last agent: Codex, 2026-10-29 17:17 Asia/Singapore
+- Branch / previous source checkpoint: codex/delivery-2-desktop-modules / 7d74c95
+- Last agent: Codex, 2026-10-29 09:55 Asia/Singapore
 - Worktree: /Users/yxflc/.codex/worktrees/delivery-2-desktop-modules/moyyi
 
 ## Done
-- A: Nine feature modules, browser-safe contracts, unique command/IPC ownership, environment-specific generated registries and feature state ownership checks. Main and App are composition shells.
-- Renderer slots/state extraction preserves byte-identical HTML in 13 baseline states. Existing component compatibility exports retain tests and licenses.
-- Architecture boundary and contributor mechanical checks, ADR 0045, feature READMEs and recipe added.
-- Independent host review found a refactor-only intermediate snapshot issue; fixed by batching each runtime event's projection writes. Two added public-host integration tests pass.
+- Nine feature modules, static generated registration, checked command/state ownership, pure state initialization/validation and explicit renderer action allowlists. Main and App are composition shells.
+- Declarative slots and module-owned UI state/dialog blocking. All 32 original dialog combinations and 13 rendered HTML states remain identical.
+- Real isolated extra-module test proves directory plus list entry extension, including typecheck, initialization, state bounds, routing and native-only rejection.
+- Final source check: 155 files / 2985 tests plus typecheck/lint passed. Wire differential: 10,682 inputs identical; 34 state fields / 33 commands / 25 renderer actions / 8 native-only commands unchanged.
+- ADR, recipe, module READMEs, architecture and contributor mechanical checks included.
+- Earlier 00da51e package and external M1–M6 gates passed; final source package must be rebuilt.
+- Baseline native import/read/approve/preview/restart/history/save completed with four synthetic requests.
 
 ## In progress
-- B: Full source verification passed after replacing a symlinked node_modules with actual dependencies. The identical external checkout also failed with a symlink and passed PDF parsing with a real dependency copy; no sandbox/product change was required. All 154 files / 2981 tests now pass in the managed worktree.
-- Next: rebuild the final clean checkpoint package, run external desktop gates, finish native baseline/candidate import/read/approve/preview/save/restart acceptance and screenshots, then one PR. Baseline isolated app currently running from ~/Applications/moyyi-desktop-modules-baseline, task complete with preview open; 4 synthetic requests. Daily app/data untouched and backed up under ~/.moyyi/reviews/desktop-modules-2026-10-29/owner-before.
-- No active writers at this checkpoint. Subagents' implementation and review turns finished. No paid run exists.
+- Rebuild this clean checkpoint with desktop:package and run verify:desktop.
+- Candidate fixture ~/Applications/moyyi-desktop-modules-candidate still has old 00da51e app and empty store. Replace app before launch, reinstall only fixture worker/config.
+- Complete candidate native flow and baseline/candidate normal/narrow screenshots; then one PR.
+- Baseline currently runs from ~/Applications/moyyi-desktop-modules-baseline with report preview open. Native copy saved as saved/modules-report.md. Normal HOME fixes the earlier system Save panel disabled by overridden HOME; worker store remains isolated. Use dedicated --user-data-dir=<root>/chromium.
+- CUA pointer resize unavailable. Documented fallback: quit, adjust only copied main initial width/height to 780/560, record hashes, capture, quit and restore original main. No source or package mutation.
+- No active code writers or paid runs. Daily app/data untouched; 235 protected file hashes matched. Backup/evidence in ~/.moyyi/reviews/desktop-modules-2026-10-29.
 
-## Collected problems (fix pass)
-- Native minimum is 780 px; M6 evidence is 1120×800 / 780×560. Delivery-zero design/skill said 560. Keep native behavior; document 560 CSS-layer validation separately.
-- No confirmed M6 behavioral defect or format/security change identified. Stop for brief section 8 if one is confirmed.
+## Collected problems
+- Native minimum stays 780 px; M6 normal/narrow sizes 1120x800 and 780x560. 560 px is a separate CSS diagnostic outside the native range; header clipping there is not claimed as supported native behavior.
+- No confirmed M6 behavior defect, format change or security relaxation. Stop for brief section 8 if confirmed.
+- A documentation write failed on shell input encoding immediately before 7d74c95; this following wip checkpoint records the completed stage.
 
 ## Commands run
-- Baseline vitest service/m6/main: 66 passed.
-- Extracted host service/m6/web-service: 31 passed.
-- Main/security/wire/preload: 59 passed.
-- Renderer suite: 45 passed; parity script: 13/13 identical baseline HTML.
-- Host ownership/boundary/service/m6/web-service: 48 passed before event publication regression addition.
-- service.test.ts after publication regression addition: 24 passed.
-- Prior npm run check with symlinked dependencies: typecheck and lint passed; 152 test files passed, 2 failed; 2943 passed / 36 parser failures. Log: /tmp/moyyi-delivery2-check-a.log. No assertions removed or widened.
-- npm run check with actual dependencies: passed typecheck/lint and 154 files / 2981 tests; /tmp/moyyi-delivery2-check-c.log.
-- Native fixture sanity against installed M6 host: real IPC/parser flow and restart passed, 4 synthetic requests / 0 network / 0 credential reads; native UI not yet verified. Fixture data cleaned.
+- Final npm run check: 155 files / 2985 tests, typecheck/lint passed; /tmp/moyyi-delivery2-check-final.log.
+- Renderer: 47 tests; parity 13/13 identical. Final targeted extension/boundary/wire/bridge/service: 59 passed.
+- Prior npm run check: 154 files / 2981 passed after replacing symlink node_modules with actual dependencies. Prior symlink failures did not require sandbox/product/assertion changes.
+- Prior 00da51e desktop:package and verify:desktop passed; logs /tmp/moyyi-delivery2-package-final.log and /tmp/moyyi-delivery2-verify-desktop.log.
+- Wire comparison script /tmp/moyyi-wire-parity.mjs retained.
 
 ## Paid usage ledger
-- Frozen budget: 0 real model requests.
-- Spent: 0; remaining: 0. Synthetic fixtures are offline and separate.
+- Frozen real model budget: 0. Spent: 0. Remaining: 0.
+- Baseline fixture: 4 synthetic requests, no network or credentials; restart must remain at 4.
 
-## Decisions taken / waiting for the owner
-- Single feature-list.json with generated static entry graphs; no new dependencies or dynamic loading.
-- Shared lifecycle invalidation coordinates cross-feature resets; feature patches are checked against declared keys.
-- Preserve the original checkout's uncommitted docs/tasks/2026-10-26-optimization-plan.md; never stage it here.
-- One PR; Claude reviews and accepts. No merge/daily replacement or public release has been performed.
+## Decisions / owner
+- One PR, Claude review and acceptance. No merge or daily replacement.
+- Preserve original checkout's uncommitted docs/tasks/2026-10-26-optimization-plan.md.

@@ -38,8 +38,10 @@ worker, using actual absolute paths:
 }
 ```
 
-Launch the copy's executable with `HOME` set to this fixture's `home/`, not through LaunchServices
-(which may reuse the daily process). Perform these native operations:
+Launch the copy's executable directly with normal macOS `HOME` and a dedicated
+`--user-data-dir=<fixture>/chromium`; do not use LaunchServices, which may reuse another process.
+The replacement worker isolates the store/settings and rejects credentials and network. Changing
+`HOME` can disable the macOS Save panel and is not needed for isolation. Perform these operations:
 
 1. Select `workspace/` and leave per-read approval off.
 2. Import `external/aster.pdf` and `external/birch.docx` with the native document picker; confirm
@@ -66,3 +68,9 @@ show read-only reopened grants, retained materials and the report preview backed
 receipt. `native-requests.json` contains only this public fixture's synthetic requests. Native
 screenshots and interaction receipts remain separate evidence; running the worker without those
 interactions does not establish native acceptance.
+
+If UI automation cannot drag window edges, quit the disposable app and change only its copied
+main bundle's initial `width: 1120` / `height: 800` to `780` / `560`. Record original/instrumented
+hashes, keep the minimum and all other bytes unchanged, and restore the original after capture.
+Use the same geometry-only setup for baseline and candidate, and label the evidence accordingly.
+This never changes source or the packaged deliverable.
