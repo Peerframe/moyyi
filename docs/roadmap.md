@@ -30,10 +30,10 @@ Claude writes the brief and accepts the result; Codex implements it.
 
 | Delivery | User outcome | Status |
 |---|---|---|
-| **Zero: agent environment** | Shared `AGENTS.md`, skill library, design rules, handoff for switching accounts or models | In review ([brief](tasks/2026-10-29-delivery-0-vibe-coding-env.md)) |
-| **One: model experience aligned with DeepSeek Harness** | Better task completion through a todo list, repeat reminders, read-tool timeouts, output spill and pruning, prompt assembly, DeepSeek adapter review and keyless replay tests | Ready ([brief](tasks/2026-10-29-delivery-1-dsh-model-experience.md)) |
-| **Two: desktop feature modules** | Each desktop feature in its own module with declarative UI slots; no behavior change | Ready, parallel with one ([brief](tasks/2026-10-29-delivery-2-desktop-modules.md)) |
-| **Three: settings, Skills and search** | Model connections (P07/P08), personal instructions (P09), a Skills library (P10), a search backend with recorded sources (P15), todo display, and stopping and switching connection when a model's quota runs out | After one and two |
+| **Zero: agent environment** | Shared `AGENTS.md`, skill library, design rules, handoff for switching accounts or models | Accepted ([PR #51](https://github.com/Peerframe/moyyi/pull/51)) |
+| **One: model experience aligned with DeepSeek Harness** | Better task completion through a todo list, repeat reminders, read-tool timeouts, output spill and pruning, prompt assembly, DeepSeek adapter review and keyless replay tests | Accepted ([PR #53](https://github.com/Peerframe/moyyi/pull/53), [record](tasks/2026-10-29-delivery-1-model-experience-record.md)) |
+| **Two: desktop feature modules** | Each desktop feature in its own module with declarative UI slots; no behavior change | Accepted ([PR #52](https://github.com/Peerframe/moyyi/pull/52), [record](tasks/2026-10-29-desktop-modules-delivery.md)) |
+| **Three: settings, Skills and search** | Model connections (P07/P08), personal instructions (P09), a Skills library (P10), a search backend with recorded sources (P15), todo display, and stopping and switching connection when a model's quota runs out | Next |
 | **Four: conditional capabilities** | Reviewed memory (P17), MCP tools (P18), image OCR (P12), controlled browser (P16), schedules and notifications (P20/P21) | Each starts when the owner uses it weekly or a real eval task needs it |
 
 Every new store added by deliveries three and four extends backup, restore and software rollback

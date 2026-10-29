@@ -113,5 +113,5 @@ Every screen and card defines each state it can reach:
 
 ## Acceptance for UI changes
 
-A PR that changes visible UI includes screenshots at normal width and at 560 px, covering the
+A PR that changes visible UI includes native screenshots at 1120 × 800 and 780 × 560 px, covering the
 states it changed. Visual changes without a brief stay small and use existing components.

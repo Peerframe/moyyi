@@ -27,7 +27,7 @@ Read [docs/design.md](../../../docs/design.md) and [apps/desktop/AGENTS.md](../.
 7. **Accessibility.** Every control is reachable by keyboard with a visible focus ring; respect
    reduced motion.
 8. **Verify.** Run the renderer tests, build the app, and capture screenshots at normal width and
-   at the minimum width (560 px). Attach them to the PR.
+   at the native minimum (780 × 560 px). Attach them to the PR.
 
 ## Review questions
 

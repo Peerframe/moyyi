@@ -26,7 +26,8 @@ working loop, normal completion or a large passing test suite does not prove fac
 |---|---|
 | Desktop app | M6, verified package source `e0c26bd7`, ZIP SHA-256 `ebc157f9…6441`; merged at `8dd5343` ([PR #50](https://github.com/Peerframe/moyyi/pull/50)); macOS arm64 only |
 | CLI | Installed from the same verified tarball; shares the session store with the desktop |
-| Session store | Schema 3. M5 and the older PR #41 CLI cannot open it; rollback requires the paired pre-upgrade backup kept with the old programs |
+| Session store | Schema 3, persisted format 1. M5 and the older PR #41 CLI cannot open it; rollback requires the paired pre-upgrade backup kept with the old programs |
+| Main, not installed | Deliveries one and two. Opening the store upgrades it to format 2 (schema stays 3), which the installed M6 CLI and desktop reject: back up, then upgrade both programs together ([installation](installation.md)) |
 | Daily settings | Flash, low, 3 requests, 120 s, zero retries; optional Kimi `kimi-k3.1-pro` connection |
 | Public version | None |
 
@@ -53,15 +54,16 @@ commands and limits.
 
 ## Answer quality
 
-The largest open problem. The original six-item source-analysis task is still a strict FAIL: the
-best answers (Flash with 8 requests; Kimi high with 5 requests) meet items 1, 2, 3 and 5 and only
-partly meet 4 and 6. The required evidence reached the model; the answers omitted two required
-conclusions. The latest Flash attempt returned HTTP 429 with no answer and counts as unavailable.
+The largest open problem. The original six-item source-analysis task is still a strict FAIL. Before
+delivery one, the best answers (Flash with 8 requests; Kimi high with 5 requests) met items 1, 2, 3
+and 5 and only partly met 4 and 6. After delivery one, the single frozen run (Flash, 7 of 8
+requests) met 1, 2 and 5, failed 3 and partly met 4 and 6: it misread code it had read and omitted
+two conclusions. Evidence reached the model in every run; the failures are interpretation.
 
-Next step: [delivery one](tasks/2026-10-29-delivery-1-dsh-model-experience.md) aligns moyyi's
-model experience with DeepSeek Harness (todo list, repeat reminders, output spill, prompt
-assembly), measured by the frozen [quality gate](tasks/2026-10-28-post-m6-plan.md#5-质量门) and one
-run of the original task with its frozen budget.
+Delivery one ([record](tasks/2026-10-29-delivery-1-model-experience-record.md)) passed the frozen
+[quality gate](tasks/2026-10-28-post-m6-plan.md#5-质量门) with no regression: six of six tasks,
+27 requests, against five of five and 27 requests at baseline. The model used `todo_write`
+unprompted once but did not keep it updated; this shows use, not reliable checklist completion.
 
 | Closed route | What it showed | Do not |
 |---|---|---|
@@ -120,10 +122,10 @@ Plan: [post-M6 plan v2](tasks/2026-10-28-post-m6-plan.md). Order is owned by the
 | M4 maintenance and combined acceptance | Owner-accepted with the known quality gap | [PR #47](https://github.com/Peerframe/moyyi/pull/47), [receipt](tasks/2026-10-28-desktop-m4.md) |
 | M5 web pages and recorded sources | Accepted, installed | [PR #48](https://github.com/Peerframe/moyyi/pull/48), [receipt](tasks/2026-10-28-desktop-m5.md) |
 | M6 materials, previews, history | Accepted, installed daily | [PR #50](https://github.com/Peerframe/moyyi/pull/50), [receipt](tasks/2026-10-28-desktop-m6.md) |
-| Delivery zero: agent environment | In review | [PR #51](https://github.com/Peerframe/moyyi/pull/51), [brief](tasks/2026-10-29-delivery-0-vibe-coding-env.md) |
-| Delivery one: model experience aligned with DSH | Ready for Codex | [Brief](tasks/2026-10-29-delivery-1-dsh-model-experience.md) |
-| Delivery two: desktop feature modules | Implemented; source, package and native checks passed; in review | [PR #52](https://github.com/Peerframe/moyyi/pull/52), [record](tasks/2026-10-29-desktop-modules-delivery.md) |
-| Delivery three: settings, Skills, search | Planned after one and two | [Plan](tasks/2026-10-28-post-m6-plan.md) |
+| Delivery zero: agent environment | Accepted, merged | [PR #51](https://github.com/Peerframe/moyyi/pull/51), [brief](tasks/2026-10-29-delivery-0-vibe-coding-env.md) |
+| Delivery one: model experience aligned with DSH | Accepted, merged; not installed. Gate 6/6, original task still FAIL | [PR #53](https://github.com/Peerframe/moyyi/pull/53), [record](tasks/2026-10-29-delivery-1-model-experience-record.md) |
+| Delivery two: desktop feature modules | Accepted, merged; not installed. No behavior change | [PR #52](https://github.com/Peerframe/moyyi/pull/52), [record](tasks/2026-10-29-desktop-modules-delivery.md) |
+| Delivery three: settings, Skills, search | Next; brief not yet written | [Plan](tasks/2026-10-28-post-m6-plan.md) |
 | Delivery four: conditional capabilities | Triggered per item | [Plan](tasks/2026-10-28-post-m6-plan.md) |
 
 ## Boundaries

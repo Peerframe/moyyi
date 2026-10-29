@@ -7,6 +7,14 @@ Owner 已授权先做整体计划，再针对已证实的缺口优化。本计�
 
 ## 持续交付：日常任务闭环（当前）
 
+### 2026-10-29：交付零、一、二验收
+
+三项交付均由 Claude 审查验收并合并：交付零 [PR #51](https://github.com/Peerframe/moyyi/pull/51)，
+交付二 [PR #52](https://github.com/Peerframe/moyyi/pull/52)（[记录](2026-10-29-desktop-modules-delivery.md)），
+交付一 [PR #53](https://github.com/Peerframe/moyyi/pull/53)（[记录](2026-10-29-delivery-1-model-experience-record.md)）。
+交付一的质量门六题全过、无退步，共 69 次付费请求；原源码分析题一次运行仍严格 FAIL。
+交付一把持久化格式升为 2（owner 批准），日常安装仍是 M6，安装需配对升级 CLI 与桌面端并先备份。
+
 ### 2026-10-29：转入 M6 之后的计划 v2
 
 M6 已合并并作为日常版本安装（[PR #50](https://github.com/Peerframe/moyyi/pull/50)）。之后的交付由
