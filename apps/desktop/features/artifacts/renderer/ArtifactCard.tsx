@@ -3,8 +3,8 @@
  * Copyright (c) 2026 OpenBot contributors. MIT; see OPENBOT-LICENSE.txt.
  * moyyi resolves receipt identities in the host; no arbitrary URL or file path is opened. */
 import { useEffect, useRef, useState } from "react";
-import type { DesktopArtifact } from "../../../shared.ts";
 import { artifactStateLabel, createActionGate } from "../../../renderer/view-state.ts";
+import type { DesktopArtifact } from "../../../shared.ts";
 
 export function ArtifactCard({
   artifact,

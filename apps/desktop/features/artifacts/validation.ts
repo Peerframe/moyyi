@@ -1,8 +1,10 @@
-import { Buffer } from "node:buffer";
-import { isAbsolute } from "node:path";
-import { containsControl, identifier, invalid, page, path, type ExactKeys } from "../../host/validation-primitives.ts";
-import { parseSettings, validateApiKey } from "../../host/settings-schema.ts";
-import { normalizeDesktopWebAccess } from "../../host/web.ts";
+import {
+  type ExactKeys,
+  identifier,
+  invalid,
+  page,
+  path,
+} from "../../host/validation-primitives.ts";
 import type { FeatureCommand } from "./contract.ts";
 export function validateCommand(input: Record<string, unknown>, exact: ExactKeys): FeatureCommand {
   switch (input.type) {
@@ -26,7 +28,8 @@ export function validateCommand(input: Record<string, unknown>, exact: ExactKeys
     case "artifact.close":
       exact(["type"]);
       break;
-    default: throw invalid();
+    default:
+      throw invalid();
   }
   return { ...input } as FeatureCommand;
 }

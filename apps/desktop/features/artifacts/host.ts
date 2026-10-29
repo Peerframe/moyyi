@@ -1,51 +1,6 @@
-import { defineHostFeature } from "../../host/feature.ts";
-import { commandTypes, stateKeys } from "./contract.ts";
-import { Buffer } from "node:buffer";
-import { realpath, stat } from "node:fs/promises";
-import type {
-  ActionDigest,
-  ClientCommand,
-  EffectId,
-  RunId,
-  RuntimeEvent,
-  SessionId,
-  SessionQuery,
-  TranscriptEntry,
-} from "moyyi/contracts";
-import {
-  createRuntime,
-  discoverNodeToolchain,
-  type Runtime,
-  type RuntimeOptions,
-  WebPolicy,
-} from "moyyi/runtime";
-import {
-  DEFAULT_DESKTOP_SETTINGS,
-  type DesktopApproval,
-  type DesktopCommand,
-  type DesktopMessage,
-  type DesktopPermissions,
-  type DesktopSessionSummary,
-  type DesktopSettings,
-  type DesktopState,
-  type DesktopWebAccess,
-} from "../../shared.ts";
-import { inspectEffectFile } from "../../host/effects.ts";
-import { imagePreview } from "../../host/image-preview.ts";
-import { ManagedMaterials } from "../../host/managed-materials.ts";
-import { FileBoundaryError, inspectMaterials } from "../../host/materials.ts";
-import { DesktopPolicy } from "../../host/permissions.ts";
+import { BoundaryError, defineHostFeature } from "../../host/feature.ts";
 import { inspectReport, reportTarget } from "../../host/reports.ts";
-import { parseDesktopCommand } from "../../host/validation.ts";
-import {
-  appendWebSource,
-  EMPTY_WEB_ACCESS,
-  normalizeDesktopWebAccess,
-  projectWebSource,
-} from "../../host/web.ts";
-
-import type { HostContext, HostFeature } from "../../host/feature.ts";
-import { BoundaryError, clip, MESSAGE_BYTES } from "../../host/feature.ts";
+import { commandTypes, stateKeys } from "./contract.ts";
 
 export const hostFeature = defineHostFeature({
   id: "artifacts",
@@ -102,29 +57,30 @@ export const hostFeature = defineHostFeature({
           event.page.workspaceRoot !== host.state.workspaceRoot
         )
           return;
-        if (host.resultsDestination !== "effects") host.update({
-                artifacts: {
-                  offset: event.page.offset,
-                  hasMore: event.page.hasMore,
-                  items: event.page.effects.flatMap((effect) =>
-                    effect.tool === "create" &&
-                    effect.state === "succeeded" &&
-                    effect.receipt?.kind === "file" &&
-                    effect.receipt.beforeHash === null &&
-                    effect.receipt.afterHash !== null
-                      ? [
-                          {
-                            effectId: effect.effectId,
-                            path: effect.receipt.path,
-                            afterHash: effect.receipt.afterHash,
-                            state: "unchecked" as const,
-                          },
-                        ]
-                      : [],
-                  ),
-                },
-                artifactPreview: null,
-        });
+        if (host.resultsDestination !== "effects")
+          host.update({
+            artifacts: {
+              offset: event.page.offset,
+              hasMore: event.page.hasMore,
+              items: event.page.effects.flatMap((effect) =>
+                effect.tool === "create" &&
+                effect.state === "succeeded" &&
+                effect.receipt?.kind === "file" &&
+                effect.receipt.beforeHash === null &&
+                effect.receipt.afterHash !== null
+                  ? [
+                      {
+                        effectId: effect.effectId,
+                        path: effect.receipt.path,
+                        afterHash: effect.receipt.afterHash,
+                        state: "unchecked" as const,
+                      },
+                    ]
+                  : [],
+              ),
+            },
+            artifactPreview: null,
+          });
         break;
       case "run.started":
         if (event.sessionId !== host.eventState.activeSessionId) return;

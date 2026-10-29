@@ -1,9 +1,9 @@
 import { useLayoutEffect, useRef } from "react";
-import type { DesktopArtifact, DesktopState } from "../../../shared.ts";
-import { ArtifactCard } from "./ArtifactCard.tsx";
 import { BoundedImage } from "../../../renderer/BoundedImage.tsx";
 import { RichMessage } from "../../../renderer/RichMessage.tsx";
 import { formatBytes } from "../../../renderer/view-state.ts";
+import type { DesktopArtifact, DesktopState } from "../../../shared.ts";
+import { ArtifactCard } from "./ArtifactCard.tsx";
 
 export function ArtifactsPanel({
   artifacts,
