@@ -31,7 +31,7 @@ export function privateDirectory(path: string, create = false): void {
   }
 }
 export function readPrivateSettingsFile(path: string, limit: number): Buffer {
-  const fd = openSync(path, constants.O_RDONLY | constants.O_NOFOLLOW);
+  const fd = openSync(path, constants.O_RDONLY | constants.O_NOFOLLOW | constants.O_NONBLOCK);
   try {
     const s = fstatSync(fd);
     if (

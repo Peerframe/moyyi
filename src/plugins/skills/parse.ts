@@ -27,7 +27,8 @@ export function parseSkill(
   try {
     if (bytes(text) > MAX_SKILL_BYTES || invalidControls(text.replaceAll("\r\n", "\n")))
       throw Error();
-    const markdown = text.replaceAll("\r\n", "\n");
+    // A UTF-8 signature is framing, but remains in the original text and its content hash.
+    const markdown = (text.startsWith("\uFEFF") ? text.slice(1) : text).replaceAll("\r\n", "\n");
     const match = /^---\n([\s\S]*?)\n---(?:\n|$)([\s\S]*)$/u.exec(markdown);
     const header = match?.[1],
       body = match?.[2];

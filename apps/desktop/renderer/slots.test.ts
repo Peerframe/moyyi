@@ -48,7 +48,10 @@ describe("build-time desktop slots", () => {
       "permissions.PermissionsDialogSlot",
       "web.WebDialog",
     ]);
-    expect(slots.settings.map((item) => item.id)).toEqual(["settings.connection", "preferences.entry"]);
+    expect(slots.settings.map((item) => item.id)).toEqual([
+      "settings.connection",
+      "preferences.entry",
+    ]);
     expect(slots.contributions("after-messages").map((item) => item.id)).toEqual([
       "effects.Approval",
       "conversation.Outcome",

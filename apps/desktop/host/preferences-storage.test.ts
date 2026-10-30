@@ -1,3 +1,4 @@
+import { execFileSync } from "node:child_process";
 import { createHash } from "node:crypto";
 import {
   existsSync,
@@ -12,8 +13,17 @@ import {
 } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
+import {
+  canonicalizeJson,
+  type ModelStreamEvent,
+  type RuntimeEvent,
+  UNKNOWN_USAGE,
+} from "moyyi/contracts";
+import { createRuntime } from "moyyi/runtime";
 import { afterEach, expect, it } from "vitest";
+import { scriptedProvider } from "../../../src/plugins/provider-scripted/index.ts";
 import type { CredentialVault } from "./keychain.ts";
+import { runDataMaintenance } from "./maintenance.ts";
 import { createPreferencesStorage } from "./preferences-storage.ts";
 import { createModelConfiguration } from "./settings.ts";
 
@@ -88,7 +98,8 @@ it("requires review confirmation, imports only immutable SKILL.md, enables one d
   expect(before.review?.omitted).toEqual(["script.sh"]);
   expect(before.skills).toEqual([]);
   expect(existsSync(join(home, ".moyyi/desktop/skills"))).toBe(false);
-  const review = before.review!;
+  const review = before.review;
+  if (!review) throw Error("Missing review");
   await expect(c.preferences.importSkill("wrong-review")).rejects.toThrow();
   const imported = await c.preferences.importSkill(review.id);
   expect(imported.skills[0]?.enabled).toBe(false);
@@ -101,7 +112,8 @@ it("requires review confirmation, imports only immutable SKILL.md, enables one d
     sha256: review.sha256,
   });
   source(home, "A second immutable version.");
-  const next = (await c.preferences.inspectSkill(dir)).review!;
+  const next = (await c.preferences.inspectSkill(dir)).review;
+  if (!next) throw Error("Missing review");
   await c.preferences.importSkill(next.id);
   await c.preferences.setSkillEnabled(next.sha256, true);
   expect(
@@ -134,3 +146,129 @@ it("checks cancellation before reading either trusted source", async () => {
   await expect(c.preferences.readPersonal(stop.signal)).rejects.toThrow();
   await expect(c.preferences.librarySource.list(stop.signal)).rejects.toThrow();
 });
+
+it("preserves BOM bytes through review, runtime source verification and backup", async () => {
+  const { home, c } = fixture(),
+    { dir, text } = source(home);
+  const original = `\uFEFF${text}`,
+    personal = "\uFEFFKeep the original source bytes.";
+  writeFileSync(join(dir, "SKILL.md"), original);
+  const review = (await c.preferences.inspectSkill(dir)).review;
+  if (!review) throw Error("Missing review");
+  const sha = createHash("sha256").update(original).digest("hex");
+  expect(review).toMatchObject({ text: original, sha256: sha });
+  await c.preferences.importSkill(review.id);
+  await c.preferences.setSkillEnabled(sha, true);
+  const personalHash = createHash("sha256").update(personal).digest("hex");
+  expect(await c.preferences.savePersonal(personal)).toMatchObject({
+    personalInstructions: personal,
+    personalInstructionsHash: personalHash,
+  });
+  expect(await c.preferences.readPersonal(signal())).toEqual({
+    text: personal,
+    sha256: personalHash,
+  });
+  expect(await c.preferences.librarySource.read("check-marker", sha, signal())).toEqual({
+    text: original,
+    sha256: sha,
+  });
+  const completed: Extract<ModelStreamEvent, { type: "completed" }> = {
+    type: "completed",
+    stopReason: "end_turn",
+    providerStopReason: null,
+    usage: UNKNOWN_USAGE,
+  };
+  const scripted = scriptedProvider([
+    [
+      {
+        type: "part_completed",
+        index: 0,
+        part: {
+          type: "tool_call",
+          callId: "bom-skill-call" as import("moyyi/contracts").ToolCallPart["callId"],
+          providerCallId: "bom-skill-call",
+          providerItemId: null,
+          name: "read_skill",
+          rawArguments: '{"name":"check-marker"}',
+          argumentsSource: "verbatim",
+        },
+      },
+      { ...completed, stopReason: "tool_use" },
+    ],
+    [{ type: "part_completed", index: 0, part: { type: "text", text: "Done." } }, completed],
+  ]);
+  const runtime = await createRuntime({
+    dataDirectory: join(home, ".moyyi/deepseek-data"),
+    model: { provider: "scripted", model: "scripted" },
+    plugins: [{ plugin: scripted.plugin }],
+    personalInstructions: c.preferences.readPersonal,
+    skillLibrary: c.preferences.librarySource,
+  });
+  const events: RuntimeEvent[] = [];
+  runtime.subscribe((event) => events.push(event));
+  try {
+    await runtime.send({ type: "session.create", workspaceRoot: dir });
+    const ready = events.find((event) => event.type === "session.ready");
+    if (ready?.type !== "session.ready") throw Error("Missing session");
+    await runtime.send({
+      type: "run.start",
+      sessionId: ready.sessionId,
+      input: [{ type: "text", text: "Read the enabled skill." }],
+    });
+    await runtime.idle();
+    expect(events.findLast((event) => event.type === "run.finished")).toMatchObject({
+      outcome: { kind: "completed" },
+    });
+    expect(canonicalizeJson(scripted.client.requests[0]?.system)).toContain(personalHash);
+    const results = scripted.client.requests[1]?.messages
+      .flatMap((message) => message.content)
+      .filter((part) => part.type === "tool_result");
+    expect(canonicalizeJson(results)).toContain(sha);
+    expect(
+      events
+        .filter(
+          (event) => event.type === "entry.appended" && event.entry.body.kind === "tool_results",
+        )
+        .map((event) => (event.type === "entry.appended" ? event.entry.body : null)),
+    ).toMatchObject([{ results: [{ status: "succeeded" }] }]);
+  } finally {
+    await runtime.close();
+  }
+  const destination = join(home, "backup");
+  await runDataMaintenance(home, { mode: "backup", destination });
+  expect(readFileSync(join(destination, "skills", sha, "SKILL.md"))).toEqual(Buffer.from(original));
+  expect(readFileSync(join(destination, "personal-instructions.md"))).toEqual(
+    Buffer.from(personal),
+  );
+});
+
+it.each(["import", "private"])(
+  "rejects a FIFO in the %s reader within a bounded subprocess",
+  (kind) => {
+    const { home } = fixture(),
+      { dir } = source(home);
+    const path = join(dir, "SKILL.md");
+    rmSync(path);
+    execFileSync("/usr/bin/mkfifo", [path], { timeout: 1000 });
+    const runtime = new URL("../../../src/runtime/index.ts", import.meta.url).href;
+    const loader = `import { registerHooks } from "node:module"; registerHooks({ resolve(specifier, context, next) { return specifier === "moyyi/runtime" ? { url: ${JSON.stringify(runtime)}, shortCircuit: true } : next(specifier, context); } });`;
+    const code =
+      kind === "import"
+        ? `import { createPreferencesStorage } from ${JSON.stringify(new URL("./preferences-storage.ts", import.meta.url).href)}; const storage = createPreferencesStorage("", () => { throw Error("Unexpected settings read"); }, async () => { throw Error("Unexpected settings write"); }); try { await storage.inspectSkill(process.argv[1]); throw Error("FIFO was accepted"); } catch(error) { if (!String(error).includes("普通单链接文件")) throw error; console.log("rejected"); }`
+        : `import { readPrivateSettingsFile } from ${JSON.stringify(new URL("./private-settings-files.ts", import.meta.url).href)}; try { readPrivateSettingsFile(process.argv[1], 8192); throw Error("FIFO was accepted"); } catch(error) { if (!String(error).includes("Unsafe settings file")) throw error; console.log("rejected"); }`;
+    expect(
+      execFileSync(
+        process.execPath,
+        [
+          "--import",
+          `data:text/javascript,${encodeURIComponent(loader)}`,
+          "--input-type=module",
+          "--eval",
+          code,
+          kind === "import" ? dir : path,
+        ],
+        { timeout: 3000, encoding: "utf8" },
+      ).trim(),
+    ).toBe("rejected");
+  },
+);

@@ -19,6 +19,7 @@ export interface DesktopHostOptions {
     settings: DesktopSettings,
     apiKey?: string,
   ) => Promise<{
+    warning?: string;
     settings: DesktopSettings;
     runtimeOptions: RuntimeOptions;
     connection: DesktopState["connection"];

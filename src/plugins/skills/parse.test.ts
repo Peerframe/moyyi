@@ -44,6 +44,18 @@ describe("Agent Skills bounded YAML 1.2 profile", () => {
     expect(parse(text).markdown).toBe(text);
     expect(parse(text.replaceAll("\n", "\r\n")).markdown).toBe(text.replaceAll("\n", "\r\n"));
   });
+  it("accepts one UTF-8 signature without rewriting source or excluding it from the byte limit", () => {
+    const text = `\uFEFF${skill()}`;
+    expect(parse(text).markdown).toBe(text);
+    const bounded = skill(
+      undefined,
+      "x".repeat(MAX_SKILL_BYTES - Buffer.byteLength(skill(undefined, ""))),
+    );
+    expect(Buffer.byteLength(bounded)).toBe(MAX_SKILL_BYTES);
+    expect(parse(bounded).markdown).toBe(bounded);
+    expect(() => parse(`\uFEFF${bounded}`)).toThrow(/Invalid SKILL.md/);
+    expect(() => parse(`\uFEFF${text}`)).toThrow(/Invalid SKILL.md/);
+  });
   it.each([
     "name: test-skill\nname: test-skill\ndescription: test",
     "name: test-skill\ndescription: &x text\nlicense: *x",

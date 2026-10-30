@@ -11,6 +11,9 @@ import {
 import type { StoredSettings } from "./settings.ts";
 
 const hash = (bytes: string | Uint8Array) => createHash("sha256").update(bytes).digest("hex");
+// Keep the encoding signature in the reviewed/copied text so its bytes match the recorded hash.
+const decode = (bytes: Uint8Array) =>
+  new TextDecoder("utf-8", { fatal: true, ignoreBOM: true }).decode(bytes);
 export function createPreferencesStorage(
   home: string,
   get: () => StoredSettings,
@@ -31,7 +34,7 @@ export function createPreferencesStorage(
     directories();
     const bytes = readPrivateSettingsFile(join(directory, "personal-instructions.md"), 8192);
     if (hash(bytes) !== expected) throw Error("个人指令摘要不匹配，请重新保存。");
-    const text = new TextDecoder("utf-8", { fatal: true }).decode(bytes);
+    const text = decode(bytes);
     signal.throwIfAborted();
     return { text, sha256: expected };
   }
@@ -78,7 +81,7 @@ export function createPreferencesStorage(
     // The native picker grants this one SKILL.md read, not a recursive folder import.
     const file = join(directory, "SKILL.md");
     const { constants, openSync, fstatSync, readFileSync, closeSync } = await import("node:fs");
-    const fd = openSync(file, constants.O_RDONLY | constants.O_NOFOLLOW);
+    const fd = openSync(file, constants.O_RDONLY | constants.O_NOFOLLOW | constants.O_NONBLOCK);
     let bytes: Buffer;
     try {
       const s = fstatSync(fd);
@@ -89,7 +92,7 @@ export function createPreferencesStorage(
     } finally {
       closeSync(fd);
     }
-    const text = new TextDecoder("utf-8", { fatal: true }).decode(bytes);
+    const text = decode(bytes);
     const parsed = parseSkill(text, basename(directory));
     const names: string[] = [];
     const listing = opendirSync(directory);
@@ -181,7 +184,7 @@ export function createPreferencesStorage(
       privateDirectory(folder);
       const bytes = readPrivateSettingsFile(join(folder, "SKILL.md"), MAX_SKILL_BYTES);
       if (hash(bytes) !== sha256) throw Error("Skill 副本摘要不匹配。");
-      const text = new TextDecoder("utf-8", { fatal: true }).decode(bytes);
+      const text = decode(bytes);
       parseSkill(text, name);
       signal.throwIfAborted();
       return get().skills.some((s) => s.enabled && s.name === name && s.sha256 === sha256)

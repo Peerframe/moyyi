@@ -24,6 +24,20 @@ the same session and appends a bounded `connection_switched` notice using displa
 provider/model identities only. The notice is a runtime fact, not model output or a grant.
 Reopening clears session permissions. Sending the next message remains a separate user action.
 
+## Desktop settings migration
+
+The only disk-format change is desktop settings 1 → 2. Connections have stable IDs, names,
+provider/effort and private credential references; the active and search connection IDs are
+explicit. Personal-instruction SHA-256 and the reviewed Skill index share this bounded 64 KiB
+file. The session store stays format 2 / SQL schema 3. CLI configuration stays independent.
+
+Reading format 1 migrates only in memory. The first explicit save creates an exclusive,
+byte-identical `settings.format1.json` backup before atomically publishing format 2; an existing
+backup is never overwritten. Private owned directories and bounded no-follow, single-link files
+remain mandatory. A new credential is removed after a failed save only if no committed settings
+reference it. After a committed connection deletion, a failed OS key cleanup reports a fixed
+warning while retaining the committed connection/search state. It cannot restore stale UI state.
+
 ## History projection
 
 Persisted assistant messages already have `origin`. The context builder now copies that field

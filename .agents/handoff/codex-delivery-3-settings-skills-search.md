@@ -39,6 +39,10 @@
   rescue includes current files, restore still only replaces session store. Rollback rejects
   incompatible settings/store targets. Four maintenance suites: 39 tests passed.
 
+- D fix checkpoint: no-follow readers now reject FIFOs without blocking; UTF-8 BOM bytes are
+  retained consistently in review/copy/digest/runtime/backup. Parser ignores only encoding BOM
+  for frontmatter while preserving original text and byte limit.
+
 ## In progress
 
 - Root owns integration, key-deletion committed-state correction, checks, native/live acceptance and checkpoints.
@@ -52,7 +56,7 @@
 
 - Independent review: bounded open must reject FIFO without blocking; BOM text/hash must agree
   across storage and runtime; committed deletion must keep UI synchronized after key cleanup failure.
-  Fixes and focused tests in progress.
+  Fixed: 89 storage/parser/runtime/backup tests and skills 31/31; key cleanup failure host test passed.
 
 - Old module inventory tests may need additive exact sets for new commands/state. Preserve all
   M1–M6 behavioral assertions; do not loosen security checks or limits.

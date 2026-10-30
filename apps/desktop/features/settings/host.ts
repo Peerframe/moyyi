@@ -39,6 +39,7 @@ export const hostFeature = defineHostFeature({
       host.transition("settings.reconfiguring", {});
       host.transition("settings.revoking", {});
       let saved = false;
+      let warning: string | undefined;
       try {
         const configured =
           command.type === "configure"
@@ -87,6 +88,7 @@ export const hostFeature = defineHostFeature({
             to: nextNamed,
           });
         }
+        warning = configured.warning;
       } catch {
         if (saved) {
           host.update({
@@ -124,6 +126,7 @@ export const hostFeature = defineHostFeature({
           "Desktop settings could not be applied; existing conversations were retained",
         );
       }
+      if (warning) throw new BoundaryError(warning);
       return;
     }
   },

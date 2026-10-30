@@ -30,7 +30,7 @@ export function validateCommand(input: Record<string, unknown>, exact: ExactKeys
         (typeof v.name !== "string" ||
           !v.name.trim() ||
           v.name.length > 80 ||
-          /[\x00-\x1f\x7f]/.test(v.name))
+          Array.from(v.name).some((c) => c.charCodeAt(0) < 32 || c.charCodeAt(0) === 127))
       )
         throw invalid();
       if (

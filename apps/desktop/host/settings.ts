@@ -43,6 +43,7 @@ const legacy: Record<Preset, CredentialRef> = {
   "kimi-global": "legacy-kimi-global",
 };
 export interface ConfiguredDesktop {
+  readonly warning?: string;
   readonly settings: DesktopSettings;
   readonly connections: DesktopState["connections"];
   readonly activeConnectionId: string;
@@ -330,8 +331,17 @@ export function createModelConfiguration(home: string, vault: CredentialVault) {
       }
       const result = await persist(next);
       added = undefined;
-      if (removed && !next.connections.some((c) => c.credentialRef === removed))
-        await vault.remove(removed.startsWith("desktop:") ? removed.slice(8) : removed);
+      if (removed && !next.connections.some((c) => c.credentialRef === removed)) {
+        try {
+          await vault.remove(removed.startsWith("desktop:") ? removed.slice(8) : removed);
+        } catch {
+          // The settings commit is authoritative even when the OS cannot confirm key cleanup.
+          return {
+            ...result,
+            warning: "连接已删除，但钥匙串密钥未能确认删除。请在系统钥匙串中核对。",
+          };
+        }
+      }
       return result;
     } catch (error) {
       if (added && !stored.connections.some((c) => c.credentialRef === `desktop:${added}`))

@@ -96,6 +96,41 @@ it("keeps backup symlinks and target data untouched", async () => {
   expect(readFileSync(join(root, "settings.json"), "utf8")).toBe(original);
   expect(readFileSync(join(home, "canary"), "utf8")).toBe("unchanged");
 });
+it("keeps committed deletion and search state when key cleanup cannot be confirmed", async () => {
+  const { configuration: c, vault, home } = fixture();
+  await c.changeConnection({
+    action: "add",
+    name: "Search",
+    provider: "deepseek",
+    apiKey: "synthetic",
+  });
+  const second = (await c.current()).connections.find((x) => x.name === "Search")!;
+  await c.changeConnection({ action: "search", id: second.id });
+  const initial = await c.current();
+  const host = await createDesktopHost({
+    ...initial,
+    runtimeOptions: () => initial.runtimeOptions,
+    changeConnection: c.changeConnection,
+  });
+  vi.mocked(vault.remove).mockRejectedValueOnce(Error("private OS diagnostic"));
+  try {
+    await expect(
+      host.dispatch({ type: "connection.change", change: { action: "delete", id: second.id } }),
+    ).rejects.toThrow("钥匙串密钥未能确认删除");
+    const state = host.getState();
+    expect(state.connections).toEqual((await c.current()).connections);
+    expect(state.connections.some((x) => x.id === second.id)).toBe(false);
+    expect(state.searchConnectionId).toBeNull();
+    expect(state.error).toContain("钥匙串密钥未能确认删除");
+    expect(JSON.stringify(state)).not.toContain("private OS diagnostic");
+    expect((await createModelConfiguration(home, vault).current()).connections).toEqual(
+      state.connections,
+    );
+    expect(state.connection.ready).toBe(true);
+  } finally {
+    await host.close();
+  }
+});
 it("switches in the same idle session, resets grants and records a credential-free notice", async () => {
   const { home, configuration: c } = fixture();
   await c.changeConnection({ action: "add", name: "Second", provider: "deepseek" });
