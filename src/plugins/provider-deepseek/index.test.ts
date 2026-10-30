@@ -63,7 +63,7 @@ describe("DeepSeek provider", () => {
   it.each([
     [400, "invalid_request"],
     [401, "auth"],
-    [402, "auth"],
+    [402, "quota"],
     [403, "auth"],
     [422, "invalid_request"],
     [429, "rate_limited"],

@@ -88,7 +88,7 @@ describe("bounded Kimi HTTP 429 diagnostics", () => {
   it.each([
     [
       "engine_overloaded_error",
-      "overloaded",
+      "rate_limited",
       "Kimi HTTP 429 (engine_overloaded_error): Kimi service is overloaded. Wait for service capacity before starting a new run.",
     ],
     [
@@ -98,7 +98,7 @@ describe("bounded Kimi HTTP 429 diagnostics", () => {
     ],
     [
       "exceeded_current_quota_error",
-      "auth",
+      "quota",
       "Kimi HTTP 429 (exceeded_current_quota_error): Kimi account quota is unavailable. Check account balance and quota before starting a new run.",
     ],
   ])("maps only the documented %s to fixed text", async (type, kind, message) => {
@@ -162,7 +162,7 @@ describe("bounded Kimi HTTP 429 diagnostics", () => {
     const events = await fixture(
       bodyOf([...bytes].map((byte) => new Uint8Array([byte]))),
     ).collect();
-    expect(events).toMatchObject([{ type: "error", error: { kind: "overloaded" } }]);
+    expect(events).toMatchObject([{ type: "error", error: { kind: "rate_limited" } }]);
   });
 
   it.each([16 * 1024, 16 * 1024 + 1])("enforces the exact %i-byte boundary", async (size) => {
@@ -171,7 +171,7 @@ describe("bounded Kimi HTTP 429 diagnostics", () => {
     expect(encoder.encode(body).byteLength).toBe(size);
     const events = await fixture(bodyOf([encoder.encode(body)])).collect();
     expect(events).toMatchObject([
-      { type: "error", error: { kind: size === 16 * 1024 ? "overloaded" : "rate_limited" } },
+      { type: "error", error: { kind: size === 16 * 1024 ? "rate_limited" : "rate_limited" } },
     ]);
     if (size > 16 * 1024) expect(events).toMatchObject([{ error: { message: unknownMessage } }]);
   });
@@ -193,7 +193,7 @@ describe("bounded Kimi HTTP 429 diagnostics", () => {
     ];
     const events = await fixture(bodyOf(chunks)).collect();
     expect(events).toMatchObject([
-      { type: "error", error: { kind: count === 128 ? "overloaded" : "rate_limited" } },
+      { type: "error", error: { kind: count === 128 ? "rate_limited" : "rate_limited" } },
     ]);
     if (count === 129) expect(events).toMatchObject([{ error: { message: unknownMessage } }]);
   });
@@ -274,7 +274,7 @@ describe("bounded Kimi HTTP 429 diagnostics", () => {
         return Promise.reject(Error("private-key"));
       });
       const events = await fixture(bodyOf([encoder.encode(overload)]), close).collect();
-      expect(events).toMatchObject([{ type: "error", error: { kind: "overloaded" } }]);
+      expect(events).toMatchObject([{ type: "error", error: { kind: "rate_limited" } }]);
       expect(JSON.stringify(events)).not.toContain("private-key");
     },
   );

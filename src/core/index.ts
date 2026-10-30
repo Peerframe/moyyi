@@ -15,6 +15,7 @@ import {
   type IdSource,
   isTerminal,
   type ModelClient,
+  type ModelError,
   type ModelProfile,
   type ModelRequest,
   type PermissionPolicy,
@@ -501,7 +502,7 @@ export class AgentCore {
     // Closure exposes only that validated terminal; it never admits late text or tool calls.
     const terminal = response?.deferredTerminal;
     if (terminal?.type === "error" && terminal.error.kind !== "cancelled")
-      return { kind: "failed", reason: terminal.error.message };
+      return modelFailure(terminal.error);
     if (terminal?.type === "completed") {
       if (terminal.stopReason === "max_tokens")
         return { kind: "budget_exhausted", budget: "model_output_tokens" };
@@ -524,7 +525,9 @@ export class AgentCore {
       }
     }
     if (response?.signalInterrupted && response.parts.some((part) => part.type === "refusal"))
-      return { kind: "failed", reason: response.error?.message ?? "Model stream cancelled" };
+      return response.error
+        ? modelFailure(response.error)
+        : { kind: "failed", reason: "Model stream cancelled" };
     return undefined;
   }
 
@@ -593,6 +596,7 @@ export class AgentCore {
           reason:
             response.error?.message ??
             "Compaction requires complete text, optional reasoning, and no tools or refusal",
+          ...(response.error ? { modelErrorKind: response.error.kind } : {}),
         };
     let compaction: TranscriptEntry | undefined;
     if (
@@ -905,7 +909,7 @@ export class AgentCore {
           }
         }
         run.finishing = true;
-        if (response.error) return { kind: "failed", reason: response.error.message };
+        if (response.error) return modelFailure(response.error);
         // The provider's output ceiling remains the cause even on the last allowed request.
         if (response.stopReason === "max_tokens")
           return { kind: "budget_exhausted", budget: "model_output_tokens" };
@@ -1153,4 +1157,8 @@ export function errorMessage(error: unknown): string {
   } catch {
     return "Unreportable runtime error";
   }
+}
+
+function modelFailure(error: ModelError): RunOutcome {
+  return { kind: "failed", reason: error.message, modelErrorKind: error.kind };
 }

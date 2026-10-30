@@ -24,7 +24,11 @@ export type {
   DesktopSessionSummary,
   DesktopSessionUpdate,
 } from "./features/sessions/contract.ts";
-export type { DesktopSettings } from "./features/settings/contract.ts";
+export type {
+  ConnectionChange,
+  DesktopConnection,
+  DesktopSettings,
+} from "./features/settings/contract.ts";
 export { DEFAULT_DESKTOP_SETTINGS } from "./features/settings/contract.ts";
 export type { DesktopWebAccess, DesktopWebSource } from "./features/web/contract.ts";
 export interface DesktopState extends FeatureStates {

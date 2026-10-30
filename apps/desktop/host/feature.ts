@@ -24,6 +24,7 @@ export interface HostContext {
   runtime: Runtime | undefined;
   options: RuntimeOptions;
   readonly configure: DesktopHostOptions["configure"];
+  readonly changeConnection: DesktopHostOptions["changeConnection"];
   unsubscribe: (() => void) | undefined;
   readonly state: DesktopState;
   readonly eventState: DesktopState;

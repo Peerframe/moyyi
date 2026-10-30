@@ -48,15 +48,27 @@ class Host implements DesktopHost, HostContext {
   eventState: DesktopState;
   options: RuntimeOptions;
   readonly configure: DesktopHostOptions["configure"];
+  readonly changeConnection: DesktopHostOptions["changeConnection"];
   refresh: Promise<void> | undefined;
   resultsDestination: "both" | "artifacts" | "effects" = "both";
 
   constructor(
     options: RuntimeOptions,
-    display: Pick<DesktopHostOptions, "connection" | "maxOutputTokens" | "settings" | "configure">,
+    display: Pick<
+      DesktopHostOptions,
+      | "connection"
+      | "maxOutputTokens"
+      | "settings"
+      | "configure"
+      | "connections"
+      | "activeConnectionId"
+      | "searchConnectionId"
+      | "changeConnection"
+    >,
   ) {
     this.options = options;
     this.configure = display.configure;
+    this.changeConnection = display.changeConnection;
     this.state = initialState(options, display);
     this.eventState = this.state;
   }

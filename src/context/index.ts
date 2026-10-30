@@ -330,6 +330,7 @@ function renderEntry(entry: TranscriptEntry): ModelMessage {
         };
       return {
         role: "assistant",
+        origin: body.origin,
         content: body.content,
         stopReason: body.stopReason,
         ...(body.replay === undefined ? {} : { replay: body.replay }),

@@ -22,6 +22,9 @@ import {
   type Scheduler,
   type SessionManagement,
   type SessionStore,
+  type SessionId,
+  type EntryId,
+  type TranscriptEntry,
   type Timestamp,
 } from "../contracts/index.ts";
 import { AgentCore } from "../core/index.ts";
@@ -125,6 +128,7 @@ export interface Runtime {
   readonly sessions: SessionManagement;
   /** Managed original copies, available only with the owned local SQLite store. */
   readonly materials?: MaterialStore;
+  appendConnectionSwitched(sessionId: string, change: { from: { name: string; provider: string }; to: { name: string; provider: string } }): Promise<void>;
   send(command: ClientCommand): Promise<void>;
   subscribe(listener: (event: RuntimeEvent) => void): () => void;
   /** Wait for current runs; send(run.start) only waits for acceptance. */
@@ -389,7 +393,7 @@ export async function createRuntime(
         }),
       }),
     },
-    { plugin: createWebPlugin(options.web?.search?.origin) },
+    { plugin: createWebPlugin(options.web?.search && ("origin" in options.web.search ? options.web.search.origin : { backend: "deepseek" })) },
     ...(anthropic ? [{ plugin: anthropic }] : []),
     ...(deepseek ? [{ plugin: deepseek }] : []),
     ...(kimi ? [{ plugin: kimi }] : []),
@@ -418,7 +422,7 @@ export async function createRuntime(
   const emit = (event: RuntimeEvent) => {
     toolResults?.observe(event);
     if (event.type === "run.started") activeRuns.add(event.runId);
-    if (event.type === "run.finished") activeRuns.delete(event.runId);
+    if (event.type === "run.finished") { activeRuns.delete(event.runId); web?.releaseRun(event.runId); }
     // Observers receive an immutable copy, so mutating a displayed approval cannot alter work.
     const copy = freeze(JSON.parse(canonicalizeJson(event))) as RuntimeEvent;
     for (const listener of listeners) {
@@ -838,6 +842,23 @@ export async function createRuntime(
     }
   };
   return {
+    appendConnectionSwitched(sessionId, change) {
+      return manage(async () => {
+        if (!store || typeof sessionId !== "string" || !sessionId || sessionId.length > 256) throw Error("Invalid session");
+        const label = (value: { name: string; provider: string }) => {
+          if (!value || typeof value.name !== "string" || !value.name.trim() || value.name.length > 80 || /[\x00-\x1f\x7f]/.test(value.name) || !["deepseek", "kimi-cn", "kimi-global"].includes(value.provider)) throw Error("Invalid connection label");
+          return `${value.name} (${value.provider}/${value.provider === "deepseek" ? "deepseek-flash" : "kimi-k3.1-pro"})`;
+        };
+        const from = label(change.from), to = label(change.to);
+        const snapshot = await store.loadSession(sessionId as SessionId);
+        if (!snapshot || store.isSessionRemoved?.(snapshot.sessionId) || snapshot.runs.some(r => r.status === "active")) throw Error("Session is unavailable");
+        const entry: TranscriptEntry = { id: (options.ids?.next("entry") ?? randomUUID()) as EntryId, sessionId: snapshot.sessionId, parentId: snapshot.headEntryId, runId: null,
+          createdAt: (options.clock?.now() ?? new Date().toISOString()) as Timestamp,
+          body: { kind: "notice", code: "connection_switched", text: `Connection switched from ${from} to ${to}. Prior provider-specific reasoning is unavailable across providers; same-provider history is retained. Previous work is preserved. Workspace writes, checks and web grants have been reset; ask the user to enable them when needed.` } };
+        await store.commit({ entries: [entry], effects: [], sessions: [{ sessionId: snapshot.sessionId, workspaceRoot: snapshot.workspaceRoot, headEntryId: entry.id }], durability: "normal" });
+        emit({ type: "entry.appended", entry });
+      });
+    },
     sessions,
     ...(materials ? { materials } : {}),
     get plugins() {

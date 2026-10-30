@@ -258,6 +258,7 @@ describe("MinimalContextBuilder", () => {
     const assistant = textPath[1]?.body;
     if (assistant?.kind !== "assistant_message") throw new Error("fixture");
     expect(result.request.messages[1]?.replay).toBe(assistant.replay);
+    expect(result.request.messages[1]?.origin).toEqual(assistant.origin);
   });
 
   it("keeps tool definitions in deterministic name order", () => {

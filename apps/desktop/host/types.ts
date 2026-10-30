@@ -1,9 +1,15 @@
 import type { RuntimeOptions } from "moyyi/runtime";
-import type { DesktopSettings, DesktopState } from "../shared.ts";
+import type { ConnectionChange, DesktopSettings, DesktopState } from "../shared.ts";
 
 export interface DesktopHostOptions {
   readonly runtimeOptions: () => RuntimeOptions | Promise<RuntimeOptions>;
   readonly maxOutputTokens?: number;
+  readonly connections?: DesktopState["connections"];
+  readonly activeConnectionId?: string;
+  readonly searchConnectionId?: string | null;
+  readonly changeConnection?: (
+    change: ConnectionChange,
+  ) => Promise<import("./settings.ts").ConfiguredDesktop>;
   readonly connection?: DesktopState["connection"];
   readonly settings?: DesktopSettings;
   readonly configure?: (
@@ -13,6 +19,9 @@ export interface DesktopHostOptions {
     settings: DesktopSettings;
     runtimeOptions: RuntimeOptions;
     connection: DesktopState["connection"];
+    connections?: DesktopState["connections"];
+    activeConnectionId?: string;
+    searchConnectionId?: string | null;
   }>;
 }
 
