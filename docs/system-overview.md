@@ -125,7 +125,7 @@ Plan: [post-M6 plan v2](tasks/2026-10-28-post-m6-plan.md). Order is owned by the
 | Delivery zero: agent environment | Accepted, merged | [PR #51](https://github.com/Peerframe/moyyi/pull/51), [brief](tasks/2026-10-29-delivery-0-vibe-coding-env.md) |
 | Delivery one: model experience aligned with DSH | Accepted, merged; not installed. Gate 6/6, original task still FAIL | [PR #53](https://github.com/Peerframe/moyyi/pull/53), [record](tasks/2026-10-29-delivery-1-model-experience-record.md) |
 | Delivery two: desktop feature modules | Accepted, merged; not installed. No behavior change | [PR #52](https://github.com/Peerframe/moyyi/pull/52), [record](tasks/2026-10-29-desktop-modules-delivery.md) |
-| Delivery three: settings, Skills, search | Next; brief not yet written | [Plan](tasks/2026-10-28-post-m6-plan.md) |
+| Delivery three: settings, Skills, search | Ready for Codex | [Brief](tasks/2026-10-30-delivery-3-settings-skills-search.md) |
 | Delivery four: conditional capabilities | Triggered per item | [Plan](tasks/2026-10-28-post-m6-plan.md) |
 
 ## Boundaries
