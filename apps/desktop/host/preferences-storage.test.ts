@@ -15,13 +15,14 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import {
   canonicalizeJson,
+  type ModelRequest,
   type ModelStreamEvent,
+  type Plugin,
   type RuntimeEvent,
   UNKNOWN_USAGE,
 } from "moyyi/contracts";
 import { createRuntime } from "moyyi/runtime";
 import { afterEach, expect, it } from "vitest";
-import { scriptedProvider } from "../../../src/plugins/provider-scripted/index.ts";
 import type { CredentialVault } from "./keychain.ts";
 import { runDataMaintenance } from "./maintenance.ts";
 import { createPreferencesStorage } from "./preferences-storage.ts";
@@ -178,7 +179,7 @@ it("preserves BOM bytes through review, runtime source verification and backup",
     providerStopReason: null,
     usage: UNKNOWN_USAGE,
   };
-  const scripted = scriptedProvider([
+  const responses: ModelStreamEvent[][] = [
     [
       {
         type: "part_completed",
@@ -196,11 +197,38 @@ it("preserves BOM bytes through review, runtime source verification and backup",
       { ...completed, stopReason: "tool_use" },
     ],
     [{ type: "part_completed", index: 0, part: { type: "text", text: "Done." } }, completed],
-  ]);
+  ];
+  const requests: ModelRequest[] = [];
+  const plugin: Plugin = {
+    name: "bom-test-provider",
+    apiVersion: 1,
+    setup(host) {
+      host.registerModelProvider({
+        id: "scripted",
+        models: [
+          {
+            origin: { provider: "scripted", model: "scripted" },
+            contextWindowTokens: 200000,
+            maxOutputTokens: 8000,
+            parallelToolCalls: false,
+            reasoning: "none",
+            promptCache: "none",
+            editFormat: "search_replace",
+          },
+        ],
+        createClient: () => ({
+          async *stream(request) {
+            requests.push(request);
+            yield* responses.shift() ?? [];
+          },
+        }),
+      });
+    },
+  };
   const runtime = await createRuntime({
     dataDirectory: join(home, ".moyyi/deepseek-data"),
     model: { provider: "scripted", model: "scripted" },
-    plugins: [{ plugin: scripted.plugin }],
+    plugins: [{ plugin }],
     personalInstructions: c.preferences.readPersonal,
     skillLibrary: c.preferences.librarySource,
   });
@@ -219,8 +247,8 @@ it("preserves BOM bytes through review, runtime source verification and backup",
     expect(events.findLast((event) => event.type === "run.finished")).toMatchObject({
       outcome: { kind: "completed" },
     });
-    expect(canonicalizeJson(scripted.client.requests[0]?.system)).toContain(personalHash);
-    const results = scripted.client.requests[1]?.messages
+    expect(canonicalizeJson(requests[0]?.system)).toContain(personalHash);
+    const results = requests[1]?.messages
       .flatMap((message) => message.content)
       .filter((part) => part.type === "tool_result");
     expect(canonicalizeJson(results)).toContain(sha);

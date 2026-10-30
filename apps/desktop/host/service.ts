@@ -2,6 +2,8 @@ import { initializationError } from "./initialization.ts";
 import type { DesktopHost, DesktopHostOptions } from "./types.ts";
 
 export { DesktopInitializationError } from "./initialization.ts";
+// Trusted production-host composition for external installed acceptance; never exposed to IPC.
+export { createModelConfiguration } from "./settings.ts";
 export type { DesktopHost, DesktopHostOptions } from "./types.ts";
 
 import type { ClientCommand, RuntimeEvent, SessionId, SessionQuery } from "moyyi/contracts";

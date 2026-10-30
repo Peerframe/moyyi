@@ -4,7 +4,7 @@
 - Branch: `codex/delivery-3-settings-skills-search`; base main `26ecc5a3`.
 - Worktree: `/Users/yxflc/.codex/worktrees/delivery-3-settings-skills-search/moyyi`.
 - Last agent: Codex, 2026-10-30 21:33 Asia/Singapore.
-- Checkpoint: A–G implemented; H ready for integration checks. A `6a9c9f2`, B `f8971a3`, C/D `961b8b4`. No PR/installation.
+- Checkpoint: A–H implementation ready; full offline/external package acceptance in progress. A `6a9c9f2`, B `f8971a3`, C/D `961b8b4`. No PR/installation.
 
 ## Done
 
@@ -43,6 +43,10 @@
   retained consistently in review/copy/digest/runtime/backup. Parser ignores only encoding BOM
   for frontmatter while preserving original text and byte limit.
 
+- H: installed production host/configuration synthetic probe covers all A–F flows (14 scripted
+  requests / 1 search expected), with exact format 2 and connection notice additions to prior
+  fixtures. External execution pending; do not claim these expected counts as observed yet.
+
 ## In progress
 
 - Root owns integration, key-deletion committed-state correction, checks, native/live acceptance and checkpoints.
@@ -80,7 +84,13 @@
   87 passed; three old slot-inventory fixtures need additive new module entries and an unclaimed
   fixture tool name now that todo_write has its own renderer. No security assertion removed.
 - E backend + desktop: 7 files 98 tests and eval:web 9/9 passed, no paid/network calls.
-- `npm run check`, other offline suites, packages, native screenshots and live acceptance: pending.
+- Full check first attempt: formatter issue fixed; next run 3218/3220 passed, two failures were
+  test-only layer imports and exact preload entry list. Corrected, focused 39/39 passed; full
+  check rerun active. Existing boundaries and assertions retained.
+- Nine offline suites passed: core 25, deepseek 18, kimi 4, web 9, skills 31, instructions 36,
+  runtime 10, long-sessions 4, anthropic 5. `verify:package -- --offline` passed.
+- Native screenshots and live acceptance pending. Protected daily data/app/CLI/source snapshot
+  saved privately before acceptance: 5082 files/links. No actual model/search requests yet.
 
 ## Paid usage ledger
 
