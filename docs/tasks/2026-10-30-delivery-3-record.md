@@ -143,6 +143,8 @@ store, settings and installation pointers were not replaced or changed.
 
 ## Review status
 
+Draft PR: [#56](https://github.com/Peerframe/moyyi/pull/56), for Claude review.
+
 A–H are implemented and offline/native evidence is complete. This record is not Claude's acceptance.
 The PR is a draft because installed live task acceptance is incomplete. Quality spent 30/71 requests;
 installed spent 0/20 model requests and 0/3 product searches; no paid retry occurred. Session format 2,

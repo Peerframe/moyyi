@@ -3,7 +3,8 @@
 - Brief: `docs/tasks/2026-10-30-delivery-3-settings-skills-search.md`; owner fee amendment `de28e57`.
 - Branch: `codex/delivery-3-settings-skills-search`; worktree:
   `/Users/yxflc/.codex/worktrees/delivery-3-settings-skills-search/moyyi`.
-- Last agent: Codex, 2026-10-30 Asia/Singapore. A–H implemented; draft PR for Claude, not accepted.
+- Last agent: Codex, 2026-10-30 Asia/Singapore. A–H implemented; not accepted.
+- Draft PR: https://github.com/Peerframe/moyyi/pull/56 — Claude review, installed acceptance blocked.
 - Durable details: `docs/tasks/2026-10-30-delivery-3-record.md` and screenshot index beside it.
 
 ## Final product and evidence
