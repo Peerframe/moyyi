@@ -56,6 +56,14 @@ function checkSwitch(text) {
 function checkSkill(text) {
   assert.equal(normalize(text), EXPECTED_SKILL);
 }
+function checkOutputPath(path) {
+  assert(
+    !resolve(path)
+      .split("/")
+      .some((component) => component.toLowerCase() === ".moyyi"),
+    "Acceptance output cannot contain a .moyyi path component: workspaces and report targets are protected there. Use an isolated temporary directory, then archive private evidence separately after completion.",
+  );
+}
 function checkRecordedArtifact(records, workspace, name, expectedText) {
   const target = resolve(workspace, name),
     calls = new Map();
@@ -196,6 +204,13 @@ function checkSearch(text, sources, selected) {
   );
 }
 function selfTest() {
+  checkOutputPath("/private/tmp/moyyi-delivery3-acceptance");
+  checkOutputPath("/private/tmp/evidence.moyyi-suffix");
+  assert.throws(
+    () => checkOutputPath("/Users/yxflc/.moyyi/evals/installed"),
+    /isolated temporary directory/u,
+  );
+  assert.throws(() => checkOutputPath("/private/tmp/.MOYYI/installed"), /protected there/u);
   checkSwitch(EXPECTED_SWITCH);
   checkSkill(EXPECTED_SKILL);
   assert.throws(() => checkSwitch(EXPECTED_SWITCH.replace("48", "49")));
@@ -373,6 +388,7 @@ if (mode === "--self-test") {
   const frozenPath = join(output, "frozen.json"),
     ledgerPath = join(output, "ledger.json");
   if (mode === "--freeze") {
+    checkOutputPath(output);
     selfTest();
     assert(
       !existsSync(output),
