@@ -4,7 +4,7 @@
 - Branch: `codex/delivery-3-settings-skills-search`; base main `26ecc5a3`.
 - Worktree: `/Users/yxflc/.codex/worktrees/delivery-3-settings-skills-search/moyyi`.
 - Last agent: Codex, 2026-10-30 21:33 Asia/Singapore.
-- Checkpoint: A implementation; B backend included, desktop integration underway. No PR/installation.
+- Checkpoint: A and B implemented; C–H integration underway. Last A checkpoint `6a9c9f2`. No PR/installation.
 
 ## Done
 
@@ -18,6 +18,8 @@
 - B backend: quota classification, nonpersisted origin/error kind propagation, foreign reasoning
   and replay filtering with paired tool calls. Store format 2/schema 3 unchanged. ADR 0048 added.
   Runtime trusted `appendConnectionSwitched` records a bounded credential-free notice while idle.
+- B desktop: recorded failed outcomes project safe quota/rate-limit/auth cards without provider
+  bodies; synthetic 402/429/401 plus same-session switch tests pass (7 connection tests).
 
 ## In progress
 

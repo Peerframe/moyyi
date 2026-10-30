@@ -124,3 +124,38 @@ it("switches in the same idle session, resets grants and records a credential-fr
     await host.close();
   }
 });
+it.each([
+  [402, "quota"],
+  [429, "rate_limited"],
+  [401, "auth"],
+] as const)("projects HTTP %s as a safe connection-unavailable card", async (status, kind) => {
+  const { home, configuration } = fixture();
+  const initial = await configuration.current();
+  const host = await createDesktopHost({
+    ...initial,
+    runtimeOptions: () => ({
+      ...initial.runtimeOptions,
+      deepseek: {
+        getApiKey: async () => "synthetic-only",
+        fetch: async () =>
+          new Response('{"error":{"message":"never-display-private-raw-body"}}', { status }),
+      },
+    }),
+  });
+  const workspace = join(home, "work");
+  mkdirSync(workspace);
+  try {
+    await host.dispatch({ type: "create", workspaceRoot: workspace, askEachRead: false });
+    await host.dispatch({
+      type: "start",
+      sessionId: host.getState().activeSessionId,
+      text: "Say hello",
+    });
+    await vi.waitFor(() => expect(host.getState().outcome?.kind).toBe("failed"));
+    expect(host.getState().connectionFailure).toEqual({ name: "DeepSeek Flash", kind });
+    expect(JSON.stringify(host.getState())).not.toContain("never-display-private-raw-body");
+    expect(host.getState().messages.some((m) => m.role === "user")).toBe(true);
+  } finally {
+    await host.close();
+  }
+});
