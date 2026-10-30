@@ -33,7 +33,7 @@ export interface MessageRenderer {
   readonly id: string;
   readonly role?: DesktopMessage["role"];
   readonly tool?: string;
-  readonly Component: ComponentType<{ message: DesktopMessage }>;
+  readonly Component: ComponentType<{ message: DesktopMessage; latest?: boolean }>;
 }
 export interface RendererFeature {
   readonly id: string;

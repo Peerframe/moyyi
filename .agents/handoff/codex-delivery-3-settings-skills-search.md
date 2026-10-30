@@ -4,7 +4,7 @@
 - Branch: `codex/delivery-3-settings-skills-search`; base main `26ecc5a3`.
 - Worktree: `/Users/yxflc/.codex/worktrees/delivery-3-settings-skills-search/moyyi`.
 - Last agent: Codex, 2026-10-30 21:33 Asia/Singapore.
-- Checkpoint: A–E implemented; F/G/H ready for integration checks. A `6a9c9f2`, B `f8971a3`, C/D `961b8b4`. No PR/installation.
+- Checkpoint: A–F implemented; G/H ready for integration checks. A `6a9c9f2`, B `f8971a3`, C/D `961b8b4`. No PR/installation.
 
 ## Done
 
@@ -31,6 +31,9 @@
 - E: DeepSeek structured-only native search, explicit grant + each-call approval, fixed auxiliary
   prompt, recorded usage and source-panel/report integration. CLI SearXNG retained. Focused
   98 tests and offline web 9/9 passed. No real search has run.
+
+- F: recorded todo_write cards show all recorded items/statuses; latest expanded, earlier folded.
+  Fixed model-reported-progress label, no separate state. Renderer tests passed.
 
 ## In progress
 
