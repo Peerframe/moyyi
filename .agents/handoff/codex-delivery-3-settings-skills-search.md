@@ -11,7 +11,7 @@
 - A–H checkpoints committed individually (C/D shared foundation then D safety checkpoint).
 - Independent review fixes: FIFO bounded open, BOM source/hash agreement through runtime/backup,
   key cleanup failure committed-state synchronization. No store/schema change or permission widening.
-- `npm run check`: 170 files / 3221 tests passed. Prior concurrent timeouts recorded; no timeout or
+- `npm run check`: 170 files / 3231 tests passed. Prior concurrent timeouts recorded; no timeout or
   assertion weakened. Node 26 required: `export PATH=/opt/homebrew/bin:$PATH`.
 - Nine offline suites and `verify:package -- --offline` passed. `desktop:package` and full
   `verify:desktop` passed on pre-UI-fix candidate: H observed 8 cases / 14 synthetic requests /
@@ -23,22 +23,21 @@
 
 ## In progress / next step
 
-- No subagent writing; provider agent is read-only checking quality preparation. Quality completed 6/6 PASS (30 requests); installed paid run has not started.
-- Native 780x560 transcript minimum fixed and verified with complete three-state todo screenshot. Search approval needs compact first-level query/count/destination with full raw preview retained as details; provider agent owns only ApprovalCard/render tests/README. Repackage this renderer-only refinement before installed paid execution. Keep all unexecuted freezes as historical zero-usage evidence.
-- Clean final product candidate `b4bf305` built (archive `77b924027623e3482308bab108dad22d4fee0de812754b09084552ea7b8950ef`); final external desktop verification passed (including H 8 cases / 14 synthetic requests / 1 search).
-- Native isolated app is running at `/private/tmp/moyyi-delivery3-native-yqt_p9wi/Moyyi.app`.
-  Original worker/main are saved in its parent. Only this copy's worker, initial geometry,
-  Chromium userData and renderer are instrumented; production package/daily app untouched.
-  Normal/narrow settings, personal, Skill review and normal todo screenshots saved in
-  `docs/tasks/assets/2026-10-30-delivery-3/`. Finish narrow todo and both search approvals,
-  refresh copy from final renderer, restore all original bundle files after quitting.
-- Final renderer copied to disposable native app; finish narrow scroll and search-approval captures.
-- Quality gate finished. Freeze/run installed 3-task acceptance only once after final approval UI.
-  Private preparation root: `/Users/yxflc/.moyyi/evals/delivery-3-settings-skills-search-2026-10-30`.
-  `host.mjs` reuses D1 private callback/config with candidate source imports and 71-request
-  durable ledger guard; `run-quality.py` refuses repeating started tasks. Quality freeze/ledger will be created against the next checkpoint before execution.
-  Installed runner: `scripts/desktop-fixtures/live-d3.mjs --freeze|--run <isolated app dir> <new output>`;
-  run with bundled Node26.12.1. Frozen against clean `b4bf305`; checkers self-tested and independently reviewed including brief7 stops. Offline freeze exposed import-only ESM export resolution; runner now resolves the installed public import export, and freeze succeeded with ledger still 0+0.
+- No subagent writers or paid processes running. Quality completed once: 6/6 PASS, 30 requests.
+- Final clean product `07ff3e657399c02ec07fc456f7222c697fb84579`, archive SHA-256
+  `5cff085d0882850c071a841862a51e44a288bb737f5631bd0a315e6882116bb2`.
+  Final `npm run check`: 170 files / 3231 tests PASS; final `verify:desktop` PASS.
+- Native isolated app `/private/tmp/moyyi-delivery3-native-yqt_p9wi/Moyyi.app` has final renderer;
+  finish narrow + normal search approval screenshots, restart check, normal menu Quit and restore
+  original worker/main. Normal/narrow settings, personal, Skill review, quota and todo evidence saved.
+- Installed acceptance frozen against final package; ledger still frozen 0 model +0 search.
+  Execute ONCE with bundled Node26.12.1, `scripts/desktop-fixtures/live-d3.mjs --run`, app dir
+  `/private/tmp/moyyi-delivery3-live-oob3rjud/Moyyi.app/Contents/Resources/app`, output
+  `/Users/yxflc/.moyyi/evals/delivery-3-settings-skills-search-2026-10-30/installed`.
+  Guard before HTTP hard-limits 20+3, max_uses5, zero retries; native no_structured_results or
+  successfulSearches>5 triggers mandatory terminal stop. Do not repeat a started task.
+- Private quality freeze/ledger/summary at the same parent; quality recordings match all 30 debits.
+  Earlier unexecuted package freezes remain as `installed-unexecuted-*`, all 0 requests.
 - Finish evidence record/protected hashes, push one PR for Claude. No merge/daily install.
 
 ## Paid ledger

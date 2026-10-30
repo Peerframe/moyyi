@@ -33,20 +33,25 @@ zero retries, explicit permission grants and the daily installation remain uncha
   cleanup failure; all three were fixed with regressions before paid acceptance.
 - First full unit run: 3218/3220 passed. Corrected test-only layer imports and the exact preload
   entry inventory, preserving the layer rule and every old behavioral assertion. A subsequent
-  run exposed existing process/runtime tests timing out concurrently; the unchanged suite then passed (170 files / 3221 tests).
+  run exposed existing process/runtime tests timing out concurrently; the unchanged suite then passed (170 files / 3231 tests).
 - Nine offline suites passed: core 25/25, deepseek 18/18, kimi 4/4, web 9/9, skills 31/31,
   instructions 36/36, runtime 10/10, long-sessions 4/4, anthropic 5/5.
 - `npm run verify:package -- --offline` passed, including installed declarations and seven PTY flows.
 - `npm run desktop:package` and `npm run verify:desktop` passed. H observed eight cases,
   14 synthetic model requests and one synthetic search; zero real network/credential calls.
   Native screenshots found card/header wrapping and search-grant status issues, fixed before
-  live acceptance. Final clean package and remaining native/live evidence pending.
+  live acceptance. Final clean package `07ff3e6` passed the full check (3231 tests) and external desktop verification.
+  Archive SHA-256: `5cff085d0882850c071a841862a51e44a288bb737f5631bd0a315e6882116bb2`.
+  Remaining native search screenshots and installed live evidence are pending.
 
 ## Frozen paid envelope
 
 Quality gate ran once against `739275951098b0feb6cbd3892a5001375973a9d0`: all six passed,
 30 of 71 requests, zero retries, no baseline rerun required. Installed paid acceptance has not run.
 The final approval presentation refinement changes only renderer output; model/runtime evidence is reused.
+The 30 recorded exchanges match the durable request ledger exactly. Reported totals: 120,031 input
+tokens (including 88,832 cache-read), 9,179 output tokens (including 4,492 reasoning). Cache-write
+usage is unknown in all 30 responses; it is not counted as zero.
 Exact runner, Skill and installed host hashes are frozen privately before execution. Failures are retained; no failed candidate task is rerun.
 
 Quality gate: Flash / Responses / low / 8192 output, write capability, no shell or web, zero retries.
