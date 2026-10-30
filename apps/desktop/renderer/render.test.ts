@@ -10,8 +10,10 @@ import { PermissionsDialog } from "../features/permissions/renderer/PermissionsD
 import { SettingsDialog } from "../features/settings/renderer/SettingsDialog.tsx";
 import { SourcesPanel } from "../features/web/renderer/SourcesPanel.tsx";
 import { WebAccessDialog } from "../features/web/renderer/WebAccessDialog.tsx";
+import { initialState } from "../host/state.ts";
 import { DEFAULT_DESKTOP_SETTINGS, type DesktopEffect } from "../shared.ts";
 import { MessageList } from "./MessageList.tsx";
+import { type ReadyRendererUI, RendererContext } from "./ui.ts";
 
 describe("desktop untrusted content rendering", () => {
   it("renders recorded web bodies, provenance and distinct truncation indicators without navigation", () => {
@@ -251,11 +253,15 @@ describe("desktop untrusted content rendering", () => {
   it("starts settings with an empty masked key and describes local save without a paid probe", () => {
     const onConfigure = vi.fn();
     const html = renderToStaticMarkup(
-      createElement(SettingsDialog, {
-        settings: DEFAULT_DESKTOP_SETTINGS,
-        onConfigure,
-        onClose: vi.fn(),
-      }),
+      createElement(
+        RendererContext.Provider,
+        { value: { state: initialState({}, {}), busy: false } as ReadyRendererUI },
+        createElement(SettingsDialog, {
+          settings: DEFAULT_DESKTOP_SETTINGS,
+          onConfigure,
+          onClose: vi.fn(),
+        }),
+      ),
     );
     expect(html).toMatch(/type="password"[^>]*value=""/);
     expect(html).toContain("留空保留该服务已有密钥");

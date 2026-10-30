@@ -9,6 +9,7 @@ import {
   type DesktopState,
 } from "../shared.ts";
 import { type CredentialRef, type CredentialVault, isCredentialRef } from "./keychain.ts";
+import { createPreferencesStorage } from "./preferences-storage.ts";
 import {
   privateDirectory,
   readPrivateSettingsFile,
@@ -163,6 +164,25 @@ export function createModelConfiguration(home: string, vault: CredentialVault) {
               getApiKey,
             },
           }),
+      personalInstructions: preferences.readPersonal,
+      skillLibrary: preferences.librarySource,
+      ...(value.searchConnectionId
+        ? {
+            web: {
+              allowedOrigins: [],
+              search: {
+                backend: "deepseek" as const,
+                getApiKey: async () => {
+                  const selected = value.connections.find(
+                    (c) => c.id === value.searchConnectionId && c.provider === "deepseek",
+                  );
+                  if (!selected) throw Error("搜索连接不可用。");
+                  return validateApiKey(await vault.read(selected.credentialRef));
+                },
+              },
+            },
+          }
+        : {}),
       workspaceNavigation: true,
       ...(value.settings.evidenceAnswer ? { evidenceAnswer: true } : {}),
       dataDirectory: join(home, ".moyyi/deepseek-data"),
@@ -215,10 +235,11 @@ export function createModelConfiguration(home: string, vault: CredentialVault) {
         readPrivateSettingsFile(join(directory, "settings.format1.json"), 16_384);
       }
     }
-    writePrivateSettingsFile(path, text);
-    stored = next;
-    invalid = false;
-    format1 = undefined;
+    writePrivateSettingsFile(path, text, false, () => {
+      stored = next;
+      invalid = false;
+      format1 = undefined;
+    });
     return current();
   }
   async function save(settingsValue: unknown, apiKey?: string): Promise<ConfiguredDesktop> {
@@ -318,7 +339,8 @@ export function createModelConfiguration(home: string, vault: CredentialVault) {
       throw error;
     }
   }
-  return { current, save, changeConnection };
+  const preferences = createPreferencesStorage(home, () => stored, persist);
+  return { current, save, changeConnection, preferences };
 }
 
 export function parseStoredSettings(value: unknown): StoredSettings {
@@ -342,7 +364,7 @@ export function parseStoredSettings(value: unknown): StoredSettings {
         typeof c.name === "string" &&
         c.name.trim().length > 0 &&
         c.name.length <= 80 &&
-        !/[\x00-\x1f\x7f]/.test(c.name) &&
+        !Array.from(c.name).some((c) => c.charCodeAt(0) < 32 || c.charCodeAt(0) === 127) &&
         ["deepseek", "kimi-cn", "kimi-global"].includes(c.provider) &&
         ["low", "high"].includes(c.reasoningEffort) &&
         !(c.provider === "deepseek" && c.reasoningEffort !== "low") &&

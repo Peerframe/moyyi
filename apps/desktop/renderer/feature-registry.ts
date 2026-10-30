@@ -6,8 +6,10 @@ import { rendererFeature as feature2 } from "../features/effects/renderer/index.
 import { rendererFeature as feature8 } from "../features/maintenance/renderer/index.tsx";
 import { rendererFeature as feature3 } from "../features/materials/renderer/index.tsx";
 import { rendererFeature as feature7 } from "../features/permissions/renderer/index.tsx";
+import { rendererFeature as feature9 } from "../features/preferences/renderer/index.tsx";
 import { rendererFeature as feature0 } from "../features/sessions/renderer/index.tsx";
 import { rendererFeature as feature6 } from "../features/settings/renderer/index.tsx";
+import { rendererFeature as feature10 } from "../features/todos/renderer/index.tsx";
 import { rendererFeature as feature5 } from "../features/web/renderer/index.tsx";
 export const rendererFeatures = [
   feature0,
@@ -19,4 +21,6 @@ export const rendererFeatures = [
   feature6,
   feature7,
   feature8,
+  feature9,
+  feature10,
 ];

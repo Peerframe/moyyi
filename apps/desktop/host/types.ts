@@ -2,6 +2,9 @@ import type { RuntimeOptions } from "moyyi/runtime";
 import type { ConnectionChange, DesktopSettings, DesktopState } from "../shared.ts";
 
 export interface DesktopHostOptions {
+  readonly preferences?: ReturnType<
+    typeof import("./preferences-storage.ts").createPreferencesStorage
+  >;
   readonly runtimeOptions: () => RuntimeOptions | Promise<RuntimeOptions>;
   readonly maxOutputTokens?: number;
   readonly connections?: DesktopState["connections"];

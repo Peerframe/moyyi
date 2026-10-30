@@ -45,3 +45,9 @@ declare global {
     readonly moyyi: DesktopBridge;
   }
 }
+
+export type {
+  DesktopPreferences,
+  DesktopSkill,
+  SkillReview,
+} from "./features/preferences/contract.ts";

@@ -47,6 +47,7 @@ class Host implements DesktopHost, HostContext {
   state: DesktopState;
   eventState: DesktopState;
   options: RuntimeOptions;
+  readonly preferences: DesktopHostOptions["preferences"];
   readonly configure: DesktopHostOptions["configure"];
   readonly changeConnection: DesktopHostOptions["changeConnection"];
   refresh: Promise<void> | undefined;
@@ -64,9 +65,11 @@ class Host implements DesktopHost, HostContext {
       | "activeConnectionId"
       | "searchConnectionId"
       | "changeConnection"
+      | "preferences"
     >,
   ) {
     this.options = options;
+    this.preferences = display.preferences;
     this.configure = display.configure;
     this.changeConnection = display.changeConnection;
     this.state = initialState(options, display);

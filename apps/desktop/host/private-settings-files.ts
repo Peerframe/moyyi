@@ -53,6 +53,7 @@ export function writePrivateSettingsFile(
   path: string,
   bytes: string | Uint8Array,
   exclusive = false,
+  onCommit?: () => void,
 ): void {
   privateDirectory(dirname(path));
   if (!exclusive) {
@@ -79,6 +80,7 @@ export function writePrivateSettingsFile(
     }
     if (!exclusive) renameSync(temp, path);
     written = false;
+    onCommit?.();
     const parent = openSync(dirname(path), constants.O_RDONLY | constants.O_NOFOLLOW);
     try {
       fsyncSync(parent);

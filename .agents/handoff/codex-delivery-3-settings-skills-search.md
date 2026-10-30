@@ -4,7 +4,7 @@
 - Branch: `codex/delivery-3-settings-skills-search`; base main `26ecc5a3`.
 - Worktree: `/Users/yxflc/.codex/worktrees/delivery-3-settings-skills-search/moyyi`.
 - Last agent: Codex, 2026-10-30 21:33 Asia/Singapore.
-- Checkpoint: A and B implemented; C–H integration underway. Last A checkpoint `6a9c9f2`. No PR/installation.
+- Checkpoint: A–D implemented; E/F implementation ready, G/H in progress. A `6a9c9f2`, B `f8971a3`. No PR/installation.
 
 ## Done
 
@@ -21,14 +21,20 @@
 - B desktop: recorded failed outcomes project safe quota/rate-limit/auth cards without provider
   bodies; synthetic 402/429/401 plus same-session switch tests pass (7 connection tests).
 
+- C: bounded personal-instruction file and settings digest, request-by-request plugin refresh,
+  safety precedence and no absolute path in source blocks. File-save failure restores prior bytes
+  unless metadata committed. Storage and model-experience tests passed.
+- D: reviewed native SKILL.md-only immutable imports, omitted-file listing, one enabled digest
+  per name, read_skill with revocation/version/cancel checks. CLI eager Skills remain unchanged.
+  Catalog is a bounded recorded request suffix, not a new persisted event or authority.
+
 ## In progress
 
 - Root owns desktop settings, personal/Skills storage + UI, maintenance G, F, H and integration.
-- `provider_preflight` owns C/D plugins/context/runtime registration + ADR 0049. It has stopped
-  editing B files; no paid work. Runtime/index.ts now belongs to this agent until it finishes.
-- `search_preflight` owns E backend and desktop web/lifecycle integration + ADR 0050/docs/web.
-  Its uncommitted files are intentionally excluded from this checkpoint while it writes.
-- Next: finish C/D, connect E configured credentials, F and G, then H and full required checks.
+- `provider_preflight` finished C/D and now owns H external desktop fixture plus verify-desktop
+  integration and the configuration re-export in host/service.ts. No paid work.
+- `search_preflight` finished E and now owns G maintenance/rollback/package metadata and tests.
+- Next: checkpoint E/F, finish G/H, run full required checks and native/live acceptance.
   Native screenshots, external packages and frozen live runs have not started.
 
 ## Collected problems (fix pass)
@@ -49,7 +55,13 @@
 - `npm run typecheck`: passed after runtime and desktop integration.
 - B focused: 4 files, 156 passed. Earlier broader 615-test run had two new test setup/assertion
   mistakes; corrected and the affected suites passed. See final delivery record for full gate.
-- `npm run check`, offline suites, packages, native screenshots and live acceptance: pending.
+- C/D backend: 124 focused behaviors covered; final group 123/124 then corrected new cancellation
+  expectation (cancelled run / failed executing read), affected suite 10/10 passed. Typecheck/lint passed.
+- C/D storage + F renderer + prior renderer tests: 24/24 passed. Broader 90-test desktop run:
+  87 passed; three old slot-inventory fixtures need additive new module entries and an unclaimed
+  fixture tool name now that todo_write has its own renderer. No security assertion removed.
+- E backend + desktop: 7 files 98 tests and eval:web 9/9 passed, no paid/network calls.
+- `npm run check`, other offline suites, packages, native screenshots and live acceptance: pending.
 
 ## Paid usage ledger
 

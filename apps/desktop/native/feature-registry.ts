@@ -5,6 +5,7 @@ import { nativeFeature as feature1 } from "../features/conversation/main.ts";
 import { nativeFeature as feature7 } from "../features/maintenance/main.ts";
 import { nativeFeature as feature2 } from "../features/materials/main.ts";
 import { nativeFeature as feature6 } from "../features/permissions/main.ts";
+import { nativeFeature as feature8 } from "../features/preferences/main.ts";
 import { nativeFeature as feature0 } from "../features/sessions/main.ts";
 import { nativeFeature as feature5 } from "../features/settings/main.ts";
 import { nativeFeature as feature4 } from "../features/web/main.ts";
@@ -17,4 +18,5 @@ export const nativeFeatures = [
   feature5,
   feature6,
   feature7,
+  feature8,
 ];

@@ -23,6 +23,7 @@ export class BoundaryError extends Error {}
 export interface HostContext {
   runtime: Runtime | undefined;
   options: RuntimeOptions;
+  readonly preferences: DesktopHostOptions["preferences"];
   readonly configure: DesktopHostOptions["configure"];
   readonly changeConnection: DesktopHostOptions["changeConnection"];
   unsubscribe: (() => void) | undefined;

@@ -247,7 +247,7 @@ function project(path: readonly TranscriptEntry[]): readonly ProjectedEntry[] {
 function render(input: ContextInput, projection: readonly ProjectedEntry[]): ModelRequest {
   const system = (["static", "session", "turn"] as const).flatMap((stability) =>
     input.sections
-      .filter((section) => section.stability === stability)
+      .filter((section) => section.stability === stability && section.placement !== "after_history")
       .flatMap((section) => section.content),
   );
   const messages: ModelMessage[] = [];
@@ -280,6 +280,12 @@ function render(input: ContextInput, projection: readonly ProjectedEntry[]): Mod
         },
       ],
     });
+  const suffix = (["static", "session", "turn"] as const).flatMap((stability) =>
+    input.sections
+      .filter((section) => section.stability === stability && section.placement === "after_history")
+      .flatMap((section) => section.content),
+  );
+  if (suffix.length) messages.push({ role: "user", content: suffix });
   for (const message of messages) assertTextBudgetSupported(message.content);
   return {
     origin: input.profile.origin,
