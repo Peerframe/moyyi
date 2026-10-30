@@ -5,7 +5,7 @@
 - Base / last implementation commit: `26ecc5a3d556dce22bb5d75f50e82a5828d2ae7b` (latest fetched main).
 - Worktree: `/Users/yxflc/.codex/worktrees/delivery-3-settings-skills-search/moyyi`.
 - Last agent: Codex, 2026-10-30 20:44 Asia/Singapore.
-- Status: **STOPPED under brief section 7; no product implementation yet.**
+- Status: **Billing stop resolved by the owner on 2026-10-30; resume A–H.** No product implementation yet.
 
 ## Done
 
@@ -20,14 +20,24 @@
 - DSH reference checkout: `/tmp/moyyi-delivery3-dsh`, pinned to
   `f3803c96974ad4a94195fb97e5c637e9c2a3afe3`. Read as source only; no scripts/dependencies run.
 
-## In progress
+## Owner resolution (2026-10-30, recorded by Claude)
 
-A–H have not been implemented. Do not resume implementation or paid acceptance until Claude
-and the owner resolve the billing discrepancy below. No PR has been opened, merged or installed.
+- D3-1a: accept the announced native-search fee (USD 0.75 per 1,000 successful non-empty searches
+  from 2026-11-01) and keep DeepSeek native search. `max_uses` stays 5. The extra search fee is
+  authorized.
+- D3-3a: the acceptance allowance of 3 searches counts product-side `web_search` invocations; each
+  may trigger at most 5 billed native searches (at most 15). All other budgets and constraints are
+  unchanged.
+- Brief sections 4 E, 6, 7, 8 and 10 are amended on this branch. Record `usage.server_tool_use`
+  per product search; write "unknown" when absent.
+- The owner may self-host a search service later; it is recorded in the roadmap as out of scope.
 
-Exact next step: review the announced native-search billing with Claude/owner and amend the
-brief's cost disclosure and search-budget counting. Then continue A–H on this branch; do not
-restart from the original checkout or repeat this preflight without new evidence.
+
+A–H have not been implemented. The billing discrepancy below is resolved (see Owner resolution). No PR has been opened, merged or installed.
+
+Exact next step: pull this branch (Claude pushed the brief amendment and this update), then
+implement A–H on this branch. Do not restart from the original checkout or repeat this preflight
+without new evidence.
 
 ## Stop condition and evidence
 
