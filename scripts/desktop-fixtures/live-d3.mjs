@@ -13,7 +13,6 @@ import {
   renameSync,
   writeFileSync,
 } from "node:fs";
-import { createRequire } from "node:module";
 import { dirname, isAbsolute, join, resolve } from "node:path";
 import { DatabaseSync } from "node:sqlite";
 import { pathToFileURL } from "node:url";
@@ -334,8 +333,11 @@ function identity(app) {
     !app.startsWith("/Applications/") && !app.startsWith("/Users/yxflc/Applications/"),
     "Use an isolated candidate copy",
   );
-  const require = createRequire(join(app, "host.mjs"));
-  const runtime = require.resolve("moyyi/runtime");
+  const packageRoot = join(app, "node_modules/moyyi");
+  const packageJson = JSON.parse(readFileSync(join(packageRoot, "package.json"), "utf8"));
+  const publicExport = packageJson.exports?.["./runtime"]?.import;
+  assert.equal(typeof publicExport, "string", "Installed ESM public runtime export required");
+  const runtime = realpathSync(resolve(packageRoot, publicExport));
   assert(runtime.startsWith(join(app, "node_modules/moyyi/dist/")), "Installed runtime required");
   assert(!existsSync(join(app, "node_modules/moyyi/src")));
   const candidatePath = join(app, "../candidate.json");

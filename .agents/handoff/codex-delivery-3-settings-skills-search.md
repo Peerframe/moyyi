@@ -24,7 +24,7 @@
 ## In progress / next step
 
 - No subagent writing; both preflight agents released files. No paid run started.
-- Clean final product candidate `b4bf305` built (archive `77b924027623e3482308bab108dad22d4fee0de812754b09084552ea7b8950ef`); final external desktop verification running.
+- Clean final product candidate `b4bf305` built (archive `77b924027623e3482308bab108dad22d4fee0de812754b09084552ea7b8950ef`); final external desktop verification passed (including H 8 cases / 14 synthetic requests / 1 search).
 - Native isolated app is running at `/private/tmp/moyyi-delivery3-native-yqt_p9wi/Moyyi.app`.
   Original worker/main are saved in its parent. Only this copy's worker, initial geometry,
   Chromium userData and renderer are instrumented; production package/daily app untouched.
@@ -35,9 +35,9 @@
 - Freeze/run quality gate (6 unchanged tasks) and installed 3-task acceptance only once.
   Private preparation root: `/Users/yxflc/.moyyi/evals/delivery-3-settings-skills-search-2026-10-30`.
   `host.mjs` reuses D1 private callback/config with candidate source imports and 71-request
-  durable ledger guard; `run-quality.py` refuses repeating started tasks. Quality freeze/ledger will be created against this documentation checkpoint before execution.
+  durable ledger guard; `run-quality.py` refuses repeating started tasks. Quality freeze/ledger will be created against the next checkpoint before execution.
   Installed runner: `scripts/desktop-fixtures/live-d3.mjs --freeze|--run <isolated app dir> <new output>`;
-  run with bundled Node26.12.1. Frozen against clean `b4bf305`; checkers self-tested and independently reviewed including brief7 stops.
+  run with bundled Node26.12.1. Frozen against clean `b4bf305`; checkers self-tested and independently reviewed including brief7 stops. Offline freeze exposed import-only ESM export resolution; runner now resolves the installed public import export, and freeze succeeded with ledger still 0+0.
 - Finish evidence record/protected hashes, push one PR for Claude. No merge/daily install.
 
 ## Paid ledger
