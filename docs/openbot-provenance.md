@@ -342,8 +342,8 @@ with the DSH commit and path in the same change.
 | 2026-10-27 | `1f81c047` | Provider source check only; no code | [Harness comparison](research/harness-comparison.md#dsh-preview-source-check-2026-10-27) |
 | 2026-10-29 | `f3803c96` | Skill structure and wording ideas for `moyyi-model-experience`, `moyyi-desktop-ui` and `moyyi-check` (from `agent-experience`, `dsh-client-ui-ux`, `dsh-pre-push-checks`), rewritten; AGENTS.md layout | [`.agents/skills`](../.agents/skills/), [AGENTS.md](../AGENTS.md) |
 
-Delivery one adaptations are recorded below. Remaining planned adaptations are listed in the
-[delivery two brief](tasks/2026-10-29-delivery-2-desktop-modules.md).
+Delivery-specific source maps below distinguish earlier code adaptations from later design-only
+references. The dated briefs define scope; implementation alone does not establish acceptance.
 
 ### Delivery one source map (2026-10-29)
 
@@ -375,3 +375,28 @@ not evidence that the candidate improves task quality.
 
 The typed persisted reference, SQL migration, desktop version pairing and session access checks
 are original moyyi integration. They are covered by ADR 0046 rather than copied from a DSH store.
+
+### Delivery three design references (2026-10-30)
+
+Every row uses DeepSeek Harness commit
+`f3803c96974ad4a94195fb97e5c637e9c2a3afe3`, MIT. These are design, model-experience and failure-case
+references. Delivery three copies no DSH implementation, UI component or fixture code and installs
+no DSH/Cordis dependency. Existing adapted OpenBot primitives and the delivery-one todo tool keep
+their earlier provenance; reusing them does not change their source or license.
+
+| moyyi destination | Pinned DSH source | Decision and boundary |
+| --- | --- | --- |
+| `apps/desktop/features/settings/renderer/{Connections,SettingsFields,SettingsDialog,index}.tsx`, `host/settings.ts` | `packages/client/ui-settings-models/README.md`, `packages/client/ui-model-selection/README.md` | **Borrow** named settings/selection concepts. UI and private format 2 storage are original moyyi implementation; no dynamic providers, custom endpoints, upstream account layer or credential migration code. |
+| `src/contracts/{model,protocol}.ts`, `src/core/index.ts`, `src/plugins/provider-{deepseek,kimi}` | `packages/llm/llm/README.md`, `packages/llm/llm-deepseek/src/transport.ts`, `tests/stream.spec.ts` | **Borrow** structured failure categories and 402/429 cases. Kimi's exact structured quota type follows its official API documentation. **Reject** free-text quota guesses, automatic retries and account fallback. |
+| `src/context/index.ts`, both provider codecs, `src/runtime/model-recording.ts`, `tests/provider-connection-continuation.test.ts` | `packages/llm/llm/README.md`, `packages/llm/llm-deepseek/src/serialize.ts` | **Borrow** origin/replay isolation and tool pairing concepts. Existing persisted origins support original moyyi request projection; foreign wire-ID mapping never rewrites stored records. |
+| `src/plugins/skill-library/{index.ts,index.test.ts,README.md}`, `src/runtime/personal-skills.test.ts` | `packages/skill/skill/README.md`, `src/index.ts`; `packages/skill/tool-skill/README.md`, `src/index.ts` | **Borrow** summary discovery, exact-name body loads, stale-selection checks and explicit empty availability. Add original immutable SHA-256 binding and pre/post-read revocation checks under moyyi policy. |
+| `src/contracts/plugin.ts`, `src/context/{index,evidence-answer}.ts` | `packages/skill/tool-skill/README.md`, `src/index.ts` | **Adapt** current catalog placement after stable context. DSH retains replacement catalog messages; moyyi records a current request suffix. No durable catalog event or promise of full old-tail cache reuse. |
+| `src/plugins/personal-instructions`, `apps/desktop/features/preferences`, `host/preferences-storage.ts` | `packages/skill/skill-filesystem/README.md`, `src/index.ts` | **Reject** automatic root discovery/watch and referenced resource access. Personal-file storage, reviewed native imports and the bounded trusted callbacks are original integration; only selected `SKILL.md` is copied. |
+| `src/plugins/web/deepseek-search.ts`, `src/runtime/web-deepseek.ts`, `src/runtime/web-deepseek.test.ts` | `packages/web/web-search-deepseek/README.md`, `src/provider.ts`, `tests/deepseek.spec.ts` | **Borrow** fixed auxiliary search, structured-only source extraction, URL deduplication and failure cases. **Reject** generic endpoints, account authentication and citation joining; retain the approved query-only request and real reported usage. |
+| `apps/desktop/features/todos/renderer/index.tsx`, `features/web/renderer/SearchCard.tsx` | `packages/client/ui-conversation/README.md`, `packages/todo/tool-todo/README.md` | **Borrow** dedicated conversation-node and whole-list presentation concepts. Original moyyi React views project existing records; model-reported todo progress is explicitly unverified, and absent search usage stays unknown. |
+
+The decisions are detailed in ADRs [0048](decisions/0048-connection-continuation.md),
+[0049](decisions/0049-personal-instructions-and-skill-library.md) and
+[0050](decisions/0050-deepseek-native-search.md). Desktop file checks, backup/rollback compatibility,
+trusted host exports and external-package synthetic checks are moyyi integration, not inherited
+upstream safety or live-service guarantees.

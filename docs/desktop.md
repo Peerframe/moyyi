@@ -13,8 +13,10 @@ M5's specified-page/source/report workflow has completed bounded acceptance in t
 `dd897834` bundle. The [PR48 receipt](https://github.com/Peerframe/moyyi/pull/48) records final
 merge/installation; the [M5 task record](tasks/2026-10-28-desktop-m5.md) separates its one live
 trial, initial source-panel defect and corrected zero-call history reopening.
-M5 remains the installed baseline. M6 materials, previews and complete history are **candidate
-implemented, acceptance pending**; source changes do not update the installed app.
+The [system overview](system-overview.md#installed-version) identifies the installed M6 baseline
+and the later source-only deliveries. Delivery three's named connections, personal instructions,
+Skill library, native search and task cards are candidate implementations; their installation and
+live-task evidence are separate. Source changes do not update the installed app.
 See [ADR 0037](decisions/0037-installed-desktop-client.md),
 [ADR 0038](decisions/0038-desktop-materials-and-reports.md),
 [ADR 0039](decisions/0039-desktop-controlled-workflows.md),
@@ -53,7 +55,8 @@ Open **模型设置** to choose Flash, Kimi China or Kimi Global. M3 originally 
 all three. Installed M5 retains M4's explicit low/high choice for Kimi only. High is labelled
 **实验**; it did not pass the fixed complex-source task and is not a reliability recommendation.
 Flash always uses low. Switching back to Flash removes high from the configuration. Legacy
-three-field settings retain low behavior; saving low or Flash retains that older representation.
+three-field settings retain low behavior. Delivery three stores those nested model settings inside
+the new format 2 connection/preferences document; saving low does not downgrade that format.
 
 The installed M4/M5 settings also offer **独立证据成文（实验）**, default off. For a new session
 containing a self-contained question, it uses one request within the selected budget to answer
@@ -72,6 +75,53 @@ Changing preset, saving or closing clears the input. Save stores local configura
 does not probe the provider, incur model usage or prove that the remote key is valid. An absent
 or inaccessible credential leaves sending disabled while history remains accessible. If applying
 settings cannot be confirmed, reopen settings to inspect the current values before retrying.
+
+### Named connections and continuation (delivery three candidate)
+
+**模型设置 → 模型连接** lists up to 16 named connections. Add a DeepSeek, Kimi China or Kimi
+Global connection, rename it, select it as the default, or delete an inactive connection. A key
+may be omitted when adding: the connection then visibly remains unconfigured. To replace the
+selected connection's key, enter it in the model settings form and save. There is no custom
+endpoint or automatic provider discovery. The header's **当前连接** selector switches the default
+for subsequent requests. Stop active work and wait for cleanup before changing it.
+
+A switch reopens the same session and records a `connection_switched` notice. It sends no model
+request and does not resume work automatically: send a new message to continue. Switching
+between DeepSeek and Kimi preserves prior text and paired tool calls/results, while excluding
+the other provider's private reasoning and replay data from the new request. Same-provider
+history retains its supported reasoning. Old records remain unchanged; incomplete or unpaired
+history is not made valid by switching. Write/check/report/web grants are reset and must be
+enabled again if needed. See [ADR 0048](decisions/0048-connection-continuation.md).
+
+An HTTP 402 or a recognized Kimi quota 429 stops the run and shows the connection name with **额度用完**.
+Other 429 responses show **被限流**; authentication failures show **密钥无效**. These cards use
+structured provider classifications, not response-text guesses. The app retains the conversation
+and offers **切换连接**; it never retries or silently chooses another account. The card does not
+claim to know an account balance. Missing credentials remain a separate not-ready state.
+
+### Personal instructions and Skills (delivery three candidate)
+
+Open **个人指令与 Skills** from the header or model settings. Personal instructions are UTF-8
+text, at most 8 KiB. **保存个人指令** stores them privately and refreshes their full text and
+SHA-256 on the next model request, after default safety guidance and before root `AGENTS.md`.
+Empty text contributes no instructions. Old requests remain unchanged. This guidance cannot
+grant permissions or override explicit task instructions and host safety rules.
+
+For a Skill, choose **从本机导入**, select its folder, and review the complete `SKILL.md`, metadata,
+hash and omitted-files list. **确认导入** stores an immutable copy without enabling it. Choose
+**启用此版本** separately; only one digest per name and at most 8 versions are enabled at once.
+The model sees their bounded catalog and must call `read_skill` for full instructions before use.
+**撤销** prevents later body reads without deleting earlier request/tool records. No scripts or
+referenced files are imported or executed, and `allowed-tools` never grants authority. Import,
+review and activation themselves make no model request. See [Skills](skills.md#desktop-library-delivery-three-candidate)
+for format, size, source-recording and revocation limits.
+
+### Task list cards (delivery three candidate)
+
+Recorded `todo_write` calls render task items with pending, in-progress and completed labels.
+The latest call is expanded; older calls remain collapsible history. A failed or incomplete
+record is not presented as a verified complete list. The card says **这是模型自己报告的进度，不代表已核实**:
+the model's checklist is neither an independent task checker nor permission to perform its steps.
 
 The installed M2–M5 **选择材料** control accepts up to8 workspace-local
 PDF/DOCX/XLSX/PPTX/ODT/ODS/ODP files,
@@ -104,8 +154,9 @@ check its claims, citations and coverage against the materials.
 
 ## Materials, previews and complete history (M6 candidate)
 
-These controls are **candidate implemented, acceptance pending** under
-[ADR 0044](decisions/0044-desktop-material-library-and-history.md). They reuse the normal task
+These controls were introduced under
+[ADR 0044](decisions/0044-desktop-material-library-and-history.md); the
+[M6 receipt](tasks/2026-10-28-desktop-m6.md) owns their acceptance evidence. They reuse the normal task
 loop, permissions and parsers. They do not change Flash defaults or rescore any earlier task.
 
 In an idle selected session, choose **导入材料**, drop selected files into the materials panel,
@@ -235,7 +286,7 @@ same store first. Maintenance makes no model call and does not read or export Ke
 
 | Action | What to do and what changes |
 |---|---|
-| **创建备份** | Choose a new folder in the native save dialog. The backup includes a consistent session database, referenced transcript/undo blobs (plus retained managed-material originals in M6), data-only settings and a hash manifest. It never overwrites an existing backup. Project files and Keychain secrets are excluded; credential references in settings are not portable keys. Keep this private backup protected. |
+| **创建备份** | Choose a new folder in the native save dialog. The backup includes a consistent session database, referenced transcript/undo/material blobs, data-only settings and a hash manifest. Delivery three also includes the referenced personal-instruction file and every indexed Skill version, including disabled versions. It never overwrites an existing backup. Project files and Keychain secrets are excluded; credential references in settings are not portable keys. Keep this private backup protected. |
 | **选择备份并恢复** | Select a moyyi backup and confirm the native warning. The app verifies its files and formats, saves the current records/settings under `~/.moyyi/backups/before-restore-<id>`, then replaces only the session database in its original location. Current settings, Keychain and workspace files are unchanged. The selected backup's settings are not applied. |
 | **检查可回退版本** | The app checks the previously retained installation, archive hash, app identity/signature and compatibility with current data/settings. If available, it shows the target revision and rescue location. **退出并回退** arms replacement only after the current app exits; the helper retains the current app and attempts to reopen the old one. This confirmation is not proof that the old app launched successfully. |
 
@@ -246,6 +297,14 @@ protective workspace leases prevent session restoration from bypassing their saf
 Corrupt/modified, unsupported or unsafe backup files are refused. Cancellation before confirmation
 leaves the selection's data unapplied. On an unconfirmed result, inspect the existing backup/rescue
 and current state; do not assume that repeating the action is necessary.
+
+Delivery-three backups verify the exact format 2 settings index, personal text digest and Skill
+copies before publishing. Restore validates those backup files but preserves the currently active
+settings, personal instructions and Skill library; it restores session data only. The rescue
+backup retains the current indexed configuration alongside the replaced session state. A format 1
+backup is still supported. Software rollback refuses an app that cannot read settings format 2;
+saving Flash or disabling Skills does not make the new document readable by that older app. See
+[installation compatibility](installation.md).
 
 Software rollback preserves current conversations/settings/workspaces; it does not restore a
 database backup. It requires a verified previous installation retained in managed local storage,
@@ -312,7 +371,12 @@ the trusted worker. Stored secrets are never returned to the renderer. A newly t
 temporarily in its password field and travels through the dedicated write-only configure IPC
 and helper stdin; it is excluded from state snapshots, transcripts, argv, environment and logs.
 Non-executable settings and credential references live in `~/.moyyi/desktop/settings.json`
-(mode0600). Configuration closes the old runtime and reopens the same store, clearing its old
+(mode 0600). Delivery three saves format 2 with named connections, default/search selections,
+the personal-instruction digest and the Skill index. A format 1 file is read compatibly and its
+original bytes are kept as `settings.format1.json` before the first format 2 save. Personal text
+lives in `personal-instructions.md` (mode 0600); imported Skill copies live under
+`skills/<sha256>/SKILL.md` (mode 0400). The app writes API keys only to Keychain. The CLI does not
+read these desktop preferences. Configuration closes the old runtime and reopens the same store, clearing its old
 credential cache, report grant and write/check permissions. A post-commit reopen failure can
 leave settings saved but not yet usable; the UI reports that applying them could not be confirmed.
 
@@ -356,6 +420,11 @@ the desktop JavaScript/static UI and does not assemble a standalone app.
 compiled host, checks real files/SQLite/approval/recovery, the packaged worker and a document
 parser containment canary with synthetic model responses. It never uses an API key. This gate
 does not replace visible GUI testing, paid task-quality checks or the original fixed tasks.
+Delivery three adds the production connection manager with a fake vault and injected HTTP
+responses: named-connection changes, safe quota/rate/auth cards, both provider continuation
+directions, personal sources, reviewed Skill activation/revocation, recorded todos and approved
+native-search/report/restart flows. This exercises installed code without a real credential or
+network request; the delivery record reports whether the gate actually ran and passed.
 
 M2's external-copy, native-control, live-task and final installation evidence is recorded above
 and in its PR receipt. M3/M4 evidence remains in their receipts; M5 is the installed baseline
@@ -399,10 +468,37 @@ uncertain requests stay in operation/tool history without an invented source car
 
 Grants clear on new/reopened sessions, model-setting changes and close. Reopening sources does
 not refetch them. Use **关闭网页访问** while idle to remove the grant. During a run, cancel and
-wait for it to settle first; an already sent GET cannot be recalled. There is no desktop search,
-login state, JavaScript execution, automatic redirect/following, cookies or file downloads.
+wait for it to settle first; an already sent GET cannot be recalled. M5 itself had no desktop
+search; delivery three adds the bounded search flow below. Login state, JavaScript execution,
+automatic redirect/following, cookies and file downloads remain unsupported.
 The original network limits in [web.md](web.md) remain. M5 acceptance is recorded separately in
 [the delivery receipt](tasks/2026-10-28-desktop-m5.md); original M4 answer failures remain retained.
+
+### Native search (delivery three candidate)
+
+In **模型设置 → 模型连接**, choose **用于网页搜索** on a configured DeepSeek connection. It can
+be different from the conversation connection, including when chatting with Kimi. If none is
+available, search remains unavailable. Then enable **网页访问 → 开启网页搜索** for the current
+session. Search and exact-origin webpage access are separate grants; search works with an empty
+origin list, and a returned URL does not authorize fetching that page.
+
+Each proposed `web_search` requires approval of its query and fixed auxiliary request. The
+warning states **将产生一次 DeepSeek Flash 付费调用，外加最多 5 次计费搜索**. Only the query is sent
+to that request, without conversation history or personal/Skill text. Each run allows at most
+5 product searches; a call can use at most 5 native searches. The app never retries a failed or
+interrupted search. Stopping cannot recall a sent request or undo its possible charges.
+
+Only structured provider search-result records populate **网页来源**; generated prose and
+unstructured citations do not. The source card retains its recorded query, URL, title, available
+publication date, excerpt and digest. Missing excerpts or usage are not invented. **网页搜索**
+tool cards show provider-reported successful searches, attempts and token/cache counters, with
+unknown values labelled **未知**. A successful source record is not factual verification.
+
+To read a result, explicitly grant its exact HTTPS origin and approve its GET. To write a report,
+select a separate missing report path and approve its creation. Check every report URL against
+recorded search or fetch observations. Reopening restores those observations without refetching
+and turns search/page/write grants off. See [web limits](web.md) and
+[ADR 0050](decisions/0050-deepseek-native-search.md) for response bounds, usage and failure behavior.
 
 ### Choosing a request limit for document reports
 

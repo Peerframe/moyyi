@@ -10,6 +10,7 @@ import { PermissionsDialog } from "../features/permissions/renderer/PermissionsD
 import { SettingsDialog } from "../features/settings/renderer/SettingsDialog.tsx";
 import { SourcesPanel } from "../features/web/renderer/SourcesPanel.tsx";
 import { WebAccessDialog } from "../features/web/renderer/WebAccessDialog.tsx";
+import { desktopStateSchema } from "../native/state-schema.ts";
 import { DEFAULT_DESKTOP_SETTINGS, type DesktopEffect } from "../shared.ts";
 import { MessageList } from "./MessageList.tsx";
 import { type ReadyRendererUI, RendererContext } from "./ui.ts";
@@ -256,7 +257,7 @@ describe("desktop untrusted content rendering", () => {
         RendererContext.Provider,
         {
           value: {
-            state: { connections: [], activeConnectionId: "", searchConnectionId: null },
+            state: desktopStateSchema.initialize({ options: {}, display: {} }),
             busy: false,
           } as ReadyRendererUI,
         },

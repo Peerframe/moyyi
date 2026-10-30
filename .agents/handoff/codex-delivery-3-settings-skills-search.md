@@ -53,7 +53,7 @@
 - `provider_preflight` finished C/D and now owns H external desktop fixture plus verify-desktop
   integration (ready), now owns desktop/skills/design/architecture/provenance documentation. No paid work.
 - `search_preflight` owns fixes for review findings: FIFO bounded reads and BOM-preserving Skill/personal text. G is finished (39 focused tests).
-- Next: checkpoint E/F, finish G/H, run full required checks and native/live acceptance.
+- Next: finish full check, external desktop package, then frozen paid/native acceptance.
   Native screenshots, external packages and frozen live runs have not started.
 
 ## Collected problems (fix pass)

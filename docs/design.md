@@ -59,11 +59,16 @@ Reuse before adding. New components are added to this list in the same change.
 | `SessionSidebar` | Sessions, search, pin and grouping | Adapted from OpenBot |
 | `MessageList` | Conversation transcript | moyyi |
 | `ArtifactsPanel` | All results of a session | moyyi |
-| `SourcesPanel` | Recorded web sources with URL, status, time and truncation | moyyi |
+| `SourcesPanel` | Recorded fetch/search sources with URL, status, query/date when present, time and truncation | moyyi |
 | `MaterialsPanel` | Imported materials and current selection | moyyi |
 | `HistoryPanel` | Paged complete history | moyyi |
 | `BoundedImage` | Local PNG/JPEG preview within size limits | moyyi |
-| `SettingsDialog` | Model connection and preferences | moyyi |
+| `SettingsDialog`, `SettingsFields` | Fixed provider/limit form and declarative settings sections | moyyi; `features/settings/renderer` |
+| `Connections`, `ConnectionSelector` | Named connection CRUD, default selection and separate DeepSeek search selection | moyyi; `features/settings/renderer/Connections.tsx` |
+| `ConnectionNotice` | Structured quota, rate-limit and authentication failures with connection name and switch action | moyyi; `features/settings/renderer/index.tsx` |
+| `PreferencesDialog`, `PreferencesContent` | Personal text editor, Skill review and immutable-version enable/revoke controls | moyyi; `features/preferences/renderer/index.tsx` |
+| `SearchCard` | Recorded search query, declared billing, actual/unknown usage and failures | moyyi; `features/web/renderer/SearchCard.tsx` |
+| `TodoCard` | Recorded whole-list model progress, with an explicit unverified-progress label | moyyi; `features/todos/renderer/index.tsx` |
 | `PermissionsDialog`, `WebAccessDialog` | Grant workspace or site access for the current session | moyyi |
 | `MaintenanceDialog` | Backup, restore and software rollback | moyyi |
 | `UsageGuide` | First-use guidance | moyyi |
@@ -82,6 +87,19 @@ Every screen and card defines each state it can reach:
 | Failed | Say what failed and what the user can do next |
 | Unknown outcome | Say the result could not be confirmed and how to check it; never show it as success or failure |
 | Success | Only with a recorded receipt or effect; link to the result |
+
+Connection failures identify the affected saved connection and distinguish quota, rate limiting
+and authentication. Their switch action opens settings; it does not retry, select a fallback or
+claim an account balance. Unconfigured local credentials are a separate state from a rejected
+provider request. Keep the saved connection selector visible while idle and disabled during work.
+
+Skill import review displays the complete document and hash, with the bounded omitted-files list
+marked when truncated. Import success and enabled status are separate. Personal text shows its
+UTF-8 byte limit beside the editor. Show pending, failed, empty and revoked states without stale
+success. A search approval includes its approved query and auxiliary-charge warning. Search
+results display missing usage as unknown; a source list is not verification of the sources' claims.
+The latest todo call opens by default, older records fold, and every card says that progress is
+the model's own report. A failed/truncated record must not become a complete success checklist.
 
 ## Feedback placement
 
