@@ -23,7 +23,8 @@
 
 ## In progress / next step
 
-- No subagent writing; both preflight agents released files. No paid run started.
+- No subagent writing; provider agent is read-only checking quality preparation. No paid run started.
+- Native 780x560 revealed the transcript could shrink to about 96px. Keep a 240px minimum with the already-scrollable outer conversation; rebuild before paid execution. Prior unexecuted freezes are retained, then replaced against this CSS-only candidate.
 - Clean final product candidate `b4bf305` built (archive `77b924027623e3482308bab108dad22d4fee0de812754b09084552ea7b8950ef`); final external desktop verification passed (including H 8 cases / 14 synthetic requests / 1 search).
 - Native isolated app is running at `/private/tmp/moyyi-delivery3-native-yqt_p9wi/Moyyi.app`.
   Original worker/main are saved in its parent. Only this copy's worker, initial geometry,

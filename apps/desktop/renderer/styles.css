@@ -233,7 +233,7 @@ svg {
 .messages {
   overflow-y: auto;
   flex: 1;
-  min-height: 0;
+  min-height: 240px;
   padding: 28px 32px;
   scroll-behavior: auto;
 }
