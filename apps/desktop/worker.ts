@@ -14,6 +14,11 @@ try {
     runtimeOptions: () => initial.runtimeOptions,
     settings: initial.settings,
     configure: configuration.save,
+    preferences: configuration.preferences,
+    changeConnection: configuration.changeConnection,
+    connections: initial.connections,
+    activeConnectionId: initial.activeConnectionId,
+    searchConnectionId: initial.searchConnectionId,
     connection: initial.connection,
     maxOutputTokens: 8192,
   });

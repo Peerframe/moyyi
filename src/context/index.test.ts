@@ -258,6 +258,51 @@ describe("MinimalContextBuilder", () => {
     const assistant = textPath[1]?.body;
     if (assistant?.kind !== "assistant_message") throw new Error("fixture");
     expect(result.request.messages[1]?.replay).toBe(assistant.replay);
+    expect(result.request.messages[1]?.origin).toEqual(assistant.origin);
+  });
+
+  it("places changing catalog data after stable system/history without modifying older requests", () => {
+    const builder = new MinimalContextBuilder();
+    const base = input({
+      path: textPath.slice(0, 3),
+      unsettledEffects: [],
+      sections: [
+        { id: "static", stability: "static", content: [{ type: "text", text: "Stable safety" }] },
+        {
+          id: "catalog",
+          stability: "turn",
+          placement: "after_history",
+          content: [{ type: "text", text: "Catalog version A" }],
+        },
+      ],
+    });
+    const first = builder.build(base).request,
+      saved = canonical(first);
+    const stableSection = base.sections[0];
+    if (!stableSection) throw Error("Missing stable section");
+    const next = builder.build({
+      ...base,
+      sections: [
+        stableSection,
+        {
+          id: "catalog",
+          stability: "turn",
+          placement: "after_history",
+          content: [{ type: "text", text: "Catalog version B" }],
+        },
+      ],
+    }).request;
+    expect(first.system).toEqual(next.system);
+    expect(first.messages.slice(0, -1)).toEqual(next.messages.slice(0, -1));
+    expect(first.messages.at(-1)).toEqual({
+      role: "user",
+      content: [{ type: "text", text: "Catalog version A" }],
+    });
+    expect(next.messages.at(-1)).toEqual({
+      role: "user",
+      content: [{ type: "text", text: "Catalog version B" }],
+    });
+    expect(canonical(first)).toBe(saved);
   });
 
   it("keeps tool definitions in deterministic name order", () => {

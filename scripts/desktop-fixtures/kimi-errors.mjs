@@ -33,7 +33,7 @@ const secret = "PRIVATE_PROVIDER_DIAGNOSTIC_MUST_NOT_ESCAPE";
 const expectations = [
   {
     type: "engine_overloaded_error",
-    kind: "overloaded",
+    kind: "rate_limited",
     message:
       "Kimi HTTP 429 (engine_overloaded_error): Kimi service is overloaded. Wait for service capacity before starting a new run.",
   },
@@ -45,7 +45,7 @@ const expectations = [
   },
   {
     type: "exceeded_current_quota_error",
-    kind: "auth",
+    kind: "quota",
     message:
       "Kimi HTTP 429 (exceeded_current_quota_error): Kimi account quota is unavailable. Check account balance and quota before starting a new run.",
   },
@@ -137,7 +137,11 @@ try {
     await runtime.idle();
     const outcomes = events.filter((event) => event.type === "run.finished");
     assert.equal(outcomes.length, 1);
-    assert.deepEqual(outcomes[0].outcome, { kind: "failed", reason: expected.message });
+    assert.deepEqual(outcomes[0].outcome, {
+      kind: "failed",
+      reason: expected.message,
+      modelErrorKind: expected.kind,
+    });
     assert.equal(requests.length, 1);
     assert.equal(bodyReads, 1);
     assert.equal(closes, 1);

@@ -143,7 +143,7 @@ const manifest = {
   maintenanceCompatibility: {
     schemaVersion: SCHEMA_VERSION,
     persistedFormat: PERSISTED_FORMAT_VERSION,
-    settingsFormat: 1,
+    settingsFormat: 2,
     settingsKeys: ["preset", "maxRequests", "timeoutMs", "kimiReasoningEffort", "evidenceAnswer"],
   },
   electron: "45.0.0",

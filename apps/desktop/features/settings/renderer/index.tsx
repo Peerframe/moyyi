@@ -2,6 +2,7 @@ import type { Dispatch, SetStateAction } from "react";
 import { useState } from "react";
 import type { RendererFeature } from "../../../renderer/slot-types.ts";
 import { useDesktopUI } from "../../../renderer/ui.ts";
+import { ConnectionSelector } from "./Connections.tsx";
 import { SettingsDialog } from "./SettingsDialog.tsx";
 import { SettingsFields } from "./SettingsFields.tsx";
 import { UsageGuide } from "./UsageGuide.tsx";
@@ -77,6 +78,22 @@ function ConnectionNotice() {
 
   return (
     <>
+      {state.connectionFailure ? (
+        <section className="error error-banner" role="alert">
+          <strong>连接不可用 · {state.connectionFailure.name}</strong>
+          <p>
+            {
+              { quota: "额度用完", rate_limited: "被限流", auth: "密钥无效" }[
+                state.connectionFailure.kind
+              ]
+            }
+            。本次运行已停止，历史已保留。
+          </p>
+          <button type="button" disabled={busy} onClick={() => setSettingsOpen(true)}>
+            切换连接
+          </button>
+        </section>
+      ) : null}
       {!state.connection.ready ? (
         <div className="error error-banner" role="alert">
           <span>当前模型连接未就绪。已有会话仍可查看，材料仍可选择。</span>
@@ -103,6 +120,12 @@ export const rendererFeature: RendererFeature = {
   useController,
   blocksComposer: (ui) => ui.settingsOpen || ui.helpOpen,
   slots: [
+    {
+      id: "settings.ConnectionSelector",
+      slot: "header-actions",
+      order: 25,
+      Component: ConnectionSelector,
+    },
     { id: "settings.HelpButton", slot: "header-actions", order: 0, Component: HelpButton },
     { id: "settings.SettingsButton", slot: "header-actions", order: 30, Component: SettingsButton },
     { id: "settings.Help", slot: "dialogs", order: 0, Component: Help },

@@ -16,6 +16,9 @@ export interface StateInitialization {
     readonly connection?: DesktopState["connection"];
     readonly settings?: DesktopState["settings"];
     readonly maxOutputTokens?: number;
+    readonly connections?: DesktopState["connections"];
+    readonly activeConnectionId?: string;
+    readonly searchConnectionId?: string | null;
   };
 }
 export interface StateContract {

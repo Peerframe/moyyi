@@ -29,6 +29,16 @@ export async function openRuntime(
     developmentPlugins: _development,
     ...base
   } = host.options;
+  const search =
+    access.search === true &&
+    _web?.search &&
+    "backend" in _web.search &&
+    _web.search.backend === "deepseek"
+      ? _web.search
+      : undefined;
+  if (access.search === true && !search)
+    throw new BoundaryError("Search requires a configured DeepSeek connection");
+  const hasWeb = access.allowedOrigins.length > 0 || !!search;
   const runtime = await createRuntime({
     ...base,
     ...((target || permissions.writes) && host.state.workspaceRoot
@@ -44,11 +54,21 @@ export async function openRuntime(
           },
         }
       : {}),
-    ...(access.allowedOrigins.length ? { web: { ...access, approval: "ask" as const } } : {}),
-    policy: access.allowedOrigins.length
+    ...(hasWeb
+      ? {
+          web: {
+            allowedOrigins: access.allowedOrigins,
+            dns: access.dns,
+            ...(search ? { search } : {}),
+            approval: "ask" as const,
+          },
+        }
+      : {}),
+    policy: hasWeb
       ? new WebPolicy({
           previous: new DesktopPolicy(permissions, askEachRead, target),
-          fetch: true,
+          fetch: access.allowedOrigins.length > 0,
+          search: !!search,
           approval: "ask",
         })
       : new DesktopPolicy(permissions, askEachRead, target),

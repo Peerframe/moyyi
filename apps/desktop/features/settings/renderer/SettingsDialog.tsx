@@ -30,6 +30,10 @@ export function SettingsDialog({
     };
   }, []);
 
+  useEffect(() => {
+    setDraft(newSettingsDraft(settings));
+  }, [settings]);
+
   function close() {
     if (!gate.current.begin()) return;
     setDraft((current) => newSettingsDraft(current.settings));

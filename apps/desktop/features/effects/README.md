@@ -4,8 +4,12 @@ Exact pending approvals, operation history, inspection and undo/check draft cont
 
 ## Status
 
-Build-time repository module extracted from the accepted M6 desktop. Behavior is unchanged;
-acceptance evidence is recorded in the [delivery record](../../../../docs/tasks/2026-10-29-desktop-modules-delivery.md).
+Build-time repository module extracted from the accepted M6 desktop; original acceptance evidence
+is recorded in the [delivery record](../../../../docs/tasks/2026-10-29-desktop-modules-delivery.md).
+Known DeepSeek native-search approvals show the exact query, requested result limit and destination
+beside the unchanged approval summary. Their complete original preview remains in a collapsed
+disclosure. Unknown or malformed previews retain the full default text display. This is a renderer
+projection only; approval identities, digests, decisions and host authority are unchanged.
 
 ## Structure
 

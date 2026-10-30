@@ -21,6 +21,8 @@ export interface ModelRequest {
 
 export interface ModelMessage {
   readonly role: "user" | "assistant";
+  /** Historical assistant provenance, copied from the transcript; absent means legacy input. */
+  readonly origin?: ModelOrigin;
   readonly content: readonly ContentPart[];
   readonly replay?: ReplayEnvelope;
   /** Transcript provenance; absent means unknown, never proof of complete reasoning. */
@@ -77,6 +79,7 @@ export interface ModelError {
 }
 
 export type ModelErrorKind =
+  | "quota"
   | "rate_limited"
   | "overloaded"
   | "auth"

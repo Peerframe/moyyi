@@ -1,8 +1,14 @@
 import { createHash } from "node:crypto";
 import type { ToolCallId, ToolResultPart } from "moyyi/contracts";
 import { describe, expect, it } from "vitest";
+import { validateState } from "../features/web/state.ts";
 import { parseDesktopCommand } from "./validation.ts";
-import { appendWebSource, normalizeDesktopWebAccess, projectWebSource } from "./web.ts";
+import {
+  appendWebSource,
+  normalizeDesktopWebAccess,
+  projectWebSearchSources,
+  projectWebSource,
+} from "./web.ts";
 
 const recordedAt = "2026-10-29T00:00:00.000Z";
 const response = {
@@ -27,6 +33,27 @@ function result(data: unknown = response): ToolResultPart {
 }
 
 describe("desktop web permission admission", () => {
+  it("admits a separate boolean search grant without accepting backend or credential fields", () => {
+    const access = { allowedOrigins: [], dns: "system", search: true };
+    expect(normalizeDesktopWebAccess(access)).toEqual(access);
+    expect(
+      parseDesktopCommand({ type: "web.permissions", sessionId: "session", ...access }),
+    ).toEqual({ type: "web.permissions", sessionId: "session", ...access });
+    expect(normalizeDesktopWebAccess({ ...access, search: false })).toEqual({
+      allowedOrigins: [],
+      dns: "system",
+    });
+    for (const search of [undefined, null, "true", 1, {}, { backend: "deepseek" }])
+      expect(() => normalizeDesktopWebAccess({ ...access, search })).toThrow();
+    expect(() =>
+      parseDesktopCommand({
+        type: "web.permissions",
+        sessionId: "session",
+        ...access,
+        getApiKey: "secret",
+      }),
+    ).toThrow();
+  });
   it("accepts only bounded canonical origins and copies the grant", () => {
     const input = { allowedOrigins: ["https://docs.example.com"], dns: "cloudflare-doh" };
     const parsed = normalizeDesktopWebAccess(input);
@@ -83,6 +110,87 @@ describe("desktop web permission admission", () => {
         approval: "allow",
       }),
     ).toThrow();
+  });
+});
+
+describe("recorded structured search sources", () => {
+  const native = () => ({
+    url: "https://api.deepseek.com/anthropic/v1/messages",
+    status: 200,
+    contentType: "application/json",
+    truncated: false,
+    text: JSON.stringify({
+      results: [
+        {
+          url: "https://docs.example.com/a",
+          title: "First",
+          content: "First excerpt",
+          publishedAt: "2026-10-30",
+        },
+        { url: "https://docs.example.com/b", title: "Second", content: "", publishedAt: null },
+      ],
+    }),
+    search: {
+      backend: "deepseek",
+      query: "public topic",
+      usage: {
+        successfulSearches: 2,
+        attemptedSearches: 2,
+        inputTokens: 10,
+        outputTokens: 5,
+        cacheReadInputTokens: null,
+        cacheCreationInputTokens: null,
+      },
+    },
+  });
+  it("keeps all sources under one original result identity without granting fetch access", () => {
+    const projected = projectWebSearchSources("entry", recordedAt, result(native()), "web_search");
+    expect(projected).toHaveLength(2);
+    expect(projected?.[0]).toMatchObject({
+      id: "entry:fetch-1",
+      text: "First excerpt",
+      search: { index: 0, query: "public topic", publishedAt: "2026-10-30" },
+    });
+    expect(projected?.[1]).toMatchObject({
+      id: "entry:fetch-1",
+      text: "",
+      search: { index: 1, publishedAt: null },
+    });
+    let sources: ReturnType<typeof appendWebSource> = { items: [], truncated: false };
+    for (const source of projected ?? []) sources = appendWebSource(sources, source);
+    expect(sources.items).toHaveLength(2);
+    expect(appendWebSource(sources, projected?.[0] as NonNullable<typeof projected>[number])).toBe(
+      sources,
+    );
+    expect(validateState({ webAccess: { allowedOrigins: [], dns: "system" }, sources })).toBe(true);
+    expect(projected?.[0]?.textSha256).toBe(
+      `sha256:${createHash("sha256").update("First excerpt").digest("hex")}`,
+    );
+  });
+  it("refuses unrelated calls, errors, duplicate sources and malformed usage", () => {
+    expect(projectWebSearchSources("entry", recordedAt, result(native()), "web_fetch")).toBeNull();
+    expect(
+      projectWebSearchSources(
+        "entry",
+        recordedAt,
+        { ...result(native()), status: "failed" },
+        "web_search",
+      ),
+    ).toBeNull();
+    for (const data of [
+      { ...native(), search: { ...native().search, error: "no_structured_results" } },
+      { ...native(), search: { ...native().search, usage: { successfulSearches: -1 } } },
+      { ...native(), url: "https://forged.example.com/" },
+      {
+        ...native(),
+        text: '{"results":[{"url":"https://docs.example.com/a","title":"A","content":"","publishedAt":null},{"url":"https://docs.example.com/a","title":"A","content":"","publishedAt":null}]}',
+      },
+      {
+        ...native(),
+        text: '{"results":[{"url":"https://127.0.0.1/","title":"A","content":"","publishedAt":null}]}',
+      },
+    ])
+      expect(projectWebSearchSources("entry", recordedAt, result(data), "web_search")).toBeNull();
   });
 });
 

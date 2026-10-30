@@ -89,7 +89,7 @@ describe("Kimi provider transport", () => {
   it.each([
     [400, "invalid_request"],
     [401, "auth"],
-    [402, "auth"],
+    [402, "quota"],
     [403, "auth"],
     [404, "invalid_request"],
     [413, "invalid_request"],

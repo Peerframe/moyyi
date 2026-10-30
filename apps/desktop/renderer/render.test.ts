@@ -10,8 +10,10 @@ import { PermissionsDialog } from "../features/permissions/renderer/PermissionsD
 import { SettingsDialog } from "../features/settings/renderer/SettingsDialog.tsx";
 import { SourcesPanel } from "../features/web/renderer/SourcesPanel.tsx";
 import { WebAccessDialog } from "../features/web/renderer/WebAccessDialog.tsx";
+import { desktopStateSchema } from "../native/state-schema.ts";
 import { DEFAULT_DESKTOP_SETTINGS, type DesktopEffect } from "../shared.ts";
 import { MessageList } from "./MessageList.tsx";
+import { type ReadyRendererUI, RendererContext } from "./ui.ts";
 
 describe("desktop untrusted content rendering", () => {
   it("renders recorded web bodies, provenance and distinct truncation indicators without navigation", () => {
@@ -110,6 +112,72 @@ describe("desktop untrusted content rendering", () => {
     expect(html).toContain("批准本次操作");
     expect(html).toContain("拒绝");
     expect(onDecide).not.toHaveBeenCalled();
+  });
+
+  it("projects the exact native search query and keeps the complete preview collapsed", () => {
+    const onDecide = vi.fn();
+    const query = '  <img src=x onerror=alert(1)>\n"AbortController" & signal  ';
+    const summary = "将产生一次 DeepSeek Flash 付费调用，外加最多 5 次计费搜索";
+    const preview = JSON.stringify({
+      kind: "search",
+      destination: "https://api.deepseek.com/anthropic/v1/messages",
+      query,
+      count: 5,
+      billing: summary,
+      request: { model: "deepseek-flash", messages: [{ role: "user", content: query }] },
+    });
+    const html = renderToStaticMarkup(
+      createElement(ApprovalCard, {
+        approval: { effectId: "effect", digest: "digest", summary, preview },
+        hostError: null,
+        onDecide,
+      }),
+    );
+    expect(html).toContain(`<h2>${summary}</h2>`);
+    expect(html).toContain(
+      "<pre>  &lt;img src=x onerror=alert(1)&gt;\n&quot;AbortController&quot; &amp; signal  </pre>",
+    );
+    expect(html).toContain("<dt>最多返回结果</dt><dd>5 条</dd>");
+    expect(html).toContain("DeepSeek · https://api.deepseek.com/anthropic/v1/messages");
+    expect(html).toContain(
+      `<details><summary>完整操作预览</summary>${renderToStaticMarkup(createElement("pre", null, preview))}</details>`,
+    );
+    expect(html).not.toMatch(/<(?:a|img|script)\b/);
+    expect(onDecide).not.toHaveBeenCalled();
+  });
+
+  it.each([
+    "{incomplete",
+    "null",
+    JSON.stringify({ kind: "search", query: "public topic", count: 5 }),
+    ...[
+      { kind: "fetch" },
+      { destination: "https://example.com/search" },
+      { query: 5 },
+      { count: "5" },
+      { count: 0 },
+      { count: 11 },
+    ].map((change) =>
+      JSON.stringify({
+        kind: "search",
+        destination: "https://api.deepseek.com/anthropic/v1/messages",
+        query: "public topic",
+        count: 5,
+        ...change,
+      }),
+    ),
+  ])("retains the full default preview for unrecognized search data: %s", (preview) => {
+    const html = renderToStaticMarkup(
+      createElement(ApprovalCard, {
+        approval: { effectId: "effect", digest: "digest", summary: "原操作摘要", preview },
+        hostError: null,
+        onDecide: vi.fn(),
+      }),
+    );
+    expect(html).toContain(renderToStaticMarkup(createElement("pre", null, preview)));
+    expect(html).not.toContain("<details>");
+    expect(html).not.toContain("目标服务");
+    expect(html).toContain("原操作摘要");
   });
 
   it("renders current file text literally and exposes truncation instead of a generated preview", () => {
@@ -251,11 +319,20 @@ describe("desktop untrusted content rendering", () => {
   it("starts settings with an empty masked key and describes local save without a paid probe", () => {
     const onConfigure = vi.fn();
     const html = renderToStaticMarkup(
-      createElement(SettingsDialog, {
-        settings: DEFAULT_DESKTOP_SETTINGS,
-        onConfigure,
-        onClose: vi.fn(),
-      }),
+      createElement(
+        RendererContext.Provider,
+        {
+          value: {
+            state: desktopStateSchema.initialize({ options: {}, display: {} }),
+            busy: false,
+          } as ReadyRendererUI,
+        },
+        createElement(SettingsDialog, {
+          settings: DEFAULT_DESKTOP_SETTINGS,
+          onConfigure,
+          onClose: vi.fn(),
+        }),
+      ),
     );
     expect(html).toMatch(/type="password"[^>]*value=""/);
     expect(html).toContain("留空保留该服务已有密钥");

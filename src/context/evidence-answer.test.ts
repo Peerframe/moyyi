@@ -101,6 +101,24 @@ function build(change: Partial<ContextInput> = {}) {
 }
 
 describe("evidence answer projection", () => {
+  it("retains the enabled catalog after evidence without promoting it to system instructions", () => {
+    const { request, data } = build({
+      sections: [
+        {
+          id: "catalog",
+          stability: "turn",
+          placement: "after_history",
+          content: [{ type: "text", text: "Current enabled skill catalog: report-style" }],
+        },
+      ],
+    });
+    expect(canonicalizeJson(request.system)).not.toContain("report-style");
+    expect(request.messages.at(-1)).toEqual({
+      role: "user",
+      content: [{ type: "text", text: "Current enabled skill catalog: report-style" }],
+    });
+    expect(data.observations).toHaveLength(1);
+  });
   it.each([
     "The client freezes configuration at startup; changes need a new client.",
     "The client reads configuration on every operation; changes apply to the existing client.",

@@ -37,6 +37,12 @@ import type {
   FeatureState as State7,
 } from "./features/permissions/contract.ts";
 import type {
+  FeatureAction as Action9,
+  FeatureBridge as Bridge9,
+  FeatureCommand as Command9,
+  FeatureState as State9,
+} from "./features/preferences/contract.ts";
+import type {
   FeatureAction as Action0,
   FeatureBridge as Bridge0,
   FeatureCommand as Command0,
@@ -48,6 +54,12 @@ import type {
   FeatureCommand as Command6,
   FeatureState as State6,
 } from "./features/settings/contract.ts";
+import type {
+  FeatureAction as Action10,
+  FeatureBridge as Bridge10,
+  FeatureCommand as Command10,
+  FeatureState as State10,
+} from "./features/todos/contract.ts";
 import type {
   FeatureAction as Action5,
   FeatureBridge as Bridge5,
@@ -62,7 +74,9 @@ export type FeatureStates = State0 &
   State5 &
   State6 &
   State7 &
-  State8;
+  State8 &
+  State9 &
+  State10;
 export type FeatureCommands =
   | Command0
   | Command1
@@ -72,7 +86,9 @@ export type FeatureCommands =
   | Command5
   | Command6
   | Command7
-  | Command8;
+  | Command8
+  | Command9
+  | Command10;
 export type FeatureActions =
   | Action0
   | Action1
@@ -82,7 +98,9 @@ export type FeatureActions =
   | Action5
   | Action6
   | Action7
-  | Action8;
+  | Action8
+  | Action9
+  | Action10;
 export type FeatureBridges = Bridge0 &
   Bridge1 &
   Bridge2 &
@@ -91,4 +109,6 @@ export type FeatureBridges = Bridge0 &
   Bridge5 &
   Bridge6 &
   Bridge7 &
-  Bridge8;
+  Bridge8 &
+  Bridge9 &
+  Bridge10;

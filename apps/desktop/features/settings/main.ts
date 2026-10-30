@@ -4,6 +4,10 @@ import { contract } from "./contract.ts";
 export const nativeFeature = {
   contract,
   handlers: {
+    async changeConnection(context, change) {
+      if (context.selecting || context.quitting) throw Error("请先完成或取消当前选择。");
+      return context.host.send(parseDesktopCommand({ type: "connection.change", change }));
+    },
     async configure(context, options) {
       if (context.selecting || context.quitting) throw Error("请先完成或取消当前选择。 ");
       const command = parseDesktopCommand({ ...options, type: "configure" });

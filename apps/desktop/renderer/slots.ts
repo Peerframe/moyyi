@@ -75,8 +75,14 @@ export function SettingsSections(props: SettingsSectionProps) {
     ),
   );
 }
-export function ConversationNode({ message }: { message: DesktopMessage }) {
+export function ConversationNode({
+  message,
+  latest,
+}: {
+  message: DesktopMessage;
+  latest?: boolean;
+}) {
   const node = registeredSlots().message(message);
   if (!node) throw Error(`No desktop renderer for ${message.role}`);
-  return createElement(node.Component, { message });
+  return createElement(node.Component, { message, ...(latest !== undefined ? { latest } : {}) });
 }

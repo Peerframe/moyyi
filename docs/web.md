@@ -6,7 +6,8 @@ unavailable without an explicit host grant. Selecting DeepSeek/Anthropic does no
 The M5 desktop candidate exposes specified-page fetch through **网页访问** and a recorded-source
 panel. Its fixed public-source/report task and corrected original-record reopening have separate
 [M5 acceptance evidence](tasks/2026-10-28-desktop-m5.md); source cards do not automatically verify
-report claims. Desktop search remains disabled; it does not select a public search instance. See
+report claims. Delivery three adds a DeepSeek native-search backend, described below; its
+installed/live acceptance belongs to the delivery record. See
 [desktop usage](desktop.md#web-pages-and-recorded-sources-m5) and
 [ADR0043](decisions/0043-desktop-web-sources.md). CLI configuration below remains independent.
 
@@ -56,6 +57,41 @@ See [ADR 0029](decisions/0029-explicit-cloudflare-doh.md).
 
 ## Search
 
+### Desktop DeepSeek search
+
+Select an existing DeepSeek connection for search in settings, then enable search separately in
+**网页访问** for the current session. A connection alone grants no web permission. With no selected
+DeepSeek connection, search is unavailable. Each tool invocation still needs approval, showing
+the query and “将产生一次 DeepSeek Flash 付费调用，外加最多 5 次计费搜索”. A run permits at most
+5 product searches, including failed attempts. Restarting or switching connections resets web
+permissions to the read-only default; search-result URLs do not grant permission to fetch pages.
+
+One product search calls the fixed DeepSeek Anthropic Messages endpoint with Flash, thinking
+disabled, 4096 output tokens and `max_uses: 5`. Its auxiliary prompt contains only the approved
+query. No conversation content or personal instructions are sent. The action preview records
+the exact secret-free request; keys are neither recorded nor exposed to the model. Transport
+uses the provider's fixed-origin, no-redirect credential rules, with a total timeout and a bounded
+complete JSON response. There is no retry or fallback service.
+
+Only structured search-result blocks supply URLs, titles, dates and optional inline excerpts.
+The backend deduplicates public HTTPS URLs and returns at most 10 sources, further limited by
+the existing tool-output budget. Missing excerpts stay empty, and prose is never used as an
+answer or source. Missing structured results or an in-band native error produce a failed tool
+result. Source cards and reports use recorded sources; this does not independently verify their
+claims. Fetching a result still needs its own site grant and approval.
+
+Starting 2026-11-01 00:00 Beijing time (also Singapore time), DeepSeek charges USD 0.75 per
+1,000 successful, non-empty native searches, in addition to Flash token charges. Failed, empty
+and timed-out searches do not incur the search fee. One product search can perform up to 5
+billable native searches. The recorded result includes the provider's successful/attempted search
+counts and input/output/cache token counts; unavailable counters are `null` and shown as unknown,
+never estimated. The successful count comes from `usage.server_tool_use.tool_search`, not the
+number of returned links. See [official billing](https://api-docs.deepseek.com/guides/search/#billing),
+[usage counters](https://api-docs.deepseek.com/guides/anthropic_api/#server-tool-usage), and
+[ADR 0050](decisions/0050-deepseek-native-search.md).
+
+### CLI SearXNG search
+
 If you already have a public HTTPS SearXNG instance with its JSON API enabled, configure its
 origin separately:
 
@@ -80,9 +116,11 @@ list. Private/localhost SearXNG deployments are outside this first network bound
 - HTTPS on port 443, DNS names with public IPv4 A records, valid TLS certificates. Every resolved
   A record must pass public-address checks; the selected address is pinned to the connection.
   IPv6-only sites, private/reserved addresses and literal IP URLs are rejected.
-- No redirects, credentials, cookies, custom headers, proxy environment, POST bodies, downloads
+- Page fetch and SearXNG: no redirects, credentials, cookies, custom headers, proxy environment, POST bodies, downloads
   or browser JavaScript. Compressed responses are refused. Supported UTF-8 media types are
   `text/plain`, `text/html` and `application/json`. HTML becomes a bounded, untrusted plain text view with its title.
+- Native DeepSeek search is the explicit fixed-endpoint credential-bearing POST exception. It
+  follows the model-provider transport rules and grants no additional page-fetch destinations.
 - Default response cap is 256 KiB, configurable up to 1 MiB, further bounded by the tool-output
   limit. Fetch may return a marked prefix. Search requires complete bounded JSON. Default timeout
   is 30 seconds, configurable up to 120 seconds, covering DNS and HTTP.

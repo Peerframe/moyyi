@@ -2,6 +2,8 @@ import { initializationError } from "./initialization.ts";
 import type { DesktopHost, DesktopHostOptions } from "./types.ts";
 
 export { DesktopInitializationError } from "./initialization.ts";
+// Trusted production-host composition for external installed acceptance; never exposed to IPC.
+export { createModelConfiguration } from "./settings.ts";
 export type { DesktopHost, DesktopHostOptions } from "./types.ts";
 
 import type { ClientCommand, RuntimeEvent, SessionId, SessionQuery } from "moyyi/contracts";
@@ -47,16 +49,31 @@ class Host implements DesktopHost, HostContext {
   state: DesktopState;
   eventState: DesktopState;
   options: RuntimeOptions;
+  readonly preferences: DesktopHostOptions["preferences"];
   readonly configure: DesktopHostOptions["configure"];
+  readonly changeConnection: DesktopHostOptions["changeConnection"];
   refresh: Promise<void> | undefined;
   resultsDestination: "both" | "artifacts" | "effects" = "both";
 
   constructor(
     options: RuntimeOptions,
-    display: Pick<DesktopHostOptions, "connection" | "maxOutputTokens" | "settings" | "configure">,
+    display: Pick<
+      DesktopHostOptions,
+      | "connection"
+      | "maxOutputTokens"
+      | "settings"
+      | "configure"
+      | "connections"
+      | "activeConnectionId"
+      | "searchConnectionId"
+      | "changeConnection"
+      | "preferences"
+    >,
   ) {
     this.options = options;
+    this.preferences = display.preferences;
     this.configure = display.configure;
+    this.changeConnection = display.changeConnection;
     this.state = initialState(options, display);
     this.eventState = this.state;
   }

@@ -6,8 +6,10 @@ import { contract as feature2 } from "../features/effects/contract.ts";
 import { contract as feature8 } from "../features/maintenance/contract.ts";
 import { contract as feature3 } from "../features/materials/contract.ts";
 import { contract as feature7 } from "../features/permissions/contract.ts";
+import { contract as feature9 } from "../features/preferences/contract.ts";
 import { contract as feature0 } from "../features/sessions/contract.ts";
 import { contract as feature6 } from "../features/settings/contract.ts";
+import { contract as feature10 } from "../features/todos/contract.ts";
 import { contract as feature5 } from "../features/web/contract.ts";
 import type { FeatureContract } from "./contract.ts";
 export const featureContracts: readonly FeatureContract[] = [
@@ -20,4 +22,6 @@ export const featureContracts: readonly FeatureContract[] = [
   feature6,
   feature7,
   feature8,
+  feature9,
+  feature10,
 ];

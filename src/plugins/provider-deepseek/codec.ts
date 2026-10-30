@@ -72,13 +72,34 @@ export function buildDeepSeekRequest(
   const pending = new Map<string, string>();
   const localIds = new Set<string>();
   const providerIds = new Set<string>();
+  // Chat providers can reuse a wire call ID in later turns. Responses requires global
+  // uniqueness, so only foreign calls receive deterministic, collision-free wire IDs.
+  const reservedIds = new Set(
+    value.messages.flatMap((message) =>
+      message.content.flatMap((part) => (part.type === "tool_call" ? [part.providerCallId] : [])),
+    ),
+  );
+  let foreignCallSequence = 0;
   for (const message of value.messages) {
-    keys(object(message), ["role", "content", "replay", "stopReason"]);
+    keys(object(message), ["role", "origin", "content", "replay", "stopReason"]);
     requireCondition(message.role === "user" || message.role === "assistant", "Unsupported role");
+    if (message.origin !== undefined) {
+      requireCondition(message.role === "assistant", "Only assistant history has model origin");
+      keys(object(message.origin), ["provider", "model"]);
+      requireCondition(
+        string(message.origin.provider).length > 0 && string(message.origin.model).length > 0,
+        "Invalid historical model origin",
+      );
+    }
+    const foreign = message.origin !== undefined && message.origin.provider !== "deepseek";
+    const foreignTurnIds = new Set<string>();
     requireCondition(message.content.length > 0, "Empty history message");
     if (message.role === "assistant") {
       requireCondition(pending.size === 0, "Tool results must precede the next assistant");
-      const complete = message.stopReason === "end_turn" || message.stopReason === "tool_use";
+      const complete =
+        message.stopReason === "end_turn" ||
+        message.stopReason === "tool_use" ||
+        (foreign && message.stopReason === "refusal");
       const hasCall = message.content.some((part) => part.type === "tool_call");
       requireCondition(
         tools.length || hasCall ? complete : message.stopReason === undefined || complete,
@@ -88,13 +109,23 @@ export function buildDeepSeekRequest(
       // every actual visible part below; a complete response may contain no reasoning.
       requireCondition(
         (message.stopReason !== "tool_use" || hasCall) &&
-          (message.stopReason !== "end_turn" || !hasCall),
+          (message.stopReason !== "end_turn" || !hasCall) &&
+          (message.stopReason !== "refusal" || !hasCall),
         "Assistant stop reason does not match its calls",
       );
+      if (foreign)
+        requireCondition(
+          message.content.some(
+            (part) => part.type === "text" || part.type === "refusal" || part.type === "tool_call",
+          ),
+          "Foreign assistant history has no transferable content",
+        );
     }
     for (const part of message.content) {
-      if (part.type === "text") {
+      if (part.type === "text" || (foreign && part.type === "refusal")) {
         keys(object(part), ["type", "text"]);
+        if (part.type === "refusal")
+          requireCondition(message.stopReason === "refusal", "Refusal requires a refusal outcome");
         input.push({
           type: "message",
           role: message.role,
@@ -106,6 +137,15 @@ export function buildDeepSeekRequest(
           ],
         });
       } else if (part.type === "reasoning" && message.role === "assistant") {
+        if (foreign) {
+          keys(object(part), part.kind === "opaque" ? ["type", "kind"] : ["type", "kind", "text"]);
+          requireCondition(
+            ["visible", "summary", "opaque"].includes(part.kind),
+            "Invalid reasoning kind",
+          );
+          if (part.kind !== "opaque") string(part.text);
+          continue;
+        }
         keys(object(part), ["type", "kind", "text"]);
         requireCondition(part.kind === "visible", "Only full visible reasoning is supported");
         input.push({
@@ -122,12 +162,18 @@ export function buildDeepSeekRequest(
           "rawArguments",
           "argumentsSource",
         ]);
-        const providerId = identifier(part.providerCallId);
+        let providerId = identifier(part.providerCallId);
         requireCondition(
           typeof part.callId === "string" && part.callId.length > 0 && part.callId.length <= 512,
           "Invalid local call ID",
         );
         if (part.providerItemId !== null) identifier(part.providerItemId);
+        if (foreign) {
+          requireCondition(!foreignTurnIds.has(providerId), "Duplicate call ID");
+          foreignTurnIds.add(providerId);
+          do providerId = `moyyi_foreign_${++foreignCallSequence}`;
+          while (reservedIds.has(providerId));
+        }
         requireCondition(
           !localIds.has(part.callId) && !providerIds.has(providerId),
           "Duplicate call ID",
@@ -810,6 +856,7 @@ function failureKind(code: unknown): ModelErrorKind {
 function externalKind(error: unknown): ModelErrorKind {
   if (error instanceof CodecError) return error.kind;
   const kinds = [
+    "quota",
     "rate_limited",
     "overloaded",
     "auth",
