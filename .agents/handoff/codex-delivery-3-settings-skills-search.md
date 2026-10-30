@@ -4,7 +4,7 @@
 - Branch: `codex/delivery-3-settings-skills-search`; base main `26ecc5a3`.
 - Worktree: `/Users/yxflc/.codex/worktrees/delivery-3-settings-skills-search/moyyi`.
 - Last agent: Codex, 2026-10-30 21:33 Asia/Singapore.
-- Checkpoint: A–F implemented; G/H ready for integration checks. A `6a9c9f2`, B `f8971a3`, C/D `961b8b4`. No PR/installation.
+- Checkpoint: A–G implemented; H ready for integration checks. A `6a9c9f2`, B `f8971a3`, C/D `961b8b4`. No PR/installation.
 
 ## Done
 
@@ -34,6 +34,10 @@
 
 - F: recorded todo_write cards show all recorded items/statuses; latest expanded, earlier folded.
   Fixed model-reported-progress label, no separate state. Renderer tests passed.
+
+- G: backups hash format 2 settings, personal instructions and every indexed Skill version;
+  rescue includes current files, restore still only replaces session store. Rollback rejects
+  incompatible settings/store targets. Four maintenance suites: 39 tests passed.
 
 ## In progress
 

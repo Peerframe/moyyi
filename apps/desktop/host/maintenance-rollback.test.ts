@@ -28,6 +28,7 @@ const sha = (bytes: string | Buffer) => createHash("sha256").update(bytes).diges
 interface StoreVersion {
   readonly schemaVersion: number;
   readonly persistedFormat: number;
+  readonly settingsFormat?: 1 | 2;
 }
 function app(path: string, revision: string, version?: StoreVersion) {
   const resources = join(path, "Contents/Resources");
@@ -48,7 +49,7 @@ function app(path: string, revision: string, version?: StoreVersion) {
         ? {
             maintenanceCompatibility: {
               ...version,
-              settingsFormat: 1,
+              settingsFormat: version.settingsFormat ?? 1,
               settingsKeys: [
                 "preset",
                 "maxRequests",
@@ -136,9 +137,68 @@ function fixture(high = false, versions?: { data: StoreVersion; target: StoreVer
   return { home, root, target, data, archive, receiptPath, settingsPath, previous };
 }
 
+function upgradeSettings(path: string): Buffer {
+  const bytes = Buffer.from(
+    JSON.stringify({
+      format: 2,
+      settings: { preset: "flash", maxRequests: 3, timeoutMs: 120000 },
+      connections: [
+        {
+          id: "research",
+          name: "Research",
+          provider: "deepseek",
+          reasoningEffort: "low",
+          credentialRef: "desktop:11111111-1111-4111-8111-111111111111",
+        },
+      ],
+      activeConnectionId: "research",
+      searchConnectionId: "research",
+      personalInstructionsHash: null,
+      skills: [],
+    }),
+  );
+  writeFileSync(path, bytes);
+  return bytes;
+}
+
 describe.skipIf(process.platform !== "darwin" || process.arch !== "arm64")(
   "software rollback coordination (native calls mocked)",
   () => {
+    it("refuses settings format 2 with format-1 software without discarding current connections", async () => {
+      const version = { schemaVersion: 3, persistedFormat: 2 };
+      const f = fixture(false, { data: version, target: version });
+      const settings = upgradeSettings(f.settingsPath);
+      const installed = readFileSync(join(f.target, "Contents/Resources/candidate.json"));
+      await expect(prepareRollback(f.home, currentRevision)).rejects.toThrow("升级前设置备份");
+      expect(readFileSync(f.settingsPath)).toEqual(settings);
+      expect(readFileSync(join(f.target, "Contents/Resources/candidate.json"))).toEqual(installed);
+    });
+
+    it.each([1, 2])(
+      "allows settings format %i with software that declares format 2",
+      async (format) => {
+        const version = { schemaVersion: 3, persistedFormat: 2, settingsFormat: 2 as const };
+        const f = fixture(false, { data: version, target: version });
+        if (format === 2) upgradeSettings(f.settingsPath);
+        const settings = readFileSync(f.settingsPath);
+        const prepared = await prepareRollback(f.home, currentRevision);
+        await prepared.commit();
+        expect(readFileSync(f.settingsPath)).toEqual(settings);
+      },
+    );
+
+    it("rechecks settings format before replacing software after preparation", async () => {
+      const version = { schemaVersion: 3, persistedFormat: 2 };
+      const f = fixture(false, { data: version, target: version });
+      const prepared = await prepareRollback(f.home, currentRevision);
+      const installed = readFileSync(join(f.target, "Contents/Resources/candidate.json"));
+      const settings = upgradeSettings(f.settingsPath);
+      await expect(prepared.commit()).rejects.toThrow("ROLLBACK_SETTINGS");
+      expect(readFileSync(f.settingsPath)).toEqual(settings);
+      expect(readFileSync(join(f.target, "Contents/Resources/candidate.json"))).toEqual(installed);
+      prepared.abort();
+    });
+
     it("retains format-2 data and reports its actual format when the target matches", async () => {
       const version = { schemaVersion: 3, persistedFormat: 2 };
       const f = fixture(false, { data: version, target: version });
