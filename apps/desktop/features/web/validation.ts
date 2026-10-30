@@ -4,11 +4,18 @@ import type { FeatureCommand } from "./contract.ts";
 export function validateCommand(input: Record<string, unknown>, exact: ExactKeys): FeatureCommand {
   switch (input.type) {
     case "web.permissions": {
-      exact(["type", "sessionId", "allowedOrigins", "dns"]);
+      exact([
+        "type",
+        "sessionId",
+        "allowedOrigins",
+        "dns",
+        ...(Object.hasOwn(input, "search") ? ["search"] : []),
+      ]);
       if (!identifier(input.sessionId)) throw invalid();
       const access = normalizeDesktopWebAccess({
         allowedOrigins: input.allowedOrigins,
         dns: input.dns,
+        ...(Object.hasOwn(input, "search") ? { search: input.search } : {}),
       });
       return { type: "web.permissions", sessionId: input.sessionId, ...access };
     }

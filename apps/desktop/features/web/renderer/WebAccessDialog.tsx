@@ -5,11 +5,15 @@ import type { DesktopWebAccess } from "../../../shared.ts";
 export function WebAccessDialog({
   workspace,
   webAccess,
+  searchAvailable = false,
+  searchConnectionName,
   onConfigure,
   onClose,
 }: {
   workspace: string;
   webAccess: DesktopWebAccess;
+  searchAvailable?: boolean;
+  searchConnectionName?: string;
   onConfigure(options: DesktopWebAccess): Promise<DesktopWebAccess>;
   onClose(): void;
 }) {
@@ -18,6 +22,7 @@ export function WebAccessDialog({
   const mounted = useRef(true);
   const [origins, setOrigins] = useState(webAccess.allowedOrigins.join("\n"));
   const [dns, setDns] = useState(webAccess.dns);
+  const [search, setSearch] = useState(webAccess.search === true);
   const [pending, setPending] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
@@ -44,14 +49,17 @@ export function WebAccessDialog({
             .map((line) => line.trim())
             .filter(Boolean),
       dns: clear ? "system" : dns,
+      ...(!clear && search && searchAvailable ? { search: true } : {}),
     };
     try {
       const actual = await onConfigure(requested);
       if (!mounted.current) return;
       setOrigins(actual.allowedOrigins.join("\n"));
       setDns(actual.dns);
+      setSearch(actual.search === true);
       setNotice(
         actual.dns === requested.dns &&
+          !!actual.search === !!requested.search &&
           JSON.stringify(actual.allowedOrigins) === JSON.stringify(requested.allowedOrigins)
           ? "当前网页访问设置已确认；尚未读取网页或调用模型。"
           : "本次选择未应用；系统确认可能已取消。下方显示当前授权。",
@@ -94,6 +102,29 @@ export function WebAccessDialog({
           仍需逐次批准。与报告位置、文件修改及命令检查权限独立。
         </p>
         <fieldset className="web-options" disabled={pending}>
+          <label htmlFor="web-search">
+            <input
+              id="web-search"
+              type="checkbox"
+              checked={search}
+              disabled={!searchAvailable}
+              onChange={(event) => {
+                setSearch(event.target.checked);
+                setNotice(null);
+              }}
+            />
+            开启网页搜索
+          </label>
+          <p className="panel-note">
+            {searchAvailable
+              ? `使用连接：${searchConnectionName ?? "DeepSeek"}。`
+              : "搜索不可用：请先在模型连接中配置并选择一个 DeepSeek 搜索连接。"}
+            每次搜索仍需批准，将产生一次 DeepSeek Flash 付费调用，外加最多 5
+            次计费搜索；每次运行最多 5 次产品搜索。
+          </p>
+          <p className="panel-note">
+            搜索只发送搜索词。返回链接不授予网页读取权限；读取仍需要下方的来源授权。
+          </p>
           <label htmlFor="web-origins">允许的 HTTPS 来源（每行一个，最多 8 个）</label>
           <textarea
             id="web-origins"
@@ -109,7 +140,7 @@ export function WebAccessDialog({
           />
           <p className="panel-note">
             填写确切来源，如
-            https://example.com；不含页面路径、端口、通配符或查询参数。子域名需单独列出。留空表示关闭。
+            https://example.com；不含页面路径、端口、通配符或查询参数。子域名需单独列出。留空表示关闭网页读取，搜索独立开启。
           </p>
           <label htmlFor="web-dns">主机名解析</label>
           <select

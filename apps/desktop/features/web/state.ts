@@ -36,7 +36,8 @@ function publicHttps(value: unknown, originOnly = false): boolean {
 
 function webAccess(value: unknown): boolean {
   return (
-    object(value, ["allowedOrigins", "dns"]) &&
+    object(value, ["allowedOrigins", "dns", "search"]) &&
+    (value.search === undefined || typeof value.search === "boolean") &&
     choice(value.dns, ["system", "cloudflare-doh"]) &&
     Array.isArray(value.allowedOrigins) &&
     value.allowedOrigins.length <= 8 &&
@@ -67,6 +68,7 @@ function sources(value: unknown): boolean {
           "displayTruncated",
           "recordedAt",
           "textSha256",
+          "search",
         ]) &&
         string(v.entryId, 128) &&
         v.entryId.length > 0 &&
@@ -90,7 +92,16 @@ function sources(value: unknown): boolean {
         Number.isFinite(Date.parse(v.recordedAt)) &&
         new Date(v.recordedAt).toISOString() === v.recordedAt &&
         string(v.textSha256, 71) &&
-        /^sha256:[a-f0-9]{64}$/.test(v.textSha256),
+        /^sha256:[a-f0-9]{64}$/.test(v.textSha256) &&
+        (v.search === undefined ||
+          (object(v.search, ["index", "query", "publishedAt"]) &&
+            integer(v.search.index) &&
+            Number(v.search.index) < 10 &&
+            string(v.search.query, 2048) &&
+            v.search.query.isWellFormed() &&
+            new TextEncoder().encode(v.search.query).byteLength <= 2048 &&
+            (v.search.publishedAt === null ||
+              (string(v.search.publishedAt, 128) && v.search.publishedAt.isWellFormed())))),
     )
   );
 }

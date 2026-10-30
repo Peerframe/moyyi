@@ -45,13 +45,16 @@ function publicUrl(value: unknown, maxBytes = 8192): URL {
 export function normalizeDesktopWebAccess(value: unknown): DesktopWebAccess {
   if (
     !plain(value) ||
-    Reflect.ownKeys(value).length !== 2 ||
+    Reflect.ownKeys(value).some(
+      (key) => !["allowedOrigins", "dns", "search"].includes(String(key)),
+    ) ||
     !Object.hasOwn(value, "allowedOrigins") ||
     !Object.hasOwn(value, "dns") ||
     Object.values(Object.getOwnPropertyDescriptors(value)).some((item) => !("value" in item)) ||
     !Array.isArray(value.allowedOrigins) ||
     value.allowedOrigins.length > 8 ||
-    !["system", "cloudflare-doh"].includes(value.dns as string)
+    !["system", "cloudflare-doh"].includes(value.dns as string) ||
+    (Object.hasOwn(value, "search") && typeof value.search !== "boolean")
   )
     throw Error("Invalid desktop web access");
   const input = value.allowedOrigins;
@@ -67,7 +70,11 @@ export function normalizeDesktopWebAccess(value: unknown): DesktopWebAccess {
     return url.origin;
   });
   if (new Set(origins).size !== origins.length) throw Error("Duplicate web origin");
-  return { allowedOrigins: origins, dns: value.dns as DesktopWebAccess["dns"] };
+  return {
+    allowedOrigins: origins,
+    dns: value.dns as DesktopWebAccess["dns"],
+    ...(value.search === true ? { search: true } : {}),
+  };
 }
 
 /** Only a successful, associated web_fetch result can supply an observed source. */
@@ -147,7 +154,12 @@ export function appendWebSource(
   previous: DesktopState["sources"],
   source: DesktopWebSource,
 ): DesktopState["sources"] {
-  if (previous.items.some((item) => item.id === source.id)) return previous;
+  if (
+    previous.items.some(
+      (item) => item.id === source.id && item.search?.index === source.search?.index,
+    )
+  )
+    return previous;
   const items = [...previous.items, source];
   let truncated = previous.truncated;
   while (
@@ -158,4 +170,105 @@ export function appendWebSource(
     truncated = true;
   }
   return { items, truncated };
+}
+
+/** Every source is reconstructed from one successful, associated recorded search result. */
+export function projectWebSearchSources(
+  entryId: string,
+  recordedAt: string,
+  result: ToolResultPart,
+  toolName: string | undefined,
+): readonly DesktopWebSource[] | null {
+  if (
+    toolName !== "web_search" ||
+    result.status !== "succeeded" ||
+    result.content.length !== 1 ||
+    result.content[0]?.type !== "text"
+  )
+    return null;
+  const text = result.content[0].text;
+  if (!text.startsWith(SOURCE_PREFIX) || Buffer.byteLength(text) > 1024 * 1024) return null;
+  try {
+    const data = parseStrictJson(text.slice(SOURCE_PREFIX.length), 1024 * 1024);
+    if (
+      !plain(data) ||
+      Object.keys(data).some(
+        (key) => !["url", "status", "contentType", "text", "truncated", "search"].includes(key),
+      ) ||
+      data.url !== "https://api.deepseek.com/anthropic/v1/messages" ||
+      data.status !== 200 ||
+      data.contentType !== "application/json" ||
+      typeof data.truncated !== "boolean" ||
+      typeof data.text !== "string" ||
+      !plain(data.search) ||
+      Object.keys(data.search).sort().join(",") !== "backend,query,usage" ||
+      data.search.backend !== "deepseek" ||
+      typeof data.search.query !== "string" ||
+      !data.search.query.trim() ||
+      !data.search.query.isWellFormed() ||
+      Buffer.byteLength(data.search.query) > 2048 ||
+      !plain(data.search.usage) ||
+      Object.keys(data.search.usage).sort().join(",") !==
+        "attemptedSearches,cacheCreationInputTokens,cacheReadInputTokens,inputTokens,outputTokens,successfulSearches" ||
+      Object.values(data.search.usage).some(
+        (value) => value !== null && (!Number.isSafeInteger(value) || Number(value) < 0),
+      )
+    )
+      return null;
+    const observed = parseStrictJson(data.text, 1024 * 1024);
+    if (
+      !plain(observed) ||
+      Object.keys(observed).join(",") !== "results" ||
+      !Array.isArray(observed.results) ||
+      observed.results.length > 10
+    )
+      return null;
+    const sources: DesktopWebSource[] = [];
+    const urls = new Set<string>();
+    for (const [index, item] of observed.results.entries()) {
+      if (
+        !plain(item) ||
+        Object.keys(item).sort().join(",") !== "content,publishedAt,title,url" ||
+        typeof item.url !== "string" ||
+        typeof item.title !== "string" ||
+        typeof item.content !== "string" ||
+        (item.publishedAt !== null &&
+          (typeof item.publishedAt !== "string" ||
+            item.publishedAt.length > 128 ||
+            !item.publishedAt.isWellFormed()))
+      )
+        return null;
+      if (urls.has(item.url)) return null;
+      urls.add(item.url);
+      const source = projectWebSource(
+        entryId,
+        recordedAt,
+        {
+          ...result,
+          content: [
+            {
+              type: "text",
+              text: `${SOURCE_PREFIX}${JSON.stringify({
+                url: item.url,
+                status: 200,
+                contentType: "application/json",
+                text: item.content,
+                title: item.title,
+                truncated: data.truncated,
+              })}`,
+            },
+          ],
+        },
+        "web_fetch",
+      );
+      if (!source) return null;
+      sources.push({
+        ...source,
+        search: { index, query: data.search.query, publishedAt: item.publishedAt as string | null },
+      });
+    }
+    return sources;
+  } catch {
+    return null;
+  }
 }

@@ -2,6 +2,7 @@ import type { Dispatch, SetStateAction } from "react";
 import { useState } from "react";
 import type { RendererFeature } from "../../../renderer/slot-types.ts";
 import { useDesktopUI } from "../../../renderer/ui.ts";
+import { SearchCard } from "./SearchCard.tsx";
 import { SourcesPanel } from "./SourcesPanel.tsx";
 import { WebAccessDialog } from "./WebAccessDialog.tsx";
 
@@ -29,6 +30,10 @@ function Sources() {
 }
 function WebDialog() {
   const { state, bridge, perform, webAccessOpen, setWebAccessOpen } = useDesktopUI();
+  const searchConnection = state.connections.find(
+    (connection) =>
+      connection.id === state.searchConnectionId && connection.provider === "deepseek",
+  );
 
   return (
     <>
@@ -37,6 +42,8 @@ function WebDialog() {
           key={state.activeSessionId}
           workspace={state.workspaceRoot}
           webAccess={state.webAccess}
+          searchAvailable={searchConnection?.configured === true}
+          {...(searchConnection ? { searchConnectionName: searchConnection.name } : {})}
           onConfigure={async (webAccess) => {
             const result = await perform(
               () =>
@@ -66,6 +73,7 @@ export const rendererFeature: RendererFeature = {
   id: "web",
   useController,
   blocksComposer: (ui) => ui.webAccessOpen,
+  messages: [{ id: "web.search", tool: "web_search", Component: SearchCard }],
   slots: [
     { id: "web.WebButton", slot: "header-actions", order: 10, Component: WebButton },
     { id: "web.Sources", slot: "after-messages", order: 40, Component: Sources },

@@ -4,7 +4,7 @@
 - Branch: `codex/delivery-3-settings-skills-search`; base main `26ecc5a3`.
 - Worktree: `/Users/yxflc/.codex/worktrees/delivery-3-settings-skills-search/moyyi`.
 - Last agent: Codex, 2026-10-30 21:33 Asia/Singapore.
-- Checkpoint: A–D implemented; E/F implementation ready, G/H in progress. A `6a9c9f2`, B `f8971a3`. No PR/installation.
+- Checkpoint: A–E implemented; F/G/H ready for integration checks. A `6a9c9f2`, B `f8971a3`, C/D `961b8b4`. No PR/installation.
 
 ## Done
 
@@ -28,16 +28,24 @@
   per name, read_skill with revocation/version/cancel checks. CLI eager Skills remain unchanged.
   Catalog is a bounded recorded request suffix, not a new persisted event or authority.
 
+- E: DeepSeek structured-only native search, explicit grant + each-call approval, fixed auxiliary
+  prompt, recorded usage and source-panel/report integration. CLI SearXNG retained. Focused
+  98 tests and offline web 9/9 passed. No real search has run.
+
 ## In progress
 
-- Root owns desktop settings, personal/Skills storage + UI, maintenance G, F, H and integration.
+- Root owns integration, key-deletion committed-state correction, checks, native/live acceptance and checkpoints.
 - `provider_preflight` finished C/D and now owns H external desktop fixture plus verify-desktop
-  integration and the configuration re-export in host/service.ts. No paid work.
-- `search_preflight` finished E and now owns G maintenance/rollback/package metadata and tests.
+  integration (ready), now owns desktop/skills/design/architecture/provenance documentation. No paid work.
+- `search_preflight` owns fixes for review findings: FIFO bounded reads and BOM-preserving Skill/personal text. G is finished (39 focused tests).
 - Next: checkpoint E/F, finish G/H, run full required checks and native/live acceptance.
   Native screenshots, external packages and frozen live runs have not started.
 
 ## Collected problems (fix pass)
+
+- Independent review: bounded open must reject FIFO without blocking; BOM text/hash must agree
+  across storage and runtime; committed deletion must keep UI synchronized after key cleanup failure.
+  Fixes and focused tests in progress.
 
 - Old module inventory tests may need additive exact sets for new commands/state. Preserve all
   M1–M6 behavioral assertions; do not loosen security checks or limits.
