@@ -26,6 +26,23 @@ const effect = (index: number): DesktopEffect => ({
 });
 
 describe("desktop effect presentation", () => {
+  it("distinguishes approved search from page fetch grants in the persistent status", () => {
+    const label = permissionLabel({ writes: false, checks: false }, null, {
+      allowedOrigins: [],
+      dns: "system",
+      search: true,
+    });
+    expect(label).toContain("网页读取关闭");
+    expect(label).toContain("网页搜索需逐次批准");
+    expect(label).not.toContain("不访问网页");
+    expect(
+      permissionLabel({ writes: false, checks: false }, "report.md", {
+        allowedOrigins: ["https://example.com"],
+        dns: "system",
+        search: true,
+      }),
+    ).toContain("网页读取限 1 个来源");
+  });
   it.each([0, 1, 9, 10, 11, 12])("does not lose rows below the folding threshold: %i", (count) => {
     const items = Array.from({ length: count }, (_, index) => effect(index));
     expect(visibleEffects(items, false)).toEqual(items);

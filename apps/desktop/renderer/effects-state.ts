@@ -40,9 +40,12 @@ export function permissionLabel(
   reportTarget: string | null,
   webAccess?: DesktopWebAccess,
 ) {
-  const web = webAccess?.allowedOrigins.length
+  const fetch = webAccess?.allowedOrigins.length
     ? `网页读取限 ${webAccess.allowedOrigins.length} 个来源，逐次批准（${webAccess.dns === "system" ? "系统 DNS" : "Cloudflare DoH"}）`
-    : "不访问网页";
+    : webAccess?.search
+      ? "网页读取关闭"
+      : "不访问网页";
+  const web = webAccess?.search ? `${fetch} · 网页搜索需逐次批准` : fetch;
   if (reportTarget) return `可读工作目录；仅可审批创建报告：${reportTarget} · 不执行命令、${web}`;
   return [
     permissions.writes ? "工作目录文件修改需逐次批准" : "工作目录文件只读",

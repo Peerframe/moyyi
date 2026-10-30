@@ -115,7 +115,7 @@ function PreferencesContent({ close }: { close(): void }) {
           <p className="panel-note">尚未导入 Skill。选择包含 SKILL.md 的目录开始。</p>
         ) : (
           p.skills.map((skill) => (
-            <article key={skill.sha256} className="artifact-card">
+            <article key={skill.sha256} className="artifact-card settings-card">
               <strong>{skill.name}</strong>
               <p>{skill.description}</p>
               <p className="panel-note">SHA-256：{skill.sha256}</p>
@@ -144,7 +144,7 @@ function PreferencesContent({ close }: { close(): void }) {
         )}
       </section>
       {review ? (
-        <section aria-label="Skill 审查" className="artifact-card">
+        <section aria-label="Skill 审查" className="artifact-card settings-card">
           <h3>审查 {review.name}</h3>
           <p>{review.description}</p>
           <p className="panel-note">SHA-256：{review.sha256}</p>

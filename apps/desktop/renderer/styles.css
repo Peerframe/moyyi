@@ -192,6 +192,7 @@ svg {
   padding: 6px 9px;
 }
 .conversation {
+  overflow-y: auto;
   display: flex;
   flex-direction: column;
   min-width: 0;
@@ -200,6 +201,7 @@ svg {
 }
 .conversation-header {
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
   justify-content: space-between;
   gap: 20px;
@@ -493,7 +495,9 @@ svg {
 }
 .header-actions {
   justify-content: flex-end;
-  flex-shrink: 0;
+  flex-shrink: 1;
+  min-width: 0;
+  max-width: 100%;
 }
 .panel-heading {
   display: flex;
@@ -1017,5 +1021,10 @@ svg {
   max-height: var(--skill-review-height);
   overflow: auto;
   white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+.settings-card {
+  display: block;
   overflow-wrap: anywhere;
 }

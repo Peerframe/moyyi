@@ -58,7 +58,7 @@ export function Connections() {
         切换连接或保存设置后，写入、检查和网页权限回到只读，需要重新开启。
       </p>
       {state.connections.map((c) => (
-        <div className="artifact-card" key={c.id}>
+        <div className="artifact-card settings-card" key={c.id}>
           <strong>{c.name}</strong>
           <p className="panel-note">
             {c.provider} · {c.configured ? "已配置" : "未配置密钥"}
@@ -78,29 +78,31 @@ export function Connections() {
               disabled={pending || busy}
             />
           </label>
-          <button
-            type="button"
-            disabled={pending || busy || c.id === state.activeConnectionId}
-            onClick={() => void change({ action: "select", id: c.id })}
-          >
-            设为默认并切换
-          </button>
-          <button
-            type="button"
-            disabled={pending || busy || c.id === state.activeConnectionId}
-            onClick={() => void change({ action: "delete", id: c.id })}
-          >
-            删除连接
-          </button>
-          {c.provider === "deepseek" ? (
+          <div className="dialog-actions">
             <button
               type="button"
-              disabled={pending || busy || c.id === state.searchConnectionId}
-              onClick={() => void change({ action: "search", id: c.id })}
+              disabled={pending || busy || c.id === state.activeConnectionId}
+              onClick={() => void change({ action: "select", id: c.id })}
             >
-              {c.id === state.searchConnectionId ? "搜索使用此连接" : "用于网页搜索"}
+              设为默认并切换
             </button>
-          ) : null}
+            <button
+              type="button"
+              disabled={pending || busy || c.id === state.activeConnectionId}
+              onClick={() => void change({ action: "delete", id: c.id })}
+            >
+              删除连接
+            </button>
+            {c.provider === "deepseek" ? (
+              <button
+                type="button"
+                disabled={pending || busy || c.id === state.searchConnectionId}
+                onClick={() => void change({ action: "search", id: c.id })}
+              >
+                {c.id === state.searchConnectionId ? "搜索使用此连接" : "用于网页搜索"}
+              </button>
+            ) : null}
+          </div>
         </div>
       ))}
       <label>
