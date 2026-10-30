@@ -44,8 +44,9 @@ zero retries, explicit permission grants and the daily installation remain uncha
 
 ## Frozen paid envelope
 
-No paid request has run at this checkpoint. Candidate revision and fixture hashes will be recorded
-before execution. Failures are retained; no failed candidate task is rerun.
+No paid request has run at this checkpoint. Clean product candidate: `b4bf3050bfc0c517e122d37dc6b54c4dd5a86214`;
+app archive SHA-256: `77b924027623e3482308bab108dad22d4fee0de812754b09084552ea7b8950ef`.
+Exact runner, Skill and installed host hashes are frozen privately before execution. Failures are retained; no failed candidate task is rerun.
 
 Quality gate: Flash / Responses / low / 8192 output, write capability, no shell or web, zero retries.
 Reuse delivery one's private host configuration and lazy credential callback; a private wrapper

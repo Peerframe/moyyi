@@ -24,20 +24,20 @@
 ## In progress / next step
 
 - No subagent writing; both preflight agents released files. No paid run started.
-- Build a clean final candidate after this checkpoint, rerun external desktop verification.
+- Clean final product candidate `b4bf305` built (archive `77b924027623e3482308bab108dad22d4fee0de812754b09084552ea7b8950ef`); final external desktop verification running.
 - Native isolated app is running at `/private/tmp/moyyi-delivery3-native-yqt_p9wi/Moyyi.app`.
   Original worker/main are saved in its parent. Only this copy's worker, initial geometry,
   Chromium userData and renderer are instrumented; production package/daily app untouched.
   Normal/narrow settings, personal, Skill review and normal todo screenshots saved in
   `docs/tasks/assets/2026-10-30-delivery-3/`. Finish narrow todo and both search approvals,
   refresh copy from final renderer, restore all original bundle files after quitting.
-- Final CSS outer scroll change needs native narrow check (build needed).
+- Final renderer copied to disposable native app; finish narrow scroll and search-approval captures.
 - Freeze/run quality gate (6 unchanged tasks) and installed 3-task acceptance only once.
   Private preparation root: `/Users/yxflc/.moyyi/evals/delivery-3-settings-skills-search-2026-10-30`.
   `host.mjs` reuses D1 private callback/config with candidate source imports and 71-request
-  durable ledger guard; `run-quality.py` refuses repeating started tasks. Freeze/ledger not created yet.
+  durable ledger guard; `run-quality.py` refuses repeating started tasks. Quality freeze/ledger will be created against this documentation checkpoint before execution.
   Installed runner: `scripts/desktop-fixtures/live-d3.mjs --freeze|--run <isolated app dir> <new output>`;
-  run with bundled Node26.12.1. Freeze requires clean candidate. Checkers already self-tested.
+  run with bundled Node26.12.1. Frozen against clean `b4bf305`; checkers self-tested and independently reviewed including brief7 stops.
 - Finish evidence record/protected hashes, push one PR for Claude. No merge/daily install.
 
 ## Paid ledger
