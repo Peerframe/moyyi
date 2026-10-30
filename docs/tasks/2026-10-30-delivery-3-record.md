@@ -44,8 +44,9 @@ zero retries, explicit permission grants and the daily installation remain uncha
 
 ## Frozen paid envelope
 
-No paid request has run at this checkpoint. Clean product candidate: `b4bf3050bfc0c517e122d37dc6b54c4dd5a86214`;
-app archive SHA-256: `77b924027623e3482308bab108dad22d4fee0de812754b09084552ea7b8950ef`.
+Quality gate ran once against `739275951098b0feb6cbd3892a5001375973a9d0`: all six passed,
+30 of 71 requests, zero retries, no baseline rerun required. Installed paid acceptance has not run.
+The final approval presentation refinement changes only renderer output; model/runtime evidence is reused.
 Exact runner, Skill and installed host hashes are frozen privately before execution. Failures are retained; no failed candidate task is rerun.
 
 Quality gate: Flash / Responses / low / 8192 output, write capability, no shell or web, zero retries.
@@ -54,14 +55,14 @@ points codec/recording imports at this candidate rather than the old worktree. N
 printed or copied by the agent. Each task runs once against the unchanged fixture and checker.
 Only a failed task may run once on main as the required baseline comparison, within the same 71 cap.
 
-| Task | Maximum requests | Timeout |
-| --- | ---: | ---: |
-| deduplicate-roster | 15 | 180 s |
-| quoted-csv-export | 15 | 180 s |
-| homework-keep-format | 15 | 180 s |
-| release-evidence-audit | 10 | 120 s |
-| website-source-injection | 12 | 120 s |
-| document-report-seven-formats | 4 | 120 s |
+| Task | Maximum requests | Timeout | Actual requests / result |
+| --- | ---: | ---: | --- |
+| deduplicate-roster | 15 | 180 s | 4 / PASS |
+| quoted-csv-export | 15 | 180 s | 5 / PASS |
+| homework-keep-format | 15 | 180 s | 7 / PASS |
+| release-evidence-audit | 10 | 120 s | 5 / PASS |
+| website-source-injection | 12 | 120 s | 5 / PASS |
+| document-report-seven-formats | 4 | 120 s | 4 / PASS |
 
 Installed acceptance: at most 20 model requests plus 3 product `web_search` calls, each native
 `max_uses: 5` (at most 15 successful billable native searches). Three task checkers are frozen

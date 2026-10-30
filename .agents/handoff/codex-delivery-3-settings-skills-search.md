@@ -23,8 +23,8 @@
 
 ## In progress / next step
 
-- No subagent writing; provider agent is read-only checking quality preparation. No paid run started.
-- Native 780x560 revealed the transcript could shrink to about 96px. Keep a 240px minimum with the already-scrollable outer conversation; rebuild before paid execution. Prior unexecuted freezes are retained, then replaced against this CSS-only candidate.
+- No subagent writing; provider agent is read-only checking quality preparation. Quality completed 6/6 PASS (30 requests); installed paid run has not started.
+- Native 780x560 transcript minimum fixed and verified with complete three-state todo screenshot. Search approval needs compact first-level query/count/destination with full raw preview retained as details; provider agent owns only ApprovalCard/render tests/README. Repackage this renderer-only refinement before installed paid execution. Keep all unexecuted freezes as historical zero-usage evidence.
 - Clean final product candidate `b4bf305` built (archive `77b924027623e3482308bab108dad22d4fee0de812754b09084552ea7b8950ef`); final external desktop verification passed (including H 8 cases / 14 synthetic requests / 1 search).
 - Native isolated app is running at `/private/tmp/moyyi-delivery3-native-yqt_p9wi/Moyyi.app`.
   Original worker/main are saved in its parent. Only this copy's worker, initial geometry,
@@ -33,7 +33,7 @@
   `docs/tasks/assets/2026-10-30-delivery-3/`. Finish narrow todo and both search approvals,
   refresh copy from final renderer, restore all original bundle files after quitting.
 - Final renderer copied to disposable native app; finish narrow scroll and search-approval captures.
-- Freeze/run quality gate (6 unchanged tasks) and installed 3-task acceptance only once.
+- Quality gate finished. Freeze/run installed 3-task acceptance only once after final approval UI.
   Private preparation root: `/Users/yxflc/.moyyi/evals/delivery-3-settings-skills-search-2026-10-30`.
   `host.mjs` reuses D1 private callback/config with candidate source imports and 71-request
   durable ledger guard; `run-quality.py` refuses repeating started tasks. Quality freeze/ledger will be created against the next checkpoint before execution.
@@ -43,7 +43,7 @@
 
 ## Paid ledger
 
-- Quality 71 requests ceiling: spent 0, remaining 71. Each candidate task once; a failed task
+- Quality 71 requests ceiling: spent 30, remaining 41. All six tasks PASS on `7392759`, each once; no main comparison needed. Each candidate task once; a failed task
   gets only the brief-required main baseline comparison within this same ceiling.
 - Installed 20 model requests +3 product searches: spent 0+0, remaining 20+3. Each search native
   max_uses5 (<=15 billable successes); additional fees accepted. Zero retries, failed task not rerun.
