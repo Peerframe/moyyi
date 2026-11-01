@@ -8,14 +8,22 @@ export function validateState(s: Record<string, unknown>): boolean {
     s.connections.length > 16 ||
     !s.connections.every(
       (c) =>
-        object(c, ["id", "name", "provider", "reasoningEffort", "configured"]) &&
+        object(c, [
+          "id",
+          "name",
+          "provider",
+          "reasoningEffort",
+          "configured",
+          "credentialDeletion",
+        ]) &&
         string(c.id, 64) &&
         string(c.name, 80) &&
         c.name.trim().length > 0 &&
         choice(c.provider, ["deepseek", "kimi-cn", "kimi-global"]) &&
         choice(c.reasoningEffort, ["low", "high"]) &&
         !(c.provider === "deepseek" && c.reasoningEffort !== "low") &&
-        typeof c.configured === "boolean",
+        typeof c.configured === "boolean" &&
+        choice(c.credentialDeletion, ["delete", "retain-legacy", "retain-shared"]),
     ) ||
     !string(s.activeConnectionId, 64) ||
     new Set(s.connections.map((c) => c.id)).size !== s.connections.length ||

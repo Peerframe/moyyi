@@ -77,6 +77,89 @@ it("persists bounded personal instructions with verified hash, refresh and resta
   writeFileSync(join(home, ".moyyi/desktop/personal-instructions.md"), "tampered");
   await expect(c.preferences.readPersonal(signal())).rejects.toThrow("摘要不匹配");
 });
+it.each(["empty", "disabled"])(
+  "omits the Skill tool and catalog for a %s desktop library",
+  async (mode) => {
+    const { home, c } = fixture();
+    if (mode === "disabled") {
+      const { dir } = source(home);
+      const review = (await c.preferences.inspectSkill(dir)).review;
+      if (!review) throw Error("Missing review");
+      await c.preferences.importSkill(review.id);
+    }
+    const workspace = join(home, "workspace");
+    mkdirSync(workspace);
+    const requests: ModelRequest[] = [];
+    const {
+      deepseek: _provider,
+      deepseekReasoningEffort: _effort,
+      ...options
+    } = (await c.current()).runtimeOptions;
+    const runtime = await createRuntime({
+      ...options,
+      model: { provider: "scripted", model: "scripted" },
+      plugins: [
+        {
+          plugin: {
+            name: "empty-library-provider",
+            apiVersion: 1,
+            setup(host) {
+              host.registerModelProvider({
+                id: "scripted",
+                models: [
+                  {
+                    origin: { provider: "scripted", model: "scripted" },
+                    contextWindowTokens: 200000,
+                    maxOutputTokens: 8000,
+                    parallelToolCalls: false,
+                    reasoning: "none",
+                    promptCache: "none",
+                    editFormat: "search_replace",
+                  },
+                ],
+                createClient: () => ({
+                  async *stream(request) {
+                    requests.push(request);
+                    yield {
+                      type: "part_completed",
+                      index: 0,
+                      part: { type: "text", text: "Done." },
+                    };
+                    yield {
+                      type: "completed",
+                      stopReason: "end_turn",
+                      providerStopReason: null,
+                      usage: UNKNOWN_USAGE,
+                    };
+                  },
+                }),
+              });
+            },
+          },
+        },
+      ],
+    });
+    const events: RuntimeEvent[] = [];
+    runtime.subscribe((event) => events.push(event));
+    try {
+      await runtime.send({ type: "session.create", workspaceRoot: workspace });
+      const ready = events.find((event) => event.type === "session.ready");
+      if (ready?.type !== "session.ready") throw Error("Missing session");
+      await runtime.send({
+        type: "run.start",
+        sessionId: ready.sessionId,
+        input: [{ type: "text", text: "Hello." }],
+      });
+      await runtime.idle();
+      expect(requests).toHaveLength(1);
+      expect(requests[0]?.tools.some((tool) => tool.name === "read_skill")).toBe(false);
+      expect(canonicalizeJson(requests[0])).not.toContain("skill catalog");
+      expect(canonicalizeJson(requests[0])).not.toContain("skills are");
+    } finally {
+      await runtime.close();
+    }
+  },
+);
 it("restores previous personal bytes when metadata save fails", async () => {
   const { home, c } = fixture();
   await c.preferences.savePersonal("old");

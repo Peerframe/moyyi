@@ -3,11 +3,29 @@
 - Brief: `docs/tasks/2026-10-30-delivery-3-settings-skills-search.md`; owner fee amendment `de28e57`.
 - Branch: `codex/delivery-3-settings-skills-search`; worktree:
   `/Users/yxflc/.codex/worktrees/delivery-3-settings-skills-search/moyyi`.
-- Last agent: Codex, 2026-10-30 Asia/Singapore. A–H implemented; not accepted.
+- Last agent: Codex, 2026-11-01 Asia/Singapore. A–H implemented; review fixes in progress; not accepted.
 - Draft PR: https://github.com/Peerframe/moyyi/pull/56 — Claude review, installed acceptance blocked.
 - Durable details: `docs/tasks/2026-10-30-delivery-3-record.md` and screenshot index beside it.
 
-## Final product and evidence
+## Current review fixes (2026-11-01)
+
+- User requested three fixes: omit the library when no Skills are enabled, preserve shared legacy
+  credentials when deleting a connection, and confirm deletion with accurate credential consequences.
+- Code and regression tests are implemented. Skill refresh uses the existing runtime registry;
+  no core, persisted format or settings-format change. Zero-Skill tools/messages match the
+  no-library baseline, with a one-request revoked notice based on recorded request tools.
+- Connection host deletes only unshared desktop-owned keys. Native deletion confirms the displayed
+  name and deletion/retention policy, defaults to cancel, and revalidates current state afterwards.
+- Focused runtime tests: 14 PASS; desktop empty/disabled-library integration: 10 PASS; settings,
+  keychain, native dialog and renderer tests PASS. New offline Skill scenarios: 33/33 PASS.
+- First full check exposed two new-test issues (renderer layer import and a wrong event matcher),
+  now corrected with focused passing checks, plus the already-reviewed document parser 5 s timeout.
+- Next: final check, affected offline/package/desktop gates, isolated native normal/narrow screenshots,
+  update this record and the existing PR. Packaging is currently running; no paid process is active.
+- No other agent is writing. The original checkout's two user documents remain untouched.
+- The existing paid ledger and no-rerun decision below remain authoritative; no live retry authorized.
+
+## Prior product and evidence (before review fixes)
 
 - Clean product revision `07ff3e657399c02ec07fc456f7222c697fb84579`.
 - Archive: `artifacts/desktop/Moyyi-local-arm64.zip`, SHA-256

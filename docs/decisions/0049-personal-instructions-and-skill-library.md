@@ -78,3 +78,17 @@ cover the existing parser, cryptographic hash checks, request ordering, future-r
 recorded source immutability and denial before any body read. Existing explicit CLI Skills tests
 remain in place. Desktop import, file checks, backup, UI and paid acceptance evidence are owned
 by the delivery record; synthetic plugin tests do not establish live-model compliance.
+
+## 2026-11-01 review correction
+
+Runtime now registers the Skill library only while the trusted enabled catalog is nonempty.
+A configured but empty library adds no tool or context. Refresh uses the existing registry at
+request collection, serializes concurrent registrations and bounds cancellation without changing
+core or plugin contracts. The tool getter reads the resulting registry for that request.
+
+When the preceding assistant request on the selected session path exposed `read_skill` and the
+current library is empty, one unavailable suffix is added. Its recorded request has no Skill tool,
+so following requests do not repeat it. Reading the selected path survives runtime restart and
+avoids treating compaction's sibling audit request as the latest conversation request. The suffix
+is not a durable notice and does not remove previously recorded Skill bodies. This supersedes the
+unconditional empty-catalog behavior above; empty desktop requests match the no-library baseline.

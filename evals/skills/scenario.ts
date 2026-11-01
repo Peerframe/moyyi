@@ -36,6 +36,8 @@ import {
 export const skillScenarios = [
   "enabled-source-and-persisted-request",
   "default-no-discovery",
+  "library-empty-matches-unconfigured",
+  "library-enable-revoke-once",
   "selection-only-no-reference-or-script",
   "edit-refresh",
   "tool-continuation-refresh",
@@ -221,6 +223,82 @@ export async function runSkillScenario(scenario: SkillScenario): Promise<void> {
       assert.equal((await h.turn()).kind, "completed");
       assert(!system(h.client.requests[0]).includes("review-code"));
       assert(!h.runtime.plugins.some((plugin) => plugin.name === "skills"));
+    } else if (scenario === "library-empty-matches-unconfigured") {
+      const skills = { root: library, enabled: [] };
+      const baseline = await open([final(), final()], { skills });
+      const empty = await open([final(), final()], {
+        skills,
+        skillLibrary: {
+          list: async () => [],
+          read: async () => {
+            throw Error("An empty library must not read a Skill body");
+          },
+        },
+      });
+      for (let index = 0; index < 2; index++) {
+        assert.equal((await baseline.turn()).kind, "completed");
+        assert.equal((await empty.turn()).kind, "completed");
+        const expected = baseline.client.requests[index],
+          actual = empty.client.requests[index];
+        assert(expected && actual);
+        assert.deepEqual(actual.tools, expected.tools);
+        assert.deepEqual(actual.messages, expected.messages);
+        assert(!actual.tools.some((tool) => tool.name === "read_skill"));
+        assert(!canonicalizeJson(actual).includes("skill catalog"));
+        assert(!canonicalizeJson(actual).includes("skills are"));
+        assert(!empty.runtime.plugins.some((plugin) => plugin.name === "skill-library"));
+      }
+      assert.equal(baseline.client.requests.length, 2);
+      assert.equal(empty.client.requests.length, 2);
+    } else if (scenario === "library-enable-revoke-once") {
+      let enabled = false;
+      const entry = {
+        name: "review-code",
+        description: "Review synthetic code",
+        sha256: hash(document()),
+      };
+      const h = await open([final(), final(), final(), final()], {
+        skills: { root: library, enabled: [] },
+        skillLibrary: {
+          list: async () => (enabled ? [entry] : []),
+          read: async () => {
+            throw Error("A summary catalog must not read a Skill body");
+          },
+        },
+      });
+      const registered = () => h.runtime.plugins.some((plugin) => plugin.name === "skill-library");
+      assert.equal((await h.turn()).kind, "completed");
+      assert(!registered());
+      enabled = true;
+      assert.equal((await h.turn()).kind, "completed");
+      assert(registered());
+      const enabledRequest = canonicalizeJson(h.client.requests[1]);
+      assert(enabledRequest.includes("Current enabled skill catalog"));
+      assert(enabledRequest.includes(entry.name));
+      assert(!enabledRequest.includes("SKILL_BODY_CANARY"));
+      enabled = false;
+      assert.equal((await h.turn()).kind, "completed");
+      assert(!registered());
+      assert.equal((await h.turn()).kind, "completed");
+      assert(!registered());
+      assert.equal(h.client.requests.length, 4);
+      assert.deepEqual(
+        h.client.requests.map((request) =>
+          request.tools.some((tool) => tool.name === "read_skill"),
+        ),
+        [false, true, false, false],
+      );
+      assert.deepEqual(
+        h.client.requests.map((request) =>
+          canonicalizeJson(request).includes("Previously enabled skills are now unavailable"),
+        ),
+        [false, false, true, false],
+      );
+      for (const index of [0, 2, 3])
+        assert(
+          !canonicalizeJson(h.client.requests[index]).includes("Current enabled skill catalog"),
+        );
+      assert.equal(canonicalizeJson(h.client.requests[1]), enabledRequest);
     } else if (
       scenario === "selection-only-no-reference-or-script" ||
       scenario === "explicit-ignored-selection"

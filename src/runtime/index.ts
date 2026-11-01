@@ -27,7 +27,7 @@ import {
   type Timestamp,
   type TranscriptEntry,
 } from "../contracts/index.ts";
-import { AgentCore } from "../core/index.ts";
+import { AgentCore, pathToHead } from "../core/index.ts";
 import { defaultInstructionsPlugin } from "../plugins/default-instructions/index.ts";
 import { documentsPlugin } from "../plugins/documents/index.ts";
 import { fsPlugin } from "../plugins/fs/index.ts";
@@ -59,7 +59,9 @@ import {
 import { createShellPlugin } from "../plugins/shell/index.ts";
 import {
   createSkillLibraryPlugin,
+  readEnabledSkillCatalog,
   type SkillLibraryAccess,
+  skillLibraryUnavailable,
 } from "../plugins/skill-library/index.ts";
 import { skillsPlugin } from "../plugins/skills/index.ts";
 import { parseSkill } from "../plugins/skills/parse.ts";
@@ -443,7 +445,6 @@ export async function createRuntime(
     ...(personalInstructions ? [{ plugin: personalInstructions }] : []),
     ...(options.projectInstructions === false ? [] : [{ plugin: projectInstructionsPlugin }]),
     ...(skills?.enabled.length ? [{ plugin: skillsPlugin }] : []),
-    ...(skillLibrary ? [{ plugin: skillLibrary }] : []),
     ...(workspaceNavigation ? [{ plugin: workspaceNavigationPlugin }] : []),
     { plugin: fsPlugin },
     ...(documentsEnabled ? [{ plugin: documentsPlugin }] : []),
@@ -472,6 +473,7 @@ export async function createRuntime(
   ];
   const development = new Map<string, DevelopmentPlugin>();
   const reserved = new Set(startup.map(({ plugin }) => plugin.name));
+  if (skillLibrary) reserved.add(skillLibrary.name);
   for (const entry of options.developmentPlugins ?? []) {
     if (!/^[a-z][a-z0-9-]{0,63}$/.test(entry.name) || typeof entry.load !== "function")
       throw Error("Invalid development plugin entry");
@@ -480,6 +482,44 @@ export async function createRuntime(
     development.set(entry.name, entry);
   }
   for (const entry of startup) plugins.push(await registry.load(entry));
+  let libraryRegistered = false;
+  let libraryRefresh = Promise.resolve();
+  // Only expose the library while the trusted host has enabled entries. Registration still
+  // happens in setup; each collection refreshes it before core reads the tool definitions.
+  async function refreshSkillLibrary(signal: AbortSignal): Promise<void> {
+    if (!skillLibrary || !libraryList) return;
+    signal.throwIfAborted();
+    let abort = () => {};
+    const cancelled = new Promise<never>((_, reject) => {
+      abort = () => reject(signal.reason);
+      signal.addEventListener("abort", abort, { once: true });
+    });
+    let enabled: boolean;
+    try {
+      enabled =
+        (await Promise.race([readEnabledSkillCatalog(libraryList, signal), cancelled])).length > 0;
+      signal.throwIfAborted();
+    } finally {
+      signal.removeEventListener("abort", abort);
+    }
+    // Host reads can run concurrently; only the bounded registry mutations are serialized.
+    const pending = libraryRefresh.then(async () => {
+      signal.throwIfAborted();
+      if (enabled === libraryRegistered) return;
+      if (enabled) {
+        const result = await registry.load({ plugin: skillLibrary });
+        if (result.state !== "loaded") throw Error("Cannot register the enabled skill library");
+        plugins.push(result);
+      } else {
+        await registry.unload(skillLibrary.name);
+        const index = plugins.findIndex((entry) => entry.name === skillLibrary.name);
+        if (index >= 0) plugins.splice(index, 1);
+      }
+      libraryRegistered = enabled;
+    });
+    libraryRefresh = pending.catch(() => {});
+    return pending;
+  }
 
   const listeners = new Set<(event: RuntimeEvent) => void>();
   const diagnostics: string[] = [];
@@ -670,7 +710,9 @@ export async function createRuntime(
       model: selectedClient,
       ...(recorder ? { settleModel: recorder.flush.bind(recorder) } : {}),
       profile,
-      tools: registry.tools,
+      get tools() {
+        return registry.tools;
+      },
       store,
       policy,
       context: new MinimalContextBuilder(),
@@ -709,20 +751,38 @@ export async function createRuntime(
       clock: options.clock ?? { now: () => new Date().toISOString() as Timestamp },
       ids: options.ids ?? { next: (prefix) => `${prefix}_${randomUUID()}` },
       emit,
-      collect: async (workspaceRoot, signal, sessionId) => [
-        await facts(sessionId, workspaceRoot, profile),
-        ...(await collectContext(
-          registry.contextSources,
-          files,
-          policy,
-          workspaceRoot,
-          profile,
-          signal,
-          options.projectInstructions !== false,
-          skills,
-          workspaceNavigation,
-        )),
-      ],
+      collect: async (workspaceRoot, signal, sessionId) => {
+        await refreshSkillLibrary(signal);
+        const sections = [
+          await facts(sessionId, workspaceRoot, profile),
+          ...(await collectContext(
+            registry.contextSources,
+            files,
+            policy,
+            workspaceRoot,
+            profile,
+            signal,
+            options.projectInstructions !== false,
+            skills,
+            workspaceNavigation,
+          )),
+        ];
+        if (skillLibrary && !libraryRegistered) {
+          const snapshot = await store?.loadSession(sessionId);
+          const previous =
+            snapshot &&
+            pathToHead(snapshot).findLast((entry) => entry.body.kind === "assistant_message")?.body;
+          if (previous?.kind === "assistant_message") {
+            const bytes = await store?.getBlob(previous.request.tools);
+            if (!bytes) throw Error("Previous skill availability could not be read");
+            const tools = JSON.parse(new TextDecoder().decode(bytes)) as { name: string }[];
+            if (tools.some((tool) => tool.name === "read_skill"))
+              sections.push(skillLibraryUnavailable());
+          }
+        }
+        signal.throwIfAborted();
+        return sections;
+      },
       ...(options.limits === undefined ? {} : { limits: options.limits }),
       ...(evidenceAnswer ? { evidenceAnswer } : {}),
     });

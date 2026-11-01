@@ -64,6 +64,9 @@ export function Connections() {
             {c.provider} · {c.configured ? "已配置" : "未配置密钥"}
             {c.id === state.activeConnectionId ? " · 当前默认连接" : ""}
           </p>
+          {c.credentialDeletion === "retain-legacy" ? (
+            <p className="panel-note">删除此连接只会解除关联；旧版共享密钥仍保留在系统钥匙串中。</p>
+          ) : null}
           <label>
             <span>新名称</span>
             <input

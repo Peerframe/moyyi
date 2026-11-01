@@ -28,6 +28,15 @@ limits, output limit and zero retries are unchanged. Add without a key is allowe
 unconfigured; an active connection cannot be deleted. CRUD, selection and save do not probe a
 provider. Search selects an existing DeepSeek connection independently of the conversation model.
 
+Deletion opens a native confirmation naming the connection and its credential consequence, with
+Cancel as the default. Cancellation sends no mutation. The host projects that consequence from
+the credential reference and remaining references; it does not infer ownership from a connection
+ID. Legacy shared credentials remain in Keychain for the CLI and rollback builds. Desktop-owned
+credentials are removed only after the settings commit and only when no other connection uses
+them. The native vault refuses legacy identifiers even if called directly. The dialog rechecks
+the idle state and displayed connection before sending deletion; failed Keychain cleanup stays
+visible without undoing a committed settings deletion.
+
 Trusted `host/settings.ts` owns private format 2 JSON and native Keychain references. The renderer
 receives connection metadata and readiness, never stored keys or credential references. A newly
 typed key is transient password-field state and uses the dedicated validated bridge. Legacy

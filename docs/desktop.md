@@ -79,7 +79,11 @@ settings cannot be confirmed, reopen settings to inspect the current values befo
 ### Named connections and continuation (delivery three candidate)
 
 **模型设置 → 模型连接** lists up to 16 named connections. Add a DeepSeek, Kimi China or Kimi
-Global connection, rename it, select it as the default, or delete an inactive connection. A key
+Global connection, rename it, select it as the default, or delete an inactive connection. Deletion
+opens a native confirmation naming the connection and stating whether its Keychain item will be
+deleted. Cancel is the default. Only unshared, desktop-owned items are removed; legacy DeepSeek
+and Kimi items remain for the CLI and rollback builds, and shared desktop items remain for their
+other connections. The connection list also identifies retained legacy items. A key
 may be omitted when adding: the connection then visibly remains unconfigured. To replace the
 selected connection's key, enter it in the model settings form and save. There is no custom
 endpoint or automatic provider discovery. The header's **当前连接** selector switches the default

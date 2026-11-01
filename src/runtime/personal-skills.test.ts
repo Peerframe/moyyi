@@ -71,14 +71,16 @@ async function fixture(
   const store = new SqliteSessionStore(join(directory, "store")),
     scripted = scriptedProvider(responses),
     events: RuntimeEvent[] = [];
-  const runtime = await createRuntime({
+  const runtimeOptions = {
     ...options,
     store,
     model: { provider: "scripted", model: "scripted" },
     plugins: [{ plugin: scripted.plugin }],
     limits: { maxModelRequests: 4, maxRetries: 0 },
-  });
-  resources.push({ directory, store, runtime });
+  };
+  let runtime = await createRuntime(runtimeOptions);
+  const resource = { directory, store, runtime };
+  resources.push(resource);
   runtime.subscribe((event) => events.push(event));
   await runtime.send({ type: "session.create", workspaceRoot: workspace });
   const ready = events.find((event) => event.type === "session.ready");
@@ -86,14 +88,23 @@ async function fixture(
   const sessionId = ready.sessionId;
   return {
     store,
-    runtime,
+    workspace,
+    get runtime() {
+      return runtime;
+    },
+    async reopen() {
+      await runtime.close();
+      runtime = await createRuntime(runtimeOptions);
+      resource.runtime = runtime;
+      runtime.subscribe((event) => events.push(event));
+    },
     scripted,
     events,
     sessionId,
-    async run() {
+    async run(target = sessionId) {
       await runtime.send({
         type: "run.start",
-        sessionId,
+        sessionId: target,
         input: [{ type: "text", text: "Write the report using current guidance." }],
       });
       await runtime.idle();
@@ -174,6 +185,139 @@ describe("trusted personal instructions and skill library integration", () => {
       "Current enabled skill catalog",
     );
   });
+  it("matches the no-library request with a configured but empty enabled library", async () => {
+    const read = vi.fn<SkillLibraryAccess["read"]>(async () => null);
+    const empty = await fixture([answer(), answer()], {
+      skillLibrary: { list: async () => [], read },
+    });
+    const baseline = await fixture([answer()]);
+    await baseline.run();
+    await empty.run();
+    await empty.run();
+    for (const request of empty.scripted.client.requests) {
+      expect(request.tools).toEqual(baseline.scripted.client.requests[0]?.tools);
+      expect(canonicalizeJson(request)).not.toContain("skill catalog");
+      expect(canonicalizeJson(request)).not.toContain("skills are");
+      expect(request.tools.some((tool) => tool.name === "read_skill")).toBe(false);
+    }
+    expect(empty.scripted.client.requests[0]?.messages).toEqual(
+      baseline.scripted.client.requests[0]?.messages,
+    );
+    expect(empty.runtime.plugins.some((plugin) => plugin.name === "skill-library")).toBe(false);
+    expect(read).not.toHaveBeenCalled();
+  });
+  it("refreshes registrations and reports revocation once per session across reopen", async () => {
+    let enabled = false;
+    const test = await fixture(Array.from({ length: 7 }, answer), {
+      skillLibrary: { list: async () => (enabled ? [entry] : []), read: async () => null },
+    });
+    await test.run();
+    enabled = true;
+    await test.run();
+    const original = canonicalizeJson(test.scripted.client.requests[1]);
+    expect(original).toContain("Current enabled skill catalog");
+    expect(test.scripted.client.requests[1]?.tools.some((t) => t.name === "read_skill")).toBe(true);
+    enabled = false;
+    await test.reopen();
+    await test.run();
+    expect(canonicalizeJson(test.scripted.client.requests[2])).toContain(
+      "Previously enabled skills are now unavailable",
+    );
+    expect(test.scripted.client.requests[2]?.tools.some((t) => t.name === "read_skill")).toBe(
+      false,
+    );
+    expect(canonicalizeJson(test.scripted.client.requests[2])).not.toContain(
+      "Current enabled skill catalog",
+    );
+    await test.reopen();
+    await test.run();
+    expect(canonicalizeJson(test.scripted.client.requests[3])).not.toContain(
+      "skills are now unavailable",
+    );
+    await test.runtime.send({
+      type: "session.create",
+      workspaceRoot: test.workspace,
+    });
+    const other = test.events.findLast((event) => event.type === "session.ready");
+    if (other?.type !== "session.ready") throw Error("Missing second session");
+    await test.run(other.sessionId);
+    expect(canonicalizeJson(test.scripted.client.requests[4])).not.toContain(
+      "skills are now unavailable",
+    );
+    enabled = true;
+    await test.run();
+    enabled = false;
+    await test.run();
+    expect(canonicalizeJson(test.scripted.client.requests[6])).toContain(
+      "skills are now unavailable",
+    );
+    expect(canonicalizeJson(test.scripted.client.requests[1])).toBe(original);
+  });
+  it("isolates an uncooperative catalog read and cancels without registering late entries", async () => {
+    const entered = Promise.withResolvers<void>();
+    const delayed = Promise.withResolvers<readonly (typeof entry)[]>();
+    let first = true;
+    const test = await fixture([answer(), answer()], {
+      skillLibrary: {
+        list: async () => {
+          if (first) {
+            first = false;
+            entered.resolve();
+            return delayed.promise;
+          }
+          return [];
+        },
+        read: async () => null,
+      },
+    });
+    const running = test.run();
+    await entered.promise;
+    await test.runtime.send({ type: "session.create", workspaceRoot: test.workspace });
+    const other = test.events.findLast((event) => event.type === "session.ready");
+    if (other?.type !== "session.ready") throw Error("Missing second session");
+    const otherFinished = Promise.withResolvers<RuntimeEvent>();
+    let otherRunId: string | undefined;
+    test.runtime.subscribe((event) => {
+      if (event.type === "run.started" && event.sessionId === other.sessionId)
+        otherRunId = event.runId;
+      if (event.type === "run.finished" && event.runId === otherRunId) otherFinished.resolve(event);
+    });
+    await test.runtime.send({
+      type: "run.start",
+      sessionId: other.sessionId,
+      input: [{ type: "text", text: "Continue independently." }],
+    });
+    expect(await otherFinished.promise).toMatchObject({ outcome: { kind: "completed" } });
+    const started = test.events.find((event) => event.type === "run.started");
+    if (started?.type !== "run.started") throw Error("Missing run");
+    await test.runtime.send({ type: "run.cancel", runId: started.runId });
+    expect(await running).toMatchObject({ outcome: { kind: "cancelled" } });
+    expect(test.scripted.client.requests).toHaveLength(1);
+    expect(await test.run()).toMatchObject({ outcome: { kind: "completed" } });
+    delayed.resolve([entry]);
+    await delayed.promise;
+    expect(test.runtime.plugins.some((plugin) => plugin.name === "skill-library")).toBe(false);
+    expect(test.scripted.client.requests[0]?.tools.some((t) => t.name === "read_skill")).toBe(
+      false,
+    );
+  });
+  it("serializes library registration for concurrent sessions", async () => {
+    const test = await fixture([answer(), answer()], {
+      skillLibrary: { list: async () => [entry], read: async () => null },
+    });
+    await test.runtime.send({ type: "session.create", workspaceRoot: test.workspace });
+    const other = test.events.findLast((event) => event.type === "session.ready");
+    if (other?.type !== "session.ready") throw Error("Missing second session");
+    await Promise.all([test.run(), test.run(other.sessionId)]);
+    expect(test.scripted.client.requests).toHaveLength(2);
+    expect(test.runtime.plugins.filter((plugin) => plugin.name === "skill-library")).toEqual([
+      { name: "skill-library", state: "loaded" },
+    ]);
+    for (const request of test.scripted.client.requests) {
+      expect(request.tools.filter((tool) => tool.name === "read_skill")).toHaveLength(1);
+      expect(canonicalizeJson(request)).toContain("Current enabled skill catalog");
+    }
+  });
   it.each(["deny", "ask"] as const)(
     "never reads skill bodies when the read policy is %s",
     async (mode) => {
@@ -234,7 +378,7 @@ describe("trusted personal instructions and skill library integration", () => {
     await test.run();
     const next = test.scripted.client.requests[1];
     if (!next) throw Error("Missing next request");
-    expect(canonicalizeJson(next)).toContain("No skills are currently enabled");
+    expect(canonicalizeJson(next)).toContain("Previously enabled skills are now unavailable");
     expect(canonicalizeJson(next)).not.toContain("Include Evidence and Verification headings.");
   });
   it("keeps the verified source immutable across the final enabled-version check", async () => {

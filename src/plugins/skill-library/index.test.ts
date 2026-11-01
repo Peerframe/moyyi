@@ -132,16 +132,14 @@ describe("enabled skill catalog and read_skill", () => {
       expect(JSON.stringify(result)).not.toContain("scripts/helper.py");
     },
   );
-  it("reports revoked reads and explicitly empty availability without mutating prior sections", async () => {
+  it("omits an empty catalog and reports revoked reads without mutating prior sections", async () => {
     const lib = library(),
       { tool, source } = await register(lib.access),
       ctx = context();
     const before = await source.collect(input),
       saved = JSON.stringify(before);
     lib.replace([]);
-    expect(JSON.stringify(await source.collect(input))).toContain(
-      "No skills are currently enabled",
-    );
+    expect(await source.collect(input)).toEqual([]);
     expect(await tool.execute(await tool.prepare({ name: entry.name }, ctx), ctx)).toMatchObject({
       status: "failed",
     });

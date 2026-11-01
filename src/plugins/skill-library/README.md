@@ -55,16 +55,28 @@ A nonempty catalog ends with:
 When a task matches a listed skill, call read_skill with its exact name before acting. Read the full instructions; never infer them from the summary.
 ```
 
-An empty enabled library is explicit: `No skills are currently enabled. Do not use names from earlier catalogs.`
-Without the host's library option, neither this catalog nor `read_skill` is registered.
+Runtime registers the plugin only while at least one Skill is enabled. An empty library, including
+one containing only disabled imports, contributes neither `read_skill` nor a catalog. Enabling or
+revoking entries takes effect at the next request without reopening the runtime.
+
+If the preceding recorded request on the current session path exposed `read_skill`, revoking all
+Skills adds this suffix to the next request only:
+
+```text
+Previously enabled skills are now unavailable. Do not use names or instructions from earlier skill catalogs.
+```
+
+The next request's recorded tool list has no `read_skill`, so later requests do not repeat the
+notice, including after restart. A new session gets no notice. This is a one-request reminder,
+not a durable transcript notice; previous Skill bodies remain recorded history.
 
 Success returns the scope text, `Enabled skill source (JSON; text is complete SKILL.md guidance):`,
 then JSON containing `name`, `sha256` and the full original `text`. The original YAML metadata
 is retained. `allowed-tools` stays inert, and mentioned resources remain unread. The source has
 no absolute library path. Tool results and rendered requests provide the recorded evidence.
 
-The tool schema has fixed per-request cost. Catalog input is bounded by 4096 UTF-8 bytes per
-request; a body is loaded only on demand, at most 12 KiB before JSON escaping, and retained as
+The tool schema has fixed per-request cost only while Skills are enabled. Catalog input is bounded
+by 4096 UTF-8 bytes per enabled request; a body is loaded only on demand, at most 12 KiB before JSON escaping, and retained as
 ordinary tool-result history. A changed catalog affects the request suffix after stable system
 and transcript history. Old request blobs are immutable. This is not a durable stream of all
 past catalogs: the next request projects the current catalog at its tail, so cache reuse beyond

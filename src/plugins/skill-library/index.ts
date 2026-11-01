@@ -1,4 +1,10 @@
-import type { ActionDigest, Plugin, ToolDefinition, ToolOutcome } from "../../contracts/index.ts";
+import type {
+  ActionDigest,
+  ContextSection,
+  Plugin,
+  ToolDefinition,
+  ToolOutcome,
+} from "../../contracts/index.ts";
 
 export interface SkillLibraryEntry {
   readonly name: string;
@@ -32,34 +38,7 @@ export function createSkillLibraryPlugin(access: SkillLibraryAccess): Plugin {
     throw Error("The skill library requires trusted list and read callbacks");
   const list = access.list.bind(access),
     read = access.read.bind(access);
-  const current = async (signal: AbortSignal): Promise<readonly SkillLibraryEntry[]> => {
-    signal.throwIfAborted();
-    try {
-      const value = await list(signal);
-      signal.throwIfAborted();
-      if (!Array.isArray(value) || value.length > MAX_ENABLED_LIBRARY_SKILLS) throw Error();
-      const names = new Set<string>();
-      const entries = value.map((item) => {
-        if (
-          !item ||
-          !validName(item.name) ||
-          names.has(item.name) ||
-          typeof item.description !== "string" ||
-          !item.description.isWellFormed() ||
-          !item.description.trim() ||
-          [...item.description].length > 1024 ||
-          !digestPattern.test(item.sha256)
-        )
-          throw Error();
-        names.add(item.name);
-        return { name: item.name, description: item.description, sha256: item.sha256 };
-      });
-      return entries.sort((a, b) => (a.name < b.name ? -1 : a.name > b.name ? 1 : 0));
-    } catch {
-      signal.throwIfAborted();
-      throw Error("Cannot load the enabled skill catalog safely");
-    }
-  };
+  const current = (signal: AbortSignal) => readEnabledSkillCatalog(list, signal);
   const tool: ToolDefinition = {
     name: "read_skill",
     description:
@@ -153,7 +132,8 @@ export function createSkillLibraryPlugin(access: SkillLibraryAccess): Plugin {
         id: "skill-library.catalog",
         async collect(input) {
           const entries = await current(input.signal);
-          const text = `${scope}\nCurrent enabled skill catalog (summaries only; replaces earlier availability):\n${JSON.stringify(entries.map(({ name, description }) => ({ name, description: clip(description.replace(/\s+/gu, " ").trim(), MAX_DESCRIPTION_BYTES) })))}\n${entries.length ? "When a task matches a listed skill, call read_skill with its exact name before acting. Read the full instructions; never infer them from the summary." : "No skills are currently enabled. Do not use names from earlier catalogs."}`;
+          if (!entries.length) return [];
+          const text = `${scope}\nCurrent enabled skill catalog (summaries only; replaces earlier availability):\n${JSON.stringify(entries.map(({ name, description }) => ({ name, description: clip(description.replace(/\s+/gu, " ").trim(), MAX_DESCRIPTION_BYTES) })))}\nWhen a task matches a listed skill, call read_skill with its exact name before acting. Read the full instructions; never infer them from the summary.`;
           if (encoder.encode(text).byteLength > MAX_SKILL_CATALOG_BYTES)
             throw Error("Enabled skill catalog exceeds its byte limit");
           return [
@@ -200,4 +180,50 @@ function clip(text: string, maximum: number): string {
 }
 function output(status: ToolOutcome["status"], text: string, maximum: number): ToolOutcome {
   return { status, content: [{ type: "text", text: clip(text, maximum) }] };
+}
+
+export async function readEnabledSkillCatalog(
+  list: SkillLibraryAccess["list"],
+  signal: AbortSignal,
+): Promise<readonly SkillLibraryEntry[]> {
+  signal.throwIfAborted();
+  try {
+    const value = await list(signal);
+    signal.throwIfAborted();
+    if (!Array.isArray(value) || value.length > MAX_ENABLED_LIBRARY_SKILLS) throw Error();
+    const names = new Set<string>();
+    const entries = value.map((item) => {
+      if (
+        !item ||
+        !validName(item.name) ||
+        names.has(item.name) ||
+        typeof item.description !== "string" ||
+        !item.description.isWellFormed() ||
+        !item.description.trim() ||
+        [...item.description].length > 1024 ||
+        !digestPattern.test(item.sha256)
+      )
+        throw Error();
+      names.add(item.name);
+      return { name: item.name, description: item.description, sha256: item.sha256 };
+    });
+    return entries.sort((a, b) => (a.name < b.name ? -1 : a.name > b.name ? 1 : 0));
+  } catch {
+    signal.throwIfAborted();
+    throw Error("Cannot load the enabled skill catalog safely");
+  }
+}
+
+export function skillLibraryUnavailable(): ContextSection {
+  return {
+    id: "skill-library.unavailable",
+    stability: "turn",
+    placement: "after_history",
+    content: [
+      {
+        type: "text",
+        text: "Previously enabled skills are now unavailable. Do not use names or instructions from earlier skill catalogs.",
+      },
+    ],
+  };
 }

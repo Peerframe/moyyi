@@ -1,3 +1,4 @@
+import assert from "node:assert/strict";
 import {
   existsSync,
   mkdirSync,
@@ -25,7 +26,11 @@ function fixture() {
   const keys = new Map<CredentialRef, string>([["legacy-flash", "synthetic-legacy"]]);
   const vault: CredentialVault = {
     status: vi.fn(async (r) => keys.has(r)),
-    read: vi.fn(async (r) => keys.get(r)!),
+    read: vi.fn(async (r) => {
+      const key = keys.get(r);
+      assert(key, "Expected a configured synthetic credential");
+      return key;
+    }),
     add: vi.fn(async (id, key) => {
       keys.set(`desktop:${id}`, key);
     }),
@@ -66,8 +71,10 @@ it("keeps named same-provider keys distinct, deletes only selected dormant key, 
     provider: "deepseek",
     apiKey: "synthetic-second",
   });
-  const second = (await c.current()).connections.find((x) => x.name === "Second")!;
+  const second = (await c.current()).connections.find((x) => x.name === "Second");
+  assert(second, "Expected the added connection");
   expect(second.configured).toBe(true);
+  expect(second.credentialDeletion).toBe("delete");
   expect(vault.read).not.toHaveBeenCalled();
   await c.changeConnection({ action: "rename", id: second.id, name: "Backup" });
   const selected = await c.changeConnection({ action: "select", id: second.id });
@@ -78,6 +85,82 @@ it("keeps named same-provider keys distinct, deletes only selected dormant key, 
   await c.changeConnection({ action: "delete", id: second.id });
   expect(vault.remove).toHaveBeenCalledWith(second.id);
   expect((await c.current()).connections).toHaveLength(1);
+});
+it.each(["flash", "kimi-cn", "kimi-global"] as const)(
+  "unlinks the migrated %s connection while preserving the shared legacy credential",
+  async (preset) => {
+    const { home, vault, keys } = fixture();
+    const root = join(home, ".moyyi/desktop");
+    mkdirSync(root, { recursive: true, mode: 0o700 });
+    const ref = `legacy-${preset}` as CredentialRef;
+    keys.set(ref, "shared-synthetic-key");
+    const original = JSON.stringify({
+      format: 1,
+      settings: { preset, maxRequests: 3, timeoutMs: 120000 },
+      credentials: {},
+    });
+    writeFileSync(join(root, "settings.json"), original, { mode: 0o600 });
+    const c = createModelConfiguration(home, vault);
+    const old = (await c.current()).connections[0];
+    assert(old, "Expected the migrated connection");
+    expect(old.credentialDeletion).toBe("retain-legacy");
+    const added = await c.changeConnection({ action: "add", name: "Next", provider: "deepseek" });
+    const next = added.connections.find((x) => x.name === "Next");
+    assert(next, "Expected the replacement connection");
+    await c.changeConnection({ action: "select", id: next.id });
+    const removed = await c.changeConnection({ action: "delete", id: old.id });
+    expect(removed.connections.map((x) => x.id)).toEqual([next.id]);
+    expect(removed.searchConnectionId).toBeNull();
+    expect(keys.get(ref)).toBe("shared-synthetic-key");
+    expect(vault.remove).not.toHaveBeenCalled();
+    expect(vault.read).not.toHaveBeenCalled();
+    expect(readFileSync(join(root, "settings.format1.json"), "utf8")).toBe(original);
+    expect((await createModelConfiguration(home, vault).current()).connections).toEqual(
+      removed.connections,
+    );
+  },
+);
+it("uses the credential reference when a legacy connection has a new desktop-owned key", async () => {
+  const { configuration: c, vault, keys } = fixture();
+  const initial = await c.current();
+  const saved = await c.save(initial.settings, "new-synthetic-key");
+  expect(saved.activeConnectionId).toBe("legacy-flash");
+  expect(saved.connections[0]?.credentialDeletion).toBe("delete");
+  const keyId = vi.mocked(vault.add).mock.calls[0]?.[0];
+  assert(keyId, "Expected the new credential identity");
+  await c.changeConnection({ action: "add", name: "Next", provider: "deepseek" });
+  const next = (await c.current()).connections.find((x) => x.name === "Next");
+  assert(next, "Expected the replacement connection");
+  await c.changeConnection({ action: "select", id: next.id });
+  await c.changeConnection({ action: "delete", id: initial.activeConnectionId });
+  expect(vault.remove).toHaveBeenCalledExactlyOnceWith(keyId);
+  expect(keys.has(`desktop:${keyId}`)).toBe(false);
+  expect(keys.get("legacy-flash")).toBe("synthetic-legacy");
+});
+it("retains a desktop credential still referenced by another connection", async () => {
+  const { configuration: original, home, vault, keys } = fixture();
+  await original.changeConnection({
+    action: "add",
+    name: "Shared",
+    provider: "deepseek",
+    apiKey: "shared-synthetic-key",
+  });
+  const path = join(home, ".moyyi/desktop/settings.json");
+  const stored = JSON.parse(readFileSync(path, "utf8"));
+  const shared = stored.connections.find((c: { name: string }) => c.name === "Shared");
+  stored.connections.push({ ...shared, id: "another-reference", name: "Other" });
+  writeFileSync(path, JSON.stringify(stored));
+  const c = createModelConfiguration(home, vault);
+  expect((await c.current()).connections.find((x) => x.id === shared.id)?.credentialDeletion).toBe(
+    "retain-shared",
+  );
+  const result = await c.changeConnection({ action: "delete", id: shared.id });
+  expect(result.connections.find((x) => x.id === "another-reference")?.credentialDeletion).toBe(
+    "delete",
+  );
+  expect(keys.get(shared.credentialRef)).toBe("shared-synthetic-key");
+  expect(vault.remove).not.toHaveBeenCalled();
+  expect(JSON.stringify(result.connections)).not.toContain("credentialRef");
 });
 it("keeps backup symlinks and target data untouched", async () => {
   const { home, vault } = fixture();
@@ -104,7 +187,8 @@ it("keeps committed deletion and search state when key cleanup cannot be confirm
     provider: "deepseek",
     apiKey: "synthetic",
   });
-  const second = (await c.current()).connections.find((x) => x.name === "Search")!;
+  const second = (await c.current()).connections.find((x) => x.name === "Search");
+  assert(second, "Expected the search connection");
   await c.changeConnection({ action: "search", id: second.id });
   const initial = await c.current();
   const host = await createDesktopHost({
@@ -147,7 +231,8 @@ it("switches in the same idle session, resets grants and records a credential-fr
     await host.dispatch({ type: "create", workspaceRoot: workspace, askEachRead: false });
     const id = host.getState().activeSessionId;
     await host.dispatch({ type: "permissions", sessionId: id, writes: true, checks: false });
-    const second = initial.connections.find((x) => x.name === "Second")!;
+    const second = initial.connections.find((x) => x.name === "Second");
+    assert(second, "Expected the added connection");
     await host.dispatch({ type: "connection.change", change: { action: "select", id: second.id } });
     const state = host.getState();
     expect(state.activeSessionId).toBe(id);
@@ -155,6 +240,16 @@ it("switches in the same idle session, resets grants and records a credential-fr
     expect(state.messages.some((m) => m.role === "notice" && m.text.includes("Second"))).toBe(true);
     expect(JSON.stringify(state)).not.toContain("credentialRef");
     expect(isDesktopState(state)).toBe(true);
+    for (const credentialDeletion of [undefined, "unknown", true])
+      expect(
+        isDesktopState({
+          ...state,
+          connections: state.connections.map((connection) => ({
+            ...connection,
+            credentialDeletion,
+          })),
+        }),
+      ).toBe(false);
   } finally {
     await host.close();
   }

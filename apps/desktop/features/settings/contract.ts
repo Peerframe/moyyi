@@ -15,6 +15,7 @@ export interface DesktopConnection {
   readonly provider: "deepseek" | "kimi-cn" | "kimi-global";
   readonly reasoningEffort: "low" | "high";
   readonly configured: boolean;
+  readonly credentialDeletion: "delete" | "retain-legacy" | "retain-shared";
 }
 export type ConnectionChange =
   | {

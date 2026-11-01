@@ -84,23 +84,7 @@ export function nativeVault(helper: string, home = homedir()): CredentialVault {
       });
     },
     async remove(id) {
-      if (["legacy-flash", "legacy-kimi-cn", "legacy-kimi-global"].includes(id)) {
-        const service = {
-          "legacy-flash": "moyyi.deepseek.api-key",
-          "legacy-kimi-cn": "moyyi.kimi.cn.api-key",
-          "legacy-kimi-global": "moyyi.kimi.global.api-key",
-        }[id as "legacy-flash"];
-        try {
-          await execute(
-            "/usr/bin/security",
-            ["delete-generic-password", "-a", "moyyi", "-s", service, keychain],
-            { timeout: 5000, maxBuffer: 1024 },
-          );
-        } catch {
-          throw Error("连接已移除，但钥匙串项目未能确认删除。");
-        }
-        return;
-      }
+      // Legacy services are shared with the CLI and rollback builds, never desktop-owned.
       if (!isCredentialRef(`desktop:${id}`)) throw Error("Invalid credential identity");
       try {
         await execute(helper, ["delete", id], {

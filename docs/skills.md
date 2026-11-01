@@ -24,7 +24,8 @@ the original folder does not change a copy: inspect and import the new version e
 Symlinked directories/files, hardlinked or special files, invalid UTF-8 and oversized documents
 are rejected. There is no remote installation, directory scan, file watcher or script runner.
 
-Each request gets a summary-only catalog after its recorded history. Descriptions normalize
+Requests with at least one enabled Skill get `read_skill` and a summary-only catalog after their
+recorded history. An empty or fully disabled library contributes neither. Descriptions normalize
 whitespace and are capped at 256 UTF-8 bytes each; the whole catalog is at most 4096 bytes.
 The prompt tells the model to call `read_skill({"name":"code-review"})` before using matching
 guidance, rather than infer its full instructions from the summary. A successful read returns
@@ -33,8 +34,10 @@ absolute library path. A file that cannot fit the tool-output limit is not claim
 Read policy and cancellation still apply; importing or enabling grants no ordinary file, process
 or network capability. `allowed-tools` remains inert metadata.
 
-**撤销** removes the version from future catalogs. An empty enabled library is explicit. The
-reader binds the selected name and digest, checks availability before and after the read, and
+**撤销** removes the version from future catalogs. Revoking the last enabled Skill removes the
+tool as well. A session whose preceding request exposed the library receives one unavailable
+reminder on its next request; subsequent requests and new sessions have no empty catalog or
+repeated reminder. The recorded request controls this behavior across restart. The reader binds the selected name and digest, checks availability before and after the read, and
 fails if the version is revoked or replaced. It cannot return a cached body after revocation.
 Already recorded requests and tool observations are retained; revocation does not erase text
 the model previously received. All enabled guidance is potentially sent to the selected provider.

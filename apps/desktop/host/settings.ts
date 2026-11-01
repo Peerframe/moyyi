@@ -18,7 +18,7 @@ import {
 import { parseSettings, validateApiKey } from "./settings-schema.ts";
 
 type Preset = DesktopSettings["preset"];
-interface StoredConnection extends Omit<DesktopConnection, "configured"> {
+interface StoredConnection extends Omit<DesktopConnection, "configured" | "credentialDeletion"> {
   readonly credentialRef: CredentialRef;
 }
 export interface StoredSettings {
@@ -204,6 +204,13 @@ export function createModelConfiguration(home: string, vault: CredentialVault) {
       stored.connections.map(async ({ credentialRef, ...connection }) => ({
         ...connection,
         configured: !invalid && (await vault.status(credentialRef)),
+        credentialDeletion: !credentialRef.startsWith("desktop:")
+          ? ("retain-legacy" as const)
+          : stored.connections.some(
+                (c) => c.id !== connection.id && c.credentialRef === credentialRef,
+              )
+            ? ("retain-shared" as const)
+            : ("delete" as const),
       })),
     );
     const ready =
@@ -331,9 +338,12 @@ export function createModelConfiguration(home: string, vault: CredentialVault) {
       }
       const result = await persist(next);
       added = undefined;
-      if (removed && !next.connections.some((c) => c.credentialRef === removed)) {
+      if (
+        removed?.startsWith("desktop:") &&
+        !next.connections.some((c) => c.credentialRef === removed)
+      ) {
         try {
-          await vault.remove(removed.startsWith("desktop:") ? removed.slice(8) : removed);
+          await vault.remove(removed.slice(8));
         } catch {
           // The settings commit is authoritative even when the OS cannot confirm key cleanup.
           return {
