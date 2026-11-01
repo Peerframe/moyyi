@@ -425,13 +425,21 @@ try {
       provider: "kimi",
       calls: [tool("read_skill", { name: "report-style" })],
       check(body) {
-        assert(content(body.messages.at(-1)).includes("No skills are currently enabled"));
+        assert(
+          content(body.messages.at(-1)).includes("Previously enabled skills are now unavailable"),
+        );
+        assert(!body.tools.some((tool) => tool.function?.name === "read_skill"));
+        assert(!content(body.messages.at(-1)).includes("Current enabled skill catalog"));
       },
     },
     {
       provider: "kimi",
       text: "The revoked Skill is unavailable.",
       check(body) {
+        assert(!body.tools.some((tool) => tool.function?.name === "read_skill"));
+        assert(
+          !JSON.stringify(body.messages).includes("Previously enabled skills are now unavailable"),
+        );
         const result = resultMessages(body).at(-1);
         assert(result.content.includes("unavailable"));
         assert(!result.content.includes("D3_SKILL_BODY_CANARY"));

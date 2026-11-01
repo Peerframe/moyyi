@@ -20,8 +20,16 @@
   keychain, native dialog and renderer tests PASS. New offline Skill scenarios: 33/33 PASS.
 - First full check exposed two new-test issues (renderer layer import and a wrong event matcher),
   now corrected with focused passing checks, plus the already-reviewed document parser 5 s timeout.
-- Next: final check, affected offline/package/desktop gates, isolated native normal/narrow screenshots,
-  update this record and the existing PR. Packaging is currently running; no paid process is active.
+- Product checkpoint: `954dc229635c74cc307ac3fb3b428e680d092188` pushed to PR #56.
+  CI check and macos-documents passed. Desktop CI found the old fixture expected the removed
+  empty-library message; the fixture now asserts the one-time unavailable suffix, no tool/catalog,
+  and retained failure/no-body behavior for an attempted revoked tool call.
+- Desktop package and native 1120 × 800 / 780 × 560 cancellation checks complete. The native sheet
+  screenshot API produced blank images; exact AX captures plus settings screenshots are retained.
+  Isolated app closed and removed; no model/search requests or real vault/network calls.
+- Final local check passed type/lint but had 8 timeout-only failures in existing document/eval
+  tests; serial full-suite verification is running unchanged. Next: finish local checks and external
+  desktop gate, then update evidence and existing PR. No paid process is active.
 - No other agent is writing. The original checkout's two user documents remain untouched.
 - The existing paid ledger and no-rerun decision below remain authoritative; no live retry authorized.
 
