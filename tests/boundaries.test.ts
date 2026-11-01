@@ -241,6 +241,32 @@ describe("layer boundaries", () => {
     ).toEqual([]);
   });
 
+  it("keeps moyyi Chat to React and its own files", () => {
+    const file = join(repo, "apps/chat/ui/App.tsx");
+    expect(layerOf(file)).toBe("app:chat");
+    expect(
+      violations(
+        file,
+        'import { useState } from "react"; import type { ChatPort } from "../port.ts"; import "./x.tsx";',
+      ),
+    ).toEqual([]);
+    for (const source of [
+      'import "node:fs";',
+      'import "electron";',
+      'import "../../desktop/renderer/App.tsx";',
+      'import "../../../src/contracts/index.ts";',
+      'import "react-dom/server";',
+      "const x = import(variable);",
+    ])
+      expect(violations(file, source), source).toHaveLength(1);
+    expect(
+      violations(
+        join(repo, "apps/chat/port.test.ts"),
+        'import "vitest"; import "react-dom/server";',
+      ),
+    ).toEqual([]);
+  });
+
   it("scans TSX and does not use test support to widen production imports", () => {
     const renderer = join(repo, "apps/desktop/renderer");
     expect(sourceFiles(renderer)).toContain(join(renderer, "App.tsx"));

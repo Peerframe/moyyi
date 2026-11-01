@@ -1,0 +1,831 @@
+// One open chat (boards S3, S7, S10, S11, S17): header, topic tabs, the pinned job bar, the message
+// column on the wallpaper, jump buttons and the composer. Right-click or long-press opens the
+// message menu; selecting turns the composer into an action bar (N7); ⌘F searches here (N9).
+import { useEffect, useLayoutEffect, useRef, useState } from "react";
+import type { Chat, ChatAction, ChatWorld, Job, Message } from "../port.ts";
+import { author, textOf } from "../text.ts";
+import { Composer } from "./Composer.tsx";
+import { Icon } from "./icons.tsx";
+import type { MessageActions, Run } from "./messages.tsx";
+import { MessageView } from "./messages.tsx";
+import type { PanelFrame } from "./Panel.tsx";
+import { Avatar, Badge } from "./parts.tsx";
+
+const FILTERS = ["AI", "文件", "改动", "出处", "决定"] as const;
+type Filter = (typeof FILTERS)[number];
+
+export interface ConversationProps {
+  readonly world: ChatWorld;
+  readonly chat: Chat;
+  readonly draft: string;
+  readonly sticker: string;
+  readonly infoOpen: boolean;
+  readonly narrow: boolean;
+  readonly searchOpen: boolean;
+  readonly onSearch: (open: boolean) => void;
+  readonly onDraft: (text: string) => void;
+  readonly onInfo: () => void;
+  readonly onPanel: (frame: PanelFrame) => void;
+  readonly onBack: () => void;
+  readonly onOpenChat: (chatId: string) => void;
+  readonly act: (action: ChatAction) => void;
+}
+
+export function runs(messages: readonly Message[]): Run[] {
+  return messages.map((message, index) => {
+    const own = author(message);
+    const before = messages[index - 1];
+    const after = messages[index + 1];
+    return {
+      first: !before || author(before) !== own,
+      last: !after || author(after) !== own,
+    };
+  });
+}
+
+function matchesFilter(message: Message, filter: Filter | null): boolean {
+  switch (filter) {
+    case null:
+      return true;
+    case "AI":
+      return "from" in message && message.kind !== "file";
+    case "文件":
+      return message.kind === "file";
+    case "改动":
+      return message.kind === "change";
+    case "出处":
+      return (
+        (message.kind === "result" && Boolean(message.claims?.length)) ||
+        (message.kind === "text" && Boolean(message.tag))
+      );
+    case "决定":
+      return message.kind === "decision" || message.kind === "options" || message.kind === "plan";
+  }
+}
+
+/** Open decisions in this chat, oldest first: what the orange jump button walks through. */
+export function openDecisions(messages: readonly Message[]): Message[] {
+  return messages.filter(
+    (message) =>
+      ((message.kind === "decision" || message.kind === "options") && !message.answered) ||
+      (message.kind === "plan" && !message.answered && !message.scheduled),
+  );
+}
+
+function orderJobs(jobs: readonly Job[], chatId: string): Job[] {
+  const here = jobs.filter((job) => job.chatId === chatId);
+  return [...here.filter((job) => job.waiting), ...here.filter((job) => !job.waiting)];
+}
+
+interface Menu {
+  readonly x: number;
+  readonly y: number;
+  readonly messageId: string;
+}
+
+export function Conversation(props: ConversationProps) {
+  const { world, chat, act } = props;
+  const all = world.messages[chat.id] ?? [];
+  const [topic, setTopic] = useState("全部");
+  const [pinnedAt, setPinnedAt] = useState(0);
+  const [flash, setFlash] = useState<string | null>(null);
+  const [atBottom, setAtBottom] = useState(true);
+  const [replyTo, setReplyTo] = useState<string | null>(null);
+  const [editing, setEditing] = useState<string | null>(null);
+  const [menu, setMenu] = useState<Menu | null>(null);
+  const [selected, setSelected] = useState<readonly string[] | null>(null);
+  const [forwarding, setForwarding] = useState(false);
+  const [query, setQuery] = useState("");
+  const [filter, setFilter] = useState<Filter | null>(null);
+  const [hit, setHit] = useState(0);
+  const [notice, setNotice] = useState<string | null>(null);
+  const column = useRef<HTMLDivElement>(null);
+  const searchInput = useRef<HTMLInputElement>(null);
+  const press = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const messages = all.filter(
+    (message) => topic === "全部" || !message.topic || message.topic === topic,
+  );
+  const grouped = runs(messages);
+  const topicClosed = topic !== "全部" && (chat.closedTopics ?? []).includes(topic);
+  const jobs = orderJobs(world.jobs, chat.id);
+  const shownJob = jobs.length ? jobs[pinnedAt % jobs.length] : undefined;
+  const decisions = openDecisions(all);
+  const needle = query.trim();
+  const hits =
+    props.searchOpen && (needle || filter)
+      ? messages.filter((m) => matchesFilter(m, filter) && (!needle || textOf(m).includes(needle)))
+      : [];
+  const currentHit = hits.length ? hits[Math.min(hit, hits.length - 1)] : undefined;
+
+  // Opening a chat lands on the unread line if there is one, otherwise at the bottom.
+  // biome-ignore lint/correctness/useExhaustiveDependencies: runs once per opened chat
+  useLayoutEffect(() => {
+    setTopic("全部");
+    setPinnedAt(0);
+    setReplyTo(null);
+    setEditing(null);
+    setSelected(null);
+    setMenu(null);
+    const element = column.current;
+    if (!element) return;
+    const divider = element.querySelector(".mc-unread-divider");
+    if (divider instanceof HTMLElement) element.scrollTop = Math.max(0, divider.offsetTop - 24);
+    else element.scrollTop = element.scrollHeight;
+  }, [chat.id]);
+
+  // New messages keep the view pinned to the bottom when it already was.
+  // biome-ignore lint/correctness/useExhaustiveDependencies: follows the message count only
+  useLayoutEffect(() => {
+    const element = column.current;
+    if (element && atBottom) element.scrollTop = element.scrollHeight;
+  }, [all.length]);
+
+  useEffect(() => {
+    if (props.searchOpen) searchInput.current?.focus();
+    else {
+      setQuery("");
+      setFilter(null);
+    }
+  }, [props.searchOpen]);
+
+  // biome-ignore lint/correctness/useExhaustiveDependencies: scrolls only when the hit changes
+  useEffect(() => {
+    if (currentHit) reveal(currentHit.id, false);
+  }, [currentHit?.id]);
+
+  useEffect(() => {
+    if (!notice) return;
+    const timer = setTimeout(() => setNotice(null), 2400);
+    return () => clearTimeout(timer);
+  }, [notice]);
+
+  function reveal(messageId: string, blink = true) {
+    const element = column.current?.querySelector(`[data-wrap="${CSS.escape(messageId)}"]`);
+    if (element instanceof HTMLElement)
+      element.scrollIntoView({ block: "center", behavior: "smooth" });
+    if (blink) {
+      setFlash(messageId);
+      setTimeout(() => setFlash((value) => (value === messageId ? null : value)), 1600);
+    }
+  }
+
+  const find = (messageId: string) => all.find((message) => message.id === messageId);
+  const senderName = (message: Message): string => {
+    const from = author(message);
+    if (from === "me") return "你";
+    return (from && world.members[from]?.name) ?? "moyyi";
+  };
+  const copy = (text: string, done: string) => {
+    navigator.clipboard?.writeText(text).catch(() => undefined);
+    setNotice(done);
+  };
+
+  const actions: MessageActions = {
+    answer: (messageId, key) => {
+      const message = find(messageId);
+      if (message?.kind === "result") {
+        const claim = message.claims?.find((c) => !c.check) ?? message.claims?.[0];
+        if (key === 1) setNotice("在 Finder 里打开了论文文件夹");
+        else if (claim) props.onPanel({ kind: "claim", messageId, claimId: claim.id });
+        else setNotice("核查已经对过了 · 这次没有要你核对的结论");
+        return;
+      }
+      act({ type: "answer", messageId, key });
+      if (message?.kind === "decision" && message.text.includes("毕业论文") && key === 0)
+        props.onOpenChat("lunwen");
+    },
+    react: (messageId, emoji) => act({ type: "react", messageId, emoji }),
+    openReplies: (messageId) => props.onPanel({ kind: "thread", messageId }),
+    openClaim: (messageId, claimId) => props.onPanel({ kind: "claim", messageId, claimId }),
+    undo: (changeIds) => act({ type: "undo", changeIds }),
+    openChat: props.onOpenChat,
+    retry: (messageId) => {
+      const message = find(messageId);
+      if (message?.kind === "out") act({ type: "send", chatId: chat.id, text: message.text });
+    },
+    unschedule: (messageId) => act({ type: "unschedule", messageId }),
+  };
+
+  const command = (name: string) => {
+    if (name === "/撤回") props.onPanel({ kind: "undo" });
+    else if (name === "/预算") props.onInfo();
+    else if (name === "/对账") {
+      const result = all.find(
+        (m) => m.kind === "result" && m.claims?.some((claim) => !claim.check),
+      );
+      const claim = result?.kind === "result" ? result.claims?.find((c) => !c.check) : undefined;
+      if (result && claim)
+        props.onPanel({ kind: "claim", messageId: result.id, claimId: claim.id });
+      else setNotice("这个对话里没有要对账的结论");
+    } else act({ type: "send", chatId: chat.id, text: name });
+  };
+
+  const editLast = () => {
+    const last = [...all].reverse().find((m) => m.kind === "out" && !m.retracted && !m.failed);
+    if (last?.kind !== "out") return;
+    setEditing(last.id);
+    props.onDraft(last.text);
+    if (last.receipt === "taken")
+      setNotice("已经有人接手了 · 改的话会作为一条补充发出去，原话不变");
+  };
+
+  const toggleSelect = (messageId: string) =>
+    setSelected((value) => {
+      const now = value ?? [];
+      const next = now.includes(messageId)
+        ? now.filter((id) => id !== messageId)
+        : [...now, messageId];
+      return next.length ? next : null;
+    });
+
+  const openMenu = (x: number, y: number, messageId: string) => {
+    const message = find(messageId);
+    if (!message || message.kind === "unread-divider") return;
+    const bounds = column.current?.getBoundingClientRect();
+    setMenu({ x: x - (bounds?.left ?? 0), y: y - (bounds?.top ?? 0), messageId });
+  };
+
+  const menuMessage = menu ? find(menu.messageId) : undefined;
+  const replyMessage = replyTo ? find(replyTo) : undefined;
+  const projects = world.chats.filter(
+    (c) => c.kind === "project" && c.id !== chat.id && !c.archived,
+  );
+
+  return (
+    <section className="mc-wallpaper ch-conversation" aria-label={chat.name}>
+      <header className="ch-head">
+        {props.narrow ? (
+          <button
+            type="button"
+            className="mc-icon-btn"
+            aria-label="返回列表"
+            title="返回列表"
+            onClick={props.onBack}
+          >
+            <Icon.back size={18} />
+          </button>
+        ) : null}
+        <Avatar avatar={chat.avatar} shape={chat.kind === "project" ? "project" : "ai"} size={32} />
+        <div className="ch-head-text">
+          <span className="ch-head-name">{chat.name}</span>
+          <span className="ch-head-sub">{chat.subtitle}</span>
+        </div>
+        <button
+          type="button"
+          className="mc-icon-btn"
+          aria-label="搜索这个对话"
+          title="搜索这个对话 ⌘F"
+          aria-pressed={props.searchOpen}
+          onClick={() => props.onSearch(!props.searchOpen)}
+        >
+          <Icon.search size={18} />
+        </button>
+        <button
+          type="button"
+          className="mc-icon-btn"
+          aria-label="资料"
+          title="资料"
+          aria-pressed={props.infoOpen}
+          onClick={props.onInfo}
+        >
+          <Icon.info size={18} />
+        </button>
+      </header>
+      {props.searchOpen ? (
+        <search className="ch-search-bar">
+          <div className="mc-composer ch-search">
+            <Icon.search />
+            <label htmlFor={`find-${chat.id}`} className="ch-sr">
+              在这个对话里找
+            </label>
+            <input
+              ref={searchInput}
+              id={`find-${chat.id}`}
+              type="search"
+              placeholder="在这个对话里找"
+              value={query}
+              onChange={(event) => {
+                setHit(0);
+                setQuery(event.target.value);
+              }}
+              onKeyDown={(event) => {
+                if (event.key === "Enter" && hits.length) {
+                  event.preventDefault();
+                  setHit((value) => (value + (event.shiftKey ? hits.length - 1 : 1)) % hits.length);
+                } else if (event.key === "Escape") {
+                  event.stopPropagation();
+                  props.onSearch(false);
+                }
+              }}
+            />
+            <span className="ch-sub num" aria-live="polite">
+              {needle || filter
+                ? hits.length
+                  ? `第 ${Math.min(hit, hits.length - 1) + 1}/${hits.length} 处`
+                  : "没找到"
+                : ""}
+            </span>
+          </div>
+          <fieldset className="ch-filters">
+            <legend className="ch-sr">只看</legend>
+            {FILTERS.map((item) => (
+              <button
+                key={item}
+                type="button"
+                className="ch-tab"
+                aria-pressed={filter === item}
+                onClick={() => {
+                  setHit(0);
+                  setFilter(filter === item ? null : item);
+                }}
+              >
+                {item}
+              </button>
+            ))}
+          </fieldset>
+        </search>
+      ) : null}
+      {chat.topics?.length ? (
+        <nav className="ch-topics" aria-label="话题">
+          {["全部", ...chat.topics].map((name) => (
+            <button
+              key={name}
+              type="button"
+              className="ch-tab"
+              aria-pressed={topic === name}
+              onClick={() => setTopic(name)}
+            >
+              {name}
+            </button>
+          ))}
+        </nav>
+      ) : null}
+      {topicClosed ? (
+        <div className="ch-topic-closed">
+          这个话题做完了 ·{" "}
+          <button
+            type="button"
+            className="ch-text-button"
+            onClick={() => act({ type: "reopen-topic", chatId: chat.id, topic })}
+          >
+            重新打开
+          </button>
+        </div>
+      ) : null}
+      {shownJob ? (
+        <PinnedBar
+          job={shownJob}
+          index={pinnedAt % jobs.length}
+          jobs={jobs}
+          onJump={() => {
+            reveal(shownJob.messageId);
+            setPinnedAt((value) => value + 1);
+          }}
+          onList={() => props.onPanel({ kind: "jobs" })}
+          onStop={() => act({ type: "stop", jobId: shownJob.id })}
+        />
+      ) : null}
+      {world.connection.state === "offline" ? (
+        <div className="ch-offline" role="status">
+          <span className="ch-offline-title">没连上网络</span>
+          <span className="muted">{world.connection.note ?? "本机的事继续做；消息连上后再发"}</span>
+        </div>
+      ) : null}
+      <div className="ch-column">
+        {/* biome-ignore lint/a11y/noStaticElementInteractions: the column delegates the message menu; the ContextMenu key and Shift+F10 reach it from the keyboard */}
+        <div
+          ref={column}
+          className="mc-msgs ch-msgs"
+          onScroll={(event) => {
+            const element = event.currentTarget;
+            setAtBottom(element.scrollHeight - element.scrollTop - element.clientHeight < 48);
+            setMenu(null);
+          }}
+          onContextMenu={(event) => {
+            const wrap = (event.target as HTMLElement).closest<HTMLElement>("[data-wrap]");
+            if (!wrap?.dataset.wrap) return;
+            event.preventDefault();
+            openMenu(event.clientX, event.clientY, wrap.dataset.wrap);
+          }}
+          onPointerDown={(event) => {
+            if (event.pointerType !== "touch") return;
+            const wrap = (event.target as HTMLElement).closest<HTMLElement>("[data-wrap]");
+            const { clientX, clientY } = event;
+            if (wrap?.dataset.wrap)
+              press.current = setTimeout(
+                () => openMenu(clientX, clientY, wrap.dataset.wrap ?? ""),
+                500,
+              );
+          }}
+          onPointerUp={() => press.current && clearTimeout(press.current)}
+          onPointerCancel={() => press.current && clearTimeout(press.current)}
+        >
+          {messages.length === 0 ? <span className="mc-service">还没有消息</span> : null}
+          {messages.map((message, index) => {
+            const isSelected = selected?.includes(message.id) ?? false;
+            return (
+              <div
+                key={message.id}
+                className={`ch-msg${flash === message.id || currentHit?.id === message.id ? " ch-flash" : ""}`}
+                data-wrap={message.id}
+                data-selected={selected ? isSelected : undefined}
+                onClickCapture={(event) => {
+                  if (message.kind === "unread-divider" || message.kind === "service") return;
+                  if (selected || event.shiftKey) {
+                    event.preventDefault();
+                    event.stopPropagation();
+                    toggleSelect(message.id);
+                  }
+                }}
+              >
+                <MessageView
+                  message={message}
+                  chat={chat}
+                  members={world.members}
+                  run={grouped[index] ?? { first: true, last: true }}
+                  actions={actions}
+                  sticker={props.sticker}
+                />
+              </div>
+            );
+          })}
+        </div>
+        {menu && menuMessage ? (
+          <MessageMenu
+            menu={menu}
+            message={menuMessage}
+            onClose={() => setMenu(null)}
+            onReply={() => setReplyTo(menuMessage.id)}
+            onCopy={() => copy(textOf(menuMessage), "已复制")}
+            onLink={() =>
+              copy(
+                `moyyi://chat/${chat.id}/${menuMessage.id}`,
+                "已复制链接 · 粘贴到记忆或别的聊天里会变成引用",
+              )
+            }
+            onSelect={() => toggleSelect(menuMessage.id)}
+            onEdit={() => {
+              if (menuMessage.kind !== "out") return;
+              setEditing(menuMessage.id);
+              props.onDraft(menuMessage.text);
+            }}
+            onRetract={() => act({ type: "retract", messageId: menuMessage.id })}
+            onForward={() => {
+              setSelected([menuMessage.id]);
+              setForwarding(true);
+            }}
+          />
+        ) : null}
+        {!atBottom || decisions.length ? (
+          <div className="mc-jumps">
+            {decisions.length && !atBottom ? (
+              <button
+                type="button"
+                className="mc-jump mc-jump-attention"
+                aria-label={`跳到下一个要你决定的，${decisions.length} 个`}
+                title="下一个要你决定的"
+                onClick={() => {
+                  const next = decisions[0];
+                  if (next) reveal(next.id);
+                }}
+              >
+                <Icon.attention size={18} />
+                <Badge kind="decide" count={decisions.length} />
+              </button>
+            ) : null}
+            {!atBottom ? (
+              <button
+                type="button"
+                className="mc-jump"
+                aria-label={chat.unread ? `跳到最新，${chat.unread} 条未读` : "跳到最新"}
+                title="跳到最新"
+                onClick={() => {
+                  const element = column.current;
+                  if (element) element.scrollTo({ top: element.scrollHeight, behavior: "smooth" });
+                  act({ type: "open", chatId: chat.id });
+                }}
+              >
+                <Icon.down size={18} />
+                <Badge kind="unread" count={chat.unread} />
+              </button>
+            ) : null}
+          </div>
+        ) : null}
+        {notice ? (
+          <span className="mc-service ch-toast" role="status">
+            {notice}
+          </span>
+        ) : null}
+      </div>
+      {selected ? (
+        <SelectionBar
+          count={selected.length}
+          forwarding={forwarding}
+          projects={projects}
+          onCheck={() => {
+            const result = selected.map(find).find((m) => m?.kind === "result" && m.claims?.length);
+            const claim =
+              result?.kind === "result"
+                ? (result.claims?.find((c) => !c.check) ?? result.claims?.[0])
+                : undefined;
+            if (result && claim)
+              props.onPanel({ kind: "claim", messageId: result.id, claimId: claim.id });
+            else setNotice("选中的消息里没有带出处的结论");
+          }}
+          onMemory={() => {
+            act({ type: "save-memory", messageIds: selected });
+            setSelected(null);
+            setNotice(`存进记忆了 · ${selected.length} 条，带着出处`);
+          }}
+          onForward={() => setForwarding(true)}
+          onForwardTo={(chatId) => {
+            act({ type: "forward", messageIds: selected, chatId });
+            setSelected(null);
+            setForwarding(false);
+            setNotice("转过去了 · 出处跟着走，文件权限不跟着走");
+          }}
+          onCopy={() => {
+            copy(
+              selected
+                .map(find)
+                .filter((m): m is Message => Boolean(m))
+                .map((m) => `${senderName(m)}：${textOf(m)}`)
+                .join("\n"),
+              `已复制 ${selected.length} 条`,
+            );
+            setSelected(null);
+          }}
+          onCancel={() => {
+            setSelected(null);
+            setForwarding(false);
+          }}
+        />
+      ) : topicClosed ? (
+        <div className="ch-composer-wrap">
+          <div className="mc-composer ch-archived">
+            <span className="muted">话题「{topic}」已关闭，只能看 · </span>
+            <button
+              type="button"
+              className="mc-key"
+              onClick={() => act({ type: "reopen-topic", chatId: chat.id, topic })}
+            >
+              重新打开
+            </button>
+          </div>
+        </div>
+      ) : (
+        <Composer
+          chat={chat}
+          members={world.members}
+          draft={props.draft}
+          running={
+            shownJob
+              ? { who: chat.kind === "project" ? "负责人 moyyi" : chat.name, step: shownJob.step }
+              : null
+          }
+          sticker={props.sticker}
+          onDraft={props.onDraft}
+          onSend={(text) => {
+            if (editing) act({ type: "edit", messageId: editing, text });
+            else act({ type: "send", chatId: chat.id, text, ...(replyTo ? { replyTo } : {}) });
+            setEditing(null);
+            setReplyTo(null);
+            setAtBottom(true);
+          }}
+          onStop={() => shownJob && act({ type: "stop", jobId: shownJob.id })}
+          onAttach={(name, access) => act({ type: "attach", chatId: chat.id, name, access })}
+          onCommand={command}
+          onVoice={(seconds) =>
+            act({
+              type: "send",
+              chatId: chat.id,
+              text: `[语音 0:${String(seconds).padStart(2, "0")}]`,
+            })
+          }
+          onReopen={() => act({ type: "archive", chatId: chat.id, archived: false })}
+          replyTo={
+            replyMessage ? { name: senderName(replyMessage), text: textOf(replyMessage) } : null
+          }
+          onCancelReply={() => setReplyTo(null)}
+          editing={editing !== null}
+          onEditLast={editLast}
+          onCancelEdit={() => {
+            if (editing) props.onDraft("");
+            setEditing(null);
+          }}
+        />
+      )}
+    </section>
+  );
+}
+
+function PinnedBar({
+  job,
+  index,
+  jobs,
+  onJump,
+  onList,
+  onStop,
+}: {
+  readonly job: Job;
+  readonly index: number;
+  readonly jobs: readonly Job[];
+  readonly onJump: () => void;
+  readonly onList: () => void;
+  readonly onStop: () => void;
+}) {
+  const total = jobs.length;
+  const count = total > 1 ? ` · 第 ${index + 1}/${total} 件` : "";
+  const label = job.stopping
+    ? `正在停${count} · ${job.name}`
+    : `${job.waiting ? "等你" : "进度"}${count} · ${job.name}`;
+  return (
+    <div className={`mc-pinned${job.waiting ? " mc-pinned-attention" : ""}`}>
+      <button type="button" className="mc-pinned-jump" aria-label="跳到进度消息" onClick={onJump}>
+        <span className="mc-pinned-segs">
+          {jobs.map((each, at) => (
+            <span
+              key={each.id}
+              className={each.waiting ? "mc-seg-attention" : undefined}
+              aria-current={at === index ? "true" : undefined}
+            />
+          ))}
+        </span>
+        <span className="ch-min">
+          <span className="mc-pinned-label">{label}</span>
+          <span className="mc-pinned-body ch-block">
+            {job.waiting ? `等你决定：${job.waiting} · ${job.step}` : job.step}
+          </span>
+        </span>
+      </button>
+      {total > 1 ? (
+        <button
+          type="button"
+          className="mc-icon-btn mc-pinned-list"
+          aria-label="全部在做的事"
+          title="全部在做的事"
+          onClick={onList}
+        >
+          <Icon.list size={18} />
+        </button>
+      ) : null}
+      <button type="button" className="mc-stop" disabled={job.stopping} onClick={onStop}>
+        {job.stopping ? "正在停…" : "停下"}
+      </button>
+    </div>
+  );
+}
+
+function MessageMenu({
+  menu,
+  message,
+  onClose,
+  onReply,
+  onCopy,
+  onLink,
+  onSelect,
+  onEdit,
+  onRetract,
+  onForward,
+}: {
+  readonly menu: Menu;
+  readonly message: Message;
+  readonly onClose: () => void;
+  readonly onReply: () => void;
+  readonly onCopy: () => void;
+  readonly onLink: () => void;
+  readonly onSelect: () => void;
+  readonly onEdit: () => void;
+  readonly onRetract: () => void;
+  readonly onForward: () => void;
+}) {
+  const first = useRef<HTMLButtonElement>(null);
+  useEffect(() => first.current?.focus(), []);
+  const own = message.kind === "out" && !message.retracted;
+  const items: { label: string; run: () => void; danger?: boolean }[] = [
+    { label: "回复", run: onReply },
+    { label: "复制", run: onCopy },
+    { label: "复制链接", run: onLink },
+    ...(message.kind === "text" || message.kind === "result"
+      ? [{ label: "转发", run: onForward }]
+      : []),
+    { label: "选择", run: onSelect },
+    ...(own && message.receipt !== "taken" ? [{ label: "改这句", run: onEdit }] : []),
+    ...(own ? [{ label: "收回这句话", run: onRetract, danger: true }] : []),
+  ];
+  return (
+    <>
+      <button
+        type="button"
+        className="ch-scrim"
+        aria-label="关闭菜单"
+        tabIndex={-1}
+        onClick={onClose}
+      />
+      <div
+        className="mc-attach ch-menu"
+        role="menu"
+        aria-label="消息"
+        style={{ left: menu.x, top: menu.y }}
+        onKeyDown={(event) => {
+          const buttons = [...event.currentTarget.querySelectorAll<HTMLButtonElement>("button")];
+          const at = buttons.indexOf(document.activeElement as HTMLButtonElement);
+          if (event.key === "Escape") {
+            event.stopPropagation();
+            onClose();
+          } else if (event.key === "ArrowDown" || event.key === "ArrowUp") {
+            event.preventDefault();
+            buttons[
+              (at + (event.key === "ArrowDown" ? 1 : buttons.length - 1)) % buttons.length
+            ]?.focus();
+          }
+        }}
+      >
+        {items.map((item, index) => (
+          <button
+            key={item.label}
+            ref={index === 0 ? first : undefined}
+            type="button"
+            className={`mc-attach-item${item.danger ? " ch-danger" : ""}`}
+            role="menuitem"
+            onClick={() => {
+              onClose();
+              item.run();
+            }}
+          >
+            {item.label}
+          </button>
+        ))}
+      </div>
+    </>
+  );
+}
+
+function SelectionBar({
+  count,
+  forwarding,
+  projects,
+  onCheck,
+  onMemory,
+  onForward,
+  onForwardTo,
+  onCopy,
+  onCancel,
+}: {
+  readonly count: number;
+  readonly forwarding: boolean;
+  readonly projects: readonly Chat[];
+  readonly onCheck: () => void;
+  readonly onMemory: () => void;
+  readonly onForward: () => void;
+  readonly onForwardTo: (chatId: string) => void;
+  readonly onCopy: () => void;
+  readonly onCancel: () => void;
+}) {
+  return (
+    <div className="ch-composer-wrap">
+      {forwarding ? (
+        <div className="mc-suggest ch-popup" role="menu" aria-label="转到哪个项目">
+          {projects.map((project) => (
+            <button
+              key={project.id}
+              type="button"
+              className="mc-suggest-item"
+              role="menuitem"
+              onClick={() => onForwardTo(project.id)}
+            >
+              <Avatar avatar={project.avatar} shape="project" size={32} />
+              <strong>{project.name}</strong>
+              <span className="muted">出处跟着走，文件权限不跟着走</span>
+            </button>
+          ))}
+        </div>
+      ) : null}
+      <div className="mc-composer ch-selection" role="toolbar" aria-label={`已选 ${count} 条`}>
+        <span className="ch-grow num">已选 {count} 条</span>
+        <button type="button" className="mc-key" onClick={onCheck}>
+          对账
+        </button>
+        <button type="button" className="mc-key mc-key-primary" onClick={onMemory}>
+          存进记忆
+        </button>
+        <button type="button" className="mc-key" onClick={onForward}>
+          转发
+        </button>
+        <button type="button" className="mc-key" onClick={onCopy}>
+          复制
+        </button>
+        <button
+          type="button"
+          className="mc-icon-btn"
+          aria-label="取消选择"
+          title="取消选择"
+          onClick={onCancel}
+        >
+          <Icon.close />
+        </button>
+      </div>
+    </div>
+  );
+}

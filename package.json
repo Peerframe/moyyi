@@ -53,7 +53,7 @@
     "postpack": "node scripts/package-lock.ts --clean",
     "package:candidate": "node scripts/package-candidate.ts",
     "verify:package": "node scripts/verify-package.ts",
-    "typecheck": "tsc -p tsconfig.json --noEmit && tsc -p tsconfig.desktop.json --noEmit",
+    "typecheck": "tsc -p tsconfig.json --noEmit && tsc -p tsconfig.desktop.json --noEmit && tsc -p tsconfig.chat.json --noEmit",
     "lint": "biome check .",
     "test": "vitest run",
     "eval": "node evals/run.ts",
@@ -75,6 +75,7 @@
     "eval:skills": "node evals/skills/run.ts",
     "eval:kimi": "node evals/kimi/run.ts",
     "desktop:build": "node scripts/desktop-build.ts",
+    "chat:build": "node scripts/chat-build.ts",
     "desktop:package": "node scripts/desktop-package.ts",
     "verify:desktop": "node scripts/verify-desktop.ts"
   },

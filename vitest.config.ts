@@ -20,6 +20,7 @@ export default defineConfig({
       "tests/**/*.test.ts",
       "evals/**/*.test.ts",
       "apps/desktop/**/*.test.ts",
+      "apps/chat/**/*.test.ts",
     ],
     // Bound competing filesystem/sandbox workers; retain every test and its original timeout.
     maxWorkers: 4,

@@ -6,7 +6,14 @@
     "useIgnoreFile": true
   },
   "files": {
-    "includes": ["**", "!dist", "!node_modules", "!evals/tasks/*/fixture"]
+    "includes": [
+      "**",
+      "!dist",
+      "!node_modules",
+      "!evals/tasks/*/fixture",
+      "!apps/chat/design/bundle.css",
+      "!apps/chat/design/tokens.json"
+    ]
   },
   "formatter": {
     "enabled": true,
