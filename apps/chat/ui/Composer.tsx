@@ -379,7 +379,12 @@ export function Composer(props: ComposerProps) {
                 } else if (suggestions && (event.key === "Enter" || event.key === "Tab")) {
                   event.preventDefault();
                   pick(selected);
-                } else if (event.key === "Enter" && !event.nativeEvent.isComposing) {
+                } else if (
+                  event.key === "Enter" &&
+                  (event.metaKey || event.ctrlKey) &&
+                  !event.nativeEvent.isComposing
+                ) {
+                  // The design system sends on ⌘ Enter only, never on plain Enter.
                   event.preventDefault();
                   send();
                 } else if (event.key === "ArrowUp" && !draft) {
@@ -419,7 +424,7 @@ export function Composer(props: ComposerProps) {
           </>
         )}
         {draft.trim() ? (
-          <button type="button" className="mc-send" onClick={send}>
+          <button type="button" className="mc-send" title="⌘ Enter 发送" onClick={send}>
             发送
           </button>
         ) : running ? (
