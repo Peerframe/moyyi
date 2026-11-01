@@ -42,7 +42,7 @@ export interface ModelProvider {
   createClient(model: string): ModelClient;
 }
 
-/** Contributes text to the system context: project instructions, skills, memory. */
+/** Contributes bounded guidance to system context or an explicit history suffix. */
 export interface ContextSource {
   readonly id: string;
   collect(input: ContextSourceInput): Promise<readonly ContextSection[]>;
@@ -96,6 +96,8 @@ export type ProjectInstructionsResult =
 
 export interface ContextSection {
   readonly id: string;
+  /** Request-only data after recorded history; omitted preserves existing system placement. */
+  readonly placement?: "after_history";
   /**
    * How often the text changes. Sections are ordered static → session → turn so that the
    * stable prefix of the request, and therefore the provider's prompt cache, survives.

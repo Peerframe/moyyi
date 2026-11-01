@@ -88,6 +88,8 @@ Answer quality is measured, not assumed:
   results.
 - Remote Bot, team or cluster operation; account or employee ownership transfer; a second core.
 - Optional Docker backend; native isolation remains the default.
+- A self-hosted search service (for example SearXNG) as a desktop search backend. The owner may
+  deploy one later; delivery three uses DeepSeek native search and keeps the backend replaceable.
 - Qwen/shasha model training and other model projects.
 - Other desktop platforms until their bundles and user flows are exercised.
 - Public versions, signed or notarized installers and automatic updates need separate release

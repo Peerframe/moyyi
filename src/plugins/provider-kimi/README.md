@@ -22,6 +22,12 @@ Refusal text uses the documented assistant `content` field on continuation; no u
 `refusal` input parameter is sent. A content-filter terminal without explanation produces an
 explicit common refusal fact, not a fabricated model quote.
 
+Historical `ModelMessage.origin` identifies foreign assistant turns. Their text/refusal and
+paired calls/results are retained; provider reasoning and replay are omitted. A foreign Responses
+item ID is validated but not sent on the Chat wire. Same-provider history retains actual visible
+reasoning and call IDs when changing credentials. Missing origin keeps legacy behavior; partial,
+unproven or unpaired history still fails. See [ADR 0048](../../../docs/decisions/0048-connection-continuation.md).
+
 The decoder requires stable response identity, exact model identity, choice zero, valid function
 identity, a finish reason, the usage tail, and `[DONE]`. It rejects duplicate/trailing events,
 invalid UTF-8/JSON and unsupported semantic content. EOF and cancellation produce errors,
@@ -37,7 +43,9 @@ diagnostics are never reflected into common errors.
 HTTP 429 diagnostics read at most 16 KiB and 128 data chunks (including empty chunks), with
 a separate two-second deadline and host cancellation. Only the exact documented `error.type`
 values `engine_overloaded_error`, `rate_limit_reached_error` and `exceeded_current_quota_error`
-select fixed overload, rate-limit or account-quota messages. Raw `message`, `code` and other
+select fixed overload, rate-limit or account-quota messages. Account quota has kind `quota`,
+also used for HTTP 402; every other HTTP 429 has kind `rate_limited`, including a known
+overload subtype. HTTP 401/403 remains `auth`, and HTTP 500/503 remains `overloaded`. Raw `message`, `code` and other
 provider strings are never reflected. Invalid UTF-8/JSON, duplicate keys, missing/unknown types,
 oversized bodies, read failures and diagnostic timeouts retain HTTP 429 with an explicitly
 unknown cause; this uses the existing common `rate_limited` kind without asserting a specific
@@ -67,3 +75,21 @@ request validation and common usage/error mapping were narrowly adapted from moy
 `provider-deepseek` implementation. They are local code under the repository license; there is
 no cross-plugin import or external framework runtime. Kimi-specific message/stream assembly is
 implemented here from the documented protocol.
+
+## Model experience
+
+The adapter adds no global prompt. It sends the assembled system sections, tool schemas, text,
+paired calls/results and same-provider visible reasoning. Foreign provider reasoning and replay
+never reach Kimi. Tool result text begins with `Tool result status: <status>` followed by the
+original evidence. The current request records the source identity controlling this projection.
+Failures return fixed HTTP/type diagnostics rather than provider message bodies; the exact
+quota diagnostic is `Kimi account balance is unavailable` for HTTP 402 and
+`Kimi HTTP 429 (exceeded_current_quota_error): Kimi account quota is unavailable. Check account balance and quota before starting a new run.`
+for the structured quota 429. Neither failure automatically retries or switches providers.
+
+Token cost grows with the transmitted history and tool definitions, including same-provider
+reasoning. Foreign reasoning costs no input tokens because it is omitted. Output is capped at
+8192 tokens including reasoning. Origin metadata is request provenance, not wire prompt prose.
+Unchanged same-provider prefixes retain their cache eligibility; a provider switch changes the
+cache domain and foreign-history representation. Later turns append normally. Reported cache
+counters, not prefix similarity, establish cache reuse.

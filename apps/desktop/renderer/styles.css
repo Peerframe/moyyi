@@ -20,6 +20,7 @@
   --focus: #1f6fd6;
   --danger: #b3261e;
   --attention: #94480b;
+  --skill-review-height: 16rem;
   font-size: 14px;
 }
 
@@ -191,6 +192,7 @@ svg {
   padding: 6px 9px;
 }
 .conversation {
+  overflow-y: auto;
   display: flex;
   flex-direction: column;
   min-width: 0;
@@ -199,6 +201,7 @@ svg {
 }
 .conversation-header {
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
   justify-content: space-between;
   gap: 20px;
@@ -230,7 +233,7 @@ svg {
 .messages {
   overflow-y: auto;
   flex: 1;
-  min-height: 0;
+  min-height: 240px;
   padding: 28px 32px;
   scroll-behavior: auto;
 }
@@ -492,7 +495,9 @@ svg {
 }
 .header-actions {
   justify-content: flex-end;
-  flex-shrink: 0;
+  flex-shrink: 1;
+  min-width: 0;
+  max-width: 100%;
 }
 .panel-heading {
   display: flex;
@@ -870,6 +875,7 @@ svg {
   margin-top: 0;
 }
 .settings-fields input,
+.settings-fields textarea,
 .settings-fields select {
   width: 100%;
   padding: 10px;
@@ -1009,4 +1015,16 @@ svg {
 }
 .material-drop:focus-within {
   border-color: #444;
+}
+
+.skill-review-body {
+  max-height: var(--skill-review-height);
+  overflow: auto;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+.settings-card {
+  display: block;
+  overflow-wrap: anywhere;
 }

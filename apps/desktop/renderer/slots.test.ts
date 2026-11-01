@@ -12,7 +12,7 @@ const Empty = () => null;
 const message: DesktopMessage = {
   id: "recorded-call",
   role: "tool",
-  tool: "todo_write",
+  tool: "fixture_tool",
   text: "Recorded observation",
 };
 
@@ -20,7 +20,7 @@ describe("build-time desktop slots", () => {
   it("resolves a tool renderer before its role fallback without changing registrations", () => {
     const extension: RendererFeature = {
       id: "test-only-feature",
-      messages: [{ id: "test-only-todo", tool: "todo_write", Component: Empty }],
+      messages: [{ id: "test-only-todo", tool: "fixture_tool", Component: Empty }],
       slots: [{ id: "test-only-panel", slot: "right-panel", order: 0, Component: Empty }],
     };
     const current = createSlots(rendererFeatures);
@@ -44,10 +44,14 @@ describe("build-time desktop slots", () => {
       "settings.Help",
       "maintenance.Maintenance",
       "settings.Settings",
+      "preferences.dialog",
       "permissions.PermissionsDialogSlot",
       "web.WebDialog",
     ]);
-    expect(slots.settings.map((item) => item.id)).toEqual(["settings.connection"]);
+    expect(slots.settings.map((item) => item.id)).toEqual([
+      "settings.connection",
+      "preferences.entry",
+    ]);
     expect(slots.contributions("after-messages").map((item) => item.id)).toEqual([
       "effects.Approval",
       "conversation.Outcome",
@@ -81,8 +85,8 @@ describe("build-time desktop slots", () => {
         {
           id: "bad",
           messages: [
-            { id: "one", tool: "todo_write", Component: Empty },
-            { id: "two", tool: "todo_write", Component: Empty },
+            { id: "one", tool: "fixture_tool", Component: Empty },
+            { id: "two", tool: "fixture_tool", Component: Empty },
           ],
         },
       ]),
@@ -111,7 +115,7 @@ describe("build-time desktop slots", () => {
       }),
     );
     expect(html).toContain('<details class="tool-message">');
-    expect(html).toContain("todo_write · 结果未知");
+    expect(html).toContain("fixture_tool · 结果未知");
     expect(html).toContain("&lt;img");
     expect(html).not.toContain("<img");
   });

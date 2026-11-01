@@ -58,6 +58,8 @@ cli / desktop host ─┐   (future: automation — also a client)
 | `provider-kimi` (Chat Completions; [ADR 0036](decisions/0036-kimi-chat-provider.md)) | model provider | opt-in K3.1 Pro; connection and task-quality evidence tracked separately |
 | `web` (fetch, search) | tools; runtime capability and base policy | merged in phase 5 |
 | `skills` (explicitly activated Agent Skills documents) | context source | implemented; refreshed per request |
+| `personal-instructions` (trusted desktop-selected text) | context source | candidate; required full source/hash before project guidance |
+| `skill-library` (explicitly enabled immutable versions) | context source and read-class `read_skill` | candidate; bounded catalog and lazy version-checked bodies |
 | `mcp` (bridge to MCP servers) | tools, policy rule | later |
 | `memory` (Hermes Agent–inspired learning) | context source, event observer | later |
 
@@ -73,7 +75,7 @@ Defined in [plugin.ts](../src/contracts/plugin.ts):
 |---|---|---|
 | Tool | Add a tool with its schema, effect profile, prepare, execute, reconcile | Skip validation, policy, approval or the journal; the executor runs those |
 | Model provider | Add models and their profiles | Retry, loop or execute tools |
-| Context source | Contribute sections, marked by stability and optional admission | Remove or reorder history, or hide unsettled effects |
+| Context source | Contribute sections marked by stability, optional admission and explicit `after_history` placement | Remove or reorder history, or hide unsettled effects |
 | Policy rule | Return `ask` or `deny` | Return `allow`; a throwing rule denies |
 | Event observer | Observe runtime events | Block or change a run; a throwing observer is recorded and ignored |
 
@@ -105,6 +107,21 @@ fixed shared lifecycle transitions. Renderer features contribute declarative sid
 dialog, settings-section and keyed conversation-node slots; the shell only places them. This is
 build-time repository composition, not third-party loading or new execution authority.
 
+Delivery three adds repository-owned `preferences` and `todos` features and extends the settings
+and web modules. Settings own named connection selection and structured connection-failure cards;
+preferences own the native Skill picker, review/import/enable commands and personal text editor.
+Todos contribute a tool-name conversation node with no host commands or independent progress
+store. Search likewise projects the existing recorded `web_search` result. Shared host lifecycle
+resets grants on configuration changes; feature state never creates an approval or tool permission.
+
+`host/settings.ts` owns the data-only format 2 settings document and native Keychain references.
+`host/preferences-storage.ts` owns the private personal file and content-addressed Skill copies.
+Native selection supplies the sole import path; renderer commands use bounded text, review IDs
+or hashes. `moyyi/runtime` exposes the existing pure Skill parser for that trusted host. Its
+`personalInstructions` and `skillLibrary` callbacks provide reviewed data, not a generic file API.
+Backup includes indexed guidance files; restore keeps current configuration while restoring
+session data, and rollback checks settings format separately from SQL/transcript compatibility.
+
 ### Trust
 
 [ADR 0046](decisions/0046-recorded-tool-output.md) adds a trusted result-processing port and a
@@ -135,6 +152,24 @@ the same context-source lifecycle. A trusted host chooses one library root and a
 activated names; runtime exposes only their fixed SKILL.md documents after read-policy checks.
 The plugin validates bounded YAML and renders source/hash/text as guidance. No discovery,
 references, scripts or permissions are imported. See [Skills setup](skills.md).
+
+[ADR 0049](decisions/0049-personal-instructions-and-skill-library.md) adds the separate desktop
+guidance path without changing CLI selection. Runtime verifies personal text and Skill bodies
+against their SHA-256; the plugins have no filesystem I/O. Personal text is at most 8 KiB and
+is collected after defaults and before project instructions. An enabled library supplies only
+bounded names/descriptions automatically. `read_skill` binds a name/digest in prepare, reads only
+after the ordinary read policy, and rechecks enabled status before releasing the complete body.
+Revocation, version changes and cancellation withhold the body. Neither automatic catalog nor
+personal guidance grants tool authority; the host explicitly selected this input data.
+
+`ContextSection.placement: "after_history"` is optional request-only metadata. The context builder
+keeps other sections in their existing static/session/turn system order and appends suffix
+sections after history and recovery notices. The evidence-answer projection also preserves their
+user-role suffix position. All sections still count toward the context limit; required suffixes
+are not silently dropped. Current Skill catalogs use this position so a catalog update leaves
+the stable system/history prefix untouched. Old request blobs remain immutable, but old catalog
+tails are not accumulated as transcript entries and full previous-prefix cache reuse is not
+promised. No persisted entry or SQL schema is added.
 
 | Kind | Runs | Trusted | Example |
 |---|---|---|---|
@@ -350,8 +385,20 @@ Protocol completion does not certify factual correctness or independently checke
 The DeepSeek adapter accepts a documented text/reasoning/function subset and delegates fixed-origin
 HTTP and credentials to runtime. Context includes the persisted assistant stop reason in the
 nonpersisted model port, so partial responses cannot masquerade as complete history. All actual
-visible reasoning is preserved, but complete turns need not produce it. Validated commentary and
-final-answer annotations retain their text in the plaintext profile; response terminals govern tools.
+visible reasoning from same-provider history is preserved, but complete turns need not produce it.
+Validated commentary and final-answer annotations retain their text in the plaintext profile;
+response terminals govern tools.
+For explicit DeepSeek/Kimi continuation, [ADR 0048](decisions/0048-connection-continuation.md)
+projects the already persisted assistant origin into optional request metadata. Each codec retains
+same-provider supported reasoning and sends only text/refusals plus paired tool calls/results
+from the other provider. Foreign reasoning/replay stays in the original records. DeepSeek maps
+foreign wire call IDs deterministically when needed, without rewriting stored IDs; interrupted
+or unpaired turns remain invalid. The trusted runtime can append an existing-kind
+`connection_switched` notice while idle. Switching never starts the next run or raises a budget.
+
+`ModelErrorKind.quota` and optional failed-outcome `modelErrorKind` carry a safe structured
+classification through the core. The adapters distinguish 402 and recognized quota 429 from
+other 429 and authentication errors. Quota cannot trigger a retry or automatic connection change.
 Optional model recording/replay lives in runtime; it captures canonical requests and common events,
 not HTTP credentials. It requires a sequential stream and exact request/profile match, with no live
 fallback. See [deepseek.md](deepseek.md) and [ADR 0010](decisions/0010-deepseek-transport-and-recording.md).
@@ -456,9 +503,19 @@ invocations and withholds their local file capabilities. Runtime enforces exact-
 no-I/O preparation, frozen action/digest/run binding, durable-start ordering and single execution.
 The default `WebPolicy` asks before network execution; installed policy rules can only restrict it.
 Production HTTPS validates all A records then pins the connection, verifies TLS, refuses redirects
-and bounds output/time. Search uses an explicitly configured SearXNG endpoint. Page content and
+and bounds output/time. CLI search can use an explicitly configured SearXNG endpoint. Page content and
 search links are untrusted data without authority. Unknown external effects are never replayed.
 See [web usage and limits](web.md) and [Anthropic usage](anthropic.md).
+
+[ADR 0050](decisions/0050-deepseek-native-search.md) adds a fixed DeepSeek native-search backend
+to the same `WebAccess` port. The trusted desktop selects an existing DeepSeek credential; model
+arguments cannot choose an endpoint or supply a key. Preparation contains the exact auxiliary
+query-only body and billing warning without reading credentials. Execute requires the existing
+external-effect permission, approval and durable-start binding, then permits one bounded request.
+Only structured result items become source data. Reported usage is recorded, absent counters stay
+unknown, and every failed attempt consumes the per-run product-search limit. Cancellation,
+interruption and errors never retry. Search does not grant any returned page's origin or introduce
+a model provider, second agent loop, external credential type or new dependency.
 
 ## Local candidate packaging (merged phase 6)
 

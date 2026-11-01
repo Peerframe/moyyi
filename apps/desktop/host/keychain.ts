@@ -84,6 +84,7 @@ export function nativeVault(helper: string, home = homedir()): CredentialVault {
       });
     },
     async remove(id) {
+      // Legacy services are shared with the CLI and rollback builds, never desktop-owned.
       if (!isCredentialRef(`desktop:${id}`)) throw Error("Invalid credential identity");
       try {
         await execute(helper, ["delete", id], {
@@ -92,7 +93,7 @@ export function nativeVault(helper: string, home = homedir()): CredentialVault {
           env: { HOME: home, PATH: "/usr/bin:/bin" },
         });
       } catch {
-        /* Only an unreferenced new item may remain; never delete a previous credential. */
+        throw Error("钥匙串项目未能确认删除。");
       }
     },
   };

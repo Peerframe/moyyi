@@ -71,6 +71,8 @@ async function verify() {
   const settingsDirectory = join(home, ".moyyi/desktop");
   mkdirSync(settingsDirectory, { recursive: true, mode: 0o700 });
   const settingsPath = join(settingsDirectory, "settings.json");
+  // Keep the format-1 seed: format-2 desktop must still back up and restore older settings
+  // byte-for-byte without migrating them during maintenance or restoring execution authority.
   const settings = JSON.stringify({
     format: 1,
     settings: { preset: "flash", maxRequests: 3, timeoutMs: 120000 },

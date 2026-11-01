@@ -6,6 +6,7 @@ import { hostFeature as feature2 } from "../features/effects/host.ts";
 import { hostFeature as feature8 } from "../features/maintenance/host.ts";
 import { hostFeature as feature3 } from "../features/materials/host.ts";
 import { hostFeature as feature7 } from "../features/permissions/host.ts";
+import { hostFeature as feature9 } from "../features/preferences/host.ts";
 import { hostFeature as feature0 } from "../features/sessions/host.ts";
 import { hostFeature as feature6 } from "../features/settings/host.ts";
 import { hostFeature as feature5 } from "../features/web/host.ts";
@@ -19,4 +20,5 @@ export const hostFeatures = [
   feature6,
   feature7,
   feature8,
+  feature9,
 ];

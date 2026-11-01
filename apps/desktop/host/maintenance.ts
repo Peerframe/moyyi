@@ -16,7 +16,10 @@ import {
   writeFileSync,
 } from "node:fs";
 import { basename, dirname, isAbsolute, join, relative, resolve } from "node:path";
+import { parseStrictJson } from "moyyi/contracts";
+import type { DesktopSettings } from "../shared.ts";
 import { isCredentialRef } from "./keychain.ts";
+import { parseStoredSettings, type StoredSettings } from "./settings.ts";
 import { parseSettings } from "./settings-schema.ts";
 
 export type MaintenanceRequest =
@@ -105,7 +108,11 @@ export function privateDirectory(path: string, create = false): string {
   return realpathSync(path);
 }
 
-export function readPrivateFile(path: string, maximum = 32 * 1024 * 1024): Buffer {
+export function readPrivateFile(
+  path: string,
+  maximum = 32 * 1024 * 1024,
+  privateContents = false,
+): Buffer {
   const fd = openSync(path, constants.O_RDONLY | constants.O_NOFOLLOW | constants.O_NONBLOCK);
   try {
     const stat = fstatSync(fd);
@@ -113,7 +120,7 @@ export function readPrivateFile(path: string, maximum = 32 * 1024 * 1024): Buffe
       !stat.isFile() ||
       stat.nlink !== 1 ||
       stat.uid !== process.getuid?.() ||
-      stat.mode & 0o022 ||
+      stat.mode & (privateContents ? 0o077 : 0o022) ||
       stat.size > maximum
     )
       throw Error("Unsafe maintenance file");
@@ -191,21 +198,33 @@ export function writePrivateJson(path: string, value: unknown): void {
   }
 }
 
-function settingsBytes(home: string): Buffer | null {
-  const folder = join(home, ".moyyi/desktop");
+export interface MaintenanceSettings {
+  readonly format: 1 | 2;
+  readonly settings: DesktopSettings;
+  readonly bytes: Buffer;
+  readonly stored?: StoredSettings;
+}
+
+function parseMaintenanceSettings(bytes: Buffer): MaintenanceSettings {
   try {
-    privateDirectory(folder);
-    const bytes = readPrivateFile(join(folder, "settings.json"), 16_384);
-    const value = JSON.parse(bytes.toString("utf8")) as Record<string, unknown>;
+    const value = parseStrictJson(
+      new TextDecoder("utf-8", { fatal: true }).decode(bytes),
+      65_536,
+    ) as Record<string, unknown>;
+    if (value?.format === 2) {
+      const stored = parseStoredSettings(value);
+      return { format: 2, settings: stored.settings, bytes, stored };
+    }
     if (
-      value.format !== 1 ||
+      value?.format !== 1 ||
+      bytes.length > 16_384 ||
       Object.keys(value).sort().join() !== "credentials,format,settings" ||
       !value.credentials ||
       typeof value.credentials !== "object" ||
       Array.isArray(value.credentials)
     )
       throw Error("Invalid data-only settings");
-    parseSettings(value.settings);
+    const settings = parseSettings(value.settings);
     for (const [key, ref] of Object.entries(value.credentials)) {
       if (
         !["flash", "kimi-cn", "kimi-global"].includes(key) ||
@@ -214,11 +233,77 @@ function settingsBytes(home: string): Buffer | null {
       )
         throw Error("Invalid credential reference");
     }
-    return bytes;
+    return { format: 1, settings, bytes };
+  } catch {
+    throw Error("Invalid data-only settings");
+  }
+}
+
+export function readMaintenanceSettings(home: string): MaintenanceSettings | null {
+  const folder = join(home, ".moyyi/desktop");
+  try {
+    privateDirectory(folder);
+    return parseMaintenanceSettings(readPrivateFile(join(folder, "settings.json"), 65_536, true));
   } catch (error) {
     if ((error as NodeJS.ErrnoException).code === "ENOENT") return null;
     throw error;
   }
+}
+
+interface SettingsFile {
+  readonly path: string;
+  readonly bytes: Buffer;
+}
+const sha256 = (bytes: Buffer) => createHash("sha256").update(bytes).digest("hex");
+
+/** The confirmed index owns the library; unconfirmed orphan imports are never activated. */
+function settingsFiles(home: string): readonly SettingsFile[] {
+  const current = readMaintenanceSettings(home);
+  if (!current) return [];
+  const files: SettingsFile[] = [{ path: "settings.json", bytes: current.bytes }];
+  const folder = join(home, ".moyyi/desktop");
+  if (current.stored?.personalInstructionsHash) {
+    const bytes = readPrivateFile(join(folder, "personal-instructions.md"), 8192, true);
+    if (sha256(bytes) !== current.stored.personalInstructionsHash)
+      throw Error("Personal instructions hash mismatch");
+    new TextDecoder("utf-8", { fatal: true }).decode(bytes);
+    files.push({ path: "personal-instructions.md", bytes });
+  }
+  if (current.stored?.skills.length) {
+    privateDirectory(join(folder, "skills"));
+    for (const skill of current.stored.skills) {
+      privateDirectory(join(folder, "skills", skill.sha256));
+      const path = `skills/${skill.sha256}/SKILL.md`;
+      const bytes = readPrivateFile(join(folder, path), 12_288, true);
+      if (sha256(bytes) !== skill.sha256) throw Error("Skill library hash mismatch");
+      new TextDecoder("utf-8", { fatal: true }).decode(bytes);
+      files.push({ path, bytes });
+    }
+  }
+  if (!readMaintenanceSettings(home)?.bytes.equals(current.bytes))
+    throw Error("Desktop settings changed during backup");
+  return files;
+}
+
+function writeSettingsFiles(root: string, files: readonly SettingsFile[]): void {
+  for (const file of files) {
+    const path = join(root, file.path);
+    mkdirSync(dirname(path), { recursive: true, mode: 0o700 });
+    const fd = openSync(
+      path,
+      constants.O_WRONLY | constants.O_CREAT | constants.O_EXCL | constants.O_NOFOLLOW,
+      0o600,
+    );
+    try {
+      writeFileSync(fd, file.bytes);
+      fsyncSync(fd);
+    } finally {
+      closeSync(fd);
+    }
+    syncFolder(dirname(path));
+  }
+  if (files.some((file) => file.path.startsWith("skills/"))) syncFolder(join(root, "skills"));
+  syncFolder(root);
 }
 
 function listBackupFiles(root: string): FileRecord[] {
@@ -230,6 +315,20 @@ function listBackupFiles(root: string): FileRecord[] {
     }),
   ];
   if (readdirSync(root).includes("settings.json")) paths.push("settings.json");
+  if (readdirSync(root).includes("personal-instructions.md"))
+    paths.push("personal-instructions.md");
+  if (readdirSync(root).includes("skills")) {
+    privateDirectory(join(root, "skills"));
+    const versions = readdirSync(join(root, "skills"));
+    if (versions.length > 32) throw Error("Too many backup skill versions");
+    for (const version of versions) {
+      if (!/^[a-f0-9]{64}$/.test(version)) throw Error("Invalid backup skill version");
+      const folder = join(root, "skills", version);
+      privateDirectory(folder);
+      if (readdirSync(folder).join() !== "SKILL.md") throw Error("Unexpected backup skill files");
+      paths.push(`skills/${version}/SKILL.md`);
+    }
+  }
   if (paths.length > 100_002) throw Error("Too many backup files");
   return paths.sort().map((path) => ({ path, ...hashFile(join(root, path)) }));
 }
@@ -251,8 +350,17 @@ function validateBackup(root: string): Manifest {
     !Array.isArray(value.files)
   )
     throw Error("Unsupported backup manifest");
-  const top = readdirSync(root).sort().join();
-  if (top !== "manifest.json,store" && top !== "manifest.json,settings.json,store")
+  const top = readdirSync(root);
+  if (
+    !top.includes("manifest.json") ||
+    !top.includes("store") ||
+    top.some(
+      (name) =>
+        !["manifest.json", "store", "settings.json", "personal-instructions.md", "skills"].includes(
+          name,
+        ),
+    )
+  )
     throw Error("Unexpected backup files");
   privateDirectory(join(root, "store"));
   privateDirectory(join(root, "store/blobs"));
@@ -260,7 +368,34 @@ function validateBackup(root: string): Manifest {
     throw Error("Unexpected store files");
   if (JSON.stringify(listBackupFiles(root)) !== JSON.stringify(value.files))
     throw Error("Backup hash verification failed");
+  validateSettingsFiles(root, top);
   return value;
+}
+
+function validateSettingsFiles(root: string, top: readonly string[]): void {
+  if (!top.includes("settings.json")) {
+    if (top.includes("personal-instructions.md") || top.includes("skills"))
+      throw Error("Backup preferences have no settings index");
+    return;
+  }
+  const current = parseMaintenanceSettings(
+    readPrivateFile(join(root, "settings.json"), 65_536, true),
+  );
+  const expectedPersonal = current.stored?.personalInstructionsHash;
+  if (!!expectedPersonal !== top.includes("personal-instructions.md"))
+    throw Error("Backup personal instructions do not match settings");
+  if (
+    expectedPersonal &&
+    sha256(readPrivateFile(join(root, "personal-instructions.md"), 8192, true)) !== expectedPersonal
+  )
+    throw Error("Backup personal instructions hash mismatch");
+  const expected = current.stored?.skills.map((skill) => skill.sha256).sort() ?? [];
+  const actual = top.includes("skills") ? readdirSync(join(root, "skills")).sort() : [];
+  if (JSON.stringify(expected) !== JSON.stringify(actual))
+    throw Error("Backup Skill library does not match settings");
+  for (const hash of expected)
+    if (sha256(readPrivateFile(join(root, "skills", hash, "SKILL.md"), 12_288, true)) !== hash)
+      throw Error("Backup Skill library hash mismatch");
 }
 
 const preserved = {
@@ -295,21 +430,12 @@ export async function runDataMaintenance(
     const staging = join(parent, `.moyyi-backup-${randomUUID()}`);
     mkdirSync(staging, { mode: 0o700 });
     try {
-      const settings = settingsBytes(home);
+      const settings = settingsFiles(home);
       const receipt = await backupLocalStore({
         dataDirectory,
         destination: join(staging, "store"),
       });
-      if (settings)
-        writeFileSync(join(staging, "settings.json"), settings, { mode: 0o600, flag: "wx" });
-      if (settings) {
-        const fd = openSync(join(staging, "settings.json"), constants.O_RDONLY);
-        try {
-          fsyncSync(fd);
-        } finally {
-          closeSync(fd);
-        }
-      }
+      writeSettingsFiles(staging, settings);
       const manifest: Manifest = {
         format: 1,
         kind: "moyyi-local-backup",
@@ -349,7 +475,7 @@ export async function runDataMaintenance(
   const backups = privateDirectory(join(root, "backups"), true);
   const rescue = join(backups, `before-restore-${randomUUID()}`);
   mkdirSync(rescue, { mode: 0o700 });
-  const settings = settingsBytes(home);
+  const settings = settingsFiles(home);
   let published = false;
   try {
     const result = await restoreLocalStore({
@@ -359,15 +485,7 @@ export async function runDataMaintenance(
         manifest.files.find((file) => file.path === "store/data.sqlite")?.sha256 ?? "",
       rescueDestination: join(rescue, "store"),
       rescuePublished(receipt) {
-        if (settings) {
-          writeFileSync(join(rescue, "settings.json"), settings, { mode: 0o600, flag: "wx" });
-          const fd = openSync(join(rescue, "settings.json"), constants.O_RDONLY);
-          try {
-            fsyncSync(fd);
-          } finally {
-            closeSync(fd);
-          }
-        }
+        writeSettingsFiles(rescue, settings);
         writePrivateJson(join(rescue, "manifest.json"), {
           format: 1,
           kind: "moyyi-local-backup",

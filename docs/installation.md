@@ -106,6 +106,27 @@ schema and persisted format; it never drops output references to manufacture com
 Restoring a format 1 backup migrates a private copy and leaves that backup unchanged. See
 [ADR 0046](decisions/0046-recorded-tool-output.md).
 
+Delivery three upgrades desktop settings separately from the conversation store. Existing
+format 1 settings are read without changing the original file. The first settings save writes
+format 2 and retains the original as `~/.moyyi/desktop/settings.format1.json`, without replacing
+an existing copy. Format 2 records connections and credential references, the search connection,
+personal-instruction hash and the confirmed Skill library index; API keys remain in Keychain.
+
+Desktop backups include the settings file, confirmed personal instructions and every indexed
+Skill version, including disabled versions. The manifest records each file's size and SHA-256.
+Unconfirmed imports are not part of the library. Backups reject missing, oversized, linked,
+publicly readable or hash-mismatched preference files. The existing manifest format and
+conversation-store format are unchanged by these additions.
+
+Restore continues to replace only the conversation store. It preserves current connections,
+personal instructions and Skills, and first saves a complete rescue backup containing those
+current files. A backup's preference files are validated but never silently applied to the
+desktop. Software rollback checks both the target's declared settings format and the store's
+schema/persisted-format pair before preparation and again before replacement. An older program
+that cannot read settings format 2 or persisted format 2 is refused. Keep the corresponding
+pre-upgrade settings/data backups and programs together; neither rollback nor restore drops
+connections, Skills or new records to make an older version compatible.
+
 ```sh
 npm uninstall --global --prefix /absolute/private/moyyi-prefix moyyi
 ```

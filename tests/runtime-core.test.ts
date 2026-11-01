@@ -768,6 +768,115 @@ describe("runtime core with real SQLite persistence", () => {
     ).toBe(true);
   });
 
+  it.each(["quota", "rate_limited", "auth"] as const)(
+    "reports structured %s once, keeps history, and waits for a new user run",
+    async (kind) => {
+      const test = await harness(
+        [
+          [
+            {
+              type: "error",
+              error: {
+                kind,
+                message: "Connection unavailable",
+                partialOutput: false,
+                usage: UNKNOWN_USAGE,
+              },
+            },
+          ],
+          finalTurn("Continued after user action."),
+        ],
+        undefined,
+        { limits: { maxRetries: kind === "quota" ? 2 : 0 } },
+      );
+      await test.start();
+      expect(await test.finish()).toEqual({
+        kind: "failed",
+        reason: "Connection unavailable",
+        modelErrorKind: kind,
+      });
+      expect(test.client.requests).toHaveLength(1);
+      expect(test.scheduler.sleep).not.toHaveBeenCalled();
+      const before = await test.snapshot();
+      expect(before.entries.at(-1)?.body).toMatchObject({
+        kind: "assistant_message",
+        stopReason: "interrupted",
+        content: [],
+      });
+      expect(
+        before.entries.some(
+          (entry) => entry.body.kind === "notice" && entry.body.code === "model_retry",
+        ),
+      ).toBe(false);
+      await test.start();
+      expect(await test.finish()).toEqual({ kind: "completed" });
+      expect(test.client.requests).toHaveLength(2);
+      expect((await test.snapshot()).entries.slice(0, before.entries.length)).toEqual(
+        before.entries,
+      );
+    },
+  );
+
+  it("retains interrupted quota output without executing its completed call or retrying", async () => {
+    const selected = syntheticTool();
+    const test = await harness(
+      [
+        [
+          { type: "part_completed", index: 0, part: call() },
+          {
+            type: "error",
+            error: {
+              kind: "quota",
+              message: "Quota exhausted",
+              partialOutput: true,
+              usage: UNKNOWN_USAGE,
+            },
+          },
+        ],
+        finalTurn("Must remain unused"),
+      ],
+      [selected],
+    );
+    await test.start();
+    expect(await test.finish()).toEqual({
+      kind: "failed",
+      reason: "Quota exhausted",
+      modelErrorKind: "quota",
+    });
+    expect(test.client.requests).toHaveLength(1);
+    expect(selected.execute).not.toHaveBeenCalled();
+    expect(results(await test.snapshot())).toMatchObject([{ callId: "call_1", status: "failed" }]);
+  });
+
+  it("honors cancellation after a quota attempt is recorded without starting another request", async () => {
+    const test = await harness([
+      [
+        {
+          type: "error",
+          error: {
+            kind: "quota",
+            message: "Quota exhausted",
+            partialOutput: false,
+            usage: UNKNOWN_USAGE,
+          },
+        },
+      ],
+      finalTurn("Must remain unused"),
+    ]);
+    test.runtime.subscribe((event) => {
+      if (
+        event.type === "entry.appended" &&
+        event.entry.body.kind === "assistant_message" &&
+        event.entry.runId
+      )
+        void test.runtime.send({ type: "run.cancel", runId: event.entry.runId });
+    });
+    await test.start();
+    expect(await test.finish()).toEqual({ kind: "cancelled" });
+    expect(test.client.requests).toHaveLength(1);
+    expect((await test.snapshot()).runs[0]?.status).toBe("interrupted");
+  });
+
   it("retains usage and the exact request for a failed attempt before retrying", async () => {
     const usage = { ...UNKNOWN_USAGE, status: "partial" as const, inputTokens: 17 };
     const test = await harness([
@@ -1219,7 +1328,11 @@ describe("runtime core with real SQLite persistence", () => {
       limits: { maxModelRequests: 2, maxRetries: 5 },
     });
     await test.start();
-    expect(await test.finish()).toEqual({ kind: "failed", reason: "Unavailable" });
+    expect(await test.finish()).toEqual({
+      kind: "failed",
+      reason: "Unavailable",
+      modelErrorKind: "network",
+    });
     expect(test.client.requests).toHaveLength(2);
     expect(JSON.stringify(test.client.requests[0]?.messages.at(-1))).toContain(
       "1 tool-enabled request(s) remain before the answer-only final request",

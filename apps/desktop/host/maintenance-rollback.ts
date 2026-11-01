@@ -17,6 +17,7 @@ import {
   type MaintenanceResult,
   preserved,
   privateDirectory,
+  readMaintenanceSettings,
   readPrivateFile,
   syncFolder,
   writePrivateJson,
@@ -200,15 +201,14 @@ async function compatibility(
   } finally {
     db.close();
   }
-  const settings = JSON.parse(
-    readPrivateFile(join(home, ".moyyi/desktop/settings.json"), 16_384).toString("utf8"),
-  ) as { format: number; settings: Record<string, unknown> };
+  const settings = readMaintenanceSettings(home);
+  if (!settings) throw Error("ROLLBACK_SETTINGS: 当前设置文件不可用，无法确认回滚兼容性。");
   const legacy = legacyRevisions.has(target.runtime.revision);
   const declared = target.maintenanceCompatibility;
   if (
     !legacy &&
     (!isSupportedStoreVersion(declared?.schemaVersion, declared?.persistedFormat) ||
-      declared?.settingsFormat !== 1 ||
+      ![1, 2].includes(declared?.settingsFormat ?? 0) ||
       !Array.isArray(declared?.settingsKeys))
   )
     throw Error("Rollback compatibility is not recorded");
@@ -219,6 +219,10 @@ async function compatibility(
     throw Error(
       "ROLLBACK_DATA: 当前会话库已升级，旧软件不能读取。请保留当前数据救援备份后，使用升级前的数据和软件成对回退；不会自动降级或丢弃新记录。",
     );
+  if (settings.format > (legacy ? 1 : (declared?.settingsFormat ?? 0)))
+    throw Error(
+      "ROLLBACK_SETTINGS: 当前桌面设置已升级到格式 2，旧软件不能读取。需要对应的升级前设置备份与软件；当前连接、个人指令和 Skills 不会被丢弃或降级。",
+    );
   const allowed = legacy ? ["maxRequests", "preset", "timeoutMs"] : (declared?.settingsKeys ?? []);
   if (
     allowed.some(
@@ -227,8 +231,6 @@ async function compatibility(
           key,
         ),
     ) ||
-    settings.format !== 1 ||
-    !settings.settings ||
     Object.keys(settings.settings).some((key) => !allowed.includes(key))
   )
     throw Error(

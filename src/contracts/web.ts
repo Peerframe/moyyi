@@ -9,6 +9,22 @@ export interface WebResponse {
   readonly contentType: string;
   readonly text: string;
   readonly truncated: boolean;
+  /** Provider-reported usage; null means unreported, never an estimated zero. */
+  readonly search?: {
+    readonly backend: "deepseek";
+    readonly query: string;
+    readonly usage: WebSearchUsage;
+    readonly error?: "no_structured_results" | "native_search_failed";
+  };
+}
+
+export interface WebSearchUsage {
+  readonly successfulSearches: number | null;
+  readonly attemptedSearches: number | null;
+  readonly inputTokens: number | null;
+  readonly outputTokens: number | null;
+  readonly cacheReadInputTokens: number | null;
+  readonly cacheCreationInputTokens: number | null;
 }
 
 export interface WebAccess {

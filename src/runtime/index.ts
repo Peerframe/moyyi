@@ -8,6 +8,7 @@ import {
   type ClientCommand,
   type Clock,
   canonicalizeJson,
+  type EntryId,
   type IdSource,
   type ModelClient,
   type ModelOrigin,
@@ -20,14 +21,20 @@ import {
   type RunLimits,
   type RuntimeEvent,
   type Scheduler,
+  type SessionId,
   type SessionManagement,
   type SessionStore,
   type Timestamp,
+  type TranscriptEntry,
 } from "../contracts/index.ts";
-import { AgentCore } from "../core/index.ts";
+import { AgentCore, pathToHead } from "../core/index.ts";
 import { defaultInstructionsPlugin } from "../plugins/default-instructions/index.ts";
 import { documentsPlugin } from "../plugins/documents/index.ts";
 import { fsPlugin } from "../plugins/fs/index.ts";
+import {
+  createPersonalInstructionsPlugin,
+  type PersonalInstructionsReader,
+} from "../plugins/personal-instructions/index.ts";
 import { projectInstructionsPlugin } from "../plugins/project-instructions/index.ts";
 import {
   ANTHROPIC_API_PROFILE,
@@ -50,7 +57,14 @@ import {
   resolveKimiReasoningEffort,
 } from "../plugins/provider-kimi/index.ts";
 import { createShellPlugin } from "../plugins/shell/index.ts";
+import {
+  createSkillLibraryPlugin,
+  readEnabledSkillCatalog,
+  type SkillLibraryAccess,
+  skillLibraryUnavailable,
+} from "../plugins/skill-library/index.ts";
 import { skillsPlugin } from "../plugins/skills/index.ts";
+import { parseSkill } from "../plugins/skills/parse.ts";
 import { todoPlugin } from "../plugins/todo/index.ts";
 import { toolOutputPlugin } from "../plugins/tool-output/index.ts";
 import { createWebPlugin } from "../plugins/web/index.ts";
@@ -82,6 +96,12 @@ import { NodeWebAccess, type WebAccessOptions } from "./web.ts";
 import type { WebHttpDependencies } from "./web-http.ts";
 import { NodeWorkspaceWrites } from "./writes.ts";
 
+export type {
+  PersonalInstructionsReader,
+  PersonalInstructionsSource,
+} from "../plugins/personal-instructions/index.ts";
+export type { SkillLibraryAccess, SkillLibraryEntry } from "../plugins/skill-library/index.ts";
+export { MAX_SKILL_BYTES, parseSkill } from "../plugins/skills/parse.ts";
 export {
   type CreateMaterial,
   MATERIAL_FORMATS,
@@ -125,6 +145,10 @@ export interface Runtime {
   readonly sessions: SessionManagement;
   /** Managed original copies, available only with the owned local SQLite store. */
   readonly materials?: MaterialStore;
+  appendConnectionSwitched(
+    sessionId: string,
+    change: { from: { name: string; provider: string }; to: { name: string; provider: string } },
+  ): Promise<void>;
   send(command: ClientCommand): Promise<void>;
   subscribe(listener: (event: RuntimeEvent) => void): () => void;
   /** Wait for current runs; send(run.start) only waits for acceptance. */
@@ -147,6 +171,10 @@ export interface RuntimeOptions {
   readonly documents?: false;
   /** Explicit trusted library root and activated names; no automatic scanning or installation. */
   readonly skills?: SkillSelection;
+  /** Explicit desktop/trusted-host guidance, refreshed on each request; no filesystem discovery. */
+  readonly personalInstructions?: PersonalInstructionsReader;
+  /** Enabled immutable versions only. CLI explicit Skills keep their existing behavior. */
+  readonly skillLibrary?: SkillLibraryAccess;
   /** Disable automatic root AGENTS.md reads. Default working instructions remain enabled. */
   readonly projectInstructions?: false;
   /** Explicit opt-in for bounded path-only navigation; omitted or false performs no scan. */
@@ -252,6 +280,48 @@ export async function createRuntime(
   const modelRecording = options.modelRecording ? { ...options.modelRecording } : undefined;
   const modelReplay = options.modelReplay ? { ...options.modelReplay } : undefined;
   const skills = selectSkills(options.skills);
+  const personalReader = options.personalInstructions;
+  if (personalReader !== undefined && typeof personalReader !== "function")
+    throw Error("Personal instructions require a trusted reader");
+  const personalInstructions = personalReader
+    ? createPersonalInstructionsPlugin(async (signal) => {
+        signal.throwIfAborted();
+        const value = await personalReader(signal);
+        signal.throwIfAborted();
+        const source = value ? { text: value.text, sha256: value.sha256 } : null;
+        if (source && createHash("sha256").update(source.text).digest("hex") !== source.sha256)
+          throw Error("Personal instruction source hash changed");
+        return source;
+      })
+    : undefined;
+  const library = options.skillLibrary;
+  if (
+    library !== undefined &&
+    (!library || typeof library.list !== "function" || typeof library.read !== "function")
+  )
+    throw Error("Skill library requires trusted list and read callbacks");
+  const libraryList = library?.list.bind(library),
+    libraryRead = library?.read.bind(library);
+  const skillLibrary =
+    libraryList && libraryRead
+      ? createSkillLibraryPlugin({
+          list: libraryList,
+          async read(name, sha256, signal) {
+            signal.throwIfAborted();
+            const value = await libraryRead(name, sha256, signal);
+            signal.throwIfAborted();
+            if (!value) return null;
+            const source = { text: value.text, sha256: value.sha256 };
+            if (
+              source.sha256 !== sha256 ||
+              createHash("sha256").update(source.text).digest("hex") !== sha256
+            )
+              throw Error("Skill source hash changed");
+            parseSkill(source.text, name);
+            return source;
+          },
+        })
+      : undefined;
   if (options.developmentPlugins?.length && (modelRecording || modelReplay))
     throw Error("Development reload cannot be combined with recording or replay");
   if (
@@ -372,6 +442,7 @@ export async function createRuntime(
     { plugin: defaultInstructionsPlugin },
     { plugin: todoPlugin },
     { plugin: toolOutputPlugin },
+    ...(personalInstructions ? [{ plugin: personalInstructions }] : []),
     ...(options.projectInstructions === false ? [] : [{ plugin: projectInstructionsPlugin }]),
     ...(skills?.enabled.length ? [{ plugin: skillsPlugin }] : []),
     ...(workspaceNavigation ? [{ plugin: workspaceNavigationPlugin }] : []),
@@ -389,7 +460,12 @@ export async function createRuntime(
         }),
       }),
     },
-    { plugin: createWebPlugin(options.web?.search?.origin) },
+    {
+      plugin: createWebPlugin(
+        options.web?.search &&
+          ("origin" in options.web.search ? options.web.search.origin : { backend: "deepseek" }),
+      ),
+    },
     ...(anthropic ? [{ plugin: anthropic }] : []),
     ...(deepseek ? [{ plugin: deepseek }] : []),
     ...(kimi ? [{ plugin: kimi }] : []),
@@ -397,6 +473,7 @@ export async function createRuntime(
   ];
   const development = new Map<string, DevelopmentPlugin>();
   const reserved = new Set(startup.map(({ plugin }) => plugin.name));
+  if (skillLibrary) reserved.add(skillLibrary.name);
   for (const entry of options.developmentPlugins ?? []) {
     if (!/^[a-z][a-z0-9-]{0,63}$/.test(entry.name) || typeof entry.load !== "function")
       throw Error("Invalid development plugin entry");
@@ -405,6 +482,44 @@ export async function createRuntime(
     development.set(entry.name, entry);
   }
   for (const entry of startup) plugins.push(await registry.load(entry));
+  let libraryRegistered = false;
+  let libraryRefresh = Promise.resolve();
+  // Only expose the library while the trusted host has enabled entries. Registration still
+  // happens in setup; each collection refreshes it before core reads the tool definitions.
+  async function refreshSkillLibrary(signal: AbortSignal): Promise<void> {
+    if (!skillLibrary || !libraryList) return;
+    signal.throwIfAborted();
+    let abort = () => {};
+    const cancelled = new Promise<never>((_, reject) => {
+      abort = () => reject(signal.reason);
+      signal.addEventListener("abort", abort, { once: true });
+    });
+    let enabled: boolean;
+    try {
+      enabled =
+        (await Promise.race([readEnabledSkillCatalog(libraryList, signal), cancelled])).length > 0;
+      signal.throwIfAborted();
+    } finally {
+      signal.removeEventListener("abort", abort);
+    }
+    // Host reads can run concurrently; only the bounded registry mutations are serialized.
+    const pending = libraryRefresh.then(async () => {
+      signal.throwIfAborted();
+      if (enabled === libraryRegistered) return;
+      if (enabled) {
+        const result = await registry.load({ plugin: skillLibrary });
+        if (result.state !== "loaded") throw Error("Cannot register the enabled skill library");
+        plugins.push(result);
+      } else {
+        await registry.unload(skillLibrary.name);
+        const index = plugins.findIndex((entry) => entry.name === skillLibrary.name);
+        if (index >= 0) plugins.splice(index, 1);
+      }
+      libraryRegistered = enabled;
+    });
+    libraryRefresh = pending.catch(() => {});
+    return pending;
+  }
 
   const listeners = new Set<(event: RuntimeEvent) => void>();
   const diagnostics: string[] = [];
@@ -418,7 +533,10 @@ export async function createRuntime(
   const emit = (event: RuntimeEvent) => {
     toolResults?.observe(event);
     if (event.type === "run.started") activeRuns.add(event.runId);
-    if (event.type === "run.finished") activeRuns.delete(event.runId);
+    if (event.type === "run.finished") {
+      activeRuns.delete(event.runId);
+      web?.releaseRun(event.runId);
+    }
     // Observers receive an immutable copy, so mutating a displayed approval cannot alter work.
     const copy = freeze(JSON.parse(canonicalizeJson(event))) as RuntimeEvent;
     for (const listener of listeners) {
@@ -592,7 +710,9 @@ export async function createRuntime(
       model: selectedClient,
       ...(recorder ? { settleModel: recorder.flush.bind(recorder) } : {}),
       profile,
-      tools: registry.tools,
+      get tools() {
+        return registry.tools;
+      },
       store,
       policy,
       context: new MinimalContextBuilder(),
@@ -631,20 +751,38 @@ export async function createRuntime(
       clock: options.clock ?? { now: () => new Date().toISOString() as Timestamp },
       ids: options.ids ?? { next: (prefix) => `${prefix}_${randomUUID()}` },
       emit,
-      collect: async (workspaceRoot, signal, sessionId) => [
-        await facts(sessionId, workspaceRoot, profile),
-        ...(await collectContext(
-          registry.contextSources,
-          files,
-          policy,
-          workspaceRoot,
-          profile,
-          signal,
-          options.projectInstructions !== false,
-          skills,
-          workspaceNavigation,
-        )),
-      ],
+      collect: async (workspaceRoot, signal, sessionId) => {
+        await refreshSkillLibrary(signal);
+        const sections = [
+          await facts(sessionId, workspaceRoot, profile),
+          ...(await collectContext(
+            registry.contextSources,
+            files,
+            policy,
+            workspaceRoot,
+            profile,
+            signal,
+            options.projectInstructions !== false,
+            skills,
+            workspaceNavigation,
+          )),
+        ];
+        if (skillLibrary && !libraryRegistered) {
+          const snapshot = await store?.loadSession(sessionId);
+          const previous =
+            snapshot &&
+            pathToHead(snapshot).findLast((entry) => entry.body.kind === "assistant_message")?.body;
+          if (previous?.kind === "assistant_message") {
+            const bytes = await store?.getBlob(previous.request.tools);
+            if (!bytes) throw Error("Previous skill availability could not be read");
+            const tools = JSON.parse(new TextDecoder().decode(bytes)) as { name: string }[];
+            if (tools.some((tool) => tool.name === "read_skill"))
+              sections.push(skillLibraryUnavailable());
+          }
+        }
+        signal.throwIfAborted();
+        return sections;
+      },
       ...(options.limits === undefined ? {} : { limits: options.limits }),
       ...(evidenceAnswer ? { evidenceAnswer } : {}),
     });
@@ -838,6 +976,60 @@ export async function createRuntime(
     }
   };
   return {
+    appendConnectionSwitched(sessionId, change) {
+      return manage(async () => {
+        if (!store || typeof sessionId !== "string" || !sessionId || sessionId.length > 256)
+          throw Error("Invalid session");
+        const label = (value: { name: string; provider: string }) => {
+          if (
+            !value ||
+            typeof value.name !== "string" ||
+            !value.name.trim() ||
+            value.name.length > 80 ||
+            [...value.name].some(
+              (character) => character.charCodeAt(0) < 32 || character.charCodeAt(0) === 127,
+            ) ||
+            !["deepseek", "kimi-cn", "kimi-global"].includes(value.provider)
+          )
+            throw Error("Invalid connection label");
+          return `${value.name} (${value.provider}/${value.provider === "deepseek" ? "deepseek-flash" : "kimi-k3.1-pro"})`;
+        };
+        const from = label(change.from),
+          to = label(change.to);
+        const snapshot = await store.loadSession(sessionId as SessionId);
+        if (
+          !snapshot ||
+          store.isSessionRemoved?.(snapshot.sessionId) ||
+          snapshot.runs.some((r) => r.status === "active")
+        )
+          throw Error("Session is unavailable");
+        const entry: TranscriptEntry = {
+          id: (options.ids?.next("entry") ?? randomUUID()) as EntryId,
+          sessionId: snapshot.sessionId,
+          parentId: snapshot.headEntryId,
+          runId: null,
+          createdAt: (options.clock?.now() ?? new Date().toISOString()) as Timestamp,
+          body: {
+            kind: "notice",
+            code: "connection_switched",
+            text: `Connection switched from ${from} to ${to}. Prior provider-specific reasoning is unavailable across providers; same-provider history is retained. Previous work is preserved. Workspace writes, checks and web grants have been reset; ask the user to enable them when needed.`,
+          },
+        };
+        await store.commit({
+          entries: [entry],
+          effects: [],
+          sessions: [
+            {
+              sessionId: snapshot.sessionId,
+              workspaceRoot: snapshot.workspaceRoot,
+              headEntryId: entry.id,
+            },
+          ],
+          durability: "normal",
+        });
+        emit({ type: "entry.appended", entry });
+      });
+    },
     sessions,
     ...(materials ? { materials } : {}),
     get plugins() {

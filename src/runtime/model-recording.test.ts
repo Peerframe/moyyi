@@ -118,6 +118,41 @@ function expectError(
 }
 
 describe("ModelClient recording and deterministic replay", () => {
+  it("records historical origin and quota without changing the recording envelope", async () => {
+    const input: ModelRequest = {
+      ...request,
+      messages: [
+        ...request.messages,
+        {
+          role: "assistant",
+          origin: { provider: "deepseek", model: "deepseek-flash" },
+          stopReason: "end_turn",
+          content: [{ type: "text", text: "Prior answer" }],
+        },
+      ],
+    };
+    const quota: ModelStreamEvent = {
+      type: "error",
+      error: {
+        kind: "quota",
+        message: "Quota exhausted",
+        partialOutput: false,
+        usage: UNKNOWN_USAGE,
+      },
+    };
+    const sink = new MemoryRecordingSink();
+    expect(await collect(new RecordingModelClient(fake([quota]), sink, options), input)).toEqual([
+      quota,
+    ]);
+    const record = sink.records[0];
+    if (!record) throw Error("Missing quota recording");
+    expect(record.request).toEqual(input);
+    const parsed = parseModelRecording(JSON.parse(canonicalizeJson(record)));
+    expect(parsed).toEqual(record);
+    const replay = new ReplayModelClient([parsed], { apiProfile: options.apiProfile });
+    expect(await collect(replay, input)).toEqual([quota]);
+  });
+
   it("round-trips the full request, events, unknown usage and honest metadata", async () => {
     const record = await recorded();
     expect(record.meta).toEqual({

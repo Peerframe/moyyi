@@ -3,6 +3,7 @@ import {
   appendWebSource,
   EMPTY_WEB_ACCESS,
   normalizeDesktopWebAccess,
+  projectWebSearchSources,
   projectWebSource,
 } from "../../host/web.ts";
 import { commandTypes, stateKeys } from "./contract.ts";
@@ -17,6 +18,7 @@ export const hostFeature = defineHostFeature({
       const access = normalizeDesktopWebAccess({
         allowedOrigins: command.allowedOrigins,
         dns: command.dns,
+        ...(command.search !== undefined ? { search: command.search } : {}),
       });
       const target = host.state.reportTarget;
       const permissions = host.state.permissions;
@@ -44,6 +46,16 @@ export const hostFeature = defineHostFeature({
       body = entry.body;
     if (body.kind === "tool_results") {
       for (const result of body.results) {
+        if (host.toolNames.get(result.callId) === "web_search") {
+          const sources = projectWebSearchSources(entry.id, entry.createdAt, result, "web_search");
+          if (sources) {
+            let projection = host.state.sources;
+            for (const source of sources) projection = appendWebSource(projection, source);
+            host.update({ sources: projection });
+          } else if (result.status === "succeeded")
+            host.update({ sources: { ...host.state.sources, truncated: true } });
+          continue;
+        }
         const source = projectWebSource(
           entry.id,
           entry.createdAt,

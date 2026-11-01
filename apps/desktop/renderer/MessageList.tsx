@@ -16,7 +16,15 @@ export function MessageList({
     <>
       {historyTruncated ? <p className="outcome">较早的记录未在本页显示；原会话仍保留。</p> : null}
       {messages.map((message) => (
-        <ConversationNode key={message.id} message={message} />
+        <ConversationNode
+          key={message.id}
+          message={message}
+          latest={
+            !!message.tool &&
+            messages.findLast((m) => m.tool === message.tool && m.state === "requested")?.id ===
+              message.id
+          }
+        />
       ))}
       {streamText ? (
         <article className="message assistant">

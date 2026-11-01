@@ -28,6 +28,7 @@ describe("feature-generated preload bridge", () => {
   it("exposes only the existing typed entries, without a generic channel or path escape", () => {
     expect(Object.keys(bridge).sort()).toEqual([
       "act",
+      "changeConnection",
       "configure",
       "configurePermissions",
       "configureWebAccess",
@@ -41,6 +42,7 @@ describe("feature-generated preload bridge", () => {
       "saveArtifact",
       "selectDocuments",
       "selectReportTarget",
+      "selectSkill",
       "selectWorkspace",
       "subscribe",
     ]);

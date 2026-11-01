@@ -80,15 +80,18 @@ export function createDeepSeekClient(
           return;
         }
         if (response.status !== 200) {
-          const kind: ModelErrorKind = [401, 402, 403].includes(response.status)
-            ? "auth"
-            : response.status === 429
-              ? "rate_limited"
-              : response.status >= 500 && response.status < 600
-                ? "overloaded"
-                : [400, 404, 413, 422].includes(response.status)
-                  ? "invalid_request"
-                  : "protocol";
+          const kind: ModelErrorKind =
+            response.status === 402
+              ? "quota"
+              : [401, 403].includes(response.status)
+                ? "auth"
+                : response.status === 429
+                  ? "rate_limited"
+                  : response.status >= 500 && response.status < 600
+                    ? "overloaded"
+                    : [400, 404, 413, 422].includes(response.status)
+                      ? "invalid_request"
+                      : "protocol";
           yield error(
             kind,
             response.status === 402

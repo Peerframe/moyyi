@@ -1,0 +1,14 @@
+Window: "Unknown", App: moyyi.
+0 sheet Description: alert, Secondary Actions: Raise
+	1 image moyyi critical alert
+	2 text 删除连接“Kimi 合成 B”？ 同时删除此连接专用的钥匙串密钥（如存在）。此操作无法撤销。
+
+已有会话保留。
+	3 button 取消, ID: action-button--999
+	4 button 删除连接, ID: action-button--998
+5 menu bar
+	6 moyyi
+	7 编辑
+	8 窗口
+
+The focused UI element is 0 sheet Description: alert, Secondary Actions: Raise

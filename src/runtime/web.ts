@@ -1,5 +1,6 @@
 import {
   canonicalizeJson,
+  type RunId,
   type ToolContext,
   type WebAccess,
   type WebAccessFactory,
@@ -7,6 +8,7 @@ import {
   type WebResponse,
   type WorkspaceWriteScope,
 } from "../contracts/index.ts";
+import { type DeepSeekSearchOptions, searchDeepSeek } from "./web-deepseek.ts";
 import {
   fetchPublicText,
   publicHttpsUrl,
@@ -18,7 +20,7 @@ export interface WebAccessOptions {
   /** Exact HTTPS origins; no wildcard or implicit grant to linked pages. */
   readonly allowedOrigins: readonly string[];
   /** Explicit SearXNG host with JSON search enabled; never selects a public instance. */
-  readonly search?: { readonly origin: string };
+  readonly search?: { readonly origin: string } | DeepSeekSearchOptions;
   /** Host-selected DNS transport; never changes destination grants or public-address checks. */
   readonly dns?: WebDnsMode;
   readonly timeoutMs?: number;
@@ -28,6 +30,8 @@ export interface WebAccessOptions {
 export class NodeWebAccess implements WebAccessFactory {
   private readonly origins: ReadonlySet<string>;
   private readonly searchOrigin: string | undefined;
+  private readonly nativeSearch: DeepSeekSearchOptions | undefined;
+  private readonly searchesByRun = new Map<RunId, number>();
   private readonly timeoutMs: number;
   private readonly maxResponseBytes: number;
   private readonly dependencies: WebHttpDependencies;
@@ -38,7 +42,18 @@ export class NodeWebAccess implements WebAccessFactory {
       throw Error("Web DNS must be system or cloudflare-doh");
     this.dns = options.dns ?? "system";
     this.origins = new Set(options.allowedOrigins.map(exactOrigin));
-    this.searchOrigin = options.search ? exactOrigin(options.search.origin) : undefined;
+    this.searchOrigin =
+      options.search && "origin" in options.search ? exactOrigin(options.search.origin) : undefined;
+    if (
+      options.search &&
+      !this.searchOrigin &&
+      (!("backend" in options.search) ||
+        options.search.backend !== "deepseek" ||
+        typeof options.search.getApiKey !== "function")
+    )
+      throw Error("Invalid web search backend");
+    this.nativeSearch =
+      options.search && "backend" in options.search ? { ...options.search } : undefined;
     this.timeoutMs = bounded(options.timeoutMs ?? 30_000, 1, 120_000, "web timeout");
     this.maxResponseBytes = bounded(
       options.maxResponseBytes ?? 256 * 1024,
@@ -47,6 +62,11 @@ export class NodeWebAccess implements WebAccessFactory {
       "web response limit",
     );
     this.dependencies = { ...dependencies };
+  }
+
+  /** The trusted runtime calls this only after the run and its capabilities have ended. */
+  releaseRun(runId: RunId): void {
+    this.searchesByRun.delete(runId);
   }
 
   create(
@@ -90,7 +110,8 @@ export class NodeWebAccess implements WebAccessFactory {
         value.count >= 1 &&
         value.count <= 10
       ) {
-        if (!this.searchOrigin) throw Error("Web search requires an explicit SearXNG origin");
+        if (!this.searchOrigin && !this.nativeSearch)
+          throw Error("Web search requires an explicit SearXNG origin or DeepSeek connection");
         return Object.freeze({ kind: "search", query: value.query, count: value.count });
       }
       throw Error("Invalid or oversized web request");
@@ -119,6 +140,30 @@ export class NodeWebAccess implements WebAccessFactory {
         const request = normalize(approved);
         if (canonicalizeJson(request) !== canonicalizeJson(approved))
           throw Error("Approved web request is not canonical");
+        const limit = Math.min(
+          this.maxResponseBytes,
+          bounded(context.limits.maxOutputBytes, 1, 1024 * 1024, "tool output limit"),
+        );
+        if (request.kind === "search" && this.nativeSearch) {
+          const spent = this.searchesByRun.get(context.runId) ?? 0;
+          if (spent >= 5)
+            throw Error("DeepSeek search limit reached: at most 5 product searches per run");
+          this.searchesByRun.set(context.runId, spent + 1);
+          const response = await searchDeepSeek(
+            this.nativeSearch,
+            request.query,
+            request.count,
+            context.signal,
+            guard,
+            {
+              timeoutMs: this.timeoutMs,
+              maxResponseBytes: this.maxResponseBytes,
+              maxOutputBytes: limit,
+            },
+          );
+          guard();
+          return response;
+        }
         const url =
           request.kind === "fetch"
             ? publicHttpsUrl(request.url)
@@ -127,10 +172,6 @@ export class NodeWebAccess implements WebAccessFactory {
           url.searchParams.set("q", request.query);
           url.searchParams.set("format", "json");
         }
-        const limit = Math.min(
-          this.maxResponseBytes,
-          bounded(context.limits.maxOutputBytes, 1, 1024 * 1024, "tool output limit"),
-        );
         const response = await fetchPublicText(
           url,
           context.signal,

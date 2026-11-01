@@ -5,6 +5,7 @@ import { initialState, validateState } from "./state.ts";
 export interface DesktopWebAccess {
   readonly allowedOrigins: readonly string[];
   readonly dns: "system" | "cloudflare-doh";
+  readonly search?: boolean;
 }
 export interface DesktopWebSource {
   readonly id: string;
@@ -19,6 +20,12 @@ export interface DesktopWebSource {
   readonly displayTruncated: boolean;
   readonly recordedAt: string;
   readonly textSha256: string;
+  /** Multiple sources share the recorded result/call identity; index identifies its item. */
+  readonly search?: {
+    readonly index: number;
+    readonly query: string;
+    readonly publishedAt: string | null;
+  };
 }
 export type FeatureCommand = {
   readonly type: "web.permissions";
@@ -60,7 +67,9 @@ export const contract = {
           !value ||
           typeof value !== "object" ||
           Array.isArray(value) ||
-          Object.keys(value).some((key) => !["sessionId", "allowedOrigins", "dns"].includes(key))
+          Object.keys(value).some(
+            (key) => !["sessionId", "allowedOrigins", "dns", "search"].includes(key),
+          )
         )
           throw Error("Invalid web permissions");
         const command = parse({ ...value, type: "web.permissions" });

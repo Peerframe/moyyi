@@ -10,6 +10,8 @@ import { commandTypes as types3 } from "../features/materials/contract.ts";
 import { validateCommand as validate3 } from "../features/materials/validation.ts";
 import { commandTypes as types7 } from "../features/permissions/contract.ts";
 import { validateCommand as validate7 } from "../features/permissions/validation.ts";
+import { commandTypes as types8 } from "../features/preferences/contract.ts";
+import { validateCommand as validate8 } from "../features/preferences/validation.ts";
 import { commandTypes as types0 } from "../features/sessions/contract.ts";
 import { validateCommand as validate0 } from "../features/sessions/validation.ts";
 import { commandTypes as types6 } from "../features/settings/contract.ts";
@@ -49,4 +51,8 @@ for (const type of types6) {
 for (const type of types7) {
   if (commandValidators.has(type)) throw Error(`Duplicate desktop command: ${type}`);
   commandValidators.set(type, validate7);
+}
+for (const type of types8) {
+  if (commandValidators.has(type)) throw Error(`Duplicate desktop command: ${type}`);
+  commandValidators.set(type, validate8);
 }

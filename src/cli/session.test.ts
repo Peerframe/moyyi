@@ -31,6 +31,7 @@ function fake() {
   };
   const close = vi.fn(async () => {});
   const runtime: Runtime = {
+    appendConnectionSwitched: async () => {},
     sessions: {
       list: async () => {
         throw Error("Unused session management");

@@ -1,6 +1,11 @@
 import { expect, it, vi } from "vitest";
 import type { ActionDigest, RunId, ToolContext, WebRequest } from "../../contracts/index.ts";
-import { webFetchTool, webPlugin, webSearchTool } from "./index.ts";
+import {
+  DEEPSEEK_SEARCH_COST,
+  DEEPSEEK_SEARCH_URL,
+  deepSeekSearchRequest,
+} from "./deepseek-search.ts";
+import { createWebPlugin, webFetchTool, webPlugin, webSearchTool } from "./index.ts";
 
 const context = (): ToolContext => ({
   runId: "run_web" as RunId,
@@ -54,6 +59,62 @@ it("registers both tools through the ordinary plugin interface", () => {
   const registerTool = vi.fn();
   webPlugin.setup({ registerTool } as never);
   expect(registerTool.mock.calls.map(([tool]) => tool.name)).toEqual(["web_fetch", "web_search"]);
+});
+it("records the exact secret-free auxiliary request in native search approval", async () => {
+  const registerTool = vi.fn();
+  createWebPlugin({ backend: "deepseek" }).setup({ registerTool } as never);
+  const search = registerTool.mock.calls[1]?.[0] as typeof webSearchTool;
+  const prepare = vi.fn(async (request: WebRequest) => request);
+  const action = await search.prepare(
+    { query: "public subject" },
+    { ...context(), web: { prepare, execute: vi.fn() } },
+  );
+  expect(action.summary).toBe(DEEPSEEK_SEARCH_COST);
+  expect(JSON.parse(action.preview ?? "null")).toEqual({
+    kind: "search",
+    query: "public subject",
+    count: 5,
+    destination: DEEPSEEK_SEARCH_URL,
+    request: deepSeekSearchRequest("public subject"),
+    billing: DEEPSEEK_SEARCH_COST,
+  });
+  expect(search.description).toContain("up to 5 billable native searches");
+});
+it("records native failure usage without declaring a successful search", async () => {
+  const result = await webSearchTool.execute(
+    { digest: "test" as ActionDigest, summary: "", preconditions: [], payload: null },
+    {
+      ...context(),
+      web: {
+        prepare: vi.fn(),
+        execute: vi.fn(async () => ({
+          url: DEEPSEEK_SEARCH_URL,
+          status: 200,
+          contentType: "application/json",
+          text: '{"results":[]}',
+          truncated: false,
+          search: {
+            backend: "deepseek" as const,
+            query: "q",
+            error: "no_structured_results" as const,
+            usage: {
+              successfulSearches: null,
+              attemptedSearches: null,
+              inputTokens: 10,
+              outputTokens: 5,
+              cacheReadInputTokens: null,
+              cacheCreationInputTokens: null,
+            },
+          },
+        })),
+      },
+    },
+  );
+  expect(result.status).toBe("failed");
+  expect(result.content[0]).toMatchObject({ text: expect.stringContaining('"inputTokens":10') });
+  expect(result.content[0]).toMatchObject({
+    text: expect.stringContaining('"successfulSearches":null'),
+  });
 });
 it.each(["text/plain", "application/json"])(
   "preserves %s and source truncation",

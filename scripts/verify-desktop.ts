@@ -72,6 +72,7 @@ try {
   );
   assert.equal(manifest.node, "26.12.1");
   assert.equal(manifest.publicRelease, false);
+  assert.equal(manifest.maintenanceCompatibility.settingsFormat, 2);
   assert.equal(run(node, ["--version"]).trim(), "v26.12.1");
   assert(!existsSync(join(appDirectory, "node_modules/moyyi/src")));
   for (const dependency of ["typescript", "vitest", "electron", "@biomejs"]) {
@@ -101,6 +102,7 @@ try {
     "host-m3.mjs",
     "host-m5.mjs",
     "host-m6.mjs",
+    "host-d3.mjs",
     "material-cancel.mjs",
     "production-settings.mjs",
     "kimi-errors.mjs",
@@ -253,6 +255,28 @@ try {
   assert.equal(webSources.credentialReads, 0);
   assert.equal(webSources.networkAttempts, 0);
   assert.equal(webSources.liveModel, false);
+  const deliveryThreeWorkspace = join(temporary, "delivery-three-workspace");
+  mkdirSync(deliveryThreeWorkspace);
+  const deliveryThree = JSON.parse(
+    run(node, [
+      "--no-experimental-strip-types",
+      join(fixture, "host-d3.mjs"),
+      deliveryThreeWorkspace,
+      join(temporary, "delivery-three-home"),
+      join(temporary, "report-style"),
+    ]),
+  );
+  assert.equal(deliveryThree.passed, true);
+  assert.equal(deliveryThree.count, 8);
+  assert.equal(deliveryThree.cases.length, deliveryThree.count);
+  assert.equal(deliveryThree.syntheticRequests, 14);
+  assert.equal(deliveryThree.syntheticSearches, 1);
+  assert.equal(deliveryThree.syntheticCredentialWrites, 2);
+  assert.equal(deliveryThree.syntheticCredentialDeletes, 1);
+  assert.equal(deliveryThree.credentialReads, 0);
+  assert.equal(deliveryThree.networkAttempts, 0);
+  assert.equal(deliveryThree.automaticRetries, 0);
+  assert.equal(deliveryThree.liveModel, false);
   const settingsWorkspace = join(temporary, "settings-workspace");
   mkdirSync(settingsWorkspace);
   const productionSettings = JSON.parse(
@@ -338,6 +362,7 @@ try {
         editsAndRecovery,
         productionSettings,
         webSources,
+        deliveryThree,
         kimiErrors,
         phaseDeadline,
         maintenance,

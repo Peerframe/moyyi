@@ -67,8 +67,17 @@ export function buildKimiRequest(request: ModelRequest, options: KimiOptions = {
   const pending = new Map<string, string>();
   const localIds = new Set<string>();
   for (const message of value.messages) {
-    keys(object(message), ["role", "content", "replay", "stopReason"]);
+    keys(object(message), ["role", "origin", "content", "replay", "stopReason"]);
     requireCondition(message.role === "user" || message.role === "assistant", "Unsupported role");
+    if (message.origin !== undefined) {
+      requireCondition(message.role === "assistant", "Only assistant history has model origin");
+      keys(object(message.origin), ["provider", "model"]);
+      requireCondition(
+        string(message.origin.provider).length > 0 && string(message.origin.model).length > 0,
+        "Invalid historical model origin",
+      );
+    }
+    const foreign = message.origin !== undefined && message.origin.provider !== "kimi";
     requireCondition(
       Array.isArray(message.content) && message.content.length > 0,
       "Empty history message",
@@ -96,6 +105,18 @@ export function buildKimiRequest(request: ModelRequest, options: KimiOptions = {
           sawText = true;
           sawRefusal ||= part.type === "refusal";
         } else if (part.type === "reasoning") {
+          if (foreign) {
+            keys(
+              object(part),
+              part.kind === "opaque" ? ["type", "kind"] : ["type", "kind", "text"],
+            );
+            requireCondition(
+              ["visible", "summary", "opaque"].includes(part.kind),
+              "Invalid reasoning kind",
+            );
+            if (part.kind !== "opaque") string(part.text);
+            continue;
+          }
           keys(object(part), ["type", "kind", "text"]);
           requireCondition(part.kind === "visible", "Only full visible reasoning is supported");
           reasoning += string(part.text);
@@ -115,7 +136,8 @@ export function buildKimiRequest(request: ModelRequest, options: KimiOptions = {
             typeof part.callId === "string" && part.callId.length > 0 && part.callId.length <= 512,
             "Invalid local call ID",
           );
-          requireCondition(part.providerItemId === null, "Unsupported function item ID");
+          if (foreign && part.providerItemId !== null) identifier(part.providerItemId);
+          else requireCondition(part.providerItemId === null, "Unsupported function item ID");
           requireCondition(
             !localIds.has(part.callId) && !providerIds.has(providerId),
             "Duplicate call ID",
@@ -145,6 +167,11 @@ export function buildKimiRequest(request: ModelRequest, options: KimiOptions = {
         "Refusal requires a refusal outcome",
       );
       requireCondition(!calls.length || !sawRefusal, "Refused response cannot contain calls");
+      if (foreign)
+        requireCondition(
+          sawText || calls.length > 0,
+          "Foreign assistant history has no transferable content",
+        );
       messages.push({
         role: "assistant",
         content: sawText ? text.join("\n\n") : null,

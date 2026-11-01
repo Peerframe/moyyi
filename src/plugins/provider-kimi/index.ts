@@ -77,13 +77,16 @@ export function createKimiClient(transport: KimiTransport, options: KimiOptions 
             yield error(diagnostic.kind, diagnostic.message, retryAfter(response.retryAfter));
             return;
           }
-          const kind: ModelErrorKind = [401, 402, 403].includes(response.status)
-            ? "auth"
-            : [500, 503].includes(response.status)
-              ? "overloaded"
-              : [400, 404, 413, 422].includes(response.status)
-                ? "invalid_request"
-                : "protocol";
+          const kind: ModelErrorKind =
+            response.status === 402
+              ? "quota"
+              : [401, 403].includes(response.status)
+                ? "auth"
+                : [500, 503].includes(response.status)
+                  ? "overloaded"
+                  : [400, 404, 413, 422].includes(response.status)
+                    ? "invalid_request"
+                    : "protocol";
           yield error(
             kind,
             response.status === 402

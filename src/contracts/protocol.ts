@@ -1,4 +1,5 @@
 import type { SessionListPage, SessionResultsPage } from "./history.ts";
+import type { ModelErrorKind } from "./model.ts";
 import type {
   ActionDigest,
   ContentPart,
@@ -70,4 +71,9 @@ export type RunOutcome =
   | { readonly kind: "completed" }
   | { readonly kind: "cancelled" }
   | { readonly kind: "budget_exhausted"; readonly budget: string }
-  | { readonly kind: "failed"; readonly reason: string };
+  | {
+      readonly kind: "failed";
+      readonly reason: string;
+      /** Structured model failure for client decisions; never parse the diagnostic text. */
+      readonly modelErrorKind?: ModelErrorKind;
+    };

@@ -11,6 +11,14 @@ a complete response need not generate reasoning. Unsupported
 content/options fail before HTTP. Opaque replay data is unused; valid common content is sufficient.
 The local output cap is 8,192 tokens. Model alias resolution remains controlled by the service.
 
+Historical `ModelMessage.origin` identifies the producing provider. For a different provider,
+only complete text/refusal and paired calls/results go to the wire; reasoning and replay are
+omitted. Foreign calls receive deterministic collision-free wire IDs because Chat history can
+reuse IDs across turns. Original records and local pairing IDs stay unchanged. Same-provider
+history preserves its visible reasoning and wire IDs across credential switches. Missing origin
+retains legacy behavior; interruption, completeness and pairing checks still apply. See
+[ADR 0048](../../../docs/decisions/0048-connection-continuation.md).
+
 `options.reasoningEffort` accepts `none`, `low`, `high` or `max`, using the official Responses
 `reasoning.effort` control. Omission keeps `high`; aliases and invalid values are rejected before
 transport. Plugin/client construction captures the value, so later caller mutation cannot change
@@ -74,8 +82,9 @@ For runtime configuration, record/replay and owner smoke instructions see
 
 The adapter adds no prompt prose. It sends the context builder's system sections, ordered tools,
 full visible text/reasoning history and paired function calls/results to the Responses endpoint.
-It preserves every complete assistant turn's actual visible reasoning, including turns without
-tools. Each tool result begins with `Tool result status: <status>` and retains its original text
+It preserves same-provider complete assistant turns' actual visible reasoning, including turns
+without tools. Foreign turns contribute text and paired tools only, without provider reasoning
+or replay. Each tool result begins with `Tool result status: <status>` and retains its original text
 parts. Unsupported history fails before transport. Partial or failed output cannot authorize a
 tool call or become a completed answer.
 
@@ -92,7 +101,7 @@ different cache domain. Cache hit counters are evidence of actual reuse; stable 
 does not guarantee a hit.
 
 HTTP failures return `DeepSeek HTTP <status>` with the existing normalized error kind; HTTP 402
-returns `DeepSeek account balance is unavailable`. Neither response bodies nor credentials are
+returns `DeepSeek account balance is unavailable` with kind `quota`. Neither response bodies nor credentials are
 included. The provider performs one request per invocation and never retries. The fixed-source
 [DSH comparison](../../../docs/deepseek.md#deepseek-harness-comparison) records the Messages
 differences, source pointers and the 5xx classification correction.

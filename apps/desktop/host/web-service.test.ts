@@ -88,13 +88,19 @@ function waitFor(
     });
   });
 }
-async function fixture(steps: ModelStreamEvent[][], stall = false, largeText = false) {
+async function fixture(
+  steps: ModelStreamEvent[][],
+  stall = false,
+  largeText = false,
+  nativeSearch?: typeof fetch,
+) {
   const directory = realpathSync(mkdtempSync(join(tmpdir(), "moyyi-desktop-web-")));
   const workspace = join(directory, "workspace");
   mkdirSync(workspace);
   const requests: ModelRequest[] = [];
   const destinations: string[] = [];
   const destroy = vi.fn();
+  const getSearchKey = vi.fn(() => "synthetic-search-key");
   const resolve = vi.fn(async () => [{ address: "93.184.216.34", family: 4 }]);
   injected.services = {
     webHttp: {
@@ -165,7 +171,13 @@ async function fixture(steps: ModelStreamEvent[][], stall = false, largeText = f
     projectInstructions: false,
     limits: { maxModelRequests: 4, maxRetries: 0, timeoutMs: 120_000 },
     plugins: [{ plugin }],
-    web: { allowedOrigins: ["https://injected.example.com"], approval: "allow" },
+    web: {
+      allowedOrigins: ["https://injected.example.com"],
+      approval: "allow",
+      ...(nativeSearch
+        ? { search: { backend: "deepseek" as const, getApiKey: getSearchKey, fetch: nativeSearch } }
+        : {}),
+    },
   };
   const resource = { directory, hosts: [] as DesktopHost[] };
   resources.push(resource);
@@ -223,10 +235,112 @@ async function fixture(steps: ModelStreamEvent[][], stall = false, largeText = f
     grant,
     start,
     approve,
+    getSearchKey,
+    grantSearch: (allowedOrigins: readonly string[] = []) =>
+      host.dispatch({
+        type: "web.permissions",
+        sessionId,
+        allowedOrigins,
+        dns: "system",
+        search: true,
+      }),
   };
 }
 
 describe("desktop web over actual runtime and SQLite", () => {
+  it("keeps configured search credentials inert until session grant and exact paid approval", async () => {
+    const send = vi.fn<typeof fetch>(async () => searchResponse());
+    const f = await fixture(
+      [
+        call("web_search", { query: "public topic" }),
+        answer,
+        call("web_search", { query: "public topic" }),
+        answer,
+        call("web_search", { query: "public topic" }),
+        call("web_fetch", { url: "https://docs.example.com/page" }),
+        answer,
+      ],
+      false,
+      false,
+      send,
+    );
+    await f.start();
+    await waitFor(f.host, (state) => state.outcome !== null);
+    expect(send).not.toHaveBeenCalled();
+    expect(f.getSearchKey).not.toHaveBeenCalled();
+    await f.grantSearch();
+    await f.start();
+    await f.approve("deny");
+    await waitFor(f.host, (state) => state.outcome !== null);
+    expect(send).not.toHaveBeenCalled();
+    expect(f.getSearchKey).not.toHaveBeenCalled();
+    await f.grantSearch(["https://docs.example.com"]);
+    await f.start();
+    const approval = await f.approve();
+    expect(approval.summary).toContain("外加最多 5 次计费搜索");
+    expect(approval.preview).toContain("public topic");
+    expect(approval.preview).toContain("max_uses");
+    await f.approve();
+    await waitFor(f.host, (state) => state.outcome !== null);
+    expect(send).toHaveBeenCalledTimes(1);
+    expect(f.destinations).toEqual(["docs.example.com/page"]);
+    const sources = f.host.getState().sources;
+    expect(sources.items).toHaveLength(3);
+    expect(sources.items[0]).toMatchObject({
+      url: "https://docs.example.com/page",
+      search: { index: 0, query: "public topic" },
+    });
+    expect(sources.items[1]).toMatchObject({
+      url: "https://other.example.com/",
+      search: { index: 1 },
+    });
+    expect(sources.items[2]?.search).toBeUndefined();
+    expect(JSON.stringify(f.requests.at(-2))).toContain("successfulSearches");
+    expect(JSON.stringify(f.host.getState())).not.toContain("synthetic-search-key");
+    await f.host.close();
+    const reopened = await f.reopen();
+    await reopened.dispatch({ type: "load", sessionId: f.sessionId, askEachRead: false });
+    expect(reopened.getState().webAccess).toEqual({ allowedOrigins: [], dns: "system" });
+    expect(reopened.getState().sources).toEqual(sources);
+    expect(send).toHaveBeenCalledTimes(1);
+  });
+
+  it("requires a configured DeepSeek backend and does not restore a failed search grant", async () => {
+    const f = await fixture([]);
+    await expect(f.grantSearch()).rejects.toThrow("no network permission was retained");
+    expect(f.host.getState().webAccess).toEqual({ allowedOrigins: [], dns: "system" });
+  });
+
+  it("cancels an active native search with unknown outcome and never retries on reopen", async () => {
+    const entered = Promise.withResolvers<void>();
+    const cancelled = vi.fn();
+    const send = vi.fn<typeof fetch>(async () => {
+      entered.resolve();
+      return new Response(new ReadableStream({ cancel: cancelled }), {
+        headers: { "content-type": "application/json" },
+      });
+    });
+    const f = await fixture(
+      [call("web_search", { query: "public topic" }), answer],
+      false,
+      false,
+      send,
+    );
+    await f.grantSearch();
+    await f.start();
+    await f.approve();
+    await entered.promise;
+    await f.host.dispatch({ type: "cancel", runId: f.host.getState().run?.id });
+    await waitFor(f.host, (state) => state.outcome !== null);
+    expect(f.host.getState().effects.items.some((effect) => effect.state === "unknown")).toBe(true);
+    expect(f.host.getState().sources.items).toEqual([]);
+    expect(cancelled).toHaveBeenCalled();
+    await f.host.close();
+    const reopened = await f.reopen();
+    await reopened.dispatch({ type: "load", sessionId: f.sessionId, askEachRead: false });
+    expect(reopened.getState().webAccess).toEqual({ allowedOrigins: [], dns: "system" });
+    expect(send).toHaveBeenCalledTimes(1);
+  });
   it("requires explicit host permission and denies a GET before DNS", async () => {
     const f = await fixture([
       ...callSteps("https://docs.example.com/page"),
@@ -454,4 +568,37 @@ describe("desktop web over actual runtime and SQLite", () => {
 
 function callSteps(url: string): ModelStreamEvent[][] {
   return [call("web_fetch", { url }), answer];
+}
+
+function searchResponse(): Response {
+  return new Response(
+    JSON.stringify({
+      content: [
+        { type: "text", text: "https://fabricated.example.com must not become a source" },
+        {
+          type: "web_search_tool_result",
+          content: [
+            {
+              type: "web_search_result",
+              url: "https://docs.example.com/page",
+              title: "Search source",
+              snippet: "SEARCH FACT",
+              page_age: "2026-10-30",
+            },
+            {
+              type: "web_search_result",
+              url: "https://other.example.com/",
+              title: "Second source",
+            },
+          ],
+        },
+      ],
+      usage: {
+        input_tokens: 100,
+        output_tokens: 20,
+        server_tool_use: { tool_search: 2, web_search_requests: 2 },
+      },
+    }),
+    { headers: { "content-type": "application/json" } },
+  );
 }

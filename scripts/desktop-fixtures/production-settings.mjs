@@ -203,6 +203,17 @@ async function verify() {
     timeoutMs: 300_000,
   };
   const savedPath = join(home, ".moyyi/desktop/settings.json");
+  const switchNotice =
+    "Connection switched from DeepSeek Flash (deepseek/deepseek-flash) to Kimi · 中国 (kimi-cn/kimi-k3.1-pro). Prior provider-specific reasoning is unavailable across providers; same-provider history is retained. Previous work is preserved. Workspace writes, checks and web grants have been reset; ask the user to enable them when needed.";
+  function assertOnlyConnectionNotice(state) {
+    assert.equal(state.messages.length, 1);
+    assert.equal(state.messages[0].role, "notice");
+    assert.equal(state.messages[0].text, switchNotice);
+    assert.equal(typeof state.messages[0].id, "string");
+    assert(state.messages[0].id.length > 0);
+    assert.equal(state.messages[0].tool, undefined);
+    assert.equal(state.messages[0].state, undefined);
+  }
   try {
     assert.equal(worker.state().connection.ready, false);
     assert.equal(worker.state().settings.maxRequests, 3);
@@ -224,9 +235,21 @@ async function verify() {
     assert.equal(saved.run, null);
     assert.equal(saved.messages.length, 0);
     assert.deepEqual(JSON.parse(readFileSync(savedPath, "utf8")), {
-      format: 1,
+      format: 2,
       settings,
-      credentials: {},
+      connections: [
+        {
+          id: "legacy-flash",
+          name: "DeepSeek Flash",
+          provider: "deepseek",
+          reasoningEffort: "low",
+          credentialRef: "legacy-flash",
+        },
+      ],
+      activeConnectionId: "legacy-flash",
+      searchConnectionId: "legacy-flash",
+      personalInstructionsHash: null,
+      skills: [],
     });
     assert.equal(statSync(savedPath).mode & 0o777, 0o600);
     cases.push(
@@ -267,7 +290,7 @@ async function verify() {
     assert.equal(selected.budgets.timeoutMs, 300_000);
     assert.deepEqual(selected.permissions, { writes: false, checks: false });
     assert.equal(selected.activeSessionId, sessionId);
-    assert.equal(selected.messages.length, 0);
+    assertOnlyConnectionNotice(selected);
     assert.deepEqual(JSON.parse(readFileSync(savedPath, "utf8")).settings, high);
   } finally {
     await worker.close();
@@ -284,7 +307,7 @@ async function verify() {
       worker.request({ type: "start", sessionId, text: "Must remain offline with high selected" }),
       /unavailable/,
     );
-    assert.equal(worker.state().messages.length, 0);
+    assertOnlyConnectionNotice(worker.state());
     cases.push(
       "explicit Kimi high persists/restarts at 8 requests/300 seconds without credentials, replay or restored grants",
     );
@@ -315,7 +338,7 @@ async function verify() {
       worker.request({ type: "start", sessionId, text: "Remain offline" }),
       /unavailable/,
     );
-    assert.equal(worker.state().messages.length, 0);
+    assertOnlyConnectionNotice(worker.state());
     cases.push(
       "evidence answer saves and restarts through DesktopProcess with the same budget and no restored grants or model call",
     );
@@ -344,7 +367,7 @@ async function verify() {
       "timeoutMs",
     ]);
     cases.push(
-      "returning to low/Flash writes the legacy three-field settings and restarts with Flash/4",
+      "returning to low/Flash retains the three-field settings within format 2 and restarts with Flash/4",
     );
   } finally {
     await worker.close();

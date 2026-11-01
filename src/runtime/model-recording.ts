@@ -35,6 +35,7 @@ const reserve = 16384;
 const digestPattern = /^sha256:[0-9a-f]{64}$/;
 const filePattern = /^exchange-\d{8}\.json$/;
 const errorKinds = new Set([
+  "quota",
   "rate_limited",
   "overloaded",
   "auth",
@@ -608,9 +609,15 @@ function assertRequest(value: unknown): asserts value is ModelRequest {
   positive(request.maxOutputTokens);
   array(request.system).forEach(part);
   for (const item of array(request.messages)) {
-    const message = shape(item, ["role", "content"], ["replay", "stopReason"]);
+    const message = shape(item, ["role", "content"], ["origin", "replay", "stopReason"]);
     if (message.role !== "user" && message.role !== "assistant")
       throw Error("Invalid message role");
+    if (message.origin !== undefined) {
+      if (message.role !== "assistant") throw Error("Only assistant history has model origin");
+      const historicalOrigin = shape(message.origin, ["provider", "model"]);
+      nonempty(historicalOrigin.provider);
+      nonempty(historicalOrigin.model);
+    }
     array(message.content).forEach(part);
     if (message.replay !== undefined) replay(message.replay);
     if (message.stopReason !== undefined && !stopReasons.has(message.stopReason as string))

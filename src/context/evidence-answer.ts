@@ -125,7 +125,9 @@ export function buildEvidenceAnswer(
     system: [
       ...(["static", "session", "turn"] as const).flatMap((stability) =>
         input.sections
-          .filter((section) => section.stability === stability)
+          .filter(
+            (section) => section.stability === stability && section.placement !== "after_history",
+          )
           .flatMap((section) => section.content),
       ),
       { type: "text", text: instruction },
@@ -146,6 +148,9 @@ export function buildEvidenceAnswer(
           },
         ],
       },
+      ...input.sections
+        .filter((section) => section.placement === "after_history")
+        .map((section) => ({ role: "user" as const, content: section.content })),
     ],
     tools: [],
     toolChoice: "none",

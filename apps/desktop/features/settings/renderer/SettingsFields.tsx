@@ -1,9 +1,11 @@
 import type { SettingsSectionProps } from "../../../renderer/slot-types.ts";
 import type { DesktopSettings } from "../../../shared.ts";
+import { Connections } from "./Connections.tsx";
 import { presetLabel, selectKimiReasoningEffort, selectSettingsPreset } from "./settings-state.ts";
 export function SettingsFields({ draft, setDraft, setNotice, setError }: SettingsSectionProps) {
   return (
     <>
+      <Connections />
       <label>
         <span>模型服务</span>
         <select
