@@ -436,10 +436,15 @@ export function Composer(props: ComposerProps) {
         )}
       </div>
       {running && draft.trim() ? (
-        <span className="ch-caption">{running.who}做完这一步就看你的话</span>
+        <span className="ch-caption">{withSpace(running.who)}做完这一步就看你的话</span>
       ) : null}
     </div>
   );
+}
+
+/** A Latin name before Chinese text takes a space ("moyyi 做完"); a Chinese name does not. */
+function withSpace(name: string): string {
+  return /[A-Za-z0-9]$/.test(name) ? `${name} ` : name;
 }
 
 function memberNames(chat: Chat, members: Readonly<Record<string, Member>>): string {

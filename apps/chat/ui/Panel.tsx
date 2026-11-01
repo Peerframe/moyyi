@@ -220,16 +220,31 @@ function Info({
               <span style={{ width: `${Math.round(section.meter.value * 100)}%` }} />
             </span>
           ) : null}
-          {section.members?.map((id) => {
-            const member: Member | undefined = world.members[id];
-            return member ? (
-              <span key={id} className="ch-member">
-                <Avatar avatar={member.avatar} shape="ai" size={32} presence={member.presence} />
-                {member.name}
-                {member.model ? ` · ${member.model}` : ""}
-              </span>
-            ) : null;
-          })}
+          {section.members
+            ? // Everyone the subtitle counts, lead first, each with the role it has here.
+              (chat.members ?? section.members.map((id) => ({ id, role: undefined }))).map(
+                ({ id, role }) => {
+                  const member: Member | undefined = world.members[id];
+                  return member ? (
+                    <span key={id} className="ch-member">
+                      <Avatar
+                        avatar={member.avatar}
+                        shape="ai"
+                        size={32}
+                        presence={member.presence}
+                      />
+                      <span className="ch-min">
+                        {/* No 正在做 tag: presence is global, and the member may be busy elsewhere. */}
+                        <SenderLine name={member.name} role={role} />
+                        {member.model ? (
+                          <span className="ch-sub ch-block">{member.model}</span>
+                        ) : null}
+                      </span>
+                    </span>
+                  ) : null;
+                },
+              )
+            : null}
           {section.rows?.map((row) => (
             <span key={row.label} className="ch-info-row">
               <span>{row.label}</span>
