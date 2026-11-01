@@ -77,8 +77,9 @@ no absolute library path. Tool results and rendered requests provide the recorde
 
 The tool schema has fixed per-request cost only while Skills are enabled. Catalog input is bounded
 by 4096 UTF-8 bytes per enabled request; a body is loaded only on demand, at most 12 KiB before JSON escaping, and retained as
-ordinary tool-result history. A changed catalog affects the request suffix after stable system
-and transcript history. Old request blobs are immutable. This is not a durable stream of all
+ordinary tool-result history. Enabling the first Skill or revoking the last changes the tool
+schema list, so prefix reuse from the tools position is not promised. With registration unchanged,
+a changed catalog affects only the request suffix after stable system and transcript history. Old request blobs are immutable. This is not a durable stream of all
 past catalogs: the next request projects the current catalog at its tail, so cache reuse beyond
 the previous request's catalog position is not guaranteed. Successful tool results append to
 history and have the normal history/cache cost. Actual tokenization and cache hits are provider facts.

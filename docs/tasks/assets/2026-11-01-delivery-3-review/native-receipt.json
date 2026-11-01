@@ -1,0 +1,34 @@
+{
+  "source": "Packaged native synthetic fixture; no live model or real vault",
+  "widths": [
+    [
+      1120,
+      800
+    ],
+    [
+      780,
+      560
+    ]
+  ],
+  "counts": {
+    "syntheticRequests": 0,
+    "syntheticSearches": 0,
+    "syntheticCredentialReads": 0,
+    "syntheticCredentialWrites": 1,
+    "syntheticCredentialDeletes": 0,
+    "credentialReads": 0,
+    "networkAttempts": 0,
+    "nativeCalls": 0,
+    "liveModel": false
+  },
+  "connectionsAfterCancellation": 2,
+  "legacyReferenceRetained": true,
+  "bundleRestored": {
+    "main.mjs": "455974d51367f786b22314303d2cc28da2f89e7d92825c9e25528ab1049ad398",
+    "preload.cjs": "5438b1f7c681428e5b8e1f6b89e94de7cc07cb2514b6dafd720e16c269250000",
+    "renderer.js": "83b8ef31de8995d7d03076896ed05e32b89eb669ffdab07a34f91dcd82db30e3",
+    "renderer.css": "2aa6ff671e36eb6b22dcad138278ff619d98efa1aa29f4a55454e2ea26936daa",
+    "host.mjs": "7fe47d52a5794cee872e653ad9dd690a8b8364a9aa7abd78a781c2a6e4026d20",
+    "worker.mjs": "7ff3cf3b26bb8174a2593d184bd51d684b045ab447c7e9976dc36afe2f1755e7"
+  }
+}

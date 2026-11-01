@@ -149,3 +149,54 @@ A–H are implemented and offline/native evidence is complete. This record is no
 The PR is a draft because installed live task acceptance is incomplete. Quality spent 30/71 requests;
 installed spent 0/20 model requests and 0/3 product searches; no paid retry occurred. Session format 2,
 SQL schema 3, permission bounds and the daily installation remain unchanged. No merge is requested.
+
+## 2026-11-01：复核三项修复
+
+代码提交 `954dc229635c74cc307ac3fb3b428e680d092188`；安装版回归断言更新于
+`c1dba793d16a534097dc5c4936a45e2c34d0adc1`。本轮仅处理 owner 指出的三项问题：
+
+- 空库和只有停用版本的库不注册 `skill-library`，请求没有 `read_skill` 或空目录。启停在下一次
+  请求刷新，使用现有注册器；并发注册串行，慢目录回调不会阻塞其他会话或取消。全部停用时，按
+  当前会话路径上最后一条 assistant 的已记录工具列表判断，只在下一次请求补一个不可用提示。
+  重启后沿同一路径恢复判断；不改内核、插件契约或持久化格式。
+- 删除引用 `legacy-flash`、`legacy-kimi-cn`、`legacy-kimi-global` 的连接只解除设置关联。
+  原生钥匙串实现也不再提供删除这些共享旧服务的路径。仅删除无其他连接引用的 `desktop:*`
+  密钥；按真实 credentialRef 判定，不用连接 ID 推断。界面显示旧密钥保留说明。
+- 原生删除确认框写明连接名称及密钥删除或保留后果，默认和取消项都是取消；确认后重查连接
+  名称、类型、保留策略和当前运行状态。取消不发送修改。新增 DTO 字段不写入设置文件。
+
+验证（本机 Node 26.13.0，打包运行时 Node 26.12.1）：
+
+| 检查 | 结果 |
+|---|---|
+| 聚焦 runtime/plugin/desktop/钥匙串/确认框/边界测试 | 通过；含空库请求与无库请求 tools/messages 一致、启停、重启、并发和取消 |
+| `npm run check`（最终代码） | typecheck/lint 通过；默认 4 workers 下 3254/3262 通过，8 个失败均为既有文档和 checker 的 5 s 超时 |
+| `npm run test -- --maxWorkers=1` | 3261/3262 通过；唯一失败仍为 `src/runtime/documents.test.ts:105` 的既有 5 s 超时；未改断言、时限或配置 |
+| `npm run eval:skills` | 33/33 通过，新增两个独立 scenario，旧 checker 不变 |
+| `npm run eval:instructions` | 36/36 通过 |
+| `npm run eval:runtime` | 10/10 通过 |
+| `npm run verify:package -- --offline` | 通过，包括 7/7 PTY、类型、CLI/client 和原生文档隔离 |
+| `npm run desktop:package` | 通过 |
+| `npm run verify:desktop` | 通过，保留既有 M1–M6 和 D3 断言 |
+| CI（`c1dba79`） | [run 41294909237](https://github.com/Peerframe/moyyi/actions/runs/41294909237)：check、desktop-macos、macos-documents 全通过 |
+
+实现阶段的首次 check 发现新增测试的跨层导入及错误事件匹配，均已修正并通过聚焦/最终 CI。
+首个代码提交的 desktop CI 仍断言旧的每请求空目录文案；已改为新的一次提示，并新增工具/目录
+缺席断言。原有“尝试调用已撤销工具必须失败且不返回正文”的验证保留。
+
+本地桌面 ZIP SHA-256：`c76e94a5c69e1e4e9256693021cf8244834aec00f44384f2e2e93c3e5920ddc0`。
+运行时 tarball SHA-256：`7e611c18343c0a2f0e261cbc0dc27e6c8ee3e95dcbf3f88472cf50334aaa78d7`。
+桌面包在代码 checkpoint 前构建，其 manifest 如实标注父提交和 dirty；checkpoint 后的
+`verify:package` 从 `c1dba79` 再构建得到同一 tarball 字节。后续只更新回归脚本和记录，桌面
+生产源码未再修改。该包只作隔离验收，未替换日常安装。
+
+原生检查使用生产 main/preload/renderer/host 和隔离的 `native-d3.mjs` worker：正常
+1120 × 800 与窄窗口 780 × 560 下，两种确认文案和取消返回均检查，四次取消后两条连接与
+两条假钥匙串引用保留。真实网络、凭据读取、原生凭据子进程、模型和搜索请求均为零。
+[截图、AX 文本和回执](assets/2026-11-01-delivery-3-review/README.md)保留；原生 sheet
+截图接口返回空白，因此不声称取得了确认框的视觉截图。临时副本退出后恢复并核对 bundle
+哈希，再清理隔离 app/data。原项目目录的两份未提交用户文档未改动。
+
+本轮没有付费调用或重跑。之前 6/6 质量门针对无 Skill 库的配置；本轮恢复空库与该配置的
+请求一致性，不能据此宣称已启用 Skill 的真实任务通过。此前三项安装版任务失败、零请求的
+记录及零重试约束保留；是否重新授权仍由 owner 决定。未合并，未更新日常 CLI/桌面安装。

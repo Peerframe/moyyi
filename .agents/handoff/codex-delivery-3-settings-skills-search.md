@@ -3,35 +3,32 @@
 - Brief: `docs/tasks/2026-10-30-delivery-3-settings-skills-search.md`; owner fee amendment `de28e57`.
 - Branch: `codex/delivery-3-settings-skills-search`; worktree:
   `/Users/yxflc/.codex/worktrees/delivery-3-settings-skills-search/moyyi`.
-- Last agent: Codex, 2026-11-01 Asia/Singapore. A–H implemented; review fixes in progress; not accepted.
+- Last agent: Codex, 2026-11-01 Asia/Singapore. A–H implemented; three review fixes complete; not accepted.
 - Draft PR: https://github.com/Peerframe/moyyi/pull/56 — Claude review, installed acceptance blocked.
 - Durable details: `docs/tasks/2026-10-30-delivery-3-record.md` and screenshot index beside it.
 
 ## Current review fixes (2026-11-01)
 
-- User requested three fixes: omit the library when no Skills are enabled, preserve shared legacy
-  credentials when deleting a connection, and confirm deletion with accurate credential consequences.
-- Code and regression tests are implemented. Skill refresh uses the existing runtime registry;
-  no core, persisted format or settings-format change. Zero-Skill tools/messages match the
-  no-library baseline, with a one-request revoked notice based on recorded request tools.
-- Connection host deletes only unshared desktop-owned keys. Native deletion confirms the displayed
-  name and deletion/retention policy, defaults to cancel, and revalidates current state afterwards.
-- Focused runtime tests: 14 PASS; desktop empty/disabled-library integration: 10 PASS; settings,
-  keychain, native dialog and renderer tests PASS. New offline Skill scenarios: 33/33 PASS.
-- First full check exposed two new-test issues (renderer layer import and a wrong event matcher),
-  now corrected with focused passing checks, plus the already-reviewed document parser 5 s timeout.
-- Product checkpoint: `954dc229635c74cc307ac3fb3b428e680d092188` pushed to PR #56.
-  CI check and macos-documents passed. Desktop CI found the old fixture expected the removed
-  empty-library message; the fixture now asserts the one-time unavailable suffix, no tool/catalog,
-  and retained failure/no-body behavior for an attempted revoked tool call.
-- Desktop package and native 1120 × 800 / 780 × 560 cancellation checks complete. The native sheet
-  screenshot API produced blank images; exact AX captures plus settings screenshots are retained.
-  Isolated app closed and removed; no model/search requests or real vault/network calls.
-- Final local check passed type/lint but had 8 timeout-only failures in existing document/eval
-  tests; serial full-suite verification is running unchanged. Next: finish local checks and external
-  desktop gate, then update evidence and existing PR. No paid process is active.
-- No other agent is writing. The original checkout's two user documents remain untouched.
-- The existing paid ledger and no-rerun decision below remain authoritative; no live retry authorized.
+- Product fixes: `954dc229635c74cc307ac3fb3b428e680d092188`; installed probe:
+  `c1dba793d16a534097dc5c4936a45e2c34d0adc1`, pushed to the existing draft PR #56.
+- Zero-enabled Skills now register no library/tool/catalog. One revoked suffix uses the selected
+  session's recorded request tools and survives restart. Concurrent refresh and cancellation tested.
+- Legacy shared keys are never deleted; unshared desktop keys retain cleanup. Native confirmation
+  names the connection and exact key consequence, defaults to cancel, and rejects stale state.
+- Final local check type/lint pass; 4-worker tests had 8 existing timeout failures. Serial full suite:
+  3261/3262 pass, only the already-reviewed documents.test.ts:105 5 s timeout remains. No limits changed.
+- Local skills 33/33, instructions 36/36, runtime 10/10, offline package, desktop package and external
+  desktop verification passed. CI run 41294909237: all three jobs passed at `c1dba79`.
+- Native normal/narrow settings screenshots and both alert AX/cancel checks complete. Sheet screenshot
+  API returns blank images; this limitation is recorded. Zero model/search/real credential/network
+  calls. Disposable app quit, restored/hash-checked and removed. No agents or processes remain active.
+- Current ZIP SHA-256: `c76e94a5c69e1e4e9256693021cf8244834aec00f44384f2e2e93c3e5920ddc0`.
+  Runtime tarball: `7e611c18343c0a2f0e261cbc0dc27e6c8ee3e95dcbf3f88472cf50334aaa78d7`.
+  Packaging manifest retains its pre-checkpoint dirty source stamp; final package verification rebuilt
+  the identical tarball at `c1dba79`. See the delivery record for exact provenance and commands.
+- The original checkout's two user documents and daily installation/data remain untouched.
+- Remaining: Claude/owner review and the prior installed-live acceptance decision below. No paid
+  rerun is authorized; these review fixes do not mark the overall delivery accepted.
 
 ## Prior product and evidence (before review fixes)
 
