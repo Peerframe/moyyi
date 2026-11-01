@@ -1,6 +1,6 @@
 # moyyi Chat：Telegram 模式研究、全流程模拟、前端搭建方案
 
-- 日期：2026-11-01。状态：研究和设计稿，等主人定第 4 节的三个决定。
+- 日期：2026-11-01。状态：D1–D3 主人 2026-11-01 按推荐接受；`apps/chat` 前端在假后端上搭好，待验收（见文末搭建记录）。
 - 输入：moyyi Chat 设计系统（版本 12）和画布（版本 33，S1–S18）。两者都在 claude.ai 上，只有主人能打开。
 - 分工：Claude 一比一搭前端，后端功能以后写成交付说明交给 Codex。
 
@@ -176,3 +176,20 @@ apps/chat/
 - 常见问题（回执、编辑和删除）：<https://telegram.org/faq>
 - 话题发布说明：<https://telegram.org/blog/topics-in-groups-collectible-usernames>
 - 桌面版文件夹：<https://www.omgubuntu.co.uk/2020/03/telegram-desktop-adds-chat-folders>
+
+## 搭建记录（2026-11-01）
+
+- 位置：`apps/chat`，`npm run chat:build` 生成 `artifacts/chat`，浏览器直接打开。参数：
+  `?scene=day|first-run|offline|loading`、`?theme=dark|light`、`?chat=<id>`、`?play`（自动播放这一天剩下的部分）。
+- 样式：`bundle.css` 和 `tokens.json` 原样从设计系统复制，`tokens.css` 由 `tokens.ts` 生成；页面布局和画板里写在
+  行内的样式放在 `app.css`，只用设计系统已有的 token。
+- 已做的新规则：N1 改话（一个勾原地改、两个勾变补充）、N2 收回、N4 话题关闭、N5 归档、N6 转发带出处、N7 多选、
+  N9 本聊天搜索和筛选、N10 复制链接、N11 菜单按钮、N12 草稿、N13 定时、N14 资料里写明 AI 能看到什么、
+  N15 快捷键（⌘K、⌘F、↑、Esc、⌥↑/⌥↓；单行输入框里 Enter 和 ⌘Enter 都发送）、N16 回复就是点名。
+  N3 静音和 N8 只体现在数据上（静音行灰色数字，副标题写谁在做）。
+- 对照：1280 和 560 宽、深浅两种主题，和 S7、S8、S12、S15、S17 画板截图对照。差别：
+  - 画板 S7 的文件夹数字不自洽（全部 3、项目 2，但各行加起来对不上），按设计系统 README 的规则算；
+  - 消息列按 `column-max` 760 居中，画板里铺满；
+  - 输入框左边多了 N11 菜单按钮。
+- 还没做：把 N1–N16 写回 claude.ai 上的设计系统 README 并补画板（D3）；ChatPort 接 runtime（以后的交付）。
+

@@ -19,10 +19,8 @@ export interface MessageActions {
 }
 
 export interface Run {
-  /** First bubble of a run from one sender: carries the sender line. */
+  /** First bubble of a run from one sender: carries the sender line; later ones sit closer. */
   readonly first: boolean;
-  /** Last bubble of a run: carries the avatar. */
-  readonly last: boolean;
 }
 
 interface Props {
@@ -112,9 +110,8 @@ function FromAI({
   const member = members[message.from];
   const name = member?.name ?? message.from;
   const role = chat.members?.find((m) => m.id === message.from)?.role;
-  const showSender = run.first && (chat.kind === "project" || Boolean(message.senderNote));
-  const avatar =
-    run.last && member ? <MemberAvatar member={member} /> : <span className="ch-av-space" />;
+  const showSender = Boolean(message.senderNote) || (run.first && chat.kind === "project");
+  const avatar = member ? <MemberAvatar member={member} /> : <span className="ch-av-space" />;
   if (message.kind === "sticker") {
     return (
       <div className="mc-line">
@@ -410,6 +407,21 @@ function After({
   readonly actions: MessageActions;
 }) {
   const answer = (index: number) => actions.answer(message.id, index);
+  if (message.kind === "options" && !message.answered)
+    return (
+      <div className="ch-options">
+        {message.keys.map((key, index) => (
+          <button
+            key={key.label}
+            type="button"
+            className={`mc-key${key.tone ? ` mc-key-${key.tone}` : ""}`}
+            onClick={() => answer(index)}
+          >
+            {key.label}
+          </button>
+        ))}
+      </div>
+    );
   if (message.kind === "decision" || message.kind === "options") {
     if (message.answered) return <span className="mc-answered">{message.answered}</span>;
     return (

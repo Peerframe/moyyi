@@ -39,6 +39,7 @@ cli / desktop host ─┐   (future: automation — also a client)
 | Runtime | `src/runtime` | Plugin registry, wiring, the client protocol |
 | CLI | `src/cli` | Terminal client |
 | Desktop client | `apps/desktop` | Sandboxed React renderer, validated local bridge and a trusted host using the public runtime; installed acceptance is tracked separately |
+| moyyi Chat | `apps/chat` | The next interface, built from the moyyi Chat design system over its own `ChatPort`; runs on an in-memory mock backend and is not wired to the runtime yet |
 
 ### Plugin inventory
 
@@ -159,6 +160,10 @@ Enforced by [tests/boundaries.ts](../tests/boundaries.ts):
   runtime/contracts packages or any `src` internals. Model and document text uses escaped React
   nodes, including the bounded M6 Markdown subset; raw HTML, links and remote images remain inert.
   Only host-checked bounded local PNG/JPEG bytes enter image previews. Content never grants authority.
+- `apps/chat` (layer `app:chat`) imports only its own files and React's browser entry points; its
+  tests may also use `vitest` and `react-dom/server`. It reaches no runtime, contracts or Node
+  module: everything it shows or does crosses `apps/chat/port.ts`, which a later delivery
+  implements over the runtime.
 - `shared.ts` is a data-only contract without external imports. `security.ts` is likewise pure;
   `wire.ts` can use only shared data and security validation. `preload.ts` imports only these
   three modules and Electron, exposing named methods rather than generic IPC or Node access.

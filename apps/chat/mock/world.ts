@@ -237,7 +237,7 @@ const LUNWEN: readonly Message[] = [
       { name: "第1章.docx", count: "查了 14 条" },
       { name: "第2章.docx", count: "查了 9 条" },
     ],
-    check: { kind: "partial", text: "有 3 条没有原文" },
+    check: { kind: "partial", text: "有 3 条要你看" },
     claims: [
       {
         id: "c1",
@@ -248,6 +248,22 @@ const LUNWEN: readonly Message[] = [
         source: "第1章.docx 第 2 页",
       },
       {
+        id: "c2",
+        text: "第 2 条：年份应为 2018",
+        kind: "none",
+        tag: "没有原文",
+        note: "正文写 2018，参考文献写 2019，两处都没有出版信息。",
+      },
+      {
+        id: "c3",
+        text: "第 3 条：李 2020 第 45 页",
+        kind: "partial",
+        tag: "部分有原文",
+        unsupported: "第 45 页",
+        quote: "李（2020）认为格式统一能减少审稿往返。",
+        source: "第2章.docx 第 6 页",
+      },
+      {
         id: "c4",
         text: "第 4 条：补 Zhang 2021",
         kind: "none",
@@ -255,22 +271,6 @@ const LUNWEN: readonly Message[] = [
         note: "参考文献里没有这篇。批注写的是“见 Zhang 2021，待补”。",
         quote: "见 Zhang 2021，待补",
         source: "第3章.docx 第 12 页批注",
-      },
-      {
-        id: "c7",
-        text: "第 7 条：年份应为 2018",
-        kind: "none",
-        tag: "没有原文",
-        note: "正文写 2018，参考文献写 2019，两处都没有出版信息。",
-      },
-      {
-        id: "c11",
-        text: "第 11 条：李 2020 第 45 页",
-        kind: "partial",
-        tag: "部分有原文",
-        unsupported: "第 45 页",
-        quote: "李（2020）认为格式统一能减少审稿往返。",
-        source: "第2章.docx 第 6 页",
       },
     ],
     time: "21:20",
@@ -662,7 +662,7 @@ export function xiaowenWorld(): ChatWorld {
           { title: "本周预算", meter: { label: "31 / 40 次", value: 0.77 } },
           {
             title: "核对",
-            evidence: { label: "核查标了 3 条没有原文", messageId: "l-check", claimId: "c4" },
+            evidence: { label: "核查标了 3 条要你看", messageId: "l-check", claimId: "c4" },
           },
           {
             title: "能看的文件夹",

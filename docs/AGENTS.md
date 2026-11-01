@@ -8,7 +8,7 @@
 | [architecture.md](architecture.md) | Layer boundaries and extension points |
 | [roadmap.md](roadmap.md) | Delivery order and future scope |
 | [decisions/](decisions/) | Accepted decisions and their rationale (ADRs) |
-| [design.md](design.md) | Desktop UI rules |
+| [design.md](design.md) | Desktop UI rules; `apps/chat` follows [its own design system](../apps/chat/design/README.md) |
 | [recipes/](recipes/) | Step-by-step procedures for common changes |
 | [tasks/](tasks/) | Dated briefs and delivery records (history) |
 | [openbot-provenance.md](openbot-provenance.md) | Code and designs taken from other projects |

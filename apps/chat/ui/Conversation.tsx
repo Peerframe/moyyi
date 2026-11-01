@@ -31,15 +31,17 @@ export interface ConversationProps {
   readonly act: (action: ChatAction) => void;
 }
 
+const CARDS = new Set<Message["kind"]>(["status", "plan", "result", "decision", "change"]);
+
+/** Bubbles from one sender form a run under one sender line; cards always start their own. */
 export function runs(messages: readonly Message[]): Run[] {
+  const key = (message: Message | undefined) =>
+    message && author(message) !== null
+      ? `${author(message)}${CARDS.has(message.kind) ? `#${message.id}` : ""}`
+      : undefined;
   return messages.map((message, index) => {
-    const own = author(message);
-    const before = messages[index - 1];
-    const after = messages[index + 1];
-    return {
-      first: !before || author(before) !== own,
-      last: !after || author(after) !== own,
-    };
+    const own = key(message);
+    return { first: own === undefined || key(messages[index - 1]) !== own };
   });
 }
 
@@ -243,7 +245,13 @@ export function Conversation(props: ConversationProps) {
     const message = find(messageId);
     if (!message || message.kind === "unread-divider") return;
     const bounds = column.current?.getBoundingClientRect();
-    setMenu({ x: x - (bounds?.left ?? 0), y: y - (bounds?.top ?? 0), messageId });
+    if (!bounds) return;
+    // Keep the menu inside the column: 180px wide, at most seven 34px items.
+    setMenu({
+      x: Math.max(8, Math.min(x - bounds.left, bounds.width - 188)),
+      y: Math.max(8, Math.min(y - bounds.top, bounds.height - 260)),
+      messageId,
+    });
   };
 
   const menuMessage = menu ? find(menu.messageId) : undefined;
@@ -429,7 +437,7 @@ export function Conversation(props: ConversationProps) {
                 key={message.id}
                 className={`ch-msg${flash === message.id || currentHit?.id === message.id ? " ch-flash" : ""}`}
                 data-wrap={message.id}
-                data-selected={selected ? isSelected : undefined}
+                data-selected={selected ? String(isSelected) : undefined}
                 onClickCapture={(event) => {
                   if (message.kind === "unread-divider" || message.kind === "service") return;
                   if (selected || event.shiftKey) {
@@ -443,7 +451,7 @@ export function Conversation(props: ConversationProps) {
                   message={message}
                   chat={chat}
                   members={world.members}
-                  run={grouped[index] ?? { first: true, last: true }}
+                  run={grouped[index] ?? { first: true }}
                   actions={actions}
                   sticker={props.sticker}
                 />
@@ -701,7 +709,7 @@ function MessageMenu({
   readonly onForward: () => void;
 }) {
   const first = useRef<HTMLButtonElement>(null);
-  useEffect(() => first.current?.focus(), []);
+  useEffect(() => first.current?.focus({ preventScroll: true }), []);
   const own = message.kind === "out" && !message.retracted;
   const items: { label: string; run: () => void; danger?: boolean }[] = [
     { label: "回复", run: onReply },

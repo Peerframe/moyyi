@@ -127,6 +127,7 @@ Plan: [post-M6 plan v2](tasks/2026-10-28-post-m6-plan.md). Order is owned by the
 | Delivery two: desktop feature modules | Accepted, merged; not installed. No behavior change | [PR #52](https://github.com/Peerframe/moyyi/pull/52), [record](tasks/2026-10-29-desktop-modules-delivery.md) |
 | Delivery three: settings, Skills, search | Ready for Codex | [Brief](tasks/2026-10-30-delivery-3-settings-skills-search.md) |
 | Delivery four: conditional capabilities | Triggered per item | [Plan](tasks/2026-10-28-post-m6-plan.md) |
+| moyyi Chat interface | In review; mock backend only, offline-tested, not wired to the runtime | [Study and plan](tasks/2026-11-01-moyyi-chat-study.md) |
 
 ## Boundaries
 

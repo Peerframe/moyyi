@@ -27,7 +27,7 @@ html {
   min-height: 0;
   box-sizing: border-box;
   position: relative;
-  overflow: hidden;
+  overflow: clip;
 }
 .ch-rail {
   flex: 0 0 auto;
@@ -180,7 +180,8 @@ html {
   display: flex;
   flex-direction: column;
   border-radius: var(--radius-panel);
-  overflow: hidden;
+  /* clip, not hidden: focusing a popup must never scroll the pane itself */
+  overflow: clip;
 }
 .ch-head {
   display: flex;
@@ -314,8 +315,15 @@ html {
 .ch-flash {
   background: var(--hover);
 }
+/* Same sender in a row: space-2 apart instead of space-8. */
 .ch-tight {
-  margin-top: calc(var(--space-4) * -1);
+  margin-top: calc(var(--space-6) * -1);
+}
+.ch-options {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-6);
+  margin-top: var(--space-6);
 }
 .ch-col {
   display: flex;
