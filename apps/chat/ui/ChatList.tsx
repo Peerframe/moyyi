@@ -1,131 +1,24 @@
-// Folder rail and chat list (boards S1, S7, S8). Folders are filters over one list; a folder's
-// badge counts open decisions if any, otherwise chats with unread messages (muted chats never count).
+// The chat list (boards S1, S7, S8): one list, filtered by the folder the rail picked.
 import { useState } from "react";
 import type { Chat, ChatWorld, FolderId } from "../port.ts";
 import { Icon } from "./icons.tsx";
 import { Avatar, Badge, ReceiptMark } from "./parts.tsx";
+import { FolderStrip, inFolder, type ViewId, viewLabel } from "./Rail.tsx";
 
 const EMPTY: Record<FolderId, readonly [string, string]> = {
   all: ["这里没有对话", "跟 moyyi 说一件想做的事，项目和 AI 会出现在这里"],
   ai: ["还没有 AI", "交代第一件事之后，moyyi 会拉合适的 AI 进来"],
   project: ["还没有项目", "计划卡上点开始，才会建项目群"],
   mine: ["没有等你的事", "有决定要你做时，这里会出现橙色数字"],
-  ledger: ["没有要对账的结论", "AI 给出结论后，没核对的会列在这里"],
+  running: ["没有在做的事", "计划卡上点开始之后，正在做的项目和 AI 会列在这里"],
 };
-
-const FOLDERS: readonly {
-  readonly id: FolderId;
-  readonly label: string;
-  readonly icon: keyof typeof Icon;
-}[] = [
-  { id: "all", label: "全部", icon: "all" },
-  { id: "ai", label: "AI", icon: "ai" },
-  { id: "project", label: "项目", icon: "project" },
-  { id: "mine", label: "等我的", icon: "clock" },
-  { id: "ledger", label: "待对账", icon: "ledger" },
-];
-
-export function inFolder(chat: Chat, folder: FolderId): boolean {
-  if (chat.archived) return false;
-  switch (folder) {
-    case "all":
-      return true;
-    case "ai":
-      return chat.kind === "ai" || chat.kind === "moyyi";
-    case "project":
-      return chat.kind === "project";
-    case "mine":
-      return chat.decisions > 0;
-    case "ledger":
-      return (chat.toCheck ?? 0) > 0;
-  }
-}
-
-export function folderBadge(
-  chats: readonly Chat[],
-  folder: FolderId,
-): { kind: "decide" | "unread" | "quiet"; count: number } | null {
-  const inside = chats.filter((chat) => inFolder(chat, folder));
-  if (folder === "ledger") {
-    const count = inside.reduce((sum, chat) => sum + (chat.toCheck ?? 0), 0);
-    return count ? { kind: "quiet", count } : null;
-  }
-  const decisions = inside.reduce((sum, chat) => sum + chat.decisions, 0);
-  if (decisions) return { kind: "decide", count: decisions };
-  const unread = inside.filter((chat) => chat.unread > 0 && !chat.muted).length;
-  return unread ? { kind: "unread", count: unread } : null;
-}
-
-export function Rail({
-  world,
-  folder,
-  onFolder,
-}: {
-  readonly world: ChatWorld;
-  readonly folder: FolderId;
-  readonly onFolder: (folder: FolderId) => void;
-}) {
-  return (
-    <nav className="mc-rail ch-rail" aria-label="文件夹">
-      <span className="ch-wordmark">moyyi</span>
-      {FOLDERS.map((item) => {
-        const FolderIcon = Icon[item.icon];
-        const badge = folderBadge(world.chats, item.id);
-        return (
-          <button
-            key={item.id}
-            type="button"
-            className="mc-rail-item"
-            aria-current={folder === item.id ? "true" : undefined}
-            onClick={() => onFolder(item.id)}
-          >
-            <FolderIcon size={20} />
-            <span>{item.label}</span>
-            {badge ? <Badge kind={badge.kind} count={badge.count} /> : null}
-          </button>
-        );
-      })}
-    </nav>
-  );
-}
-
-/** Below 900px the rail becomes a strip of chips above the list. */
-function FolderStrip({
-  world,
-  folder,
-  onFolder,
-}: {
-  readonly world: ChatWorld;
-  readonly folder: FolderId;
-  readonly onFolder: (folder: FolderId) => void;
-}) {
-  return (
-    <nav className="ch-strip" aria-label="文件夹">
-      {FOLDERS.map((item) => {
-        const badge = folderBadge(world.chats, item.id);
-        return (
-          <button
-            key={item.id}
-            type="button"
-            className="mc-key ch-strip-key"
-            aria-current={folder === item.id ? "true" : undefined}
-            onClick={() => onFolder(item.id)}
-          >
-            {item.label}
-            {badge ? <Badge kind={badge.kind} count={badge.count} /> : null}
-          </button>
-        );
-      })}
-    </nav>
-  );
-}
 
 export function ChatList({
   world,
   folder,
   openId,
   drafts,
-  onFolder,
+  onView,
   onOpen,
   onCompose,
 }: {
@@ -133,7 +26,7 @@ export function ChatList({
   readonly folder: FolderId;
   readonly openId: string | null;
   readonly drafts: Readonly<Record<string, string>>;
-  readonly onFolder: (folder: FolderId) => void;
+  readonly onView: (view: ViewId) => void;
   readonly onOpen: (chatId: string) => void;
   /** New work always starts by telling moyyi, so composing opens moyyi's chat. */
   readonly onCompose: () => void;
@@ -144,7 +37,7 @@ export function ChatList({
   const archived = world.chats.filter((chat) => chat.archived);
   const chats = world.chats.filter(
     (chat) =>
-      (archive ? chat.archived : inFolder(chat, folder)) &&
+      (archive ? chat.archived : inFolder(world, chat, folder)) &&
       (!needle || chat.name.includes(needle) || chat.preview.text.includes(needle)),
   );
   const [emptyTitle, emptyNote] = needle
@@ -153,9 +46,7 @@ export function ChatList({
   return (
     <section className="mc-panel ch-list" aria-label="对话列表">
       <div className="ch-list-head">
-        <h1 className="ch-list-title">
-          {archive ? "归档" : FOLDERS.find((item) => item.id === folder)?.label}
-        </h1>
+        <h1 className="ch-list-title">{archive ? "归档" : viewLabel(folder)}</h1>
         <button
           type="button"
           className="mc-icon-btn ch-list-compose"
@@ -166,7 +57,7 @@ export function ChatList({
           <Icon.compose size={20} />
         </button>
       </div>
-      <FolderStrip world={world} folder={folder} onFolder={onFolder} />
+      <FolderStrip world={world} view={folder} onView={onView} />
       <div className="mc-composer ch-search">
         <Icon.search />
         <label htmlFor="chat-search" className="ch-sr">
@@ -203,7 +94,7 @@ export function ChatList({
             key={chat.id}
             chat={chat}
             draft={drafts[chat.id]}
-            mixed={folder === "all" || folder === "mine" || folder === "ledger"}
+            mixed={folder === "all" || folder === "mine" || folder === "running"}
             open={chat.id === openId}
             onOpen={() => onOpen(chat.id)}
           />

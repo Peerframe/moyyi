@@ -62,6 +62,7 @@ export function Composer(props: ComposerProps) {
   const [recording, setRecording] = useState<number | null>(null);
   const input = useRef<HTMLInputElement>(null);
   const attachButton = useRef<HTMLButtonElement>(null);
+  const suggest = Boolean(chat.suggestions?.length) && !draft && recording === null;
 
   useEffect(() => {
     if (recording === null) return;
@@ -347,7 +348,26 @@ export function Composer(props: ComposerProps) {
         >
           <Icon.attach size={18} />
         </button>
-        <div className="mc-composer mc-glass">
+        <div className={`mc-composer mc-glass${suggest ? " ch-has-suggest" : ""}`}>
+          {suggest ? (
+            // First-task suggestions live in the field they fill; they leave once the person types.
+            <div className="ch-compose-suggest">
+              <span className="ch-compose-suggest-h">可以这样开头</span>
+              {chat.suggestions?.map((text) => (
+                <button
+                  key={text}
+                  type="button"
+                  className="mc-chip ch-chip-button"
+                  onClick={() => {
+                    onDraft(text);
+                    input.current?.focus();
+                  }}
+                >
+                  {text}
+                </button>
+              ))}
+            </div>
+          ) : null}
           {recording !== null ? (
             <span className="mc-recording" role="status">
               <span className="mc-recording-dot" />

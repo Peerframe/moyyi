@@ -61,13 +61,13 @@ describe("moyyi Chat mock backend", () => {
     const { port, flush, chat } = setup();
     await port.act({ type: "answer", messageId: "l-decide", key: 0 });
     expect(messageById(port.world(), "l-decide")).toMatchObject({
-      answered: "你选了：用 GB/T 7714",
+      answered: "你选了 用 GB/T 7714",
     });
     expect(chat("lunwen")?.decisions).toBe(0);
     expect(port.world().jobs.find((j) => j.id === "j-format")?.waiting).toBeUndefined();
     await port.act({ type: "answer", messageId: "l-decide", key: 1 });
     expect(messageById(port.world(), "l-decide")).toMatchObject({
-      answered: "你选了：用 GB/T 7714",
+      answered: "你选了 用 GB/T 7714",
     });
     flush();
     expect(port.world().jobs.some((j) => j.id === "j-format")).toBe(false);
@@ -113,15 +113,14 @@ describe("moyyi Chat mock backend", () => {
     expect(port.world().changes.lunwen?.map((c) => c.id)).toEqual(["ch-3", "ch-3t"]);
   });
 
-  it("checks a claim once and counts it off 待对账", async () => {
-    const { port, chat } = setup();
+  it("checks a claim once; a second verdict does not overwrite it", async () => {
+    const { port } = setup();
     await port.act({ type: "check", claimId: "c4", verdict: "checked" });
     await port.act({ type: "check", claimId: "c4", verdict: "wrong" });
     const result = messageById(port.world(), "l-check");
     expect(result?.kind === "result" && result.claims?.find((c) => c.id === "c4")?.check).toBe(
       "checked",
     );
-    expect(chat("lunwen")?.toCheck).toBe(2);
   });
 
   it("edits in place before anyone took it and adds a supplement after (N1)", async () => {

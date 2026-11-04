@@ -4,7 +4,8 @@
 // checks, undo results) arrive as data; the interface never invents them.
 
 export type Theme = "dark" | "light";
-export type FolderId = "all" | "ai" | "project" | "mine" | "ledger";
+/** Folders filter the one chat list: states first (全部, 等我的, 在做), then kinds (AI, 项目). */
+export type FolderId = "all" | "mine" | "running" | "ai" | "project";
 
 /** Avatar fill roles from the design system: accent (moyyi), key, ink (dark roles), quiet. */
 export type AvatarTone = "accent" | "key" | "ink" | "quiet";
@@ -59,8 +60,8 @@ export interface Chat {
   readonly placeholder: string;
   /** Project chats: members with their role here. */
   readonly members?: readonly { readonly id: string; readonly role: Role }[];
-  /** Claims left to check (待对账). */
-  readonly toCheck?: number;
+  /** First-task suggestions shown inside the composer until the person types (first run, S12). */
+  readonly suggestions?: readonly string[];
 }
 
 export interface Reaction {
@@ -292,6 +293,129 @@ export interface ChatWorld {
   readonly changes: Readonly<Record<string, readonly ChangeEntry[]>>;
   readonly threads: Readonly<Record<string, Thread>>;
   readonly firstRun?: boolean;
+  /** 设置 (S23–S30): what every AI works by, in rail order. */
+  readonly settings: readonly SettingsPage[];
+  /** 插件 (S31–S32): what AIs can do. */
+  readonly plugins: readonly PluginPage[];
+}
+
+// ---- settings and plugin pages ----
+// Pages are data so their wording and controls can change without touching the interface. Every
+// control and choice has an id: the runtime's stable key for what it does. Keys typed into a
+// provider field leave through "save-key" only and are never part of the world.
+
+export type PageIcon =
+  | "key"
+  | "me"
+  | "shield"
+  | "timer"
+  | "gauge"
+  | "db"
+  | "sliders"
+  | "info"
+  | "folder"
+  | "term"
+  | "globe"
+  | "doc"
+  | "skill";
+
+/** A button on a page. */
+export interface Control {
+  readonly id: string;
+  readonly label: string;
+  readonly tone?: "primary" | "danger";
+}
+
+/** A segmented choice; with a label it is a row in a card, without one it spans the group. */
+export interface Choice {
+  readonly id: string;
+  readonly label?: string;
+  readonly note?: string;
+  readonly options: readonly string[];
+  readonly selected: number;
+}
+
+/** One row in a card: a folder, a memory, a scheduled job, a skill. */
+export interface PageLine {
+  readonly id: string;
+  readonly text: string;
+  readonly sub?: string;
+  readonly mono?: boolean;
+  readonly icon?: PageIcon;
+  /** Member ids shown as avatars before the text. */
+  readonly members?: readonly string[];
+  /** A role pill after the text ("可以改", "开着"); dimmed when off. */
+  readonly tag?: string;
+  readonly off?: boolean;
+  readonly controls?: readonly Control[];
+}
+
+export interface Meter {
+  readonly id: string;
+  readonly avatar: Avatar;
+  readonly shape: "ai" | "project";
+  readonly name: string;
+  readonly used: number;
+  readonly total: number;
+  /** Said instead of the count when it matters more ("用完了 · 已暂停"). */
+  readonly alert?: string;
+}
+
+export interface Provider {
+  readonly id: string;
+  readonly letter: string;
+  readonly name: string;
+  readonly status: string;
+  readonly connected: boolean;
+  readonly controls: readonly Control[];
+  /** A password field whose value goes straight to the system keychain. */
+  readonly keyField?: { readonly placeholder: string; readonly save: Control };
+}
+
+export interface Shortcut {
+  readonly keys: readonly string[];
+  readonly what: string;
+}
+
+export type PageBlock =
+  | { readonly kind: "choice"; readonly choice: Choice }
+  | { readonly kind: "choices"; readonly choices: readonly Choice[] }
+  | { readonly kind: "lines"; readonly lines: readonly PageLine[] }
+  /** moyyi's guarantees: shown with a lock, never as switches. */
+  | { readonly kind: "locks"; readonly lines: readonly string[] }
+  | { readonly kind: "chips"; readonly chips: readonly string[]; readonly add?: Control }
+  | { readonly kind: "meters"; readonly meters: readonly Meter[] }
+  | { readonly kind: "providers"; readonly providers: readonly Provider[] }
+  | {
+      readonly kind: "shortcuts";
+      readonly shortcuts: readonly Shortcut[];
+      readonly more?: Control;
+    }
+  | { readonly kind: "note"; readonly text: string }
+  | { readonly kind: "controls"; readonly controls: readonly Control[] }
+  | { readonly kind: "brand"; readonly tagline: string };
+
+export interface PageGroup {
+  readonly title?: string;
+  readonly caption?: string;
+  readonly blocks: readonly PageBlock[];
+}
+
+export interface SettingsPage {
+  readonly id: string;
+  readonly name: string;
+  readonly icon: PageIcon;
+  /** The list row's second line: the current value in words. */
+  readonly summary: string;
+  /** The pane's line under the title. */
+  readonly sub?: string;
+  readonly groups: readonly PageGroup[];
+}
+
+export interface PluginPage extends SettingsPage {
+  readonly enabled: boolean;
+  /** 停用 or 启用. */
+  readonly toggle: Control;
 }
 
 export type ChatAction =
@@ -320,7 +444,10 @@ export type ChatAction =
   | { readonly type: "save-memory"; readonly messageIds: readonly string[] }
   | { readonly type: "forward"; readonly messageIds: readonly string[]; readonly chatId: string }
   | { readonly type: "unschedule"; readonly messageId: string }
-  | { readonly type: "archive"; readonly chatId: string; readonly archived: boolean };
+  | { readonly type: "archive"; readonly chatId: string; readonly archived: boolean }
+  | { readonly type: "choose"; readonly choiceId: string; readonly option: number }
+  | { readonly type: "control"; readonly controlId: string }
+  | { readonly type: "save-key"; readonly providerId: string; readonly key: string };
 
 export interface ChatPort {
   world(): ChatWorld;

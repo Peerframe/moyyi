@@ -3,6 +3,7 @@
 // status, undo takes its dependents along or asks first. Timing is injectable so tests run instantly.
 import type { Chat, ChatAction, ChatPort, ChatWorld, Claim, Job, Key, Message } from "../port.ts";
 import { author, textOf } from "../text.ts";
+import { choose, press, saveKey } from "./page-actions.ts";
 
 export interface MockOptions {
   /** Runs `apply` after `delay` ms; tests pass a manual queue. */
@@ -188,6 +189,8 @@ export function createMockPort(initial: ChatWorld, options: MockOptions = {}): M
           ...(quoted ? { quote: `${previewOf(world, quoted)}` } : {}),
         };
     commit(post(chatId, message));
+    // First-task suggestions leave once the person has said something.
+    if (chat.suggestions) commit((w) => mapChat(w, chatId, (c) => without(c, "suggestions")));
     if (world.connection.state === "offline") return;
     take(id);
     const to = listener(world, chat, text, replyTo);
@@ -240,7 +243,7 @@ export function createMockPort(initial: ChatWorld, options: MockOptions = {}): M
           let next = mapMessage(
             w,
             messageId,
-            (m) => ({ ...m, answered: `你选了：${choice}` }) as Message,
+            (m) => ({ ...m, answered: `你选了 ${choice}` }) as Message,
           );
           if (message.kind === "decision")
             next = mapChat(next, chatId, (chat) => ({
@@ -255,8 +258,6 @@ export function createMockPort(initial: ChatWorld, options: MockOptions = {}): M
           return;
         }
         if (messageId === "l-decide") return referencesChosen(choice);
-        if (message.kind === "options" && chatId === "moyyi" && message.id === "m-ready")
-          return send(chatId, choice);
         return;
       }
       case "plan": {
@@ -498,7 +499,7 @@ export function createMockPort(initial: ChatWorld, options: MockOptions = {}): M
 
   function check(claimId: string, verdict: "checked" | "wrong") {
     commit((w) => {
-      for (const [chatId, messages] of Object.entries(w.messages)) {
+      for (const messages of Object.values(w.messages)) {
         const message = messages.find(
           (m) => m.kind === "result" && m.claims?.some((c) => c.id === claimId),
         );
@@ -508,11 +509,7 @@ export function createMockPort(initial: ChatWorld, options: MockOptions = {}): M
         const claims = message.claims?.map(
           (c): Claim => (c.id === claimId ? { ...c, check: verdict } : c),
         );
-        const next = mapMessage(w, message.id, (m) => ({ ...m, claims }) as Message);
-        return mapChat(next, chatId, (chat) => ({
-          ...chat,
-          toCheck: Math.max(0, (chat.toCheck ?? 0) - (claim.kind === "cited" ? 0 : 1)),
-        }));
+        return mapMessage(w, message.id, (m) => ({ ...m, claims }) as Message);
       }
       return w;
     });
@@ -659,7 +656,7 @@ export function createMockPort(initial: ChatWorld, options: MockOptions = {}): M
             ...w,
             threads: {
               ...w.threads,
-              [action.messageId]: { ...thread, answered: `你选了：${choice}` },
+              [action.messageId]: { ...thread, answered: `你选了 ${choice}` },
             },
           }));
           commit((w) =>
@@ -731,6 +728,12 @@ export function createMockPort(initial: ChatWorld, options: MockOptions = {}): M
           return commit((w) =>
             mapChat(w, action.chatId, (chat) => ({ ...chat, archived: action.archived })),
           );
+        case "choose":
+          return commit((w) => choose(w, action.choiceId, action.option));
+        case "control":
+          return commit((w) => press(w, action.controlId, { next: nextId }));
+        case "save-key":
+          return commit((w) => saveKey(w, action.providerId, action.key));
       }
     },
     play(pace = 1) {

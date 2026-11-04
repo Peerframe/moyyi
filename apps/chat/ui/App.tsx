@@ -1,18 +1,29 @@
-// The window (boards S1, S7, S8, S12): folder rail, chat list, the open chat and the side panel.
-// Below 1200px the panel floats over the chat, below 900px the rail becomes chips above the list,
-// below 700px one pane shows at a time and the panel opens as a bottom sheet.
+// The window (boards S1, S7, S8, S12, S23–S32): folder rail, then either the chat list with the open
+// chat and its side panel, or 设置 / 插件 with the open section. Below 1200px the panel floats over
+// the chat, below 900px the rail becomes chips above the list, below 700px one pane shows at a time
+// and the panel opens as a bottom sheet.
 import { useEffect, useState, useSyncExternalStore } from "react";
 import type { ChatPort, FolderId, Theme } from "../port.ts";
-import { ChatList, inFolder, Rail } from "./ChatList.tsx";
+import { ChatList } from "./ChatList.tsx";
 import { Conversation } from "./Conversation.tsx";
+import type { PageActions } from "./Pages.tsx";
+import { PageList, PagePane } from "./Pages.tsx";
 import type { PanelActions, PanelFrame } from "./Panel.tsx";
 import { SidePanel } from "./Panel.tsx";
+import { inFolder, isFolder, Rail, type ViewId } from "./Rail.tsx";
 
 export interface AppProps {
   readonly port: ChatPort;
   readonly theme: Theme;
   readonly sticker: string;
   readonly initialChat?: string | undefined;
+  /** Opens 设置 or 插件 instead of the chats, e.g. "settings/permissions". */
+  readonly initialPage?: string | undefined;
+}
+
+function parsePage(value: string | undefined): { view: ViewId; page: string | null } | null {
+  const [view, page = null] = value?.split("/") ?? [];
+  return view === "settings" || view === "plugins" ? { view, page } : null;
 }
 
 function useNarrow(): boolean {
@@ -30,9 +41,17 @@ function useNarrow(): boolean {
   return narrow;
 }
 
-export function App({ port, theme, sticker, initialChat }: AppProps) {
+export function App({ port, theme, sticker, initialChat, initialPage }: AppProps) {
   const world = useSyncExternalStore(port.subscribe, port.world, port.world);
   const narrow = useNarrow();
+  const start = parsePage(initialPage);
+  const [view, setView] = useState<ViewId>(start?.view ?? "all");
+  /** The open section of each page list; null shows only the list on narrow layouts. */
+  const [pageOf, setPageOf] = useState<Readonly<Record<"settings" | "plugins", string | null>>>({
+    settings: start?.view === "settings" ? (start.page ?? null) : null,
+    plugins: start?.view === "plugins" ? (start.page ?? null) : null,
+  });
+  /** The last folder of chats, so 设置 and back keeps the list where it was. */
   const [folder, setFolder] = useState<FolderId>("all");
   const [openId, setOpenId] = useState<string | null>(
     initialChat ?? (world.firstRun ? "moyyi" : null),
@@ -57,16 +76,24 @@ export function App({ port, theme, sticker, initialChat }: AppProps) {
   useEffect(() => {
     const onKey = (event: KeyboardEvent) => {
       const mod = event.metaKey || event.ctrlKey;
-      if (mod && event.key.toLowerCase() === "k") {
+      if (mod && event.key === ",") {
         event.preventDefault();
+        setView("settings");
+      } else if (mod && event.key.toLowerCase() === "k") {
+        event.preventDefault();
+        setView(folder);
         if (narrow) setOpenId(null);
         requestAnimationFrame(() => document.getElementById("chat-search")?.focus());
       } else if (mod && event.key.toLowerCase() === "f" && chat) {
         event.preventDefault();
         setSearchOpen(true);
-      } else if (event.altKey && (event.key === "ArrowUp" || event.key === "ArrowDown")) {
+      } else if (
+        isFolder(view) &&
+        event.altKey &&
+        (event.key === "ArrowUp" || event.key === "ArrowDown")
+      ) {
         event.preventDefault();
-        const list = world.chats.filter((c) => inFolder(c, folder));
+        const list = world.chats.filter((c) => inFolder(world, c, folder));
         const at = list.findIndex((c) => c.id === openId);
         const next =
           list[at < 0 ? 0 : (at + (event.key === "ArrowDown" ? 1 : list.length - 1)) % list.length];
@@ -90,20 +117,63 @@ export function App({ port, theme, sticker, initialChat }: AppProps) {
     undo: (changeIds) => void port.act({ type: "undo", changeIds }),
   };
 
+  const pageActions: PageActions = {
+    choose: (choiceId, option) => void port.act({ type: "choose", choiceId, option }),
+    press: (controlId) => void port.act({ type: "control", controlId }),
+    saveKey: (providerId, key) => void port.act({ type: "save-key", providerId, key }),
+  };
+
+  const onView = (next: ViewId) => {
+    setView(next);
+    if (isFolder(next)) setFolder(next);
+  };
+
+  const layout = narrow ? "narrow" : "wide";
+
+  if (!isFolder(view)) {
+    const pages = view === "settings" ? world.settings : world.plugins;
+    const chosen = pageOf[view];
+    // Wide layouts always show a section; the first one until another is picked.
+    const page = pages.find((p) => p.id === chosen) ?? (narrow ? undefined : pages[0]);
+    const openPage = (pageId: string) => setPageOf((value) => ({ ...value, [view]: pageId }));
+    return (
+      <div className={`mc mc-${theme} mc-window ch-app`} data-layout={layout}>
+        {narrow ? null : <Rail world={world} view={view} onView={onView} />}
+        {!narrow || !page ? (
+          <PageList
+            world={world}
+            kind={view}
+            pages={pages}
+            current={page?.id ?? null}
+            onOpen={openPage}
+            onView={onView}
+          />
+        ) : null}
+        {page ? (
+          <PagePane
+            world={world}
+            page={page}
+            actions={pageActions}
+            onBack={narrow ? () => setPageOf((value) => ({ ...value, [view]: null })) : undefined}
+          />
+        ) : null}
+      </div>
+    );
+  }
+
   const showList = !narrow || !chat;
   const showChat = !narrow || Boolean(chat);
-  const layout = narrow ? "narrow" : "wide";
 
   return (
     <div className={`mc mc-${theme} mc-window ch-app`} data-layout={layout}>
-      {narrow ? null : <Rail world={world} folder={folder} onFolder={setFolder} />}
+      {narrow ? null : <Rail world={world} view={view} onView={onView} />}
       {showList ? (
         <ChatList
           world={world}
-          folder={folder}
+          folder={view}
           openId={openId}
           drafts={drafts}
-          onFolder={setFolder}
+          onView={onView}
           onOpen={open}
           onCompose={() => {
             open("moyyi");

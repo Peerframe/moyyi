@@ -50,7 +50,95 @@ export const Icon = {
       <path d="M8 5v3l2 1.5" />
     </>,
   ),
-  ledger: stroke(<path d="M1.5 8.5l2.5 2.5 5-6M7.5 10.5l.5.5 6-6.5" />),
+  running: stroke(
+    <>
+      <circle cx="8" cy="8" r="5.5" />
+      <path d="M6.8 5.6l3.4 2.4-3.4 2.4z" />
+    </>,
+  ),
+  plugins: stroke(
+    <>
+      <rect x="2.5" y="2.5" width="4.5" height="4.5" rx="1.2" />
+      <rect x="9" y="2.5" width="4.5" height="4.5" rx="1.2" />
+      <rect x="2.5" y="9" width="4.5" height="4.5" rx="1.2" />
+      <path d="M11.25 9v4.5M9 11.25h4.5" />
+    </>,
+  ),
+  settings: stroke(
+    <>
+      <circle cx="8" cy="8" r="2" />
+      <path d="M6.9 1.8h2.2l.4 1.7 1.3.6 1.5-.9 1.6 1.6-.9 1.5.6 1.3 1.7.4v2.2l-1.7.4-.6 1.3.9 1.5-1.6 1.6-1.5-.9-1.3.6-.4 1.7H6.9l-.4-1.7-1.3-.6-1.5.9-1.6-1.6.9-1.5-.6-1.3-1.7-.4V6.9l1.7-.4.6-1.3-.9-1.5 1.6-1.6 1.5.9 1.3-.6z" />
+    </>,
+    1.3,
+  ),
+  key: stroke(
+    <>
+      <circle cx="5.5" cy="10.5" r="3" />
+      <path d="M7.7 8.3L13.5 2.5M11 5l1.8 1.8M9.5 6.5l1.5 1.5" />
+    </>,
+  ),
+  me: stroke(
+    <>
+      <circle cx="8" cy="5.5" r="2.5" />
+      <path d="M3 13.5a5 5 0 0 1 10 0" />
+    </>,
+  ),
+  shield: stroke(
+    <>
+      <path d="M8 1.8l5 2v4c0 3-2.2 5.2-5 6.4-2.8-1.2-5-3.4-5-6.4v-4z" />
+      <path d="M5.8 8l1.6 1.6 2.8-3" />
+    </>,
+  ),
+  timer: stroke(
+    <>
+      <circle cx="8" cy="9" r="5" />
+      <path d="M8 6.5V9l1.8 1.2M6 1.8h4" />
+    </>,
+  ),
+  gauge: stroke(<path d="M2.5 11.5a5.5 5.5 0 0 1 11 0M8 11.5l2.5-3" />),
+  db: stroke(
+    <>
+      <ellipse cx="8" cy="4" rx="5" ry="1.8" />
+      <path d="M3 4v8c0 1 2.2 1.8 5 1.8s5-.8 5-1.8V4M3 8c0 1 2.2 1.8 5 1.8S13 9 13 8" />
+    </>,
+  ),
+  sliders: stroke(
+    <>
+      <path d="M2.5 4.5h6M11.5 4.5h2M2.5 11.5h2M7.5 11.5h6" />
+      <circle cx="10" cy="4.5" r="1.5" />
+      <circle cx="6" cy="11.5" r="1.5" />
+    </>,
+  ),
+  term: stroke(
+    <>
+      <rect x="1.5" y="2.5" width="13" height="11" rx="2" />
+      <path d="M4.5 6l2 2-2 2M8 10.5h3.5" />
+    </>,
+  ),
+  globe: stroke(
+    <>
+      <circle cx="8" cy="8" r="5.5" />
+      <path d="M2.5 8h11M8 2.5c1.7 1.6 2.5 3.4 2.5 5.5S9.7 11.9 8 13.5C6.3 11.9 5.5 10.1 5.5 8S6.3 4.1 8 2.5z" />
+    </>,
+  ),
+  doc: stroke(
+    <>
+      <path d="M4 1.8h5l3 3v9.4H4z" />
+      <path d="M9 1.8v3h3M6 8.5h4M6 11h4" />
+    </>,
+  ),
+  skill: stroke(
+    <>
+      <path d="M3 2.5h7.5a2 2 0 0 1 2 2v9H5a2 2 0 0 1-2-2z" />
+      <path d="M3 11.5a2 2 0 0 1 2-2h7.5" />
+    </>,
+  ),
+  lock: stroke(
+    <>
+      <rect x="3.5" y="7" width="9" height="6.5" rx="1.5" />
+      <path d="M5.5 7V5a2.5 2.5 0 0 1 5 0v2" />
+    </>,
+  ),
   bookmark: stroke(<path d="M4.5 2.5h7v11l-3.5-2.5-3.5 2.5z" />, 1.6),
   pin: stroke(<path d="M6 2.5h4l-.5 4 2.5 2.5h-8l2.5-2.5zM8 9v4.5" />, 1.5),
   muted: stroke(<path d="M3 6h2.5L9 3v10L5.5 10H3zM11.5 6l3 4M14.5 6l-3 4" />, 1.5),
@@ -110,6 +198,10 @@ export const Icon = {
   image: stroke(<path d="M2.5 3.5h11v9h-11zM2.5 10.5l3-3 3 3 2-2 3 3M10 6h.01" />),
   screenshot: stroke(<path d="M2.5 5.5v-2h2M11.5 3.5h2v2M13.5 10.5v2h-2M4.5 12.5h-2v-2" />),
   folder: stroke(<path d="M2.5 4.5h4l1.5 1.5h5.5v6.5h-11z" />),
+  /** The rounded folder settings use for a granted folder. */
+  grant: stroke(
+    <path d="M2.5 4.5a1 1 0 0 1 1-1h3l1.5 1.5h4.5a1 1 0 0 1 1 1v5.5a1 1 0 0 1-1 1h-9a1 1 0 0 1-1-1z" />,
+  ),
   link: stroke(
     <path d="M7 9a2.5 2.5 0 0 0 3.5 0l2-2a2.5 2.5 0 0 0-3.5-3.5L8.5 4M9 7a2.5 2.5 0 0 0-3.5 0l-2 2A2.5 2.5 0 0 0 7 12.5l.5-.5" />,
   ),

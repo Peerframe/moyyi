@@ -1,6 +1,7 @@
 // The 小温 world from the study's scenario: day 1, 21:31, the moment boards S7 and S8 show.
 // Copy is taken from the canvas boards so the app and the boards say the same thing.
 import type { Chat, ChatWorld, Member, Message } from "../port.ts";
+import { pluginPages, settingsPages } from "./pages.ts";
 
 export const MEMBERS: Readonly<Record<string, Member>> = {
   moyyi: {
@@ -58,7 +59,6 @@ export const CHATS: readonly Chat[] = [
     subtitle: "4 位 AI · 1 位在做 · 等你决定 1 件",
     placeholder: "发给负责人 moyyi，或 @ 一位 AI",
     members: LUNWEN_MEMBERS,
-    toCheck: 3,
   },
   {
     id: "moyyi",
@@ -101,7 +101,6 @@ export const CHATS: readonly Chat[] = [
       { id: "moyyi", role: "负责人" },
       { id: "hecha", role: "能改文件" },
     ],
-    toCheck: 1,
   },
   {
     id: "hecha",
@@ -114,7 +113,7 @@ export const CHATS: readonly Chat[] = [
     unread: 0,
     presence: "working",
     subtitle: "AI · 正在做 · 在「租房」重读第 9 条",
-    placeholder: "教核查怎么做，或者问它的表现",
+    placeholder: "教核查一件事，比如“金额写到元”",
   },
   {
     id: "yandu",
@@ -127,7 +126,7 @@ export const CHATS: readonly Chat[] = [
     unread: 0,
     presence: "working",
     subtitle: "AI · 正在做 · 在「毕业论文」读第 3 章引用",
-    placeholder: "教研读怎么做，或者问它的表现",
+    placeholder: "教研读一件事",
   },
   {
     id: "xiezuo",
@@ -140,7 +139,7 @@ export const CHATS: readonly Chat[] = [
     unread: 0,
     receipt: "taken",
     subtitle: "AI · 在「毕业论文」等你决定",
-    placeholder: "教写作怎么做，或者问它的表现",
+    placeholder: "教写作一件事",
   },
   {
     id: "dushu",
@@ -172,7 +171,7 @@ export const CHATS: readonly Chat[] = [
     unread: 0,
     presence: "idle",
     subtitle: "AI · 已暂停 · 本周预算用完",
-    placeholder: "教翻译怎么做，或者问它的表现",
+    placeholder: "教翻译一件事",
   },
   {
     id: "zuoye",
@@ -344,7 +343,7 @@ const ZUFANG: readonly Message[] = [
     from: "hecha",
     text: "这是扫描件，我读不了上面的字。用 OCR 识别要多 6 次请求。",
     keys: [{ label: "用 OCR", tone: "primary" }, { label: "先不读" }],
-    answered: "你选了：先不读",
+    answered: "你选了 先不读",
     time: "21:06",
   },
   {
@@ -431,10 +430,10 @@ const MOYYI: readonly Message[] = [
     senderNote: "1/2 · 模型",
     text: "用哪个模型？之后每个项目都能换。",
     keys: [{ label: "DeepSeek", tone: "primary" }, { label: "Kimi" }, { label: "Anthropic" }],
-    answered:
-      "你选了：DeepSeek · 已连上 DeepSeek Flash · 密钥在系统窗口里填，存进钥匙串，不会出现在聊天里",
+    answered: "你选了 DeepSeek",
     time: "21:00",
   },
+  { id: "m-connected", kind: "service", text: "已连上 DeepSeek Flash · 密钥存进了钥匙串" },
   {
     id: "m-folders",
     kind: "options",
@@ -442,9 +441,10 @@ const MOYYI: readonly Message[] = [
     senderNote: "2/2 · 文件夹",
     text: "我能看哪些文件夹？默认只看；要改的时候，每次在计划卡里问你。",
     keys: [{ label: "选文件夹", tone: "primary" }, { label: "先不给" }],
-    answered: "你选了：~/论文、~/租房 · 只看",
+    answered: "你选了 ~/论文、~/租房",
     time: "21:01",
   },
+  { id: "m-granted", kind: "service", text: "能看 2 个文件夹 · 只看不改" },
   { id: "m-yesterday", kind: "service", text: "昨天", day: true },
   {
     id: "m-ask",
@@ -527,9 +527,10 @@ const HECHA: readonly Message[] = [
     senderNote: "想改自己的做法",
     flag: "accent",
     text: "这周在「租房」里你标了我 3 次不对，都是没先看批注就说“合同没写”。以后先查批注再下结论，可以吗？",
-    answered: "你选了：记成规矩 · 已加进“你教过它的”",
+    answered: "你选了 记成规矩",
     time: "21:44",
   },
+  { id: "h-taught", kind: "service", text: "已加进核查的「你教过它的」" },
   { id: "h-yuan", kind: "out", text: "金额也写到元，别四舍五入", time: "21:45", receipt: "taken" },
   {
     id: "h-ok",
@@ -609,6 +610,8 @@ const ZUOYE: readonly Message[] = [
 export function xiaowenWorld(): ChatWorld {
   return {
     connection: { state: "online" },
+    settings: settingsPages(),
+    plugins: pluginPages(),
     members: MEMBERS,
     chats: CHATS,
     messages: {
@@ -683,11 +686,6 @@ export function xiaowenWorld(): ChatWorld {
       hecha: {
         kindLine: "AI · 在 租房、毕业论文 两个群里 · 正在做",
         sections: [
-          {
-            title: "本周表现",
-            meter: { label: "27 / 31 条你认可", value: 0.87 },
-            note: "👍 27 · 👎 3 · ❓ 1 · 都来自你的回应",
-          },
           { title: "它能动文件吗", segment: { options: ["不看", "只看", "可以改"], selected: 1 } },
           { title: "你教过它的", chips: ["先查批注再下结论", "金额写到元", "📌 合同用中文标注"] },
           { title: "它能看到什么", note: "核查只看到 @核查、回复核查的话和负责人转给它的事。" },
@@ -756,6 +754,8 @@ export function firstRunWorld(): ChatWorld {
         preview: { text: "说一件想做的事就行" },
         decisions: 0,
         subtitle: "负责人 · 空着",
+        placeholder: "说一件想做的事",
+        suggestions: ["把论文格式按模板改了", "对一下租房合同", "每天早上告诉我要做什么"],
       },
       {
         ...(CHATS[2] as Chat),
@@ -765,17 +765,15 @@ export function firstRunWorld(): ChatWorld {
     ],
     messages: {
       moyyi: [
-        ...MOYYI.slice(0, 4),
+        ...MOYYI.slice(
+          0,
+          MOYYI.findIndex((m) => m.id === "m-yesterday"),
+        ),
         {
           id: "m-ready",
-          kind: "options",
+          kind: "text",
           from: "moyyi",
-          text: "好了。说一件想做的事就行，我会先给你一张计划卡，你点开始才动手。",
-          keys: [
-            { label: "把论文格式按模板改了" },
-            { label: "对一下租房合同" },
-            { label: "每天早上告诉我要做什么" },
-          ],
+          text: "好了。在下面说一件想做的事，我会先给你一张计划卡，你点开始才动手。",
           time: "21:03",
         },
       ],

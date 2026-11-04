@@ -1,7 +1,9 @@
 // Starts moyyi Chat on the mock backend. URL parameters pick what to show, so every board has a
-// reproducible scene: ?scene=day|first-run|offline|loading, ?theme=dark|light, ?chat=<id>, ?play.
+// reproducible scene: ?scene=day|first-run|offline|loading, ?theme=dark|light, ?chat=<id>,
+// ?page=settings[/<section>]|plugins[/<plugin>], ?play.
 import { useEffect, useSyncExternalStore } from "react";
 import { createRoot } from "react-dom/client";
+import { chosen } from "./mock/page-actions.ts";
 import { createMockPort } from "./mock/port.ts";
 import { firstRunWorld, xiaowenWorld } from "./mock/world.ts";
 import type { ChatWorld, Theme } from "./port.ts";
@@ -18,21 +20,29 @@ function sceneWorld(): ChatWorld {
   return world;
 }
 
-// ?theme pins a theme; without it the window follows the system, also when it changes while open.
+const port = createMockPort(sceneWorld());
+
+// ?theme pins a theme. Otherwise 设置 › 通用 › 颜色 decides; 跟随系统 follows the system, also when
+// it changes while the window is open.
 const asked = params.get("theme");
 const lightQuery = matchMedia("(prefers-color-scheme: light)");
 
 function currentTheme(): Theme {
   if (asked === "light" || asked === "dark") return asked;
+  const picked = chosen(port.world(), "general.theme");
+  if (picked === "深色") return "dark";
+  if (picked === "浅色") return "light";
   return lightQuery.matches ? "light" : "dark";
 }
 
 function watchTheme(onChange: () => void): () => void {
   lightQuery.addEventListener("change", onChange);
-  return () => lightQuery.removeEventListener("change", onChange);
+  const stop = port.subscribe(onChange);
+  return () => {
+    lightQuery.removeEventListener("change", onChange);
+    stop();
+  };
 }
-
-const port = createMockPort(sceneWorld());
 if (params.has("play")) port.play(Number(params.get("play")) || 1);
 
 function Root() {
@@ -46,6 +56,7 @@ function Root() {
       theme={theme}
       sticker="./assets/character.png"
       initialChat={params.get("chat") ?? undefined}
+      initialPage={params.get("page") ?? undefined}
     />
   );
 }

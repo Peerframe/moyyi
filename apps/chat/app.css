@@ -41,6 +41,16 @@ html {
   text-align: center;
   padding: 2px 0 8px;
 }
+/* 插件 starts the bottom group; a hairline splits state folders from kinds. */
+.ch-rail-bottom {
+  margin-top: auto;
+}
+.ch-rail-rule {
+  height: 1px;
+  margin: var(--space-4) var(--space-12);
+  background: var(--line);
+  flex: 0 0 auto;
+}
 .ch-list {
   width: var(--list-width);
   flex: 0 0 auto;
@@ -889,4 +899,283 @@ html {
 .ch-list .ch-search {
   border-radius: var(--radius-pill);
   padding: var(--space-4) var(--space-12);
+}
+
+/* ---- 设置 and 插件 (S23–S32) ---- */
+
+.ch-page-list-h {
+  padding: var(--space-4) var(--space-10) 0;
+}
+.ch-page-rows {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-height: 0;
+  overflow-y: auto;
+}
+.ch-page-row {
+  padding: var(--space-8) var(--space-10);
+}
+.ch-page-row-name {
+  font-size: 14px;
+}
+.ch-one-line {
+  -webkit-line-clamp: 1;
+  line-clamp: 1;
+}
+.ch-page-foot {
+  margin: auto var(--space-10) var(--space-4);
+  font-size: 12px;
+  line-height: 1.5;
+  color: var(--muted);
+}
+.ch-page-tile-48 {
+  width: 48px;
+  height: 48px;
+  flex: 0 0 auto;
+}
+.ch-pane {
+  flex: 1 1 auto;
+  min-width: 0;
+  min-height: 0;
+  padding: 28px var(--space-32);
+  overflow-y: auto;
+}
+.ch-pane-back {
+  margin-bottom: var(--space-12);
+}
+.ch-pane-body {
+  max-width: 640px;
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+}
+.ch-pane-titles {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+}
+.ch-pane-title {
+  margin: 0;
+  font-size: 18px;
+  font-weight: 650;
+}
+.ch-pane-sub {
+  font-size: 13px;
+  color: var(--muted);
+}
+.ch-plugin-head {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+}
+.ch-plugin-head .ch-pane-titles {
+  gap: 2px;
+}
+.ch-group {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-8);
+}
+.ch-group-caption {
+  font-size: 12px;
+  line-height: 1.5;
+  color: var(--muted);
+}
+/* Light theme cards would vanish on white: the hairline keeps them. */
+.ch-card {
+  background: var(--raised);
+  box-shadow: inset 0 0 0 1px var(--line);
+  border-radius: 14px;
+  padding: 14px var(--space-16);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-10);
+}
+.ch-card-rule {
+  height: 1px;
+  background: var(--line);
+}
+.ch-line {
+  display: flex;
+  align-items: center;
+  gap: var(--space-12);
+}
+.ch-line-text {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.ch-line-main {
+  font-size: 14px;
+}
+.ch-line-mono {
+  font-size: 13px;
+}
+.ch-line-sub {
+  font-size: 12px;
+  color: var(--muted);
+}
+.ch-line-members {
+  display: flex;
+  gap: var(--space-4);
+}
+.ch-provider-name {
+  font-size: 15px;
+  font-weight: 600;
+}
+.ch-off {
+  opacity: 0.6;
+}
+.ch-page-key {
+  min-height: 32px;
+  font-size: 13px;
+  flex: 0 0 auto;
+}
+/* The design system's segment is a three-column grid; inline ones size to their options. */
+.ch-seg-inline {
+  grid-auto-flow: column;
+  grid-template-columns: none;
+  grid-auto-columns: minmax(max-content, 1fr);
+  flex: 0 0 auto;
+}
+.ch-seg-inline button {
+  padding: 0 var(--space-12);
+}
+.ch-locks {
+  gap: var(--space-8);
+  font-size: 14px;
+}
+.ch-lock {
+  display: flex;
+  align-items: center;
+  gap: var(--space-8);
+}
+.ch-page-chips {
+  align-items: center;
+}
+.ch-meters {
+  gap: 14px;
+}
+.ch-meter-row {
+  display: flex;
+  align-items: center;
+  gap: var(--space-12);
+}
+.ch-meter-text {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-6);
+}
+.ch-meter-top {
+  display: flex;
+  justify-content: space-between;
+  font-size: 14px;
+}
+.ch-meter-alert {
+  color: var(--attention);
+  font-weight: 600;
+}
+.ch-key-field {
+  display: flex;
+  align-items: center;
+  gap: var(--space-8);
+  margin: 0;
+}
+.ch-key-input {
+  padding: 2px var(--space-12);
+}
+.ch-key-input input {
+  height: 30px;
+  font-size: 13px;
+}
+.ch-shortcut {
+  display: flex;
+  align-items: center;
+  gap: var(--space-12);
+  font-size: 14px;
+}
+.ch-shortcut-keys {
+  width: 84px;
+  display: flex;
+  gap: var(--space-4);
+  flex: 0 0 auto;
+}
+.ch-kbd {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 24px;
+  height: 24px;
+  padding: 0 var(--space-6);
+  border-radius: 6px;
+  background: var(--key);
+  color: var(--on-key);
+  font: inherit;
+  font-size: 12px;
+  font-weight: 600;
+}
+.ch-note {
+  font-size: 14px;
+  line-height: 1.6;
+}
+.ch-controls {
+  display: flex;
+  gap: var(--space-8);
+}
+.ch-brand {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+}
+.ch-brand-name {
+  font-size: 20px;
+  font-weight: 650;
+  letter-spacing: -0.6px;
+  color: var(--accent);
+}
+@media (max-width: 699px) {
+  .ch-pane {
+    width: 100%;
+    border-radius: 0;
+    padding: var(--space-16);
+  }
+  .ch-line {
+    flex-wrap: wrap;
+  }
+}
+
+/* ---- first-task suggestions inside the composer (S12) ---- */
+
+.mc-compose-row > .mc-composer.ch-has-suggest {
+  flex-wrap: wrap;
+  row-gap: var(--space-4);
+  border-radius: 20px;
+  padding: var(--space-10) var(--space-6) var(--space-4) var(--space-16);
+}
+.ch-compose-suggest {
+  flex: 1 0 100%;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-6);
+}
+.ch-compose-suggest-h {
+  font-size: 12px;
+  color: var(--muted);
+}
+@media (max-width: 699px) {
+  .ch-compose-suggest {
+    flex-wrap: nowrap;
+    overflow-x: auto;
+  }
+  .ch-compose-suggest > * {
+    flex: 0 0 auto;
+  }
+}
+.ch-chip-button {
+  border: none;
+  cursor: pointer;
+  font: inherit;
+  font-size: 12px;
 }
