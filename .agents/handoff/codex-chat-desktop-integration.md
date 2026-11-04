@@ -8,12 +8,16 @@
 - Located the latest Chat UI and existing M6 installation; owner authorized real native integration.
 - Confirmed existing typed bridge covers the single-session workflow without new authority or data formats.
 - Implemented the native Chat adapter, real state/pages, preserved feature controls, and native-safe composer.
-- `npm run check` with installed Node 26.12.1 passed: 168 files / 3169 tests; final focused checks passed 71 tests.
+- Final source `bffb6fc`: `npm run check` with packaged Node 26.12.1 passed: 168 files / 3170 tests.
+- Final package and external-copy desktop acceptance passed; paired runtime SHA is unchanged from the passing offline CLI acceptance.
+- Installed final app and paired CLI; both receipts use `bffb6fc`. Previous candidate native history/settings worked.
+- 392 protected files unchanged; database tables unchanged except the previously accepted metadata format 1 → 2 migration.
 - Backed up the app, CLI, sessions and settings to `~/.moyyi/backups/pre-chat-ui-2026-11-04T11-38-41.641Z`.
 
 ## In progress
-- Main agent: package, external-copy acceptance, installation and native screenshots.
-- Both subagents finished and stopped writing. All code is ready for packaging.
+- Main agent: final native display/screenshots and documentation/PR. Mac is locked; unlock request pending.
+- Both subagents finished and stopped writing. No source process is running.
+- Final application has been installed but left stopped while waiting for unlock.
 - Install context (previous manifests and backup path): `/tmp/moyyi-chat-install-context.json`.
 
 ## Collected problems

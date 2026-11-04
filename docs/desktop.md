@@ -13,8 +13,8 @@ M5's specified-page/source/report workflow has completed bounded acceptance in t
 `dd897834` bundle. The [PR48 receipt](https://github.com/Peerframe/moyyi/pull/48) records final
 merge/installation; the [M5 task record](tasks/2026-10-28-desktop-m5.md) separates its one live
 trial, initial source-panel defect and corrected zero-call history reopening.
-M5 remains the installed baseline. M6 materials, previews and complete history are **candidate
-implemented, acceptance pending**; source changes do not update the installed app.
+The installed Chat interface includes M6 materials, previews and complete history. Current
+installation coordinates and remaining acceptance are in the [system overview](system-overview.md).
 See [ADR 0037](decisions/0037-installed-desktop-client.md),
 [ADR 0038](decisions/0038-desktop-materials-and-reports.md),
 [ADR 0039](decisions/0039-desktop-controlled-workflows.md),
@@ -24,7 +24,12 @@ See [ADR 0037](decisions/0037-installed-desktop-client.md),
 
 ## Use
 
-Open `Moyyi.app`, choose **新会话 → 选择工作目录**, and describe the file or question. Send with
+The installed moyyi Chat view reads the real local session catalog and recorded messages. Use
+**材料**, **会话权限**, **成果与记录**, **完整历史** and **管理会话** for existing desktop controls.
+Open **设置 → 模型和密钥 → 打开模型设置** for model configuration, and **设置 → 记录和数据**
+for maintenance. Mock-only voice, multi-agent and scheduling actions are unavailable.
+
+Open `Moyyi.app`, choose **新建 → 选择工作目录**, and describe the file or question. Send with
 the button or Command+Enter. The selected directory is the read scope, including supported
 document body text. New and reopened sessions are read-only. Report creation requires the
 separate explicit selection described below. M3 file changes and Node checks require their own
@@ -44,18 +49,17 @@ The left sidebar lists recorded sessions. Reopening loads their existing history
 repeating effects or approvals. The current chosen approval setting applies, not old authority.
 The live conversation displays at most100 recent messages and a bounded text projection; full
 transcripts remain in the store. M6 adds explicit older-page and long-message reading, described
-below. Its previews and external import are candidate features, not claims about the installed
-M5 app. Selecting files does not upload them or read their body into the model.
+below. Selecting files does not upload them or read their body into the model.
 
 ## Settings, materials and reports
 
 Open **模型设置** to choose Flash, Kimi China or Kimi Global. M3 originally used low reasoning for
-all three. Installed M5 retains M4's explicit low/high choice for Kimi only. High is labelled
+all three. The installed app retains M4's explicit low/high choice for Kimi only. High is labelled
 **实验**; it did not pass the fixed complex-source task and is not a reliability recommendation.
 Flash always uses low. Switching back to Flash removes high from the configuration. Legacy
 three-field settings retain low behavior; saving low or Flash retains that older representation.
 
-The installed M4/M5 settings also offer **独立证据成文（实验）**, default off. For a new session
+The settings also offer **独立证据成文（实验）**, default off. For a new session
 containing a self-contained question, it uses one request within the selected budget to answer
 directly from the question and all actual tool observations. Earlier assistant interpretations
 remain in history but are not sent into that final request. Investigation is limited to one
@@ -73,7 +77,7 @@ does not probe the provider, incur model usage or prove that the remote key is v
 or inaccessible credential leaves sending disabled while history remains accessible. If applying
 settings cannot be confirmed, reopen settings to inspect the current values before retrying.
 
-The installed M2–M5 **选择材料** control accepts up to8 workspace-local
+The original M2–M5 **选择材料** control accepted up to8 workspace-local
 PDF/DOCX/XLSX/PPTX/ODT/ODS/ODP files,
 each at most10MiB. The panel shows relative path, size, format and selection-time SHA-256; it
 does not claim document extraction. Protected paths, links, outside-workspace files and unstable
@@ -91,7 +95,7 @@ returns to read-only after active work finishes or is stopped. New/reopened sess
 connection change also discard the report grant. Cancelling either picker preserves the current
 selection; rejected input does not silently grant a different path.
 
-In the installed M2–M5 view, **报告成果** comes from successful recorded create receipts, not
+In the original M2–M5 view, **报告成果** comes from successful recorded create receipts, not
 assistant prose. **打开报告**
 re-reads a bounded regular file, compares its SHA-256 to the receipt and displays UTF-8 plain
 text inside the app. Changed, missing and unavailable files have distinct states; old text is
@@ -102,10 +106,10 @@ Receipt pages follow the underlying20-effect history, so an empty report page ca
 next page. File existence, matching bytes and a completed turn do not prove report accuracy;
 check its claims, citations and coverage against the materials.
 
-## Materials, previews and complete history (M6 candidate)
+## Materials, previews and complete history (M6)
 
-These controls are **candidate implemented, acceptance pending** under
-[ADR 0044](decisions/0044-desktop-material-library-and-history.md). They reuse the normal task
+These installed controls follow [ADR 0044](decisions/0044-desktop-material-library-and-history.md)
+and the [M6 receipt](tasks/2026-10-28-desktop-m6.md). They reuse the normal task
 loop, permissions and parsers. They do not change Flash defaults or rescore any earlier task.
 
 In an idle selected session, choose **导入材料**, drop selected files into the materials panel,
@@ -358,14 +362,18 @@ parser containment canary with synthetic model responses. It never uses an API k
 does not replace visible GUI testing, paid task-quality checks or the original fixed tasks.
 
 M2's external-copy, native-control, live-task and final installation evidence is recorded above
-and in its PR receipt. M3/M4 evidence remains in their receipts; M5 is the installed baseline
-recorded in [PR #48](https://github.com/Peerframe/moyyi/pull/48). M6 adds an installed-copy synthetic
+and in its PR receipt. M3–M6 evidence remains in their dated receipts. The current Chat
+installation is recorded in the [integration record](tasks/2026-11-04-chat-desktop-integration.md).
+M6 adds an installed-copy synthetic
 fixture for external seven-format import, actual tool observation delivery, approved report/readback,
 preview, complete history/organization and restart retention. Its package, native interaction and
 bounded fixed-task acceptance are recorded in the [M6 receipt](tasks/2026-10-28-desktop-m6.md);
 final owner installation is tracked in PR50 and the local installation manifests. Migration/backup/restore/rollback
 must include the new material records and blobs. Source evidence alone does not establish
 installation or task correctness.
+
+The current paired app and CLI use schema 3 / persisted format 2. The retained M6 format 1
+programs cannot open this store; keep their paired pre-upgrade data for rollback.
 
 Before installing, close both clients, back up the session/configuration directories, preserve
 the prior CLI tarball and any previous app, then copy the verified app to `~/Applications` and
