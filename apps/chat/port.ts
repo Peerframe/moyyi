@@ -414,8 +414,8 @@ export interface SettingsPage {
 
 export interface PluginPage extends SettingsPage {
   readonly enabled: boolean;
-  /** 停用 or 启用. */
-  readonly toggle: Control;
+  /** Present only when the host supports changing this capability. */
+  readonly toggle?: Control;
 }
 
 export type ChatAction =

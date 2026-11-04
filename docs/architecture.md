@@ -39,7 +39,7 @@ cli / desktop host ─┐   (future: automation — also a client)
 | Runtime | `src/runtime` | Plugin registry, wiring, the client protocol |
 | CLI | `src/cli` | Terminal client |
 | Desktop client | `apps/desktop` | Sandboxed React renderer, validated local bridge and a trusted host using the public runtime; installed acceptance is tracked separately |
-| moyyi Chat | `apps/chat` | The next interface, built from the moyyi Chat design system over its own `ChatPort`; runs on an in-memory mock backend and is not wired to the runtime yet |
+| moyyi Chat | `apps/chat` | Browser-only interface over `ChatPort`; a standalone mock preview and a desktop renderer adapter use the same views |
 
 ### Plugin inventory
 
@@ -89,6 +89,13 @@ See [CLI usage](cli.md) and [ADR 0011](decisions/0011-interactive-cli-and-develo
 Development reload is incompatible with recording/replay and refreshes only explicit ESM entries.
 
 ### Desktop feature composition
+
+The desktop renderer composition may import `apps/chat` views and their display-only `ChatPort`.
+Its adapter projects validated `DesktopState` and dispatches through the existing `DesktopBridge`.
+This dependency is one-way: Chat imports only its own files and React, and desktop host, preload,
+contracts and feature modules do not import Chat. The renderer still cannot import runtime, Node
+or Electron. Existing feature slots retain native pickers, approval identities, recovery and
+settings validation; unsupported preview actions cannot create receipts in the installed app.
 
 [ADR 0045](decisions/0045-desktop-feature-modules.md) implements the desktop UI slots planned
 in ADR 0005. `apps/desktop/feature-list.json` generates separate static contract, host, native and

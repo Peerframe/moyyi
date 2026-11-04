@@ -57,12 +57,13 @@ function registeredSlots() {
   registered ??= createSlots(rendererFeatures);
   return registered;
 }
-export function FeatureSlot({ name }: { name: SlotId }) {
+export function FeatureSlot({ name, only }: { name: SlotId; only?: readonly string[] }) {
   return createElement(
     Fragment,
     null,
     ...registeredSlots()
       .contributions(name)
+      .filter(({ id }) => !only || only.includes(id))
       .map(({ id, Component }) => createElement(Component, { key: id })),
   );
 }

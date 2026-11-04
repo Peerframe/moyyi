@@ -71,7 +71,9 @@ export function PageList({
   current,
   onOpen,
   onView,
+  native = false,
 }: {
+  readonly native?: boolean;
   readonly world: ChatWorld;
   readonly kind: "settings" | "plugins";
   readonly pages: readonly (SettingsPage | PluginPage)[];
@@ -136,7 +138,13 @@ export function PageList({
           </div>
         ) : null}
       </div>
-      <p className="ch-page-foot">{words.foot}</p>
+      <p className="ch-page-foot">
+        {native
+          ? kind === "settings"
+            ? "设置作用于本机应用；当前会话的权限由运行时检查。"
+            : "这里列出当前应用已接入的能力。实际操作仍受会话权限与确认限制。"
+          : words.foot}
+      </p>
     </section>
   );
 }
@@ -147,14 +155,16 @@ export function PagePane({
   page,
   actions,
   onBack,
+  feedback,
 }: {
   readonly world: ChatWorld;
   readonly page: SettingsPage | PluginPage;
+  readonly feedback?: string | null | undefined;
   readonly actions: PageActions;
   /** Narrow layouts only: back to the list. */
   readonly onBack?: (() => void) | undefined;
 }) {
-  const plugin = "toggle" in page ? page : null;
+  const plugin = "enabled" in page ? page : null;
   return (
     <section className="mc-panel ch-pane" aria-label={page.name}>
       {onBack ? (
@@ -164,6 +174,11 @@ export function PagePane({
         </button>
       ) : null}
       <div className="ch-pane-body">
+        {feedback ? (
+          <p className="ch-integration-error" role="alert">
+            {feedback}
+          </p>
+        ) : null}
         {plugin ? (
           <div className="ch-plugin-head">
             <PageIconTile icon={plugin.icon} size={48} />
@@ -172,7 +187,9 @@ export function PagePane({
               {plugin.sub ? <span className="ch-pane-sub">{plugin.sub}</span> : null}
             </span>
             {plugin.enabled ? <span className="mc-role">在用</span> : null}
-            <ControlButton control={plugin.toggle} onPress={actions.press} />
+            {plugin.toggle ? (
+              <ControlButton control={plugin.toggle} onPress={actions.press} />
+            ) : null}
           </div>
         ) : (
           <div className="ch-pane-titles">

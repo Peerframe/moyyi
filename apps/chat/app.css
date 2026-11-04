@@ -550,8 +550,27 @@ html {
   border-color: var(--focus);
   box-shadow: 0 0 0 1px var(--focus);
 }
-.mc .mc-composer input:focus-visible {
+.mc .mc-composer input:focus-visible,
+.mc .ch-native-compose-input:focus-visible {
   outline: none;
+}
+/* The native client keeps the same composer shell with the full multiline task limit. */
+.mc .ch-native-compose-input {
+  flex: 1 1 auto;
+  min-width: 0;
+  min-height: var(--space-32);
+  max-height: calc(var(--space-32) * 4);
+  field-sizing: content;
+  resize: none;
+  border: none;
+  padding: var(--space-4) 0;
+  background: transparent;
+  color: var(--text);
+  font: inherit;
+  line-height: 1.5;
+}
+.mc .ch-native-compose-input::placeholder {
+  color: var(--muted);
 }
 
 .ch-readonly {

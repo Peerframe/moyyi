@@ -21,7 +21,11 @@ export function ChatList({
   onView,
   onOpen,
   onCompose,
+  native = false,
+  showArchive = true,
 }: {
+  readonly native?: boolean;
+  readonly showArchive?: boolean;
   readonly world: ChatWorld;
   readonly folder: FolderId;
   readonly openId: string | null;
@@ -34,7 +38,7 @@ export function ChatList({
   const [query, setQuery] = useState("");
   const [archive, setArchive] = useState(false);
   const needle = query.trim();
-  const archived = world.chats.filter((chat) => chat.archived);
+  const archived = showArchive ? world.chats.filter((chat) => chat.archived) : [];
   const chats = world.chats.filter(
     (chat) =>
       (archive ? chat.archived : inFolder(world, chat, folder)) &&
@@ -42,7 +46,16 @@ export function ChatList({
   );
   const [emptyTitle, emptyNote] = needle
     ? [`没找到“${needle}”`, "试试搜文件名，或者到项目里 /对账"]
-    : EMPTY[folder];
+    : native
+      ? [
+          folder === "mine"
+            ? "没有等你确认的操作"
+            : folder === "running"
+              ? "没有正在运行的任务"
+              : "这里没有会话",
+          "选择已有会话，或点击右上角开始新会话",
+        ]
+      : EMPTY[folder];
   return (
     <section className="mc-panel ch-list" aria-label="对话列表">
       <div className="ch-list-head">
@@ -66,7 +79,7 @@ export function ChatList({
         <input
           id="chat-search"
           type="search"
-          placeholder="搜索 AI、项目、结论"
+          placeholder={native ? "搜索会话" : "搜索 AI、项目、结论"}
           value={query}
           onChange={(event) => setQuery(event.target.value)}
         />
@@ -105,7 +118,7 @@ export function ChatList({
             <span className="ch-sub">{emptyNote}</span>
           </div>
         ) : null}
-        {world.firstRun && !needle ? (
+        {world.firstRun && !needle && !native ? (
           <span className="ch-caption ch-first-run">项目和 AI 会在你交代第一件事之后出现</span>
         ) : null}
       </div>

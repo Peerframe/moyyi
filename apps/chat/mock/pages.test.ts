@@ -30,7 +30,7 @@ describe("设置 and 插件 on the mock backend", () => {
     expect(plugins.map((p) => p.name)).toEqual(["文件", "命令行", "网页", "文档", "技能"]);
     // Every choice and control id is unique: the runtime keys actions by them.
     const ids = [...settings, ...plugins].flatMap((page) => [
-      ...("toggle" in page ? [(page as PluginPage).toggle.id] : []),
+      ...("toggle" in page && (page as PluginPage).toggle ? [(page as PluginPage).toggle?.id] : []),
       ...page.groups.flatMap((g) =>
         g.blocks.flatMap((b) => {
           if (b.kind === "choice") return [b.choice.id];
