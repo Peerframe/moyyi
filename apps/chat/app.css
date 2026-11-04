@@ -183,42 +183,15 @@ html {
   /* clip, not hidden: focusing a popup must never scroll the pane itself */
   overflow: clip;
 }
-.ch-head {
-  display: flex;
-  align-items: center;
-  gap: var(--space-12);
-  padding: var(--space-12) 18px;
-  background: var(--panel);
-}
-.ch-head-text {
-  flex: 1 1 auto;
-  min-width: 0;
-  display: flex;
-  flex-direction: column;
-}
-.ch-head-name {
-  font-size: 15px;
-  font-weight: 600;
-}
-.ch-head-sub {
-  font-size: 12px;
-  color: var(--muted);
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-.ch-head .mc-icon-btn[aria-pressed="true"] {
+.mc-head .mc-icon-btn[aria-pressed="true"] {
   background: var(--selected);
   color: var(--accent);
 }
-.ch-topics,
 .ch-filters {
   display: flex;
-  /* a scroll container would otherwise shrink to nothing under the pinned bar */
+  /* a scroll container would otherwise shrink to nothing */
   flex-shrink: 0;
   gap: var(--space-4);
-  padding: 0 18px var(--space-10);
-  background: var(--panel);
   font-size: 13px;
   overflow-x: auto;
 }
@@ -244,8 +217,8 @@ html {
   display: flex;
   flex-direction: column;
   gap: var(--space-8);
-  padding: 0 18px 0;
-  background: var(--panel);
+  padding: var(--space-8) var(--space-10) 0;
+  border-radius: var(--radius-bubble);
 }
 .ch-search-bar .ch-search {
   margin: 0;
@@ -258,18 +231,10 @@ html {
 .ch-search-bar .ch-filters {
   padding: 0 0 var(--space-10);
 }
-.ch-topic-closed {
-  padding: var(--space-6) var(--space-16);
-  background: var(--panel);
-  box-shadow: inset 0 1px 0 var(--line);
-  font-size: 13px;
-  color: var(--muted);
-}
 .ch-offline {
   display: flex;
   gap: var(--space-8);
   align-items: center;
-  margin: var(--space-10) var(--space-24) 0;
   padding: var(--space-8) var(--space-10);
   border-radius: var(--radius-row);
   background: var(--raised);
@@ -306,6 +271,14 @@ html {
   flex-direction: column;
   border-radius: var(--radius-row);
   transition: background var(--duration-fast, 120ms) ease;
+}
+/* Day lines stay under the header while their messages pass; the next one slides over. Sticky
+   offsets start inside the column's top padding, which already clears the header and adds 16px. */
+.ch-day {
+  position: sticky;
+  top: calc(var(--space-8) - var(--space-16));
+  z-index: 2;
+  pointer-events: none;
 }
 .ch-msg[data-selected] {
   cursor: pointer;
@@ -529,7 +502,6 @@ html {
   transform: translateX(-50%);
   max-width: calc(100% - 2 * var(--space-24));
   text-align: center;
-  box-shadow: inset 0 0 0 1px var(--line);
 }
 .ch-empty {
   align-items: center;
@@ -564,7 +536,6 @@ html {
 
 /* ---- composer ---- */
 
-/* The whole composer shows focus; a ring around the bare field inside it reads as a second box. */
 .mc-composer:focus-within {
   border-color: var(--focus);
   box-shadow: 0 0 0 1px var(--focus);
@@ -573,6 +544,17 @@ html {
   outline: none;
 }
 
+.ch-readonly {
+  align-items: center;
+}
+.ch-readonly-action {
+  border: none;
+  color: var(--accent);
+  font: inherit;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+}
 .ch-composer-wrap {
   position: relative;
   padding: var(--space-10) 18px 14px;
@@ -644,7 +626,6 @@ html {
 .ch-emoji-row button:hover {
   background: var(--hover);
 }
-.ch-archived,
 .ch-selection {
   justify-content: center;
   min-height: 46px;
@@ -823,15 +804,8 @@ html {
   .ch-msgs {
     padding: var(--space-12) var(--space-16);
   }
-  .ch-head {
-    padding: var(--space-10) var(--space-12);
-    gap: var(--space-8);
-  }
-  .ch-topics,
-  .ch-filters,
-  .ch-search-bar {
-    padding-left: var(--space-12);
-    padding-right: var(--space-12);
+  .mc-chat-top {
+    padding: var(--space-8) var(--space-8) 0;
   }
   .ch-composer-wrap {
     padding: var(--space-8) var(--space-12) var(--space-12);
@@ -890,4 +864,29 @@ html {
 .mc * {
   scrollbar-width: thin;
   scrollbar-color: var(--line) transparent;
+}
+
+/* ---- list title, like a native window ---- */
+
+.ch-list-head {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 36px;
+  flex: 0 0 auto;
+}
+.ch-list-title {
+  margin: 0;
+  font-size: 15px;
+  font-weight: 600;
+}
+.ch-list-compose {
+  position: absolute;
+  right: var(--space-4);
+  color: var(--accent);
+}
+.ch-list .ch-search {
+  border-radius: var(--radius-pill);
+  padding: var(--space-4) var(--space-12);
 }

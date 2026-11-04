@@ -721,13 +721,6 @@ export function createMockPort(initial: ChatWorld, options: MockOptions = {}): M
             world.chats.find((c) => c.id === chatOf(world, action.messageIds[0] ?? ""))?.name ?? "";
           return carry(action.messageIds, action.chatId, source);
         }
-        case "reopen-topic":
-          return commit((w) =>
-            mapChat(w, action.chatId, (chat) => ({
-              ...chat,
-              closedTopics: (chat.closedTopics ?? []).filter((t) => t !== action.topic),
-            })),
-          );
         case "unschedule":
           return commit((w) =>
             mapMessage(w, action.messageId, (m) =>
@@ -819,7 +812,6 @@ function dayScript(now: () => string): readonly (readonly [number, (post: Post) 
           text: "第 3 章 40 条引用里，有 2 条缺页码：第 17 条和第 33 条。",
           tag: { kind: "cited", text: "有原文" },
           time: now(),
-          topic: "参考文献",
         })(next);
         return mapChat(next, "yandu", (chat) => ({
           ...chat,

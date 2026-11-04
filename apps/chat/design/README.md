@@ -1,7 +1,7 @@
 # moyyi Chat design files
 
 `tokens.json` and `bundle.css` are copied byte for byte from the owner's moyyi Chat design system
-(claude.ai artifact, version 12, 2026-11-01). Do not edit them here: change the design system,
+(claude.ai artifact, version 16, 2026-11-03: liquid glass, no topic tabs). Do not edit them here: change the design system,
 then copy both files again. Biome skips them so formatting cannot drift from the source.
 
 - `tokens.ts` turns `tokens.json` into `tokens.css` at build time: shared scales on `.mc-dark` and

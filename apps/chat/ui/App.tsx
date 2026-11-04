@@ -105,6 +105,10 @@ export function App({ port, theme, sticker, initialChat }: AppProps) {
           drafts={drafts}
           onFolder={setFolder}
           onOpen={open}
+          onCompose={() => {
+            open("moyyi");
+            requestAnimationFrame(() => document.getElementById("compose-moyyi")?.focus());
+          }}
         />
       ) : null}
       {showChat ? (

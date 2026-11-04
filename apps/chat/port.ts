@@ -59,11 +59,8 @@ export interface Chat {
   readonly placeholder: string;
   /** Project chats: members with their role here. */
   readonly members?: readonly { readonly id: string; readonly role: Role }[];
-  readonly topics?: readonly string[];
   /** Claims left to check (待对账). */
   readonly toCheck?: number;
-  /** Topics that finished and became read-only until reopened (N4). */
-  readonly closedTopics?: readonly string[];
 }
 
 export interface Reaction {
@@ -104,8 +101,6 @@ export interface Claim {
 interface Base {
   readonly id: string;
   readonly time?: string;
-  /** Topic inside a project; messages without one belong to every topic (全部). */
-  readonly topic?: string;
 }
 interface FromAI extends Base {
   /** Member id; "moyyi" for moyyi. */
@@ -118,7 +113,13 @@ interface FromAI extends Base {
 }
 
 export type Message =
-  | (Base & { readonly kind: "service"; readonly text: string; readonly tone?: "danger" })
+  | (Base & {
+      readonly kind: "service";
+      readonly text: string;
+      readonly tone?: "danger";
+      /** A day line (今天, 昨天): it stays under the header while its messages scroll by. */
+      readonly day?: boolean;
+    })
   | (Base & { readonly kind: "unread-divider" })
   | (Base & {
       readonly kind: "out";
@@ -318,7 +319,6 @@ export type ChatAction =
   | { readonly type: "retract"; readonly messageId: string }
   | { readonly type: "save-memory"; readonly messageIds: readonly string[] }
   | { readonly type: "forward"; readonly messageIds: readonly string[]; readonly chatId: string }
-  | { readonly type: "reopen-topic"; readonly chatId: string; readonly topic: string }
   | { readonly type: "unschedule"; readonly messageId: string }
   | { readonly type: "archive"; readonly chatId: string; readonly archived: boolean };
 

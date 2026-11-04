@@ -127,6 +127,7 @@ export function ChatList({
   drafts,
   onFolder,
   onOpen,
+  onCompose,
 }: {
   readonly world: ChatWorld;
   readonly folder: FolderId;
@@ -134,6 +135,8 @@ export function ChatList({
   readonly drafts: Readonly<Record<string, string>>;
   readonly onFolder: (folder: FolderId) => void;
   readonly onOpen: (chatId: string) => void;
+  /** New work always starts by telling moyyi, so composing opens moyyi's chat. */
+  readonly onCompose: () => void;
 }) {
   const [query, setQuery] = useState("");
   const [archive, setArchive] = useState(false);
@@ -149,6 +152,20 @@ export function ChatList({
     : EMPTY[folder];
   return (
     <section className="mc-panel ch-list" aria-label="对话列表">
+      <div className="ch-list-head">
+        <h1 className="ch-list-title">
+          {archive ? "归档" : FOLDERS.find((item) => item.id === folder)?.label}
+        </h1>
+        <button
+          type="button"
+          className="mc-icon-btn ch-list-compose"
+          aria-label="跟 moyyi 说一件新事"
+          title="跟 moyyi 说一件新事"
+          onClick={onCompose}
+        >
+          <Icon.compose size={20} />
+        </button>
+      </div>
       <FolderStrip world={world} folder={folder} onFolder={onFolder} />
       <div className="mc-composer ch-search">
         <Icon.search />

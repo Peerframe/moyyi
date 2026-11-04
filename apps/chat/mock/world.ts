@@ -58,7 +58,6 @@ export const CHATS: readonly Chat[] = [
     subtitle: "4 位 AI · 1 位在做 · 等你决定 1 件",
     placeholder: "发给负责人 moyyi，或 @ 一位 AI",
     members: LUNWEN_MEMBERS,
-    topics: ["格式", "参考文献", "第 4 章"],
     toCheck: 3,
   },
   {
@@ -192,7 +191,7 @@ export const CHATS: readonly Chat[] = [
 ];
 
 const LUNWEN: readonly Message[] = [
-  { id: "l-day", kind: "service", text: "今天" },
+  { id: "l-day", kind: "service", text: "今天", day: true },
   {
     id: "l-ask",
     kind: "out",
@@ -213,7 +212,6 @@ const LUNWEN: readonly Message[] = [
     ],
     budget: "预算 31/40 次",
     time: "21:31",
-    topic: "格式",
   },
   {
     id: "l-cite",
@@ -226,7 +224,6 @@ const LUNWEN: readonly Message[] = [
     ],
     budget: "预算 9/15 次",
     time: "21:06",
-    topic: "参考文献",
   },
   {
     id: "l-check",
@@ -274,7 +271,6 @@ const LUNWEN: readonly Message[] = [
       },
     ],
     time: "21:20",
-    topic: "参考文献",
   },
   {
     id: "l-zhang",
@@ -284,7 +280,6 @@ const LUNWEN: readonly Message[] = [
     tag: { kind: "cited", text: "有原文" },
     time: "21:25",
     state: "working",
-    topic: "参考文献",
     reactions: [
       { emoji: "👍", count: 2, mine: true, label: "这条没问题" },
       { emoji: "🦈", count: 1, mine: false, label: "鲨鱼" },
@@ -301,7 +296,6 @@ const LUNWEN: readonly Message[] = [
     undo: "reversible",
     dependents: ["第3章.docx 目录"],
     time: "21:31",
-    topic: "格式",
   },
   {
     id: "l-decide",
@@ -315,13 +309,12 @@ const LUNWEN: readonly Message[] = [
     ],
     note: "不回答就停在这里，不会自己选",
     time: "21:31",
-    topic: "参考文献",
   },
   { id: "l-wait", kind: "sticker", from: "moyyi", moment: "等你" },
 ];
 
 const ZUFANG: readonly Message[] = [
-  { id: "z-day", kind: "service", text: "今天" },
+  { id: "z-day", kind: "service", text: "今天", day: true },
   {
     id: "z-contract",
     kind: "file",
@@ -452,7 +445,7 @@ const MOYYI: readonly Message[] = [
     answered: "你选了：~/论文、~/租房 · 只看",
     time: "21:01",
   },
-  { id: "m-yesterday", kind: "service", text: "昨天" },
+  { id: "m-yesterday", kind: "service", text: "昨天", day: true },
   {
     id: "m-ask",
     kind: "out",
@@ -483,7 +476,7 @@ const MOYYI: readonly Message[] = [
     where: "进度在群里",
     text: "写作在读第 1 章 · 去群里看",
   },
-  { id: "m-today", kind: "service", text: "今天" },
+  { id: "m-today", kind: "service", text: "今天", day: true },
   {
     id: "m-report",
     kind: "decision",

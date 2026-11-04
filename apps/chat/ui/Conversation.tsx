@@ -1,5 +1,5 @@
-// One open chat (boards S3, S7, S10, S11, S17): header, topic tabs, the pinned job bar, the message
-// column on the wallpaper, jump buttons and the composer. Right-click or long-press opens the
+// One open chat (boards S3, S7, S10, S11, S17): header, the pinned job bar, the message column on
+// the wallpaper, jump buttons and the composer. Right-click or long-press opens the
 // message menu; selecting turns the composer into an action bar (N7); ⌘F searches here (N9).
 import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import type { Chat, ChatAction, ChatWorld, Job, Message } from "../port.ts";
@@ -88,7 +88,6 @@ interface Menu {
 export function Conversation(props: ConversationProps) {
   const { world, chat, act } = props;
   const all = world.messages[chat.id] ?? [];
-  const [topic, setTopic] = useState("全部");
   const [pinnedAt, setPinnedAt] = useState(0);
   const [flash, setFlash] = useState<string | null>(null);
   const [atBottom, setAtBottom] = useState(true);
@@ -102,14 +101,15 @@ export function Conversation(props: ConversationProps) {
   const [hit, setHit] = useState(0);
   const [notice, setNotice] = useState<string | null>(null);
   const column = useRef<HTMLDivElement>(null);
+  const top = useRef<HTMLDivElement>(null);
+  const bottom = useRef<HTMLDivElement>(null);
+  const [topHeight, setTopHeight] = useState(0);
+  const [bottomHeight, setBottomHeight] = useState(0);
   const searchInput = useRef<HTMLInputElement>(null);
   const press = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  const messages = all.filter(
-    (message) => topic === "全部" || !message.topic || message.topic === topic,
-  );
+  const messages = all;
   const grouped = runs(messages);
-  const topicClosed = topic !== "全部" && (chat.closedTopics ?? []).includes(topic);
   const jobs = orderJobs(world.jobs, chat.id);
   const shownJob = jobs.length ? jobs[pinnedAt % jobs.length] : undefined;
   const decisions = openDecisions(all);
@@ -123,7 +123,6 @@ export function Conversation(props: ConversationProps) {
   // Opening a chat lands on the unread line if there is one, otherwise at the bottom.
   // biome-ignore lint/correctness/useExhaustiveDependencies: runs once per opened chat
   useLayoutEffect(() => {
-    setTopic("全部");
     setPinnedAt(0);
     setReplyTo(null);
     setEditing(null);
@@ -132,9 +131,42 @@ export function Conversation(props: ConversationProps) {
     const element = column.current;
     if (!element) return;
     const divider = element.querySelector(".mc-unread-divider");
-    if (divider instanceof HTMLElement) element.scrollTop = Math.max(0, divider.offsetTop - 24);
+    const covered = top.current?.offsetHeight ?? 0;
+    if (divider instanceof HTMLElement)
+      element.scrollTop = Math.max(0, divider.offsetTop - covered - 24);
     else element.scrollTop = element.scrollHeight;
   }, [chat.id]);
+
+  // The header and pinned bar float over the top of the messages and the composer over the bottom;
+  // the column pads itself by their heights so every message can still scroll clear of both.
+  useLayoutEffect(() => {
+    const observed = [
+      [top.current, setTopHeight],
+      [bottom.current, setBottomHeight],
+    ] as const;
+    const observer = new ResizeObserver(() => {
+      for (const [element, set] of observed) if (element) set(element.offsetHeight);
+    });
+    for (const [element, set] of observed)
+      if (element) {
+        set(element.offsetHeight);
+        observer.observe(element);
+      }
+    return () => observer.disconnect();
+  }, []);
+  // Top padding moves the content; scroll by the same amount so what was in view stays put. A taller
+  // composer keeps a view that was at the bottom at the bottom.
+  const padded = useRef(0);
+  useLayoutEffect(() => {
+    const element = column.current;
+    if (element) element.scrollTop += topHeight - padded.current;
+    padded.current = topHeight;
+  }, [topHeight]);
+  // biome-ignore lint/correctness/useExhaustiveDependencies: follows the composer height only
+  useLayoutEffect(() => {
+    const element = column.current;
+    if (element && atBottom) element.scrollTop = element.scrollHeight;
+  }, [bottomHeight]);
 
   // New messages keep the view pinned to the bottom when it already was.
   // biome-ignore lint/correctness/useExhaustiveDependencies: follows the message count only
@@ -262,149 +294,147 @@ export function Conversation(props: ConversationProps) {
 
   return (
     <section className="mc-wallpaper ch-conversation" aria-label={chat.name}>
-      <header className="ch-head">
-        {props.narrow ? (
+      <div ref={top} className="mc-chat-top">
+        <header className="mc-head">
+          {props.narrow ? (
+            <button
+              type="button"
+              className="mc-icon-btn mc-glass mc-round"
+              aria-label="返回列表"
+              title="返回列表"
+              onClick={props.onBack}
+            >
+              <Icon.back size={18} />
+            </button>
+          ) : null}
           <button
             type="button"
-            className="mc-icon-btn"
-            aria-label="返回列表"
-            title="返回列表"
-            onClick={props.onBack}
+            className="mc-glass mc-head-main"
+            title="资料"
+            onClick={props.onInfo}
           >
-            <Icon.back size={18} />
-          </button>
-        ) : null}
-        <Avatar avatar={chat.avatar} shape={chat.kind === "project" ? "project" : "ai"} size={32} />
-        <div className="ch-head-text">
-          <span className="ch-head-name">{chat.name}</span>
-          <span className="ch-head-sub">{chat.subtitle}</span>
-        </div>
-        <button
-          type="button"
-          className="mc-icon-btn"
-          aria-label="搜索这个对话"
-          title="搜索这个对话 ⌘F"
-          aria-pressed={props.searchOpen}
-          onClick={() => props.onSearch(!props.searchOpen)}
-        >
-          <Icon.search size={18} />
-        </button>
-        <button
-          type="button"
-          className="mc-icon-btn"
-          aria-label="资料"
-          title="资料"
-          aria-pressed={props.infoOpen}
-          onClick={props.onInfo}
-        >
-          <Icon.info size={18} />
-        </button>
-      </header>
-      {props.searchOpen ? (
-        <search className="ch-search-bar">
-          <div className="mc-composer ch-search">
-            <Icon.search />
-            <label htmlFor={`find-${chat.id}`} className="ch-sr">
-              在这个对话里找
-            </label>
-            <input
-              ref={searchInput}
-              id={`find-${chat.id}`}
-              type="search"
-              placeholder="在这个对话里找"
-              value={query}
-              onChange={(event) => {
-                setHit(0);
-                setQuery(event.target.value);
-              }}
-              onKeyDown={(event) => {
-                if (event.key === "Enter" && hits.length) {
-                  event.preventDefault();
-                  setHit((value) => (value + (event.shiftKey ? hits.length - 1 : 1)) % hits.length);
-                } else if (event.key === "Escape") {
-                  event.stopPropagation();
-                  props.onSearch(false);
-                }
-              }}
+            <Avatar
+              avatar={chat.avatar}
+              shape={chat.kind === "project" ? "project" : "ai"}
+              size={32}
             />
-            <span className="ch-sub num" aria-live="polite">
-              {needle || filter
-                ? hits.length
-                  ? `第 ${Math.min(hit, hits.length - 1) + 1}/${hits.length} 处`
-                  : "没找到"
-                : ""}
+            <span className="mc-head-text">
+              <span className="mc-head-name">{chat.name}</span>
+              <span className="mc-head-sub">{chat.subtitle}</span>
+            </span>
+          </button>
+          <div className="mc-glass mc-head-tools">
+            <button
+              type="button"
+              className="mc-icon-btn"
+              aria-label="搜索这个对话"
+              title="搜索这个对话 ⌘F"
+              aria-pressed={props.searchOpen}
+              onClick={() => props.onSearch(!props.searchOpen)}
+            >
+              <Icon.search size={18} />
+            </button>
+            <button
+              type="button"
+              className="mc-icon-btn"
+              aria-label="资料"
+              title="资料"
+              aria-pressed={props.infoOpen}
+              onClick={props.onInfo}
+            >
+              <Icon.info size={18} />
+            </button>
+          </div>
+        </header>
+        {props.searchOpen ? (
+          <search className="mc-glass ch-search-bar">
+            <div className="mc-composer ch-search">
+              <Icon.search />
+              <label htmlFor={`find-${chat.id}`} className="ch-sr">
+                在这个对话里找
+              </label>
+              <input
+                ref={searchInput}
+                id={`find-${chat.id}`}
+                type="search"
+                placeholder="在这个对话里找"
+                value={query}
+                onChange={(event) => {
+                  setHit(0);
+                  setQuery(event.target.value);
+                }}
+                onKeyDown={(event) => {
+                  if (event.key === "Enter" && hits.length) {
+                    event.preventDefault();
+                    setHit(
+                      (value) => (value + (event.shiftKey ? hits.length - 1 : 1)) % hits.length,
+                    );
+                  } else if (event.key === "Escape") {
+                    event.stopPropagation();
+                    props.onSearch(false);
+                  }
+                }}
+              />
+              <span className="ch-sub num" aria-live="polite">
+                {needle || filter
+                  ? hits.length
+                    ? `第 ${Math.min(hit, hits.length - 1) + 1}/${hits.length} 处`
+                    : "没找到"
+                  : ""}
+              </span>
+            </div>
+            <fieldset className="ch-filters">
+              <legend className="ch-sr">只看</legend>
+              {FILTERS.map((item) => (
+                <button
+                  key={item}
+                  type="button"
+                  className="ch-tab"
+                  aria-pressed={filter === item}
+                  onClick={() => {
+                    setHit(0);
+                    setFilter(filter === item ? null : item);
+                  }}
+                >
+                  {item}
+                </button>
+              ))}
+            </fieldset>
+          </search>
+        ) : null}
+        {shownJob ? (
+          <PinnedBar
+            job={shownJob}
+            index={pinnedAt % jobs.length}
+            jobs={jobs}
+            onJump={() => {
+              reveal(shownJob.messageId);
+              setPinnedAt((value) => value + 1);
+            }}
+            onList={() => props.onPanel({ kind: "jobs" })}
+            onStop={() => act({ type: "stop", jobId: shownJob.id })}
+          />
+        ) : null}
+        {world.connection.state === "offline" ? (
+          <div className="ch-offline" role="status">
+            <span className="ch-offline-title">没连上网络</span>
+            <span className="muted">
+              {world.connection.note ?? "本机的事继续做；消息连上后再发"}
             </span>
           </div>
-          <fieldset className="ch-filters">
-            <legend className="ch-sr">只看</legend>
-            {FILTERS.map((item) => (
-              <button
-                key={item}
-                type="button"
-                className="ch-tab"
-                aria-pressed={filter === item}
-                onClick={() => {
-                  setHit(0);
-                  setFilter(filter === item ? null : item);
-                }}
-              >
-                {item}
-              </button>
-            ))}
-          </fieldset>
-        </search>
-      ) : null}
-      {chat.topics?.length ? (
-        <nav className="ch-topics" aria-label="话题">
-          {["全部", ...chat.topics].map((name) => (
-            <button
-              key={name}
-              type="button"
-              className="ch-tab"
-              aria-pressed={topic === name}
-              onClick={() => setTopic(name)}
-            >
-              {name}
-            </button>
-          ))}
-        </nav>
-      ) : null}
-      {topicClosed ? (
-        <div className="ch-topic-closed">
-          这个话题做完了 ·{" "}
-          <button
-            type="button"
-            className="ch-text-button"
-            onClick={() => act({ type: "reopen-topic", chatId: chat.id, topic })}
-          >
-            重新打开
-          </button>
-        </div>
-      ) : null}
-      {shownJob ? (
-        <PinnedBar
-          job={shownJob}
-          index={pinnedAt % jobs.length}
-          jobs={jobs}
-          onJump={() => {
-            reveal(shownJob.messageId);
-            setPinnedAt((value) => value + 1);
-          }}
-          onList={() => props.onPanel({ kind: "jobs" })}
-          onStop={() => act({ type: "stop", jobId: shownJob.id })}
-        />
-      ) : null}
-      {world.connection.state === "offline" ? (
-        <div className="ch-offline" role="status">
-          <span className="ch-offline-title">没连上网络</span>
-          <span className="muted">{world.connection.note ?? "本机的事继续做；消息连上后再发"}</span>
-        </div>
-      ) : null}
+        ) : null}
+      </div>
       <div className="ch-column">
         {/* biome-ignore lint/a11y/noStaticElementInteractions: the column delegates the message menu; the ContextMenu key and Shift+F10 reach it from the keyboard */}
         <div
           ref={column}
           className="mc-msgs ch-msgs"
+          style={{
+            paddingTop: `calc(${topHeight}px + var(--space-16))`,
+            paddingBottom: `calc(${bottomHeight}px + var(--space-8))`,
+            scrollPaddingTop: `calc(${topHeight}px + var(--space-8))`,
+            scrollPaddingBottom: `calc(${bottomHeight}px + var(--space-8))`,
+          }}
           onScroll={(event) => {
             const element = event.currentTarget;
             setAtBottom(element.scrollHeight - element.scrollTop - element.clientHeight < 48);
@@ -435,7 +465,7 @@ export function Conversation(props: ConversationProps) {
             return (
               <div
                 key={message.id}
-                className={`ch-msg${flash === message.id || currentHit?.id === message.id ? " ch-flash" : ""}`}
+                className={`ch-msg${flash === message.id || currentHit?.id === message.id ? " ch-flash" : ""}${message.kind === "service" && message.day ? " ch-day" : ""}`}
                 data-wrap={message.id}
                 data-selected={selected ? String(isSelected) : undefined}
                 onClickCapture={(event) => {
@@ -486,7 +516,7 @@ export function Conversation(props: ConversationProps) {
           />
         ) : null}
         {!atBottom || decisions.length ? (
-          <div className="mc-jumps">
+          <div className="mc-jumps" style={{ bottom: `calc(${bottomHeight}px + var(--space-12))` }}>
             {decisions.length && !atBottom ? (
               <button
                 type="button"
@@ -521,109 +551,104 @@ export function Conversation(props: ConversationProps) {
           </div>
         ) : null}
         {notice ? (
-          <span className="mc-service ch-toast" role="status">
+          <span
+            className="mc-service ch-toast"
+            role="status"
+            style={{ bottom: `calc(${bottomHeight}px + var(--space-12))` }}
+          >
             {notice}
           </span>
         ) : null}
       </div>
-      {selected ? (
-        <SelectionBar
-          count={selected.length}
-          forwarding={forwarding}
-          projects={projects}
-          onCheck={() => {
-            const result = selected.map(find).find((m) => m?.kind === "result" && m.claims?.length);
-            const claim =
-              result?.kind === "result"
-                ? (result.claims?.find((c) => !c.check) ?? result.claims?.[0])
-                : undefined;
-            if (result && claim)
-              props.onPanel({ kind: "claim", messageId: result.id, claimId: claim.id });
-            else setNotice("选中的消息里没有带出处的结论");
-          }}
-          onMemory={() => {
-            act({ type: "save-memory", messageIds: selected });
-            setSelected(null);
-            setNotice(`存进记忆了 · ${selected.length} 条，带着出处`);
-          }}
-          onForward={() => setForwarding(true)}
-          onForwardTo={(chatId) => {
-            act({ type: "forward", messageIds: selected, chatId });
-            setSelected(null);
-            setForwarding(false);
-            setNotice("转过去了 · 出处跟着走，文件权限不跟着走");
-          }}
-          onCopy={() => {
-            copy(
-              selected
+      <div ref={bottom} className="mc-chat-bottom">
+        {selected ? (
+          <SelectionBar
+            count={selected.length}
+            forwarding={forwarding}
+            projects={projects}
+            onCheck={() => {
+              const result = selected
                 .map(find)
-                .filter((m): m is Message => Boolean(m))
-                .map((m) => `${senderName(m)}：${textOf(m)}`)
-                .join("\n"),
-              `已复制 ${selected.length} 条`,
-            );
-            setSelected(null);
-          }}
-          onCancel={() => {
-            setSelected(null);
-            setForwarding(false);
-          }}
-        />
-      ) : topicClosed ? (
-        <div className="ch-composer-wrap">
-          <div className="mc-composer ch-archived">
-            <span className="muted">话题「{topic}」已关闭，只能看 · </span>
-            <button
-              type="button"
-              className="mc-key"
-              onClick={() => act({ type: "reopen-topic", chatId: chat.id, topic })}
-            >
-              重新打开
-            </button>
-          </div>
-        </div>
-      ) : (
-        <Composer
-          chat={chat}
-          members={world.members}
-          draft={props.draft}
-          running={
-            shownJob
-              ? { who: chat.kind === "project" ? "负责人 moyyi" : chat.name, step: shownJob.step }
-              : null
-          }
-          sticker={props.sticker}
-          onDraft={props.onDraft}
-          onSend={(text) => {
-            if (editing) act({ type: "edit", messageId: editing, text });
-            else act({ type: "send", chatId: chat.id, text, ...(replyTo ? { replyTo } : {}) });
-            setEditing(null);
-            setReplyTo(null);
-            setAtBottom(true);
-          }}
-          onStop={() => shownJob && act({ type: "stop", jobId: shownJob.id })}
-          onAttach={(name, access) => act({ type: "attach", chatId: chat.id, name, access })}
-          onCommand={command}
-          onVoice={(seconds) =>
-            act({
-              type: "send",
-              chatId: chat.id,
-              text: `[语音 0:${String(seconds).padStart(2, "0")}]`,
-            })
-          }
-          onReopen={() => act({ type: "archive", chatId: chat.id, archived: false })}
-          replyTo={
-            replyMessage ? { name: senderName(replyMessage), text: textOf(replyMessage) } : null
-          }
-          onCancelReply={() => setReplyTo(null)}
-          editing={editing !== null}
-          onEditLast={editLast}
-          onCancelEdit={() => {
-            if (editing) props.onDraft("");
-            setEditing(null);
-          }}
-        />
-      )}
+                .find((m) => m?.kind === "result" && m.claims?.length);
+              const claim =
+                result?.kind === "result"
+                  ? (result.claims?.find((c) => !c.check) ?? result.claims?.[0])
+                  : undefined;
+              if (result && claim)
+                props.onPanel({ kind: "claim", messageId: result.id, claimId: claim.id });
+              else setNotice("选中的消息里没有带出处的结论");
+            }}
+            onMemory={() => {
+              act({ type: "save-memory", messageIds: selected });
+              setSelected(null);
+              setNotice(`存进记忆了 · ${selected.length} 条，带着出处`);
+            }}
+            onForward={() => setForwarding(true)}
+            onForwardTo={(chatId) => {
+              act({ type: "forward", messageIds: selected, chatId });
+              setSelected(null);
+              setForwarding(false);
+              setNotice("转过去了 · 出处跟着走，文件权限不跟着走");
+            }}
+            onCopy={() => {
+              copy(
+                selected
+                  .map(find)
+                  .filter((m): m is Message => Boolean(m))
+                  .map((m) => `${senderName(m)}：${textOf(m)}`)
+                  .join("\n"),
+                `已复制 ${selected.length} 条`,
+              );
+              setSelected(null);
+            }}
+            onCancel={() => {
+              setSelected(null);
+              setForwarding(false);
+            }}
+          />
+        ) : (
+          <Composer
+            chat={chat}
+            members={world.members}
+            draft={props.draft}
+            running={
+              shownJob
+                ? { who: chat.kind === "project" ? "负责人 moyyi" : chat.name, step: shownJob.step }
+                : null
+            }
+            sticker={props.sticker}
+            onDraft={props.onDraft}
+            onSend={(text) => {
+              if (editing) act({ type: "edit", messageId: editing, text });
+              else act({ type: "send", chatId: chat.id, text, ...(replyTo ? { replyTo } : {}) });
+              setEditing(null);
+              setReplyTo(null);
+              setAtBottom(true);
+            }}
+            onStop={() => shownJob && act({ type: "stop", jobId: shownJob.id })}
+            onAttach={(name, access) => act({ type: "attach", chatId: chat.id, name, access })}
+            onCommand={command}
+            onVoice={(seconds) =>
+              act({
+                type: "send",
+                chatId: chat.id,
+                text: `[语音 0:${String(seconds).padStart(2, "0")}]`,
+              })
+            }
+            onReopen={() => act({ type: "archive", chatId: chat.id, archived: false })}
+            replyTo={
+              replyMessage ? { name: senderName(replyMessage), text: textOf(replyMessage) } : null
+            }
+            onCancelReply={() => setReplyTo(null)}
+            editing={editing !== null}
+            onEditLast={editLast}
+            onCancelEdit={() => {
+              if (editing) props.onDraft("");
+              setEditing(null);
+            }}
+          />
+        )}
+      </div>
     </section>
   );
 }
@@ -649,7 +674,7 @@ function PinnedBar({
     ? `正在停${count} · ${job.name}`
     : `${job.waiting ? "等你" : "进度"}${count} · ${job.name}`;
   return (
-    <div className={`mc-pinned${job.waiting ? " mc-pinned-attention" : ""}`}>
+    <div className={`mc-pinned mc-glass${job.waiting ? " mc-pinned-attention" : ""}`}>
       <button type="button" className="mc-pinned-jump" aria-label="跳到进度消息" onClick={onJump}>
         <span className="mc-pinned-segs">
           {jobs.map((each, at) => (
@@ -732,7 +757,7 @@ function MessageMenu({
         onClick={onClose}
       />
       <div
-        className="mc-attach ch-menu"
+        className="mc-attach ch-menu mc-glass"
         role="menu"
         aria-label="消息"
         style={{ left: menu.x, top: menu.y }}
@@ -794,7 +819,7 @@ function SelectionBar({
   return (
     <div className="ch-composer-wrap">
       {forwarding ? (
-        <div className="mc-suggest ch-popup" role="menu" aria-label="转到哪个项目">
+        <div className="mc-suggest ch-popup mc-glass" role="menu" aria-label="转到哪个项目">
           {projects.map((project) => (
             <button
               key={project.id}
@@ -810,7 +835,11 @@ function SelectionBar({
           ))}
         </div>
       ) : null}
-      <div className="mc-composer ch-selection" role="toolbar" aria-label={`已选 ${count} 条`}>
+      <div
+        className="mc-composer mc-glass ch-selection"
+        role="toolbar"
+        aria-label={`已选 ${count} 条`}
+      >
         <span className="ch-grow num">已选 {count} 条</span>
         <button type="button" className="mc-key" onClick={onCheck}>
           对账

@@ -74,13 +74,16 @@ export function Composer(props: ComposerProps) {
 
   if (chat.archived)
     return (
-      <div className="ch-composer-wrap">
-        <div className="mc-composer ch-archived">
-          <span className="muted">项目已归档，只能看 · </span>
-          <button type="button" className="mc-key" onClick={props.onReopen}>
-            重新打开
-          </button>
-        </div>
+      // Read-only: the composer gives way to the one thing you can do here.
+      <div className="ch-composer-wrap ch-readonly">
+        <button
+          type="button"
+          className="mc-glass mc-round-pill ch-readonly-action"
+          title="项目已归档，只能看"
+          onClick={props.onReopen}
+        >
+          <span className="muted">已归档 ·</span> 重新打开
+        </button>
       </div>
     );
 
@@ -127,7 +130,7 @@ export function Composer(props: ComposerProps) {
   return (
     <div className="ch-composer-wrap">
       {popup === "menu" ? (
-        <div className="mc-suggest ch-popup" role="menu" aria-label="操作">
+        <div className="mc-suggest ch-popup mc-glass" role="menu" aria-label="操作">
           {COMMANDS.map((command) => (
             <button
               key={command.name}
@@ -146,7 +149,7 @@ export function Composer(props: ComposerProps) {
         </div>
       ) : null}
       {commands.length ? (
-        <div className="mc-suggest ch-popup" role="listbox" aria-label="操作">
+        <div className="mc-suggest ch-popup mc-glass" role="listbox" aria-label="操作">
           {commands.map((command, index) => (
             <div
               key={command.name}
@@ -166,7 +169,7 @@ export function Composer(props: ComposerProps) {
         </div>
       ) : null}
       {mentions.length ? (
-        <div className="mc-suggest ch-popup" role="listbox" aria-label="成员">
+        <div className="mc-suggest ch-popup mc-glass" role="listbox" aria-label="成员">
           {mentions.map((member, index) => (
             <div
               key={member.id}
@@ -214,7 +217,11 @@ export function Composer(props: ComposerProps) {
         />
       ) : null}
       {popup === "emoji" ? (
-        <div className="mc-suggest ch-popup ch-emoji" role="dialog" aria-label="表情和贴纸">
+        <div
+          className="mc-suggest ch-popup ch-emoji mc-glass"
+          role="dialog"
+          aria-label="表情和贴纸"
+        >
           <div className="ch-emoji-tabs">
             <span className="mc-chip">贴纸</span>
             <span className="mc-chip">表情</span>
@@ -252,7 +259,7 @@ export function Composer(props: ComposerProps) {
         </div>
       ) : null}
       {grant ? (
-        <div className="mc-grant ch-popup">
+        <div className="mc-grant ch-popup mc-glass">
           <strong>{grant.title}</strong>
           <span className="muted">{grant.note}</span>
           <div className="mc-keys mc-keys-2">
@@ -318,10 +325,10 @@ export function Composer(props: ComposerProps) {
           </button>
         </div>
       ) : null}
-      <div className="mc-composer">
+      <div className="mc-compose-row">
         <button
           type="button"
-          className="mc-icon-btn"
+          className="mc-icon-btn mc-glass mc-round"
           aria-label="全部操作"
           title="全部操作"
           aria-expanded={popup === "menu"}
@@ -332,7 +339,7 @@ export function Composer(props: ComposerProps) {
         <button
           ref={attachButton}
           type="button"
-          className="mc-icon-btn"
+          className="mc-icon-btn mc-glass mc-round"
           aria-label="添加文件"
           title="添加文件"
           aria-expanded={popup === "attach"}
@@ -340,95 +347,103 @@ export function Composer(props: ComposerProps) {
         >
           <Icon.attach size={18} />
         </button>
-        {recording !== null ? (
-          <span className="mc-recording" role="status">
-            <span className="mc-recording-dot" />
-            <span className="num">0:{String(recording).padStart(2, "0")}</span>
-            <span className="mc-wave" aria-hidden="true">
-              {[8, 14, 20, 12, 18, 10, 16, 22, 12, 8, 14, 18, 10].map((h, i) => (
-                // biome-ignore lint/suspicious/noArrayIndexKey: fixed decorative bars
-                <span key={i} style={{ height: h }} />
-              ))}
+        <div className="mc-composer mc-glass">
+          {recording !== null ? (
+            <span className="mc-recording" role="status">
+              <span className="mc-recording-dot" />
+              <span className="num">0:{String(recording).padStart(2, "0")}</span>
+              <span className="mc-wave" aria-hidden="true">
+                {[8, 14, 20, 12, 18, 10, 16, 22, 12, 8, 14, 18, 10].map((h, i) => (
+                  // biome-ignore lint/suspicious/noArrayIndexKey: fixed decorative bars
+                  <span key={i} style={{ height: h }} />
+                ))}
+              </span>
+              <span className="muted">上滑取消</span>
             </span>
-            <span className="muted">上滑取消</span>
-          </span>
-        ) : (
-          <>
-            <label htmlFor={`compose-${chat.id}`} className="ch-sr">
-              发消息
-            </label>
-            <input
-              ref={input}
-              id={`compose-${chat.id}`}
-              type="text"
-              placeholder={chat.placeholder}
-              value={draft}
-              maxLength={4000}
-              autoComplete="off"
-              onChange={(event) => {
-                setSelected(0);
-                onDraft(event.target.value);
-              }}
-              onKeyDown={(event) => {
-                if (suggestions && (event.key === "ArrowDown" || event.key === "ArrowUp")) {
-                  event.preventDefault();
-                  setSelected(
-                    (value) =>
-                      (value + (event.key === "ArrowDown" ? 1 : suggestions - 1)) % suggestions,
-                  );
-                } else if (suggestions && (event.key === "Enter" || event.key === "Tab")) {
-                  event.preventDefault();
-                  pick(selected);
-                } else if (
-                  event.key === "Enter" &&
-                  (event.metaKey || event.ctrlKey) &&
-                  !event.nativeEvent.isComposing
-                ) {
-                  // The design system sends on ⌘ Enter only, never on plain Enter.
-                  event.preventDefault();
-                  send();
-                } else if (event.key === "ArrowUp" && !draft) {
-                  event.preventDefault();
-                  props.onEditLast();
-                } else if (event.key === "Escape") {
-                  if (popup || grant) {
-                    event.stopPropagation();
-                    setPopup(null);
-                    setGrant(null);
-                  } else if (props.replyTo || props.editing) {
-                    event.stopPropagation();
-                    props.onCancelReply();
-                    props.onCancelEdit();
+          ) : (
+            <>
+              <label htmlFor={`compose-${chat.id}`} className="ch-sr">
+                发消息
+              </label>
+              <input
+                ref={input}
+                id={`compose-${chat.id}`}
+                type="text"
+                placeholder={chat.placeholder}
+                value={draft}
+                maxLength={4000}
+                autoComplete="off"
+                onChange={(event) => {
+                  setSelected(0);
+                  onDraft(event.target.value);
+                }}
+                onKeyDown={(event) => {
+                  if (suggestions && (event.key === "ArrowDown" || event.key === "ArrowUp")) {
+                    event.preventDefault();
+                    setSelected(
+                      (value) =>
+                        (value + (event.key === "ArrowDown" ? 1 : suggestions - 1)) % suggestions,
+                    );
+                  } else if (suggestions && (event.key === "Enter" || event.key === "Tab")) {
+                    event.preventDefault();
+                    pick(selected);
+                  } else if (
+                    event.key === "Enter" &&
+                    (event.metaKey || event.ctrlKey) &&
+                    !event.nativeEvent.isComposing
+                  ) {
+                    // The design system sends on ⌘ Enter only, never on plain Enter.
+                    event.preventDefault();
+                    send();
+                  } else if (event.key === "ArrowUp" && !draft) {
+                    event.preventDefault();
+                    props.onEditLast();
+                  } else if (event.key === "Escape") {
+                    if (popup || grant) {
+                      event.stopPropagation();
+                      setPopup(null);
+                      setGrant(null);
+                    } else if (props.replyTo || props.editing) {
+                      event.stopPropagation();
+                      props.onCancelReply();
+                      props.onCancelEdit();
+                    }
                   }
-                }
-              }}
-            />
-            {running && !draft ? (
-              <MicButton
-                inside
-                onRecord={setRecording}
-                onRelease={props.onVoice}
-                recording={recording}
+                }}
               />
-            ) : null}
-            <button
-              type="button"
-              className="mc-icon-btn"
-              aria-label="表情和贴纸"
-              title="表情和贴纸"
-              aria-expanded={popup === "emoji"}
-              onClick={() => setPopup(popup === "emoji" ? null : "emoji")}
-            >
-              <Icon.emoji size={18} />
-            </button>
-          </>
-        )}
+              {running && !draft ? (
+                <MicButton
+                  inside
+                  onRecord={setRecording}
+                  onRelease={props.onVoice}
+                  recording={recording}
+                />
+              ) : null}
+              <button
+                type="button"
+                className="mc-icon-btn"
+                aria-label="表情和贴纸"
+                title="表情和贴纸"
+                aria-expanded={popup === "emoji"}
+                onClick={() => setPopup(popup === "emoji" ? null : "emoji")}
+              >
+                <Icon.emoji size={18} />
+              </button>
+            </>
+          )}
+        </div>
         {draft.trim() ? (
-          <button type="button" className="mc-send" title="⌘ Enter 发送" onClick={send}>
-            发送
+          <button
+            type="button"
+            className="mc-send mc-round"
+            aria-label="发送"
+            title="⌘ Enter 发送"
+            onClick={send}
+          >
+            <Icon.send size={18} />
           </button>
         ) : running ? (
-          <button type="button" className="mc-stop" onClick={props.onStop}>
+          <button type="button" className="mc-stop mc-glass mc-round-pill" onClick={props.onStop}>
             停下
           </button>
         ) : (
@@ -475,14 +490,14 @@ function MicButton({
   return (
     <button
       type="button"
-      className={inside ? "mc-icon-btn" : "mc-mic"}
+      className={inside ? "mc-icon-btn" : "mc-mic mc-round"}
       aria-label={recording === null ? "按住说话" : "松开发送"}
       title={recording === null ? "按住说话" : undefined}
       onPointerDown={() => onRecord(0)}
       onPointerUp={() => release(true)}
       onPointerLeave={() => release(false)}
     >
-      <Icon.mic size={inside ? 18 : 16} />
+      <Icon.mic size={18} />
     </button>
   );
 }
@@ -501,7 +516,7 @@ function AttachMenu({
   const items = chat.kind === "project" ? ATTACH : ATTACH.filter((item) => item.id !== "folder");
   return (
     <div
-      className="mc-attach ch-popup"
+      className="mc-attach ch-popup mc-glass"
       role="menu"
       aria-label="添加"
       tabIndex={-1}

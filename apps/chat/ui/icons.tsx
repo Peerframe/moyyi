@@ -88,6 +88,8 @@ export const Icon = {
       <path d="M5.8 9.5c1.2 1.3 3.2 1.3 4.4 0M6 6.5h.01M10 6.5h.01" />
     </>,
   ),
+  send: stroke(<path d="M8 13V3.5M3.5 8L8 3.5 12.5 8" />, 1.8),
+  compose: stroke(<path d="M7.5 3H3v10h10V8.5M6.5 9.5l.5-2.5 5-5 2 2-5 5z" />, 1.4),
   close: stroke(<path d="M4 4l8 8M12 4l-8 8" />, 1.5),
   back: stroke(<path d="M10 3.5L5.5 8l4.5 4.5" />, 1.6),
   mic: stroke(

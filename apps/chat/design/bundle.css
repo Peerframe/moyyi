@@ -113,7 +113,7 @@
 .mc-sticker-label{padding:2px 10px;border-radius:var(--radius-pill);background:var(--raised);color:var(--text);font-size:12px;font-weight:500}
 
 /* Pinned status bar and stop */
-.mc-pinned{display:flex;align-items:center;gap:var(--space-10);padding:var(--space-6) var(--space-16);background:var(--panel);box-shadow:inset 0 1px 0 var(--line);font-size:13px;line-height:1.4;color:var(--text)}
+.mc-pinned{display:flex;align-items:center;gap:var(--space-10);padding:var(--space-8) var(--space-8) var(--space-8) var(--space-16);border-radius:var(--radius-bubble);background:color-mix(in srgb,var(--panel) 78%,transparent);-webkit-backdrop-filter:blur(20px) saturate(1.6);backdrop-filter:blur(20px) saturate(1.6);box-shadow:inset 0 0 0 1px color-mix(in srgb,var(--text) 9%,transparent),0 4px 18px color-mix(in srgb,var(--text) 8%,transparent);font-size:13px;line-height:1.4;color:var(--text)}
 .mc-pinned-jump{flex:1 1 auto;min-width:0;display:flex;align-items:stretch;gap:var(--space-10);padding:0;border:none;background:none;color:inherit;font:inherit;text-align:left;cursor:pointer}
 .mc-pinned-bar{width:3px;align-self:stretch;border-radius:2px;background:var(--accent);flex:0 0 auto}
 .mc-pinned-attention .mc-pinned-bar{background:var(--attention)}
@@ -227,3 +227,28 @@
 .mc-attach-sep{height:1px;margin:var(--space-4) var(--space-8);background:var(--line)}
 .mc-grant{display:flex;flex-direction:column;gap:var(--space-8);padding:var(--space-12);border-radius:var(--radius-key);background:var(--raised);box-shadow:inset 0 0 0 1px var(--line);font-size:14px}
 .mc-pinned-label{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+/* Liquid glass: what floats over the conversation. Header capsules, the pinned bar, the composer's round buttons and pill, day and service pills, the jump buttons and popups. A thin tint of panel and a strong, saturated blur let what passes under show through in its own colour; light from above leaves a sheen and a bright top rim, and a soft shade lifts it off the wallpaper. Pressed, a glass control gives a little and springs back. */
+.mc-glass,.mc-service,.mc-jump:not(.mc-jump-attention){background:radial-gradient(140% 100% at 50% -40%,color-mix(in srgb,var(--sheen) 13%,transparent),transparent 62%),color-mix(in srgb,var(--panel) 62%,transparent);-webkit-backdrop-filter:blur(14px) saturate(1.9);backdrop-filter:blur(14px) saturate(1.9);box-shadow:inset 0 1px 0 color-mix(in srgb,var(--sheen) 26%,transparent),inset 0 -1px 0 color-mix(in srgb,var(--sheen) 6%,transparent),inset 0 0 0 1px color-mix(in srgb,var(--text) 8%,transparent),0 8px 24px color-mix(in srgb,var(--shade) 16%,transparent),0 1px 3px color-mix(in srgb,var(--shade) 10%,transparent)}
+.mc-round{flex:0 0 auto;width:var(--touch-min);height:var(--touch-min);padding:0;border-radius:50%;display:inline-flex;align-items:center;justify-content:center}
+.mc-round-pill{flex:0 0 auto;height:var(--touch-min);padding:0 var(--space-16);border-radius:var(--radius-pill)}
+.mc-icon-btn.mc-glass{color:var(--text)}
+.mc-icon-btn.mc-glass:hover,button.mc-glass:hover,.mc-jump:not(.mc-jump-attention):hover{background-color:color-mix(in srgb,var(--hover) 72%,transparent)}
+.mc-send.mc-round,.mc-mic.mc-round{background:radial-gradient(140% 100% at 50% -40%,color-mix(in srgb,var(--sheen) 30%,transparent),transparent 62%),var(--accent);box-shadow:inset 0 1px 0 color-mix(in srgb,var(--sheen) 40%,transparent),0 6px 18px color-mix(in srgb,var(--accent) 30%,transparent)}
+@media (prefers-reduced-motion: no-preference){
+  .mc-glass,.mc-jump,.mc-send.mc-round,.mc-mic.mc-round,.mc-head-tools .mc-icon-btn{transition:transform var(--duration-move) cubic-bezier(.34,1.56,.64,1),background-color var(--duration-fast)}
+  button.mc-glass:active,.mc-jump:active,.mc-send.mc-round:active,.mc-mic.mc-round:active,.mc-head-tools .mc-icon-btn:active{transform:scale(.94)}
+}
+.mc-chat-top{position:absolute;top:0;left:0;right:0;z-index:3;display:flex;flex-direction:column;gap:var(--space-8);padding:var(--space-10) var(--space-12) 0;pointer-events:none}
+.mc-chat-top>*{pointer-events:auto}
+.mc-chat-bottom{position:absolute;left:0;right:0;bottom:0;z-index:3}
+.mc-head{display:flex;align-items:center;gap:var(--space-8)}
+.mc-head-main{flex:1 1 auto;min-width:0;display:flex;align-items:center;gap:var(--space-10);padding:var(--space-6) var(--space-16) var(--space-6) var(--space-6);border:none;border-radius:var(--radius-pill);color:var(--text);font:inherit;text-align:left;cursor:pointer}
+.mc-head-text{flex:1 1 auto;min-width:0;display:flex;flex-direction:column}
+.mc-head-name{font-size:15px;font-weight:600}
+.mc-head-sub{font-size:12px;color:var(--muted);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.mc-head-tools{flex:0 0 auto;display:flex;gap:var(--space-2);padding:var(--space-6);border-radius:var(--radius-pill)}
+.mc-head-tools .mc-icon-btn{width:40px;height:40px;border-radius:50%;color:var(--text)}
+.mc-compose-row{display:flex;align-items:flex-end;gap:var(--space-8)}
+.mc-compose-row>.mc-composer{flex:1 1 auto;min-width:0;min-height:var(--touch-min);box-sizing:border-box;border:none;border-radius:calc(var(--touch-min) / 2);padding:var(--space-4) var(--space-6) var(--space-4) var(--space-16)}
+.mc-compose-row>.mc-composer:focus-within{box-shadow:0 0 0 2px var(--focus)}
+.mc-compose-row>.mc-composer input:focus-visible{outline:none}
