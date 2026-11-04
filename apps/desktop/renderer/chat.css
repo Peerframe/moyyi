@@ -54,6 +54,19 @@ body,
   border-color: var(--line);
   max-height: calc(100dvh - 32px);
 }
+.desktop-tools.ch-native-rich {
+  font: inherit;
+  min-width: 0;
+}
+.ch-native-rich .rich-message {
+  white-space: normal;
+}
+.ch-native-rich .rich-message code {
+  background: var(--hover);
+}
+.ch-native-rich .rich-message :is(th, td) {
+  border-color: var(--line);
+}
 .desktop-tools .settings-dialog::backdrop {
   background: var(--backdrop);
 }

@@ -117,6 +117,8 @@ export type Message =
   | (Base & {
       readonly kind: "service";
       readonly text: string;
+      /** Raw tool output, initially collapsed and rendered as escaped text. */
+      readonly detail?: string;
       readonly tone?: "danger";
       /** A day line (今天, 昨天): it stays under the header while its messages scroll by. */
       readonly day?: boolean;

@@ -19,7 +19,8 @@ function message(entry: DesktopMessage): Message {
       return {
         id: entry.id,
         kind: "service",
-        text: `${entry.tool ?? "工具活动"} · ${toolStateLabel(entry.state)}${entry.text ? `\n${entry.text}` : ""}`,
+        text: `${entry.tool ?? "工具活动"} · ${toolStateLabel(entry.state)}`,
+        ...(entry.text ? { detail: entry.text } : {}),
         ...(entry.state === "failed" || entry.state === "unknown"
           ? { tone: "danger" as const }
           : {}),

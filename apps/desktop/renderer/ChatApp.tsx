@@ -3,6 +3,7 @@ import type { Theme } from "../../chat/port.ts";
 import { App as ChatApp } from "../../chat/ui/App.tsx";
 import type { DesktopBridge } from "../shared.ts";
 import { CHAT_ACTIONS, createDesktopChatPort } from "./chat-port.ts";
+import { RichMessage } from "./RichMessage.tsx";
 import { useRenderer } from "./runtime.ts";
 import { FeatureSlot } from "./slots.ts";
 import { type ReadyRendererUI, RendererContext } from "./ui.ts";
@@ -258,6 +259,11 @@ export function DesktopChatApp({ bridge }: { bridge: DesktopBridge }) {
             beforeComposer,
             empty,
             supportedActions: CHAT_ACTIONS,
+            renderText: (text) => (
+              <div className="desktop-tools ch-native-rich">
+                <RichMessage content={text} />
+              </div>
+            ),
           }}
         />
         {panel ? (

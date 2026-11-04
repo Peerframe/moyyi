@@ -61,7 +61,7 @@ describe("desktop Chat state projection", () => {
     );
     expect(world.messages["session-a"]).toEqual([
       { id: "u1", kind: "out", text: "检查这个文件", receipt: "recorded" },
-      { id: "t1", kind: "service", text: "edit_file · 结果未知\n中断", tone: "danger" },
+      { id: "t1", kind: "service", text: "edit_file · 结果未知", detail: "中断", tone: "danger" },
       { id: "a1", kind: "text", from: "moyyi", text: "<script>source text</script>" },
       { id: "n1", kind: "service", text: "本轮模型请求：第 1 / 3 次。剩余 3 次（含本次）。" },
     ]);

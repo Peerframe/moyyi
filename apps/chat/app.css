@@ -193,6 +193,32 @@ html {
   /* clip, not hidden: focusing a popup must never scroll the pane itself */
   overflow: clip;
 }
+.ch-tool-details {
+  max-width: 100%;
+  min-width: 0;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-key);
+  color: var(--muted);
+  background: var(--panel);
+}
+.ch-tool-details summary {
+  padding: var(--space-8) var(--space-12);
+  cursor: pointer;
+}
+.ch-tool-details summary:focus-visible {
+  outline: 2px solid var(--focus);
+  outline-offset: 2px;
+}
+.ch-tool-details pre {
+  margin: 0;
+  padding: var(--space-8) var(--space-12);
+  max-height: calc(var(--space-32) * 8);
+  overflow: auto;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  font-family: var(--font-mono);
+  color: var(--text);
+}
 .mc-head .mc-icon-btn[aria-pressed="true"] {
   background: var(--selected);
   color: var(--accent);

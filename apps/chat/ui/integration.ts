@@ -11,6 +11,8 @@ export interface ChatIntegration {
   readonly header?: ReactNode;
   readonly beforeComposer?: ReactNode;
   readonly empty?: ReactNode;
+  /** The host's safe rich-text renderer for assistant message bodies. */
+  readonly renderText?: (text: string) => ReactNode;
   readonly supportedActions: readonly ChatAction["type"][];
 }
 

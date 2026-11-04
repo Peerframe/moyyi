@@ -508,6 +508,7 @@ export function Conversation(props: ConversationProps) {
                   run={grouped[index] ?? { first: true }}
                   actions={actions}
                   sticker={props.sticker}
+                  renderText={integration?.renderText}
                 />
               </div>
             );

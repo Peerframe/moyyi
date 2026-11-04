@@ -3,6 +3,8 @@ import { renderToString } from "react-dom/server";
 import { describe, expect, it, vi } from "vitest";
 import { createMockPort } from "../mock/port.ts";
 import { xiaowenWorld } from "../mock/world.ts";
+import type { Message } from "../port.ts";
+import { textOf } from "../text.ts";
 import { App, type ChatIntegration } from "./App.tsx";
 import { Composer, type ComposerProps, submitComposerMessage } from "./Composer.tsx";
 
@@ -16,6 +18,47 @@ const integration: ChatIntegration = {
 };
 
 describe("host-backed Chat interface", () => {
+  it("uses host rich text only for assistant bodies and keeps raw tool details collapsed and searchable", () => {
+    const tool: Message = {
+      id: "tool-output",
+      kind: "service",
+      text: "fs.read · 完成",
+      detail: '<script>alert("not executable")</script>\nunique tool evidence',
+    };
+    const messages: readonly Message[] = [
+      { id: "user", kind: "out", text: "**my request**" },
+      tool,
+      {
+        id: "assistant",
+        kind: "text",
+        from: "moyyi",
+        text: "| Name | Value |\n| --- | --- |\n| A | B |",
+      },
+    ];
+    const world = { ...xiaowenWorld(), messages: { moyyi: messages } };
+    const renderText = vi.fn((value: string) =>
+      createElement("div", { className: "safe-rich-text" }, value),
+    );
+    const html = renderToString(
+      createElement(App, {
+        port: createMockPort(world),
+        theme: "dark",
+        sticker: "sticker.png",
+        integration: { ...integration, renderText },
+      }),
+    );
+    expect(renderText).toHaveBeenCalledTimes(1);
+    expect(renderText).toHaveBeenCalledWith("| Name | Value |\n| --- | --- |\n| A | B |");
+    expect(html).toContain('class="safe-rich-text"');
+    expect(html).toContain(
+      '<details class="ch-tool-details"><summary>fs.read · 完成</summary><pre>',
+    );
+    expect(html).not.toMatch(/<details[^>]*\bopen(?:=|\s|>)/);
+    expect(html).not.toContain("<script>");
+    expect(html).toContain("&lt;script&gt;");
+    expect(textOf(tool)).toContain("unique tool evidence");
+  });
+
   it("follows the host session and mounts real controls without a fake voice or archive action", () => {
     const world = xiaowenWorld();
     const html = renderToString(
