@@ -96,6 +96,9 @@ body,
   max-height: 38dvh;
   overflow: auto;
   flex-shrink: 0;
+  padding-inline: var(--space-12);
+  background: var(--panel);
+  border-top: 1px solid var(--line);
 }
 .ch-native-notices:empty {
   display: none;

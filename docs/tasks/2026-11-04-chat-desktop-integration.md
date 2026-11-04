@@ -24,7 +24,9 @@ existing desktop bridge; do not replace daily functionality with mock data.
 
 Implementation complete on `codex/chat-desktop-integration`, based on Chat UI `1538d88`.
 The final code candidate is `bffb6fc`. Packaging and external-copy acceptance passed, and the
-verified app and paired CLI are installed. Final native display acceptance is pending Mac unlock.
+verified app and paired CLI are installed. Native functional/display checks passed after unlock;
+the 780 × 560 test-copy check found a notice-background overlap. A scoped CSS fix is
+being checked and repackaged; the installed copy still identifies `bffb6fc`.
 The M6 installation and paired CLI/data/settings are backed up together.
 
 ## Known evidence
@@ -64,7 +66,20 @@ renderer and folds raw tool output into expandable details. Its `npm run check` 
   Sessions, entries, effects, snapshots, materials, settings and host configuration are preserved.
 - Removed only this delivery's duplicate temporary app copies. The complete paired M6 backup
   and package archives remain available.
-- Mac locked before final visible acceptance. The final app is left stopped. Still required:
-  launch `bffb6fc`, check actual Markdown/table and collapsed tool rendering, current-workspace
-  composer and native controls, and save normal / 780 × 560 screenshots. The first candidate's
-  native checks do not substitute for this final display verification.
+- After unlock, final `bffb6fc` launched from the installed path and reopened real history.
+  Markdown tables, inert code spans and expandable/scrollable tool details were visibly checked.
+  An existing available workspace reopened read-only. Ordinary Return inserted a newline without
+  submitting; the unsent draft was cleared. Settings, materials, results, complete history,
+  management, new-session cancellation and read-only permissions were checked in the final app.
+- The first post-unlock window had stale painting despite updated accessibility state. A normal
+  quit/relaunch restored drawing; subsequent navigation and all checks above remained responsive.
+  This was not reproduced or attributed to a code change.
+- Normal 1120 × 800 screenshots are saved locally. CUA could not target the macOS exterior
+  resize border. Reused the documented delivery-two test method: copy the verified app and change
+  only initial BrowserWindow dimensions to 780 × 560, preserving minimums and renderer/runtime.
+  The native test copy confirmed responsive settings and table layout, but revealed that the
+  read-only notice lacked an opaque background over scrolling text. The scoped CSS fix is pending
+  final package re-verification. Both app processes are currently stopped; no unsent draft remains.
+- Final read-only data comparison after native checks: all 14 sessions, 14 runs, 279 entries,
+  158 effects and 10 snapshots match the backup; 229 blobs and all settings/host files are
+  unchanged. No new model run or message was recorded.

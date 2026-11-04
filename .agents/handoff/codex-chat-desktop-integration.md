@@ -15,9 +15,15 @@
 - Backed up the app, CLI, sessions and settings to `~/.moyyi/backups/pre-chat-ui-2026-11-04T11-38-41.641Z`.
 
 ## In progress
-- Main agent: final native display/screenshots and documentation/PR. Mac is locked; unlock request pending.
+- Final installed native history, Markdown/tools, composer and control checks passed after unlock.
+- Used the prior delivery-two test-copy method for 780 × 560; manual resize is no longer needed.
+- Narrow check found native notices overlapping scrolling text; root added token background,
+  border and inline padding in chat.css. Full check / package / final notice screenshot in progress.
 - Both subagents finished and stopped writing. No source process is running.
-- Final application has been installed but left stopped while waiting for unlock.
+- Daily and temporary narrow apps are stopped; unsent test draft was cleared.
+- Draft PR: https://github.com/Peerframe/moyyi/pull/60.
+- Native receipt flags are updated for bffb6fc; final notice fix still needs installation.
+- Narrow copy context: /tmp/moyyi-chat-native-narrow-context.json.
 - Install context (previous manifests and backup path): `/tmp/moyyi-chat-install-context.json`.
 
 ## Collected problems

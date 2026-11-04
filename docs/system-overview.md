@@ -40,7 +40,7 @@ commands and limits.
 
 | User outcome | Evidence | Limits |
 |---|---|---|
-| Open the app, find and resume work | [Desktop](desktop.md): real Chat integration installed; package gates and first native history/settings checks passed; final display acceptance pending | macOS arm64; one SQLite writer; reopened sessions start read-only |
+| Open the app, find and resume work | [Desktop](desktop.md): real Chat integration installed; final native history, Markdown/tools, composer and control checks passed; minimum-width screenshot pending | macOS arm64; one SQLite writer; reopened sessions start read-only |
 | Read files and explain a project | Guarded search, ranged numbered reads, navigation; original public report task passed | The original complex source explanation still fails its rubric |
 | Read PDF, DOCX, XLSX, PPTX, ODT, ODS, ODP | [Native parser](documents.md); two fixed document tasks passed through the desktop | Body text only; no OCR, legacy or macro files, formulas or layout |
 | Import materials and inspect results | M6: external PDF/DOCX import, report with full readback, Markdown table and PNG preview, save a copy; one 4-request Flash task met all six criteria | Office/PDF preview is identity only; images are not sent to the model; no original export or quoted reply |
@@ -126,7 +126,7 @@ Plan: [post-M6 plan v2](tasks/2026-10-28-post-m6-plan.md). Order is owned by the
 | Delivery two: desktop feature modules | Accepted, merged; included in installed Chat runtime. No behavior change | [PR #52](https://github.com/Peerframe/moyyi/pull/52), [record](tasks/2026-10-29-desktop-modules-delivery.md) |
 | Delivery three: settings, Skills, search | Ready for Codex | [Brief](tasks/2026-10-30-delivery-3-settings-skills-search.md) |
 | Delivery four: conditional capabilities | Triggered per item | [Plan](tasks/2026-10-28-post-m6-plan.md) |
-| moyyi Chat interface | Connected to the existing desktop runtime and locally installed; offline package gates passed, final native display acceptance pending. No new paid quality run | [Integration record](tasks/2026-11-04-chat-desktop-integration.md), [study](tasks/2026-11-01-moyyi-chat-study.md) |
+| moyyi Chat interface | Connected to the existing desktop runtime and locally installed; offline package gates and native functional checks passed; minimum-width screenshot pending. No new paid quality run | [Integration record](tasks/2026-11-04-chat-desktop-integration.md), [study](tasks/2026-11-01-moyyi-chat-study.md) |
 
 ## Boundaries
 
