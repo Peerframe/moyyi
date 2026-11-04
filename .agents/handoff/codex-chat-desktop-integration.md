@@ -8,23 +8,24 @@
 - Located the latest Chat UI and existing M6 installation; owner authorized real native integration.
 - Confirmed existing typed bridge covers the single-session workflow without new authority or data formats.
 - Implemented the native Chat adapter, real state/pages, preserved feature controls, and native-safe composer.
-- Final source `bffb6fc`: `npm run check` with packaged Node 26.12.1 passed: 168 files / 3170 tests.
-- Final package and external-copy desktop acceptance passed; paired runtime SHA is unchanged from the passing offline CLI acceptance.
-- Installed final app and paired CLI; both receipts use `bffb6fc`. Previous candidate native history/settings worked.
+- Final source `b2ef51026857c6ac5778c0e36ff331cc7e0e8190`: the narrow read-only notice now has token background, border and inline padding.
+- Final `npm run check` with packaged Node 26.12.1 passed again: 168 files / 3170 tests.
+- Final `npm run desktop:package`, `npm run verify:desktop` and `npm run verify:package -- --offline` passed again.
+- Installed final app and paired CLI; both receipts use `b2ef510`. ZIP SHA-256 `3534f0c02419db0f4a8b0b3d1f59b34201d4003a479a2205f1c6ff751431858c`; runtime SHA-256 `d2929f40aa14a4021bbea7e181dc33372a69332125a99c6a044cb66f31985809`.
+- Final installed comparison passed for all 2594 app files/symbolic links and 428 runtime package files.
+- The final runtime tarball differs from the previous qualified tarball only in bundled `docs/desktop.md`; executable files are unchanged. Earlier zero-request CLI history reopening remains reusable evidence.
+- Native history, Markdown/tools, composer and complete control checks passed on `bffb6fc`. Keep those screenshots identified as `bffb6fc`, not final-build captures.
+- Safe screenshots and method are in `docs/tasks/assets/2026-11-04-chat-desktop/`: final `b2ef510` normal capture, reusable `bffb6fc` narrow settings capture. Final notice screenshot containing real history is retained only locally.
 - 392 protected files unchanged; database tables unchanged except the previously accepted metadata format 1 → 2 migration.
 - Backed up the app, CLI, sessions and settings to `~/.moyyi/backups/pre-chat-ui-2026-11-04T11-38-41.641Z`.
 
-## In progress
-- Final installed native history, Markdown/tools, composer and control checks passed after unlock.
-- Used the prior delivery-two test-copy method for 780 × 560; manual resize is no longer needed.
-- Narrow check found native notices overlapping scrolling text; root added token background,
-  border and inline padding in chat.css. Full check / package / final notice screenshot in progress.
-- Both subagents finished and stopped writing. No source process is running.
-- Daily and temporary narrow apps are stopped; unsent test draft was cleared.
-- Draft PR: https://github.com/Peerframe/moyyi/pull/60.
-- Native receipt flags are updated for bffb6fc; final notice fix still needs installation.
-- Narrow copy context: /tmp/moyyi-chat-native-narrow-context.json.
-- Install context (previous manifests and backup path): `/tmp/moyyi-chat-install-context.json`.
+## Complete
+- Final `b2ef510` 780 × 560 native-copy notice check passed after unlock; the opaque banner stays readable over a scrolling table.
+- Restored temporary main.mjs and compared every app asset with the installed package, then removed the temporary copy and duplicate previous candidate. Keep-awake process stopped.
+- Final installed app launched and reopened real history; it remains open on settings. Unsent test draft cleared.
+- Final native receipt flags, dimensions and evidence are recorded. Source/package remains `b2ef510`; later commits contain only documentation/evidence.
+- PR: https://github.com/Peerframe/moyyi/pull/60. No merge or public release.
+- All agents stopped writing; no source/build/test process remains. No remaining local acceptance.
 
 ## Collected problems
 - Documents parser timeout under Homebrew Node 26.13.0 did not reproduce with the packaged Node 26.12.1; the full gate passed unchanged.

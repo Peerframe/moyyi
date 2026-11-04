@@ -23,10 +23,12 @@ existing desktop bridge; do not replace daily functionality with mock data.
 ## Current state
 
 Implementation complete on `codex/chat-desktop-integration`, based on Chat UI `1538d88`.
-The final code candidate is `bffb6fc`. Packaging and external-copy acceptance passed, and the
-verified app and paired CLI are installed. Native functional/display checks passed after unlock;
-the 780 × 560 test-copy check found a notice-background overlap. A scoped CSS fix is
-being checked and repackaged; the installed copy still identifies `bffb6fc`.
+The final code candidate is `b2ef510`. Full checks, packaging, external-copy desktop acceptance
+and offline package acceptance passed again; the verified app and paired CLI are installed.
+Native functional checks passed on `bffb6fc`. Its 780 × 560 test-copy check found a read-only
+notice overlapping scrolling text; `b2ef510` adds only background, border and inline padding
+to that notice. The final narrow notice check passed, the temporary copy was removed, and the
+official installed app reopened its real history and was left running. Local delivery is complete.
 The M6 installation and paired CLI/data/settings are backed up together.
 
 ## Known evidence
@@ -44,42 +46,67 @@ The first package (`5b0a6d3`) passed `npm run desktop:package`, `npm run verify:
 The installed paired CLI reopened an existing session in a PTY and exited without a model call.
 Native inspection found raw Markdown tables; `bffb6fc` reuses the existing inert RichMessage
 renderer and folds raw tool output into expandable details. Its `npm run check` passed
-168 files / 3170 tests, including typecheck and lint. The final CSS token overrides also passed
+168 files / 3170 tests, including typecheck and lint. Its CSS token overrides also passed
 `npx biome check apps/desktop/renderer/chat.css`.
+
+After the narrow-window notice correction, final source `b2ef510` passed `npm run check`
+again with 168 files / 3170 tests, then `npm run desktop:package`, `npm run verify:desktop`
+and `npm run verify:package -- --offline`. These are final-build checks; the native functional
+functional checks retain their `bffb6fc` attribution. Final `b2ef510` notice and relaunch
+observations are recorded separately below.
 
 ## Package coordinates
 
-- Source: `bffb6fcaa67815283c7a5774c03a0ec7343b860f`, clean package tree.
-- Desktop ZIP SHA-256: `71dc6a80fb33eec19f6ae8cb0e76f00f915deb0cd5a1783d61b6feebdcb0b95d`.
-- Runtime SHA-256: `4091c00536ee44732d869a39d7e38febeb05ecf695a276958e26090977cfff6e`.
-  The runtime bytes are unchanged from the package acceptance above.
+- Source: `b2ef51026857c6ac5778c0e36ff331cc7e0e8190`, clean package tree.
+- Desktop ZIP SHA-256: `3534f0c02419db0f4a8b0b3d1f59b34201d4003a479a2205f1c6ff751431858c`.
+- Runtime tarball: `moyyi-0.0.0-d2929f40aa14.tgz`.
+- Runtime SHA-256: `d2929f40aa14a4021bbea7e181dc33372a69332125a99c6a044cb66f31985809`.
+  Compared with the earlier qualified tarball, only bundled `docs/desktop.md` changed;
+  runtime executable files are unchanged. Offline package acceptance was nevertheless rerun
+  against this final artifact.
 - Backup: `~/.moyyi/backups/pre-chat-ui-2026-11-04T11-38-41.641Z`.
 - Local-only candidate; no published release or new paid model request.
 
-## Installation evidence and remaining acceptance
+## Installation evidence
 
-- Installed app: `~/Applications/Moyyi.app`; all 2594 files and symbolic links match the packaged app.
-- Installed CLI: `~/.local/share/moyyi`; all 428 runtime package files match the qualified tarball.
-- Both local installation manifests identify the same source and runtime.
+- Installed app: `~/Applications/Moyyi.app`; installed CLI: `~/.local/share/moyyi`.
+  Both local installation manifests identify final source `b2ef510` and its qualified runtime.
+- The final installation was checked against all 2594 app files/symbolic links and all 428
+  runtime package files, with no differences from the qualified artifacts. The preceding
+  `bffb6fc` app bundle digest, retained ZIP and runtime tarball also matched their receipts;
+  strict signatures passed for that app and the retained M6 app.
 - 392 of 393 protected files match the pre-upgrade backup byte for byte. Only `data.sqlite`
   changed: every table is unchanged except metadata `persisted_format`, migrated from 1 to 2.
   Sessions, entries, effects, snapshots, materials, settings and host configuration are preserved.
 - Removed only this delivery's duplicate temporary app copies. The complete paired M6 backup
   and package archives remain available.
-- After unlock, final `bffb6fc` launched from the installed path and reopened real history.
+- After unlock, `bffb6fc` launched from the installed path and reopened real history.
   Markdown tables, inert code spans and expandable/scrollable tool details were visibly checked.
   An existing available workspace reopened read-only. Ordinary Return inserted a newline without
   submitting; the unsent draft was cleared. Settings, materials, results, complete history,
-  management, new-session cancellation and read-only permissions were checked in the final app.
+  management, new-session cancellation and read-only permissions were checked in that app.
 - The first post-unlock window had stale painting despite updated accessibility state. A normal
   quit/relaunch restored drawing; subsequent navigation and all checks above remained responsive.
   This was not reproduced or attributed to a code change.
-- Normal 1120 × 800 screenshots are saved locally. CUA could not target the macOS exterior
-  resize border. Reused the documented delivery-two test method: copy the verified app and change
-  only initial BrowserWindow dimensions to 780 × 560, preserving minimums and renderer/runtime.
-  The native test copy confirmed responsive settings and table layout, but revealed that the
-  read-only notice lacked an opaque background over scrolling text. The scoped CSS fix is pending
-  final package re-verification. Both app processes are currently stopped; no unsent draft remains.
+- The [normal settings screenshot](assets/2026-11-04-chat-desktop/normal.jpg) shows the final
+  installed `b2ef510` app at 1120 × 800 logical pixels. The
+  [narrow settings screenshot](assets/2026-11-04-chat-desktop/narrow.jpg) retains `bffb6fc` evidence
+  for that unchanged layout. Neither contains credentials or private transcripts; the
+  [evidence and method note](assets/2026-11-04-chat-desktop/README.md) records their exact limits.
+  For minimum width, the documented delivery-two method was reused: copy the verified app and
+  change only initial BrowserWindow
+  dimensions from 1120 × 800 to 780 × 560 in temporary `main.mjs`, preserving minimums and all
+  other app resources. The native screenshot is 1560 × 1120 Retina pixels. This is a native
+  test-copy check, not a manual resize or a screenshot of the unmodified installed app.
+- That narrow copy confirmed responsive settings and table layout, and exposed the transparent
+  read-only notice. After correction, a fresh `b2ef510` native copy at 780 × 560 visibly kept
+  the notice readable over scrolling table content. Its final screenshot is retained locally
+  because it includes real history. The temporary main file was restored and every app asset
+  matched the installed app before the test copy was removed.
+- Final `~/Applications/Moyyi.app` launched, reopened existing history including a rendered table,
+  and was left running on its settings page. Final native flags and dimensions are recorded in
+  the local installation manifest. Temporary duplicate apps and the keep-awake process were
+  removed/stopped. The unsent composer test draft was cleared.
 - Final read-only data comparison after native checks: all 14 sessions, 14 runs, 279 entries,
   158 effects and 10 snapshots match the backup; 229 blobs and all settings/host files are
   unchanged. No new model run or message was recorded.

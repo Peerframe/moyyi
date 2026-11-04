@@ -1,6 +1,6 @@
 # System overview
 
-Current product, what users can do, and where delivery stands. Rewritten on **2026-10-29**; the
+Current product, what users can do, and where delivery stands. Updated on **2026-11-04**; the
 previous text is kept unchanged in the [archive](tasks/2026-10-29-system-overview-archive.md).
 [Architecture](architecture.md) owns layer boundaries, [ADRs](decisions/) own decisions,
 [roadmap](roadmap.md) owns delivery order, and the [delivery record](tasks/2026-10-26-optimization-plan.md)
@@ -24,7 +24,7 @@ working loop, normal completion or a large passing test suite does not prove fac
 
 | Item | Current |
 |---|---|
-| Desktop app | Chat interface, local source `bffb6fc`, ZIP SHA-256 `71dc6a80…0b95d`; [integration record](tasks/2026-11-04-chat-desktop-integration.md); macOS arm64 only |
+| Desktop app | Chat interface, local source `b2ef510`, ZIP SHA-256 `3534f0c0…858c`; [integration record](tasks/2026-11-04-chat-desktop-integration.md); installed and native-verified; macOS arm64 only |
 | CLI | Installed from the same verified tarball; shares the session store with the desktop |
 | Session store | Schema 3, persisted format 2. The M6 format 1 programs cannot open it; rollback needs the paired old app, CLI and pre-upgrade data backup ([installation](installation.md)) |
 | Daily settings | Flash, low, 3 requests, 120 s, zero retries; optional Kimi `kimi-k3.1-pro` connection |
@@ -40,7 +40,7 @@ commands and limits.
 
 | User outcome | Evidence | Limits |
 |---|---|---|
-| Open the app, find and resume work | [Desktop](desktop.md): real Chat integration installed; final native history, Markdown/tools, composer and control checks passed; minimum-width screenshot pending | macOS arm64; one SQLite writer; reopened sessions start read-only |
+| Open the app, find and resume work | [Desktop](desktop.md): native history, Markdown/tools, composer and controls passed; final `b2ef510` notice passed the 780 × 560 native-copy check, and the installed app reopened successfully | macOS arm64; one SQLite writer; reopened sessions start read-only |
 | Read files and explain a project | Guarded search, ranged numbered reads, navigation; original public report task passed | The original complex source explanation still fails its rubric |
 | Read PDF, DOCX, XLSX, PPTX, ODT, ODS, ODP | [Native parser](documents.md); two fixed document tasks passed through the desktop | Body text only; no OCR, legacy or macro files, formulas or layout |
 | Import materials and inspect results | M6: external PDF/DOCX import, report with full readback, Markdown table and PNG preview, save a copy; one 4-request Flash task met all six criteria | Office/PDF preview is identity only; images are not sent to the model; no original export or quoted reply |
@@ -126,7 +126,7 @@ Plan: [post-M6 plan v2](tasks/2026-10-28-post-m6-plan.md). Order is owned by the
 | Delivery two: desktop feature modules | Accepted, merged; included in installed Chat runtime. No behavior change | [PR #52](https://github.com/Peerframe/moyyi/pull/52), [record](tasks/2026-10-29-desktop-modules-delivery.md) |
 | Delivery three: settings, Skills, search | Ready for Codex | [Brief](tasks/2026-10-30-delivery-3-settings-skills-search.md) |
 | Delivery four: conditional capabilities | Triggered per item | [Plan](tasks/2026-10-28-post-m6-plan.md) |
-| moyyi Chat interface | Connected to the existing desktop runtime and locally installed; offline package gates and native functional checks passed; minimum-width screenshot pending. No new paid quality run | [Integration record](tasks/2026-11-04-chat-desktop-integration.md), [study](tasks/2026-11-01-moyyi-chat-study.md) |
+| moyyi Chat interface | Final `b2ef510` installed; offline package gates, native functional checks, normal/minimum layouts and final relaunch passed. No new paid quality run | [Integration record](tasks/2026-11-04-chat-desktop-integration.md), [study](tasks/2026-11-01-moyyi-chat-study.md) |
 
 ## Boundaries
 
