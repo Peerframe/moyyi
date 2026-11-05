@@ -158,4 +158,29 @@ export default {model:{provider:'local-fixture',model:'fixture'},plugins:[{plugi
     expect(second.stdout).toContain(`session | ${id}`);
     expect(second.stdout).not.toContain("No earlier session");
   });
+  it("prints one JSON summary or JSON event lines for scripts", () => {
+    const f = fixture(),
+      args = ["--demo", "-C", f.workspace, "--data", f.data];
+    const json = run([...args, "--output", "json", "Inspect the README"]);
+    expect(json.status).toBe(0);
+    const summary = JSON.parse(json.stdout);
+    expect(summary).toMatchObject({
+      outcome: { kind: "completed" },
+      exitCode: 0,
+      usage: { requests: 2, unreported: 2 },
+      effects: [{ tool: "read", state: "succeeded" }],
+    });
+    expect(summary.answer).toContain("Offline scripted demonstration.");
+    expect(summary.sessionId).toMatch(/^session_/u);
+    const stream = run([...args, "--output", "stream-json", "Inspect the README"]);
+    expect(stream.status).toBe(0);
+    const events = stream.stdout
+      .trim()
+      .split("\n")
+      .map((line) => JSON.parse(line));
+    expect(events[0].type).toBe("session.ready");
+    expect(events.at(-1)).toMatchObject({ type: "run.finished", outcome: { kind: "completed" } });
+    expect(events.some((event) => event.type === "assistant.delta")).toBe(true);
+    expect(run([...args, "--output", "xml", "x"]).status).toBe(2);
+  });
 });

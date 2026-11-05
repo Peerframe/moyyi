@@ -6,6 +6,7 @@ import { createCliRuntime, loadCliHost } from "../runtime/cli-host.ts";
 import { fileDevelopmentPlugin, watchDevelopmentPlugins } from "../runtime/development.ts";
 import type { Runtime } from "../runtime/index.ts";
 import { type CustomCommand, loadCommands } from "./commands.ts";
+import { machineOutput } from "./machine-output.ts";
 import { type CliOptions, defaultDataDirectory, parseCliOptions, usage } from "./options.ts";
 import { createCliSession, terminalText } from "./session.ts";
 
@@ -168,6 +169,10 @@ export async function main(argv: readonly string[]): Promise<number> {
   }
   const tty = !!process.stdin.isTTY && !!process.stdout.isTTY;
   const interactive = options.interactive || (options.prompt === undefined && tty);
+  if (interactive && options.output !== "text") {
+    process.stderr.write("moyyi: --output json and stream-json need a one-shot prompt.\n");
+    return 2;
+  }
   if (interactive && !tty) {
     process.stderr.write(
       "moyyi: Interactive mode needs a terminal; supply a prompt or pipe input for one-shot mode.\n",
@@ -238,7 +243,14 @@ export async function main(argv: readonly string[]): Promise<number> {
       })
     : undefined;
   terminal?.setPrompt("moyyi> ");
+  const machine =
+    options.output === "text"
+      ? undefined
+      : machineOutput(options.output, (line) => process.stdout.write(line));
+  const offMachine = machine ? runtime.subscribe((event) => machine.observe(event)) : () => {};
   const write = (text: string) => {
+    // Machine-readable modes keep stdout for JSON; human lines are not printed.
+    if (machine) return;
     if (promptVisible) {
       process.stdout.write("\n");
       promptVisible = false;
@@ -346,7 +358,10 @@ export async function main(argv: readonly string[]): Promise<number> {
       );
     }
     terminal?.resume();
-    return await session.done;
+    const code = await session.done;
+    offMachine();
+    machine?.finish(code);
+    return code;
   } catch {
     await session.end();
     return 1;

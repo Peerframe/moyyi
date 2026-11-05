@@ -120,6 +120,16 @@ The offline `--demo` rejects these daily capability and budget options.
 - `/init` asks the agent to inspect the project and draft or update the root `AGENTS.md`. It is a
   fixed brief sent as your message; saving the file needs `--allow-write` and its approval.
 
+## Output for scripts
+
+For one-shot prompts, `--output json` prints one JSON object when the session ends:
+`{sessionId, runId, outcome, exitCode, answer, usage: {requests, input, output, cacheRead,
+unreported}, effects: [{id, tool, state}]}`. `--output stream-json` prints each protocol event
+(`session.ready`, `run.started`, `assistant.delta`, `entry.appended`, `approval.requested`,
+`effect.updated`, `run.finished`, `command.rejected`) as one JSON line as it happens. Human lines
+are not printed in either mode; errors still go to stderr and exit codes are unchanged.
+Approvals in one-shot mode are still denied. Interactive sessions use `text` only.
+
 ## Notification hooks
 
 A host module can add `hooks` to run your own commands when an approval is waiting, a tool

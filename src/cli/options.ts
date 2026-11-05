@@ -18,6 +18,8 @@ Options:
       --data DIR         Private session data directory (default: ~/.moyyi/data)
       --session ID       Resume a stored session
       --continue         Resume the most recent session of this workspace (or start one)
+      --output FORMAT    text (default), json (one summary) or stream-json (event lines);
+                         one-shot prompts only
   -i, --interactive      Keep a terminal session open after an initial prompt
       --approve-reads    Ask before each read/list/search/document execution
       --allow-write      Ask before snapshot-backed writes in this workspace
@@ -55,6 +57,7 @@ export interface CliOptions {
   readonly dataDirectory?: string;
   readonly sessionId?: SessionId;
   readonly continueLatest: boolean;
+  readonly output: "text" | "json" | "stream-json";
   readonly interactive: boolean;
   readonly approveReads: boolean;
   readonly allowWrite: boolean;
@@ -86,6 +89,7 @@ export function parseCliOptions(argv: readonly string[], cwd = process.cwd()): C
       data: { type: "string" },
       session: { type: "string" },
       continue: { type: "boolean" },
+      output: { type: "string" },
       interactive: { type: "boolean", short: "i" },
       "approve-reads": { type: "boolean" },
       "allow-write": { type: "boolean" },
@@ -149,6 +153,14 @@ export function parseCliOptions(argv: readonly string[], cwd = process.cwd()): C
       values.commands?.length)
   )
     throw Error("--daemon takes no prompt, session, -i, commands or development plugins");
+  if (values.output !== undefined && !["text", "json", "stream-json"].includes(values.output))
+    throw Error("--output must be text, json or stream-json");
+  if (
+    values.output !== undefined &&
+    values.output !== "text" &&
+    (values.interactive || mode === "daemon")
+  )
+    throw Error("--output json and stream-json are for one-shot prompts");
   if (values.continue && values.session !== undefined)
     throw Error("Use either --continue or --session ID");
   if (mode === "daemon" && values.continue) throw Error("--daemon takes no --continue");
@@ -235,6 +247,7 @@ export function parseCliOptions(argv: readonly string[], cwd = process.cwd()): C
     nestedInstructions: values["nested-instructions"] ?? false,
     commandDirectories: (values.commands ?? []).map((path) => resolve(cwd, path)),
     continueLatest: values.continue ?? false,
+    output: (values.output ?? "text") as CliOptions["output"],
     webOrigins,
     ...(toolchain === undefined ? {} : { shellToolchain: toolchain as "node" }),
     ...(dns === undefined ? {} : { webDns: dns as "system" | "cloudflare-doh" }),
