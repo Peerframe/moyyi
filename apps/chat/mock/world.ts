@@ -282,7 +282,7 @@ const LUNWEN: readonly Message[] = [
     state: "working",
     reactions: [
       { emoji: "👍", count: 2, mine: true, label: "这条没问题" },
-      { emoji: "🦈", count: 1, mine: false, label: "鲨鱼" },
+      { emoji: "👀", count: 1, mine: false, label: "在看" },
     ],
     replies: { count: 2, from: ["hecha", "xiezuo"], verdict: "核查不同意" },
   },

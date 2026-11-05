@@ -31,7 +31,8 @@ function entries(chatId: string, messages: readonly Message[]): ResultItem[] {
       by: result.from,
       day: clock ? day : time || day,
       time: clock ? time : "",
-      files: result.files.map((file) => ({ name: file.name, note: file.count })),
+      // The sample world has not touched a file since it was handed over.
+      files: result.files.map((file) => ({ name: file.name, note: file.count, state: "current" })),
       check: result.check,
       ...(result.claims ? { claims: result.claims } : {}),
       ...(result.skipped ? { skipped: result.skipped } : {}),

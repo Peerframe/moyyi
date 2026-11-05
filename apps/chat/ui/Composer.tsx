@@ -23,7 +23,7 @@ const ATTACH = [
   { id: "memory", label: "从记忆里引用", sub: "带着出处引一条记忆", icon: "bookmark" },
 ] as const;
 
-const EMOJI = ["👍", "👎", "❓", "📌", "🦈", "😂", "🙏", "🎉"];
+const EMOJI = ["👍", "👎", "❓", "📌", "👀", "😂", "🙏", "🎉"];
 
 type Popup = "attach" | "emoji" | "menu" | null;
 interface Grant {

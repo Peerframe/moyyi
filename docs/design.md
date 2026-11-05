@@ -12,8 +12,9 @@ change; [apps/desktop/AGENTS.md](../apps/desktop/AGENTS.md) owns the security ru
 
 - **Name**: moyyi; Chinese name 墨一.
 - **Character**: a chibi shark girl with blue hair, a light blue cardigan and a small shark tail.
-  Calm and clever, with a small playful streak. The character appears in onboarding, empty states
-  and the About screen, never inside working content such as messages, approvals or results.
+  Withdrawn from every surface (empty states, stickers, About) until its art is finished (owner,
+  2026-11-05). When it returns it stays out of working content such as messages, approvals or
+  results.
 - **Logo**: a softly rounded lowercase `m` ending in a restrained shark tail. Keep it simple: no
   full shark, face, gills or speech bubble.
 - **Source assets**: [design/brand/2026-10-28-brandkit](../design/brand/2026-10-28-brandkit/README.md)

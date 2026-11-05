@@ -4,7 +4,8 @@
 
 html,
 body,
-#root {
+#root,
+.ch-root {
   height: 100%;
   margin: 0;
 }
@@ -1207,8 +1208,10 @@ html {
 .ch-result-day + .ch-result-day {
   margin-top: var(--space-8);
 }
+/* The claim's own padding lines its text up with the card's other lines. */
 .ch-result-claim {
-  width: 100%;
+  width: calc(100% + var(--space-10) * 2);
+  margin: 0 calc(var(--space-10) * -1);
   text-align: left;
 }
 .ch-result-claim:disabled {

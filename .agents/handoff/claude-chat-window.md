@@ -42,21 +42,42 @@
   - `chat.css` for mac material and drag.
 - Tests: rail, 成果 mock and render, native results, window chrome, and the undo service line.
 
+- Canvas (version 52):
+  - every board's rail has traffic lights and 全部 / AI / 项目 | 成果 | 插件 / 设置;
+  - boards point at the v21 bundle;
+  - stickers and 🦈 removed from S2, S5, S6, S7, S13 and S28;
+  - S6 and S14 rewritten without 等我的;
+  - new S33 成果 board.
+- Design system v21 published:
+  - FolderRail rewritten;
+  - Sticker component deleted;
+  - 🦈 and 本周表现 removed from Reactions;
+  - 本周表现 replaced by 你教过它的 in InfoPanel;
+  - the 表情 label.
+- `?chrome=mac` mock scene.
+- 🦈 replaced by 👀 in the emoji list and the mock.
+- Mock result files carry `state: current`.
+- Claim rows in 成果 line up with the card.
+- Docs: desktop.md use note, design.md character line, system-overview row.
+
 ## Next
-- Canvas:
-  - every board's rail (traffic lights, new items);
-  - stickers removed from S2, S5, S6, S7 and S13;
-  - a new S33 board for 成果.
-- Native: build, launch the packaged copy, and check screenshots at normal and narrow widths. Then tune `TRAFFIC_LIGHTS`.
-- System overview row and docs/desktop.md note.
+- Native: package, launch the packaged copy (never a second instance on the owner's store), and
+  check screenshots at normal and narrow widths. Then tune `TRAFFIC_LIGHTS`. The screenshot
+  permission for Electron was declined on 2026-11-05, so this needs the owner or an approved capture.
+- Canvas S24 comment: settings should fit an agent better. Not started.
 
 ## Collected problems
-- 对账 wording remains on S5, S6, S13, S21 and S22, and in the DS result keys. It is out of scope for this review.
+- 对账 wording remains on S5, S13, S21 and S22, in the DS result keys, and in the chat's result key and `/对账`. It is the claim-check action, not the removed folder; keep or rename it in a separate decision.
+- The mock has no file controls (预览, 在 Finder 里显示); S33 shows them as the desktop has them.
+- S33 badge counts come from the older boards; the mock world counts differ (AI 2, 项目 1).
 
 ## Commands run
 - `npm run typecheck`: passed.
 - `npx biome check apps tests scripts`: clean after `--write`.
 - vitest over apps/chat, apps/desktop, chat-design, boundaries and desktop-feature-extension: 317 passed.
+- `npm run check` (after the canvas pass): passed, 169 files, 3176 tests.
+- `npm run chat:build` and `npm run desktop:build`: passed.
+- Headless Chrome screenshots of the 成果 page (light, dark, a second entry) against S33.
 
 ## Paid usage ledger
 - None.

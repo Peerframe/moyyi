@@ -1,6 +1,7 @@
 // Starts moyyi Chat on the mock backend. URL parameters pick what to show, so every board has a
 // reproducible scene: ?scene=day|first-run|offline|loading, ?theme=dark|light, ?chat=<id>,
-// ?page=settings[/<section>]|plugins[/<plugin>], ?play.
+// ?page=results[/<id>]|settings[/<section>]|plugins[/<plugin>], ?play. ?chrome=mac leaves the
+// rail's top strip to window controls and the window ground transparent, as the desktop app does.
 import { useEffect, useSyncExternalStore } from "react";
 import { createRoot } from "react-dom/client";
 import { chosen } from "./mock/page-actions.ts";
@@ -11,6 +12,7 @@ import { App } from "./ui/App.tsx";
 
 const params = new URLSearchParams(location.search);
 const scene = params.get("scene") ?? "day";
+const mac = params.get("chrome") === "mac";
 
 function sceneWorld(): ChatWorld {
   if (scene === "first-run") return firstRunWorld();
@@ -51,12 +53,15 @@ function Root() {
     document.documentElement.className = `mc-${theme}`;
   }, [theme]);
   return (
-    <App
-      port={port}
-      theme={theme}
-      initialChat={params.get("chat") ?? undefined}
-      initialPage={params.get("page") ?? undefined}
-    />
+    <div className={mac ? "desktop-chat-root ch-native-mac" : "ch-root"}>
+      <App
+        port={port}
+        theme={theme}
+        windowControls={mac}
+        initialChat={params.get("chat") ?? undefined}
+        initialPage={params.get("page") ?? undefined}
+      />
+    </div>
   );
 }
 
