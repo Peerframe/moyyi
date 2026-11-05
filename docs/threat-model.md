@@ -50,6 +50,15 @@ explicit development modules remain trusted in-process code, not a sandbox.
   explicit. Immutable history prevents silent rewrites; it does not remove the user's ability to
   request deletion.
 
+## Local daemon boundary
+
+[ADR 0048](decisions/0048-local-daemon.md) adds a local entry point. The socket and a per-start
+256-bit token live in the owner-only data directory; clients and daemon check ownership and
+modes, and the daemon never listens on a network interface. It does not change T4 or T6: a
+process of the same account could already read the store. Client frames are untrusted input,
+validated and bounded before the runtime sees them; they cannot change grants, choose another
+workspace for new sessions, or send non-text content. Approvals still require the displayed digest.
+
 ## Remaining implementation and validation
 
 - Batch 5 implements read-only path checks and revocable per-invocation file capabilities;

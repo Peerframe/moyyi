@@ -16,3 +16,4 @@ export { parseStrictJson } from "./strict-json.ts";
 export * from "./tool-output.ts";
 export type * from "./tools.ts";
 export type * from "./web.ts";
+export * from "./wire.ts";

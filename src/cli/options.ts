@@ -4,6 +4,8 @@ import { parseArgs } from "node:util";
 import type { SessionId } from "../contracts/index.ts";
 
 export const usage = `Usage: moyyi (--demo | --host FILE) [options] [prompt]
+       moyyi --daemon (--demo | --host FILE) [grant options]
+       moyyi --connect [--data DIR] [--session ID] [-i] [prompt]
 
 Without a prompt, a terminal starts an interactive session; piped input is one prompt.
 --demo is an offline, finite script that reads README.md. It is not a language model.
@@ -25,6 +27,8 @@ Options:
       --max-requests N   Model requests per turn, 1..128; includes the final answer
       --dev              Enable development-only plugin loading and reload
       --dev-plugin N=P   Explicit plugin name and local module path (repeatable)
+      --daemon           Serve this runtime to local clients until Ctrl-C; grants stay fixed
+      --connect          Use the running daemon for --data instead of a local runtime
 
 Commands: /help /new /resume ID /compact /cancel /exit /approve EFFECT_ID /deny EFFECT_ID
 Compaction: /compact makes one request to the selected model; originals remain in history.
@@ -34,6 +38,7 @@ No workspace configuration, environment credential or plugin is auto-discovered.
 export interface CliOptions {
   readonly help: boolean;
   readonly version: boolean;
+  readonly mode: "local" | "daemon" | "connect";
   readonly demo: boolean;
   readonly host?: string;
   readonly workspaceRoot: string;
@@ -73,12 +78,45 @@ export function parseCliOptions(argv: readonly string[], cwd = process.cwd()): C
       "max-requests": { type: "string" },
       dev: { type: "boolean" },
       "dev-plugin": { type: "string", multiple: true },
+      daemon: { type: "boolean" },
+      connect: { type: "boolean" },
     },
   });
   const help = values.help ?? false,
     version = values.version ?? false;
-  if (!help && !version && (values.demo ?? false) === (values.host !== undefined))
+  if (values.daemon && values.connect) throw Error("Use either --daemon or --connect");
+  const mode = values.daemon ? "daemon" : values.connect ? "connect" : "local";
+  if (mode === "connect") {
+    // The daemon's host and startup grants are its authority; a client cannot add to them.
+    const fixed = [
+      "demo",
+      "host",
+      "cwd",
+      "approve-reads",
+      "allow-write",
+      "allow-shell",
+      "shell-toolchain",
+      "web-origin",
+      "web-dns",
+      "max-requests",
+      "dev",
+      "dev-plugin",
+    ] as const;
+    if (fixed.some((name) => values[name] !== undefined))
+      throw Error(
+        "--connect uses the daemon's host, workspace and grants; restart the daemon to change them",
+      );
+  } else if (!help && !version && (values.demo ?? false) === (values.host !== undefined))
     throw Error("Select exactly one of --demo or --host FILE");
+  if (
+    mode === "daemon" &&
+    (positionals.length ||
+      values.interactive ||
+      values.session !== undefined ||
+      values.dev ||
+      values["dev-plugin"]?.length)
+  )
+    throw Error("--daemon takes no prompt, session, -i or development plugins");
   if (values.session !== undefined && !/^[A-Za-z0-9_-]{1,512}$/.test(values.session))
     throw Error("Invalid session ID");
   if (values["dev-plugin"]?.length && !values.dev)
@@ -134,6 +172,7 @@ export function parseCliOptions(argv: readonly string[], cwd = process.cwd()): C
   return {
     help,
     version,
+    mode,
     demo: values.demo ?? false,
     workspaceRoot: resolve(cwd, values.cwd ?? "."),
     interactive: values.interactive ?? false,

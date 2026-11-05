@@ -7,13 +7,13 @@ import {
   executionReceipt,
   isReceiptEffect,
   type RunId,
+  type RuntimeClient,
   type RuntimeEvent,
   type SessionId,
   type ToolCallId,
   type ToolResultPart,
   type TranscriptEntry,
 } from "../contracts/index.ts";
-import type { Runtime } from "../runtime/index.ts";
 
 export interface CliSessionOptions {
   readonly workspaceRoot: string;
@@ -79,7 +79,10 @@ function receiptText(tool: string, data: ExecutionReceipt): string {
 }
 
 /** A protocol client. It never executes assistant text or grants policy authority. */
-export function createCliSession(runtime: Runtime, options: CliSessionOptions): CliSession {
+export function createCliSession(
+  runtime: Pick<RuntimeClient, "send" | "subscribe" | "close">,
+  options: CliSessionOptions,
+): CliSession {
   const completion = Promise.withResolvers<number>();
   let queue = Promise.resolve();
   let started = false;
