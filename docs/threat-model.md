@@ -76,6 +76,14 @@ session that started them.
 session are denied before approval, `/always` rules and `allow` grants included. Only an owner
 command leaves it.
 
+## Regex search
+
+[ADR 0055](decisions/0055-regex-search.md) lets the model supply a regular expression to `search`.
+The pattern is a cost risk, not an authority one: it only tests text the runtime already read under
+its usual checks. Matching runs in a worker thread with a heap limit and a per-search time budget,
+so a backtracking pattern cannot block cancellation or other runs; running out is reported as
+incomplete evidence.
+
 ## Notification hooks
 
 [ADR 0053](decisions/0053-notification-hooks.md) hooks are owner programs from trusted host code

@@ -18,6 +18,8 @@ export interface FileSearchOptions {
   readonly include?: readonly string[];
   readonly exclude?: readonly string[];
   readonly mode?: "content" | "files";
+  /** Treat the query as a JavaScript regular expression tested against each line. */
+  readonly regex?: boolean;
 }
 
 export interface FileReadOptions {
@@ -64,6 +66,8 @@ export interface FileSearch {
   readonly context?: readonly FileSearchContext[];
   /** True when any scan, file-size, line-size, context or result bound omitted evidence. */
   readonly truncated: boolean;
+  /** Regex matching used its time budget; files after the last result were not searched. */
+  readonly regexTimeLimit?: true;
   readonly skippedFiles: number;
 }
 

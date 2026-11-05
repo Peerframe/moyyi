@@ -192,7 +192,7 @@ Effect profile: `{"class":"read","reversibility":"not_applicable","verification"
 ### `search`
 
 ```text
-Literal file/dir search (default .), honoring .gitignore. include/exclude: relative *, **, ?; ** whole segments; dotfiles explicit; exclude wins. mode files: unique paths; content default: hits/context (8 lines/side). maxMatches counts lines/files. Inspect hits and gaps with read startLine/maxLines; truncated/skipped cannot prove absence.
+File/dir search (default .), honoring .gitignore. query is literal; regex:true tests it as a JavaScript regex per line (^/$ anchor lines). include/exclude: relative *, **, ?; ** whole segments; dotfiles explicit; exclude wins. mode files: unique paths; content default: hits/context (8 lines/side). maxMatches counts lines/files. Inspect hits and gaps with read startLine/maxLines; truncated/skipped cannot prove absence.
 ```
 
 Input schema:
@@ -250,6 +250,9 @@ Input schema:
         "content",
         "files"
       ]
+    },
+    "regex": {
+      "type": "boolean"
     }
   },
   "required": [
