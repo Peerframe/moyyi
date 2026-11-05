@@ -70,6 +70,12 @@ Background commands outlive their call but not their grant: they stay in the san
 any grant change, their own time limit or runtime close, and are reachable only from the
 session that started them.
 
+## Plan mode
+
+[ADR 0054](decisions/0054-plan-mode.md) plan mode only removes authority: non-read effects of the
+session are denied before approval, `/always` rules and `allow` grants included. Only an owner
+command leaves it.
+
 ## Notification hooks
 
 [ADR 0053](decisions/0053-notification-hooks.md) hooks are owner programs from trusted host code

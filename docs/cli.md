@@ -120,6 +120,15 @@ The offline `--demo` rejects these daily capability and budget options.
 - `/init` asks the agent to inspect the project and draft or update the root `AGENTS.md`. It is a
   fixed brief sent as your message; saving the file needs `--allow-write` and its approval.
 
+## Plan mode
+
+`/plan` (or starting with `--plan`) switches the session to plan mode: the agent may read, search,
+use read-only MCP tools and sub-agents, but every change, command or external call is refused
+before any approval prompt, and each of your messages asks for a step-by-step plan. `/execute`
+approves the plan: plan mode ends and the agent is asked to carry it out, still under your grants
+and approvals. `/plan off` ends plan mode without a message. Resuming a session starts in normal
+mode. See [ADR 0054](decisions/0054-plan-mode.md).
+
 ## Output for scripts
 
 For one-shot prompts, `--output json` prints one JSON object when the session ends:

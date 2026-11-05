@@ -17,6 +17,7 @@ const valid: unknown[] = [
   { type: "session.list", offset: 20, limit: 20 },
   { type: "session.results", sessionId: "session_1", offset: 0, limit: 20 },
   { type: "session.compact", sessionId: "session_1" },
+  { type: "session.mode", sessionId: "session_1", mode: "plan" },
   { type: "run.start", sessionId: "session_1", input: [{ type: "text", text: "Hello" }] },
   { type: "run.steer", runId: "run_1", input: [{ type: "text", text: "Also check tests" }] },
   { type: "run.cancel", runId: "run_1" },

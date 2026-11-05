@@ -19,20 +19,20 @@ describe("prompt template commands", () => {
   it("loads markdown templates with an optional description and ignores other files", () => {
     const dir = directory({
       "review.md": '---\ndescription: "Review a path"\n---\nReview $ARGUMENTS carefully.\n',
-      "plan.md": "Write a plan.",
+      "outline.md": "Write an outline.",
       "notes.txt": "ignored",
     });
     const commands = loadCommands([dir]);
-    expect([...commands.keys()]).toEqual(["plan", "review"]);
+    expect([...commands.keys()]).toEqual(["outline", "review"]);
     expect(commands.get("review")).toMatchObject({
       description: "Review a path",
       template: "Review $ARGUMENTS carefully.\n",
     });
     expect(expandCommand(commands.get("review") as never, " src ")).toBe("Review src carefully.\n");
-    expect(expandCommand(commands.get("plan") as never, "for the daemon")).toBe(
-      "Write a plan.\n\nArguments: for the daemon",
+    expect(expandCommand(commands.get("outline") as never, "for the daemon")).toBe(
+      "Write an outline.\n\nArguments: for the daemon",
     );
-    expect(expandCommand(commands.get("plan") as never, "")).toBe("Write a plan.");
+    expect(expandCommand(commands.get("outline") as never, "")).toBe("Write an outline.");
   });
 
   it.each([

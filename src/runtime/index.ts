@@ -467,6 +467,8 @@ export async function createRuntime(
   let closing: Promise<void> | undefined;
   let toolResults: RuntimeToolResults | undefined;
   const sessionApprovals = new SessionApprovals();
+  /** Sessions in plan mode: their non-read effects are denied before approval. */
+  const planSessions = new Set<SessionId>();
   const backgroundProcesses = workspaceProcesses ? new BackgroundProcesses() : undefined;
   // Validate hooks before any server or store starts, so a bad entry fails creation cleanly.
   if (options.hooks?.length) validateHooks(options.hooks);
@@ -579,15 +581,22 @@ export async function createRuntime(
         registry.evaluatePolicy({ tool, profile, args, phase: "prepare" }),
       ),
     beforeExecute: (tool, profile, action, effectId, args) =>
-      stricter(
-        sessionApprovals.lift(
-          base.beforeExecute(tool, profile, action, effectId, args),
-          tool,
-          effectId,
-          args,
-        ),
-        registry.evaluatePolicy({ tool, profile, args, phase: "execute" }),
-      ),
+      profile.class !== "read" &&
+      planSessions.has(sessionApprovals.sessionOf(effectId) ?? ("" as SessionId))
+        ? {
+            kind: "deny",
+            reason:
+              "Plan mode: changes, commands and external calls are disabled until the owner approves the plan.",
+          }
+        : stricter(
+            sessionApprovals.lift(
+              base.beforeExecute(tool, profile, action, effectId, args),
+              tool,
+              effectId,
+              args,
+            ),
+            registry.evaluatePolicy({ tool, profile, args, phase: "execute" }),
+          ),
   };
   const unload = async () => {
     for (const entry of [...plugins].reverse()) await registry.unload(entry.name);
@@ -1021,7 +1030,15 @@ export async function createRuntime(
           return Promise.resolve();
         }
       }
-      if (command.type === "session.load") sessionApprovals.forget(command.sessionId);
+      if (command.type === "session.mode") {
+        if (command.mode === "plan") planSessions.add(command.sessionId);
+        else planSessions.delete(command.sessionId);
+        return Promise.resolve();
+      }
+      if (command.type === "session.load") {
+        sessionApprovals.forget(command.sessionId);
+        planSessions.delete(command.sessionId);
+      }
       // A sub-agent's approval belongs to the child core that is waiting for it.
       const owner =
         command.type === "approval.respond" &&

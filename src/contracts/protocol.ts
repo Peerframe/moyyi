@@ -26,6 +26,15 @@ export type ClientCommand =
       readonly limit?: number;
     }
   | { readonly type: "session.compact"; readonly sessionId: SessionId }
+  /**
+   * Plan mode: until set back to `default`, every non-read effect in this session is denied
+   * before approval. Held in runtime memory only; reopening a session starts in `default`.
+   */
+  | {
+      readonly type: "session.mode";
+      readonly sessionId: SessionId;
+      readonly mode: "plan" | "default";
+    }
   | {
       readonly type: "run.start";
       readonly sessionId: SessionId;

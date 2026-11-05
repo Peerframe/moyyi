@@ -16,7 +16,13 @@ import {
   type TranscriptEntry,
 } from "../contracts/index.ts";
 
-import { type CustomCommand, expandCommand, INIT_PROMPT } from "./commands.ts";
+import {
+  type CustomCommand,
+  EXECUTE_PROMPT,
+  expandCommand,
+  INIT_PROMPT,
+  PLAN_SUFFIX,
+} from "./commands.ts";
 export interface CliSessionOptions {
   readonly workspaceRoot: string;
   readonly sessionId?: SessionId;
@@ -29,6 +35,8 @@ export interface CliSessionOptions {
   readonly commands?: ReadonlyMap<string, CustomCommand>;
   /** Resume the most recently active session of this workspace, or start one. */
   readonly continueLatest?: boolean;
+  /** Start in plan mode: read-only investigation until /execute. */
+  readonly planMode?: boolean;
 }
 export interface CliSession {
   start(): Promise<void>;
@@ -43,6 +51,7 @@ const help = [
   "History: /sessions [PAGE], /results [SESSION_ID [PAGE]]; idle only, no model requests.",
   "Compaction: /compact uses one request to the selected model; originals remain in history.",
   "Approval: /approve EFFECT_ID or /deny EFFECT_ID (only the displayed digest)",
+  "Plan mode: /plan (read-only planning), /execute (approve and carry out the plan), /plan off",
   "Project guide: /init asks the agent to draft or update AGENTS.md (needs --allow-write to save it)",
   "Always allow: /always EFFECT_ID approves it and stops asking in this session for the same tool, or the same exact shell command",
   "Development: /reload NAME (configured plugins only, between runs)",
@@ -98,6 +107,7 @@ export function createCliSession(
   let sessionId: SessionId | undefined;
   let runId: RunId | undefined;
   let loading = false;
+  let planMode = options.planMode ?? false;
   let listing: ((page: SessionListPage) => void) | undefined;
   let usage = { requests: 0, input: 0, output: 0, cacheRead: 0, unknown: 0 };
   let streamLine = false;
@@ -215,7 +225,8 @@ export function createCliSession(
           : { type: "session.load", sessionId: id },
       );
       if (!accepted) sessionId = previous;
-      else if (id !== undefined)
+      else if (planMode && sessionId) await send({ type: "session.mode", sessionId, mode: "plan" });
+      if (accepted && id !== undefined)
         output(
           "moyyi",
           "History loaded. Use /results for recorded effects; past records grant no current permission.",
@@ -235,10 +246,11 @@ export function createCliSession(
       if (!options.interactive) await finish(1, false);
       return;
     }
+    const input = planMode ? `${text}${PLAN_SUFFIX}` : text;
     const accepted = await send(
       runId
-        ? { type: "run.steer", runId, input: [{ type: "text", text }] }
-        : { type: "run.start", sessionId, input: [{ type: "text", text }] },
+        ? { type: "run.steer", runId, input: [{ type: "text", text: input }] }
+        : { type: "run.start", sessionId, input: [{ type: "text", text: input }] },
     );
     if (!accepted && !options.interactive) await finish(1, true);
     prompt();
@@ -644,7 +656,36 @@ export function createCliSession(
           else output("moyyi", "No run is active.");
         } else if ((command === "/approve" || command === "/deny") && args.length === 1)
           await respond(args[0] as EffectId, command === "/approve" ? "approve" : "deny");
-        else if (command === "/init" && !args.length) {
+        else if (
+          command === "/plan" &&
+          (!args.length || (args.length === 1 && args[0] === "off"))
+        ) {
+          const entering = !args.length;
+          if (runId) output("moyyi", "Change plan mode between runs.");
+          else {
+            planMode = entering;
+            if (sessionId)
+              await send({ type: "session.mode", sessionId, mode: entering ? "plan" : "default" });
+            output(
+              "moyyi",
+              entering
+                ? "Plan mode: the agent investigates read-only and proposes a plan; changes and commands are refused. Use /execute to approve the plan, or /plan off."
+                : "Plan mode off; grants and approvals apply as usual.",
+            );
+          }
+        } else if (command === "/execute" && !args.length) {
+          if (runId) output("moyyi", "Wait for the run to finish, then use /execute.");
+          else if (!planMode) output("moyyi", "Not in plan mode.");
+          else {
+            planMode = false;
+            if (sessionId) await send({ type: "session.mode", sessionId, mode: "default" });
+            output(
+              "moyyi",
+              "Plan approved; plan mode off. Changes still need their grants and approvals.",
+            );
+            return submit(EXECUTE_PROMPT);
+          }
+        } else if (command === "/init" && !args.length) {
           output(
             "command",
             "/init asks the agent to draft AGENTS.md; writing it still needs a write grant.",

@@ -272,6 +272,7 @@ export async function main(argv: readonly string[]): Promise<number> {
     developmentPluginNames: development.map((entry) => entry.name),
     commands,
     continueLatest: options.continueLatest,
+    planMode: options.planMode,
   });
   const pending = new Set<string>();
   let reloadTask: Promise<void> | undefined;

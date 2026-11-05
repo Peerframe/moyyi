@@ -83,6 +83,7 @@ function setup(
     developmentPluginNames?: readonly string[];
     commands?: ReadonlyMap<string, CustomCommand>;
     continueLatest?: boolean;
+    planMode?: boolean;
   } = {},
 ) {
   const host = fake();
@@ -1121,5 +1122,42 @@ describe("CLI ergonomics", () => {
     await fresh.cli.start();
     expect(fresh.output()).toContain("No earlier session in this workspace");
     expect(fresh.sent.some((command) => command.type === "session.create")).toBe(true);
+  });
+});
+
+describe("plan mode", () => {
+  it("marks the session, frames each message and approves the plan with /execute", async () => {
+    const t = setup();
+    await t.cli.start();
+    await t.cli.line("/plan");
+    expect(t.sent.at(-1)).toEqual({ type: "session.mode", sessionId, mode: "plan" });
+    await t.cli.line("Refactor the parser");
+    const start = t.sent.at(-1);
+    expect(start?.type).toBe("run.start");
+    expect(JSON.stringify(start)).toContain("Refactor the parser\\n\\n[Plan mode]");
+    t.emit({ type: "run.finished", runId, outcome: { kind: "completed" } });
+    await t.cli.line("/execute");
+    expect(t.sent.slice(-2)).toEqual([
+      { type: "session.mode", sessionId, mode: "default" },
+      {
+        type: "run.start",
+        sessionId,
+        input: [
+          {
+            type: "text",
+            text: "The plan is approved. Carry it out now, then verify the result and report what changed.",
+          },
+        ],
+      },
+    ]);
+  });
+  it("starts in plan mode with --plan and can leave it without sending a message", async () => {
+    const t = setup({ planMode: true });
+    await t.cli.start();
+    expect(t.sent).toContainEqual({ type: "session.mode", sessionId, mode: "plan" });
+    await t.cli.line("/plan off");
+    expect(t.sent.at(-1)).toEqual({ type: "session.mode", sessionId, mode: "default" });
+    await t.cli.line("/execute");
+    expect(t.output()).toContain("Not in plan mode.");
   });
 });

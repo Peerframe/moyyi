@@ -18,6 +18,7 @@ Options:
       --data DIR         Private session data directory (default: ~/.moyyi/data)
       --session ID       Resume a stored session
       --continue         Resume the most recent session of this workspace (or start one)
+      --plan             Start in plan mode: read-only planning until /execute
       --output FORMAT    text (default), json (one summary) or stream-json (event lines);
                          one-shot prompts only
   -i, --interactive      Keep a terminal session open after an initial prompt
@@ -41,8 +42,8 @@ Options:
       --daemon           Serve this runtime to local clients until Ctrl-C; grants stay fixed
       --connect          Use the running daemon for --data instead of a local runtime
 
-Commands: /help /new /resume ID /compact /cancel /exit /init /approve EFFECT_ID
-          /always EFFECT_ID /deny EFFECT_ID
+Commands: /help /new /resume ID /compact /cancel /exit /init /plan /execute
+          /approve EFFECT_ID /always EFFECT_ID /deny EFFECT_ID
 Compaction: /compact makes one request to the selected model; originals remain in history.
 Development: /reload NAME. Ctrl-C cancels an active run, or exits when idle.
 No workspace configuration, environment credential or plugin is auto-discovered.`;
@@ -57,6 +58,7 @@ export interface CliOptions {
   readonly dataDirectory?: string;
   readonly sessionId?: SessionId;
   readonly continueLatest: boolean;
+  readonly planMode: boolean;
   readonly output: "text" | "json" | "stream-json";
   readonly interactive: boolean;
   readonly approveReads: boolean;
@@ -89,6 +91,7 @@ export function parseCliOptions(argv: readonly string[], cwd = process.cwd()): C
       data: { type: "string" },
       session: { type: "string" },
       continue: { type: "boolean" },
+      plan: { type: "boolean" },
       output: { type: "string" },
       interactive: { type: "boolean", short: "i" },
       "approve-reads": { type: "boolean" },
@@ -163,7 +166,8 @@ export function parseCliOptions(argv: readonly string[], cwd = process.cwd()): C
     throw Error("--output json and stream-json are for one-shot prompts");
   if (values.continue && values.session !== undefined)
     throw Error("Use either --continue or --session ID");
-  if (mode === "daemon" && values.continue) throw Error("--daemon takes no --continue");
+  if (mode === "daemon" && (values.continue || values.plan))
+    throw Error("--daemon takes no --continue or --plan");
   if (values.session !== undefined && !/^[A-Za-z0-9_-]{1,512}$/.test(values.session))
     throw Error("Invalid session ID");
   if (values["dev-plugin"]?.length && !values.dev)
@@ -247,6 +251,7 @@ export function parseCliOptions(argv: readonly string[], cwd = process.cwd()): C
     nestedInstructions: values["nested-instructions"] ?? false,
     commandDirectories: (values.commands ?? []).map((path) => resolve(cwd, path)),
     continueLatest: values.continue ?? false,
+    planMode: values.plan ?? false,
     output: (values.output ?? "text") as CliOptions["output"],
     webOrigins,
     ...(toolchain === undefined ? {} : { shellToolchain: toolchain as "node" }),

@@ -24,7 +24,18 @@ export const BUILTIN_COMMANDS: ReadonlySet<string> = new Set([
   "deny",
   "reload",
   "init",
+  "plan",
+  "execute",
 ]);
+
+/** Appended to each message in plan mode; the runtime also denies non-read effects. */
+export const PLAN_SUFFIX =
+  "\n\n[Plan mode] Investigate with read-only tools and reply with a concrete, step-by-step plan. " +
+  "Do not change files, run commands or call external tools: they are disabled until I approve the plan.";
+
+/** Sent by /execute after leaving plan mode. */
+export const EXECUTE_PROMPT =
+  "The plan is approved. Carry it out now, then verify the result and report what changed.";
 
 /** Fixed brief behind `/init`; sent as the owner's message, so writing still needs a grant. */
 export const INIT_PROMPT =
