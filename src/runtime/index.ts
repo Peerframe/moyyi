@@ -28,6 +28,7 @@ import { AgentCore } from "../core/index.ts";
 import { defaultInstructionsPlugin } from "../plugins/default-instructions/index.ts";
 import { documentsPlugin } from "../plugins/documents/index.ts";
 import { fsPlugin } from "../plugins/fs/index.ts";
+import { createMcpPlugin } from "../plugins/mcp/index.ts";
 import { projectInstructionsPlugin } from "../plugins/project-instructions/index.ts";
 import {
   ANTHROPIC_API_PROFILE,
@@ -56,6 +57,7 @@ import { toolOutputPlugin } from "../plugins/tool-output/index.ts";
 import { createWebPlugin } from "../plugins/web/index.ts";
 import { workspaceNavigationPlugin } from "../plugins/workspace-navigation/index.ts";
 import {
+  McpPolicy,
   ReadOnlyPolicy,
   WebPolicy,
   WorkspaceProcessPolicy,
@@ -63,24 +65,31 @@ import {
 } from "../policy/index.ts";
 import { SqliteSessionStore } from "../store/index.ts";
 import type { MaterialStore } from "../store/materials.ts";
-import { type AnthropicHttpOptions, anthropicHttpTransport } from "./anthropic-http.ts";
-import { type DeepSeekHttpOptions, deepSeekHttpTransport } from "./deepseek-http.ts";
-import { NodeWorkspaceDocuments } from "./documents.ts";
-import { NodeWorkspaceFiles } from "./files.ts";
+import { NodeWorkspaceDocuments } from "./documents/documents.ts";
+import { NodeWorkspaceFiles } from "./files/files.ts";
+import { NodeWorkspaceWrites } from "./files/writes.ts";
+import { collectContext } from "./guidance/instructions.ts";
+import { type SkillSelection, selectSkills } from "./guidance/skills.ts";
 import { historyPage, sessionCatalog, sessionManagementError, sessionResults } from "./history.ts";
-import { collectContext } from "./instructions.ts";
-import { type KimiHttpOptions, kimiHttpTransport } from "./kimi-http.ts";
-import { FileRecordingSink, RecordingModelClient, ReplayModelClient } from "./model-recording.ts";
+import { connectMcpServers, type McpServerConfig } from "./mcp/index.ts";
 import { type PluginEntry, PluginRegistry, type PluginStatus } from "./plugins.ts";
 import { WorkspacePreconditions } from "./preconditions.ts";
-import { NodeWorkspaceProcesses } from "./processes.ts";
+import { BackgroundProcesses } from "./processes/background.ts";
+import { NodeWorkspaceProcesses } from "./processes/processes.ts";
+import { type AnthropicHttpOptions, anthropicHttpTransport } from "./providers/anthropic-http.ts";
+import { type DeepSeekHttpOptions, deepSeekHttpTransport } from "./providers/deepseek-http.ts";
+import { type KimiHttpOptions, kimiHttpTransport } from "./providers/kimi-http.ts";
+import {
+  FileRecordingSink,
+  RecordingModelClient,
+  ReplayModelClient,
+} from "./providers/model-recording.ts";
+import { SessionApprovals } from "./session-approvals.ts";
 import { sessionFacts } from "./session-facts.ts";
-import { type SkillSelection, selectSkills } from "./skills.ts";
 import { RuntimeToolResults, readToolDeadlines } from "./tool-results.ts";
 import { AjvArgumentValidator } from "./validation.ts";
-import { NodeWebAccess, type WebAccessOptions } from "./web.ts";
-import type { WebHttpDependencies } from "./web-http.ts";
-import { NodeWorkspaceWrites } from "./writes.ts";
+import { NodeWebAccess, type WebAccessOptions } from "./web/web.ts";
+import type { WebHttpDependencies } from "./web/web-http.ts";
 
 export {
   type CreateMaterial,
@@ -96,9 +105,9 @@ export {
   type LocalStoreReceipt,
   restoreLocalStore,
 } from "./local-maintenance.ts";
-export { FileRecordingSink, loadModelRecordings } from "./model-recording.ts";
-export { discoverNodeToolchain, type NodeToolchain } from "./node-toolchain.ts";
 export type { PluginEntry, PluginStatus } from "./plugins.ts";
+export { discoverNodeToolchain, type NodeToolchain } from "./processes/node-toolchain.ts";
+export { FileRecordingSink, loadModelRecordings } from "./providers/model-recording.ts";
 // Trusted installed hosts use the same bounded helpers as source checkouts, without reaching
 // into package-private module paths. These exports do not grant a runtime any capabilities.
 export {
@@ -153,6 +162,17 @@ export interface RuntimeOptions {
   readonly workspaceNavigation?: boolean;
   /** Opt-in direct evidence answer within the same run/request budget. */
   readonly evidenceAnswer?: boolean;
+  /**
+   * Opt-in automatic compaction of older turns, and of earlier steps inside a long turn, when a
+   * request needs this share of the context window; `true` uses 0.7. Each summary uses one
+   * model request of that turn.
+   */
+  readonly autoCompact?: boolean | { readonly thresholdRatio: number };
+  /**
+   * Owner-configured MCP servers, from trusted host configuration only. Each server is started
+   * when the runtime is created and stopped when it closes; see docs/mcp.md.
+   */
+  readonly mcp?: { readonly servers: readonly McpServerConfig[] };
   readonly developmentPlugins?: readonly DevelopmentPlugin[];
   readonly plugins?: readonly PluginEntry[];
   readonly model?: ModelOrigin;
@@ -348,7 +368,7 @@ export async function createRuntime(
         approval: workspaceProcesses.approval ?? "ask",
       })
     : filePolicy;
-  const base =
+  let base: PermissionPolicy =
     options.policy ??
     (options.web
       ? new WebPolicy({
@@ -404,10 +424,19 @@ export async function createRuntime(
       throw Error("Development plugin names must be unique and cannot replace startup plugins");
     development.set(entry.name, entry);
   }
+  // Owner-configured MCP servers start last, after every synchronous validation above; their
+  // processes are closed again if anything below fails.
+  const mcp = options.mcp?.servers.length
+    ? await connectMcpServers(options.mcp.servers)
+    : undefined;
+  if (mcp) {
+    base = new McpPolicy(base, mcp.rules);
+    if (mcp.descriptors.length) startup.push({ plugin: createMcpPlugin(mcp.descriptors) });
+  }
   for (const entry of startup) plugins.push(await registry.load(entry));
 
   const listeners = new Set<(event: RuntimeEvent) => void>();
-  const diagnostics: string[] = [];
+  const diagnostics: string[] = [...(mcp?.diagnostics ?? [])];
   const activeRuns = new Set<string>();
   const commands = new Set<Promise<void>>();
   let closed = false;
@@ -415,8 +444,11 @@ export async function createRuntime(
   let inspecting = false;
   let closing: Promise<void> | undefined;
   let toolResults: RuntimeToolResults | undefined;
+  const sessionApprovals = new SessionApprovals();
+  const backgroundProcesses = workspaceProcesses ? new BackgroundProcesses() : undefined;
   const emit = (event: RuntimeEvent) => {
     toolResults?.observe(event);
+    sessionApprovals.observe(event);
     if (event.type === "run.started") activeRuns.add(event.runId);
     if (event.type === "run.finished") activeRuns.delete(event.runId);
     // Observers receive an immutable copy, so mutating a displayed approval cannot alter work.
@@ -509,7 +541,12 @@ export async function createRuntime(
       ),
     beforeExecute: (tool, profile, action, effectId, args) =>
       stricter(
-        base.beforeExecute(tool, profile, action, effectId, args),
+        sessionApprovals.lift(
+          base.beforeExecute(tool, profile, action, effectId, args),
+          tool,
+          effectId,
+          args,
+        ),
         registry.evaluatePolicy({ tool, profile, args, phase: "execute" }),
       ),
   };
@@ -579,7 +616,18 @@ export async function createRuntime(
         })
       : undefined;
     const processes = workspaceProcesses
-      ? new NodeWorkspaceProcesses({ ...workspaceProcesses, protectedPaths: excluded })
+      ? new NodeWorkspaceProcesses({
+          ...workspaceProcesses,
+          protectedPaths: excluded,
+          ...(backgroundProcesses
+            ? {
+                background: {
+                  registry: backgroundProcesses,
+                  epoch: () => policy.revision?.() ?? 0,
+                },
+              }
+            : {}),
+        })
       : undefined;
     const files = new NodeWorkspaceFiles(excluded);
     const documents = documentsEnabled ? new NodeWorkspaceDocuments(files) : undefined;
@@ -601,6 +649,8 @@ export async function createRuntime(
       files,
       toolResults,
       toolOutputs: toolResults,
+      ...(backgroundProcesses ? { backgroundProcesses } : {}),
+      ...(mcp ? { mcp: mcp.access } : {}),
       readToolDeadlines: readToolDeadlines(
         options.scheduler ?? nodeScheduler,
         options.readToolTimeoutMs,
@@ -647,6 +697,12 @@ export async function createRuntime(
       ],
       ...(options.limits === undefined ? {} : { limits: options.limits }),
       ...(evidenceAnswer ? { evidenceAnswer } : {}),
+      ...(options.autoCompact
+        ? {
+            autoCompactRatio:
+              options.autoCompact === true ? 0.7 : options.autoCompact.thresholdRatio,
+          }
+        : {}),
     });
     if (!recovered) {
       await core.recover();
@@ -666,6 +722,7 @@ export async function createRuntime(
   } catch (error) {
     ownedStore?.close();
     await unload();
+    await mcp?.close();
     throw error;
   }
   const track = (pending: Promise<void>): Promise<void> => {
@@ -900,6 +957,30 @@ export async function createRuntime(
           return Promise.resolve();
         }
       }
+      if (command.type === "session.load") sessionApprovals.forget(command.sessionId);
+      if (command.type === "approval.respond" && command.scope === "session") {
+        if (command.decision !== "approve") {
+          reject(command.type, "Only an approval can be remembered for the session");
+          return Promise.resolve();
+        }
+        const current = core;
+        let rejected = false;
+        const watch = (event: RuntimeEvent) => {
+          if (event.type === "command.rejected" && event.command === "approval.respond")
+            rejected = true;
+        };
+        listeners.add(watch);
+        return track(
+          (async () => {
+            try {
+              await current.send(command);
+            } finally {
+              listeners.delete(watch);
+            }
+            if (!rejected) sessionApprovals.remember(command.effectId);
+          })(),
+        );
+      }
       return track(core.send(command));
     },
     subscribe(listener) {
@@ -919,6 +1000,8 @@ export async function createRuntime(
         await Promise.all([...commands]);
         await stopping;
         await core?.close();
+        await backgroundProcesses?.closeAll();
+        await mcp?.close();
         try {
           await recorder?.flush();
         } finally {

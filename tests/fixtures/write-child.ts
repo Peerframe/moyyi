@@ -13,7 +13,7 @@ import {
   UNKNOWN_USAGE,
   type WorkspaceChange,
 } from "../../src/contracts/index.ts";
-import { NodeWorkspaceWrites } from "../../src/runtime/writes.ts";
+import { NodeWorkspaceWrites } from "../../src/runtime/files/writes.ts";
 import { SqliteSessionStore } from "../../src/store/index.ts";
 
 const [checkpoint, operation, dataDirectory, workspaceRoot] = process.argv.slice(2);

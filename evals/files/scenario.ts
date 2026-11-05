@@ -16,7 +16,7 @@ import {
   UNKNOWN_USAGE,
 } from "../../src/contracts/index.ts";
 import { scriptedProfile, scriptedProvider } from "../../src/plugins/provider-scripted/index.ts";
-import { NodeWorkspaceFiles } from "../../src/runtime/files.ts";
+import { NodeWorkspaceFiles } from "../../src/runtime/files/files.ts";
 import { createRuntime, ReadOnlyPolicy, type Runtime } from "../../src/runtime/index.ts";
 
 export const fileNavigationScenarios = [

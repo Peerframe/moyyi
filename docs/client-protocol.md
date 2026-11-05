@@ -10,6 +10,10 @@ set `projectInstructions: false`; custom policies must explicitly implement `bef
 to permit automatic loading. This does not alter the client protocol or grant tool authority.
 See [instructions](instructions.md).
 
+The same commands and events also travel over the local daemon's private Unix socket
+(`src/contracts/wire.ts`, [daemon](daemon.md), [ADR 0048](decisions/0048-local-daemon.md)). That
+transport validates every client frame, accepts text input only and keeps grants with the daemon.
+
 ## Lifecycle
 
 Create a runtime with an explicit model, private data directory and trusted startup plugins or
@@ -40,7 +44,7 @@ recorded in diagnostics, not a reason to grant an action or stop the durable exe
 | `run.start` | Supply content to the ready session; overlapping work is rejected |
 | `run.steer` | Address the active run ID; steering is recorded, not a silent replacement run |
 | `run.cancel` | Address the active run; cancellation preserves completed effects and partial output |
-| `approval.respond` | Echo both the displayed effect ID and exact digest, with approve or deny |
+| `approval.respond` | Echo both the displayed effect ID and exact digest, with approve or deny; optional `scope: "session"` (approve only) remembers the tool, or the exact shell command, for that session in memory ([ADR 0049](decisions/0049-long-running-sessions.md)) |
 | `session.compact` | Explicit idle request; one selected-model summary call, with normal cancellation/budget rules |
 | `plugin.reload` | Only a host-configured development loader, while idle; no project auto-discovery |
 

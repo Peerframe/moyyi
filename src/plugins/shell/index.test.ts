@@ -93,7 +93,7 @@ describe("host-configured shell guidance", () => {
       pluginName: "shell",
       config: undefined,
       registerTool(value) {
-        tool = value;
+        if (value.name === "shell") tool = value;
       },
       registerModelProvider: unexpected,
       registerContextSource: unexpected,
@@ -163,11 +163,28 @@ describe("host-configured shell guidance", () => {
     let description = "";
     await plugin.setup({
       registerTool: (tool) => {
-        description = tool.description;
+        if (tool.name === "shell") description = tool.description;
       },
     } as PluginHost);
     expect(description).toContain("Configured workspace access: read-only.");
     expect(description).toContain("additional executable names on PATH: node.");
     expect(description).not.toContain("python3");
+  });
+});
+
+describe("background command tools", () => {
+  async function names(workspaceAccess: "unconfigured" | "read-only" | "read-write") {
+    const registered: string[] = [];
+    await createShellPlugin({ workspaceAccess, interpreter: "sh", executableNames: [] }).setup({
+      registerTool: (tool) => {
+        registered.push(tool.name);
+      },
+    } as PluginHost);
+    return registered;
+  }
+  it("adds shell_output and shell_stop only with a process grant", async () => {
+    expect(await names("unconfigured")).toEqual(["shell"]);
+    expect(await names("read-only")).toEqual(["shell", "shell_output", "shell_stop"]);
+    expect(await names("read-write")).toEqual(["shell", "shell_output", "shell_stop"]);
   });
 });

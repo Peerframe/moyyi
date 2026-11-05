@@ -102,7 +102,7 @@ successful tool return does not certify the task is correct.
 | Concern | Start in | First evidence |
 |---|---|---|
 | Launch, configuration, version | [CLI](../src/cli/program.ts), [runtime](../src/runtime/index.ts), `apps/desktop` | [Installation](installation.md), installation manifests |
-| Wrong or unhelpful tool output | [fs plugin](../src/plugins/fs/index.ts), [files](../src/runtime/files.ts) | [File contract](files.md), `eval:files` |
+| Wrong or unhelpful tool output | [fs plugin](../src/plugins/fs/index.ts), [files](../src/runtime/files/files.ts) | [File contract](files.md), `eval:files` |
 | Evidence missing from the request | [Context](../src/context/index.ts), [core loop](../src/core/index.ts) | Request records, `eval:instructions` |
 | Evidence arrived, answer wrong | [Provider](../src/plugins/provider-deepseek/), prompts and tool descriptions | Fixed-source answer vs required facts; [runtime evaluation](runtime-evaluation.md) |
 | Wrong execution or authority | [Executor](../src/core/executor.ts), [policy](../src/policy/index.ts) | Effect and policy tests, [threat model](threat-model.md) |
@@ -128,6 +128,10 @@ Plan: [post-M6 plan v2](tasks/2026-10-28-post-m6-plan.md). Order is owned by the
 | Delivery three: settings, Skills, search | Ready for Codex | [Brief](tasks/2026-10-30-delivery-3-settings-skills-search.md) |
 | Delivery four: conditional capabilities | Triggered per item | [Plan](tasks/2026-10-28-post-m6-plan.md) |
 | moyyi Chat interface | In review; mock backend only, offline-tested, not wired to the runtime | [Study and plan](tasks/2026-11-01-moyyi-chat-study.md) |
+| Long-running CLI: `--long`, `--timeout`, `--auto-compact`, `--allow-shell-write`, `/always`, background commands ([ADR 0049](decisions/0049-long-running-sessions.md)) | On branch, not merged; opt-in, defaults unchanged; offline-tested, not live-task-verified | [CLI](cli.md) |
+| MCP tools from owner-configured stdio servers ([ADR 0050](decisions/0050-mcp-client.md)) | On branch, not merged; host-module configuration (CLI, daemon); offline-tested, not live-task-verified | [MCP](mcp.md) |
+| Local daemon: `--daemon` / `--connect` over a private Unix socket ([ADR 0048](decisions/0048-local-daemon.md)) | On branch, not merged; CLI only, desktop unchanged | [Daemon guide](daemon.md) |
+| Repository structure: runtime folders, generated tool catalog | On branch, not merged; no behavior change. `check`, `verify:package`, `desktop:package` and `verify:desktop` passed on macOS arm64; not installed | [Record](tasks/2026-11-05-repository-structure.md) |
 
 ## Boundaries
 

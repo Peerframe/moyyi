@@ -7,13 +7,13 @@ import {
   executionReceipt,
   isReceiptEffect,
   type RunId,
+  type RuntimeClient,
   type RuntimeEvent,
   type SessionId,
   type ToolCallId,
   type ToolResultPart,
   type TranscriptEntry,
 } from "../contracts/index.ts";
-import type { Runtime } from "../runtime/index.ts";
 
 export interface CliSessionOptions {
   readonly workspaceRoot: string;
@@ -37,6 +37,7 @@ const help = [
   "History: /sessions [PAGE], /results [SESSION_ID [PAGE]]; idle only, no model requests.",
   "Compaction: /compact uses one request to the selected model; originals remain in history.",
   "Approval: /approve EFFECT_ID or /deny EFFECT_ID (only the displayed digest)",
+  "Always allow: /always EFFECT_ID approves it and stops asking in this session for the same tool, or the same exact shell command",
   "Development: /reload NAME (configured plugins only, between runs)",
   "While running, ordinary input steers the current run. Ctrl-C cancels; when idle it exits.",
 ];
@@ -79,7 +80,10 @@ function receiptText(tool: string, data: ExecutionReceipt): string {
 }
 
 /** A protocol client. It never executes assistant text or grants policy authority. */
-export function createCliSession(runtime: Runtime, options: CliSessionOptions): CliSession {
+export function createCliSession(
+  runtime: Pick<RuntimeClient, "send" | "subscribe" | "close">,
+  options: CliSessionOptions,
+): CliSession {
   const completion = Promise.withResolvers<number>();
   let queue = Promise.resolve();
   let started = false;
@@ -230,7 +234,11 @@ export function createCliSession(runtime: Runtime, options: CliSessionOptions): 
     if (!accepted && !options.interactive) await finish(1, true);
     prompt();
   }
-  async function respond(effectId: EffectId, decision: "approve" | "deny"): Promise<void> {
+  async function respond(
+    effectId: EffectId,
+    decision: "approve" | "deny",
+    scope?: "session",
+  ): Promise<void> {
     const pending = approvals.get(effectId);
     if (!pending) {
       output("moyyi", "No displayed pending approval has that ID. Wait for a fresh request.");
@@ -238,7 +246,18 @@ export function createCliSession(runtime: Runtime, options: CliSessionOptions): 
     }
     approvalAttempt = { effectId, digest: pending.digest };
     try {
-      await send({ type: "approval.respond", effectId, digest: pending.digest, decision });
+      const accepted = await send({
+        type: "approval.respond",
+        effectId,
+        digest: pending.digest,
+        decision,
+        ...(scope ? { scope } : {}),
+      });
+      if (accepted && scope)
+        output(
+          "moyyi",
+          "Approved. Until this session is reopened, the same tool (for commands: the same exact command) runs without asking. Grants and denials still apply.",
+        );
     } finally {
       if (approvals.get(effectId)?.digest === pending.digest) approvals.delete(effectId);
       approvalAttempt = undefined;
@@ -385,7 +404,10 @@ export function createCliSession(runtime: Runtime, options: CliSessionOptions): 
         output("approval summary", event.summary);
         if (event.preview !== undefined) output("approval preview", event.preview);
         if (options.interactive) {
-          output("moyyi", `Use /approve ${event.effectId} or /deny ${event.effectId}.`);
+          output(
+            "moyyi",
+            `Use /approve ${event.effectId}, /always ${event.effectId} or /deny ${event.effectId}.`,
+          );
           prompt();
         } else {
           output("moyyi", "Noninteractive mode denies this approval request.");
@@ -531,6 +553,8 @@ export function createCliSession(runtime: Runtime, options: CliSessionOptions): 
           else output("moyyi", "No run is active.");
         } else if ((command === "/approve" || command === "/deny") && args.length === 1)
           await respond(args[0] as EffectId, command === "/approve" ? "approve" : "deny");
+        else if (command === "/always" && args.length === 1)
+          await respond(args[0] as EffectId, "approve", "session");
         else if (command === "/reload" && args.length === 1) {
           const name = args[0] as string;
           if (!options.developmentPluginNames?.includes(name))

@@ -17,9 +17,9 @@ import {
 } from "../src/contracts/index.ts";
 import { scriptedProfile } from "../src/plugins/provider-scripted/index.ts";
 import { ReadOnlyPolicy } from "../src/policy/index.ts";
-import { NodeWorkspaceFiles } from "../src/runtime/files.ts";
+import { NodeWorkspaceFiles } from "../src/runtime/files/files.ts";
+import { collectContext } from "../src/runtime/guidance/instructions.ts";
 import { createRuntime, type RuntimeOptions } from "../src/runtime/index.ts";
-import { collectContext } from "../src/runtime/instructions.ts";
 
 const cleanups: (() => Promise<void>)[] = [];
 afterEach(async () => {

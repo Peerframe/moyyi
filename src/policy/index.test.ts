@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import type { ActionDigest, EffectId, EffectProfile, PreparedAction } from "../contracts/index.ts";
 import {
+  McpPolicy,
   ReadOnlyPolicy,
   WebPolicy,
   WorkspaceProcessPolicy,
@@ -126,5 +127,54 @@ describe("WorkspaceProcessPolicy", () => {
     policy.grant();
     expect(policy.revision()).toBe(2);
     expect(policy.beforeExecute("shell", process, action, effect)).toEqual({ kind: "ask" });
+  });
+});
+
+describe("MCP tool policy", () => {
+  const external: EffectProfile = {
+    class: "external",
+    reversibility: "none",
+    verification: "none",
+  };
+  const read: EffectProfile = {
+    class: "read",
+    reversibility: "not_applicable",
+    verification: "not_applicable",
+  };
+  const effect = "effect_mcp" as EffectId;
+  const rules = new Map([
+    ["mcp__docs__search", { effect: "read" as const, approval: "ask" as const }],
+    ["mcp__gh__create_issue", { effect: "external" as const, approval: "ask" as const }],
+    ["mcp__gh__list", { effect: "external" as const, approval: "allow" as const }],
+  ]);
+  it("applies the owner's class and approval, and denies unknown or mismatched tools", () => {
+    const policy = new McpPolicy(new ReadOnlyPolicy(), rules);
+    expect(policy.beforeExecute("mcp__docs__search", read, action, effect)).toEqual({
+      kind: "allow",
+    });
+    expect(policy.beforeExecute("mcp__gh__create_issue", external, action, effect)).toEqual({
+      kind: "ask",
+    });
+    expect(policy.beforeExecute("mcp__gh__list", external, action, effect)).toEqual({
+      kind: "allow",
+    });
+    expect(policy.beforePrepare("mcp__gh__unknown", external, {})).toMatchObject({ kind: "deny" });
+    expect(policy.beforePrepare("mcp__docs__search", external, {})).toMatchObject({ kind: "deny" });
+    expect(policy.beforePrepare("mcp__gh__list", read, {})).toMatchObject({ kind: "deny" });
+    expect(
+      policy.beforePrepare("mcp__gh__list", { ...external, reversibility: "snapshot" }, {}),
+    ).toMatchObject({ kind: "deny" });
+  });
+  it("keeps read-only MCP tools under the read grant, and leaves other tools unchanged", () => {
+    const reads = new ReadOnlyPolicy();
+    const policy = new McpPolicy(reads, rules);
+    reads.revoke();
+    expect(policy.beforeExecute("mcp__docs__search", read, action, effect)).toMatchObject({
+      kind: "deny",
+    });
+    expect(policy.beforeExecute("shell", external, action, effect)).toMatchObject({
+      kind: "deny",
+    });
+    expect(policy.revision()).toBe(reads.revision());
   });
 });
