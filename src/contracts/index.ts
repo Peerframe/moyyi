@@ -6,6 +6,7 @@ export type * from "./mcp.ts";
 export type * from "./model.ts";
 export * from "./model-conformance.ts";
 export * from "./persisted/index.ts";
+export * from "./plan-mode.ts";
 export type * from "./plugin.ts";
 export type * from "./ports.ts";
 export type * from "./processes.ts";

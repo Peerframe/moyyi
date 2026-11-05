@@ -77,8 +77,14 @@ Long-task switches, each default off and stored only when enabled:
 desktop runs reads one at a time, so sub-agents do not run in parallel there) and
 **子目录 AGENTS.md** (nested instructions, [ADR 0052](decisions/0052-nested-instructions.md)).
 An approval card also offers **本会话始终允许**: it approves the displayed action and stops asking
-for the same tool (or exact command) in this session until it is reopened. Plan mode, MCP servers
-and hooks are not configurable in the desktop app yet. An empty API Key preserves that preset's existing key.
+for the same tool (or exact command) in this session until it is reopened. **计划模式** in the
+composer turns on plan mode ([ADR 0054](decisions/0054-plan-mode.md)) for the open session: each
+message asks for a read-only investigation and a plan, and changes, commands and external calls
+are refused without an approval card. After a plan-mode run completes, **按计划执行** turns plan mode
+off and sends the fixed execute request; existing grants and approvals then apply as usual.
+Reopening or switching sessions turns plan mode off; changing permissions, site access or settings
+keeps it on. MCP servers and hooks are not configurable in
+the desktop app yet. An empty API Key preserves that preset's existing key.
 Changing preset, saving or closing clears the input. Save stores local configuration only: it
 does not probe the provider, incur model usage or prove that the remote key is valid. An absent
 or inaccessible credential leaves sending disabled while history remains accessible. If applying

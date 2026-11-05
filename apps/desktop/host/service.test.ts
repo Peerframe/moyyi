@@ -14,6 +14,8 @@ import { join } from "node:path";
 import {
   type ModelRequest,
   type ModelStreamEvent,
+  PLAN_EXECUTE_PROMPT,
+  PLAN_MODE_SUFFIX,
   type Plugin,
   type ToolCallId,
   UNKNOWN_USAGE,
@@ -830,6 +832,45 @@ describe("desktop M3 explicit grants and recorded effects", () => {
   }, 20_000);
 });
 
+it("plan mode survives a permission change, refuses writes without asking, then executes the plan", async () => {
+  const steps: Step[] = [];
+  const f = await fixture(steps);
+  await f.host.dispatch({ type: "create", workspaceRoot: f.workspace, askEachRead: false });
+  const sessionId = f.host.getState().activeSessionId as string;
+  await expect(f.host.dispatch({ type: "execute", sessionId })).rejects.toThrow(
+    "Plan mode is not on",
+  );
+  await f.host.dispatch({ type: "plan", sessionId, enabled: true });
+  // Granting writes rebuilds the runtime; plan mode must still hold there.
+  await f.host.dispatch({ type: "permissions", sessionId, writes: true, checks: false });
+  expect(f.host.getState().planMode).toBe(true);
+  steps.push(call("create", { path: "plan.txt", text: "x" }), answer("1. Create plan.txt"));
+  let approvals = 0;
+  const off = f.host.subscribe((s) => {
+    if (s.pendingApproval) approvals++;
+  });
+  await f.host.dispatch({ type: "start", sessionId, text: "Add plan.txt" });
+  await waitFor(f.host, (s) => s.outcome?.kind === "completed");
+  off();
+  expect(approvals).toBe(0);
+  expect(existsSync(join(f.workspace, "plan.txt"))).toBe(false);
+  expect(JSON.stringify(f.requests[0])).toContain(PLAN_MODE_SUFFIX.trim().slice(0, 40));
+  expect(JSON.stringify(f.requests.at(-1))).toContain("Plan mode: changes, commands");
+  expect(f.host.getState().messages.some((m) => m.tool === "create" && m.state === "denied")).toBe(
+    true,
+  );
+  steps.push(answer("Executed"));
+  await f.host.dispatch({ type: "execute", sessionId });
+  await waitFor(f.host, (s) => s.outcome?.kind === "completed" && s.messages.length > 4);
+  expect(f.host.getState().planMode).toBe(false);
+  const executed = JSON.stringify(f.requests.at(-1));
+  expect(executed).toContain(PLAN_EXECUTE_PROMPT);
+  expect(executed.split("[Plan mode]")).toHaveLength(2);
+  await f.host.dispatch({ type: "plan", sessionId, enabled: true });
+  await f.host.dispatch({ type: "load", sessionId, askEachRead: false });
+  expect(f.host.getState().planMode).toBe(false);
+});
+
 it("runs a separately approved Node check with a read-only workspace and denied network", async () => {
   const steps: Step[] = [];
   const f = await fixture(steps);
@@ -1020,11 +1061,24 @@ describe("desktop command validation", () => {
       { type: "configure", settings: { preset: "flash", maxRequests: 0, timeoutMs: 120_000 } },
       { type: "approve", effectId: "e", digest: "d", decision: "deny", scope: "session" },
       { type: "approve", effectId: "e", digest: "d", decision: "approve", scope: "forever" },
+      { type: "plan", sessionId: "x", enabled: "yes" },
+      { type: "plan", sessionId: "x" },
+      { type: "execute", sessionId: "x", text: "go" },
+      { type: "execute", sessionId: "\n" },
       Object.create({ type: "close" }),
       getter,
     ])
       expect(() => parseDesktopCommand(value)).toThrow("Invalid desktop command");
     expect(parseDesktopCommand({ type: "close" })).toEqual({ type: "close" });
+    expect(parseDesktopCommand({ type: "plan", sessionId: "x", enabled: true })).toEqual({
+      type: "plan",
+      sessionId: "x",
+      enabled: true,
+    });
+    expect(parseDesktopCommand({ type: "execute", sessionId: "x" })).toEqual({
+      type: "execute",
+      sessionId: "x",
+    });
     expect(
       parseDesktopCommand({
         type: "approve",

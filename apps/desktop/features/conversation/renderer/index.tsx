@@ -105,8 +105,19 @@ function Outcome() {
   );
 }
 function Composer() {
-  const { state, pending, act, draft, setDraft, composer, send, configuring, canSend } =
-    useDesktopUI();
+  const {
+    state,
+    pending,
+    act,
+    draft,
+    setDraft,
+    composer,
+    send,
+    configuring,
+    canSend,
+    busy,
+    composerBlocked,
+  } = useDesktopUI();
   const runStatus =
     state.run?.state === "cancelling"
       ? "正在停止…"
@@ -114,7 +125,17 @@ function Composer() {
         ? "等待你的批准"
         : state.run
           ? "正在处理…"
-          : "";
+          : state.planMode
+            ? "计划模式：只读调查，不做修改"
+            : "";
+  const sessionId = state.activeSessionId;
+  const canChangeMode = !busy && !configuring && !composerBlocked && !state.historyOnly;
+  // A plan exists once a plan-mode run has finished with an answer.
+  const canExecute =
+    canChangeMode &&
+    state.planMode &&
+    state.connection.ready &&
+    state.outcome?.kind === "completed";
   return (
     <form
       className="composer"
@@ -158,9 +179,33 @@ function Composer() {
                 {state.run.state === "cancelling" ? "正在停止…" : "停止"}
               </button>
             ) : (
-              <button className="primary" type="submit" disabled={!canSend}>
-                {pending ? "正在处理…" : "发送"}
-              </button>
+              <span className="composer-buttons">
+                <button
+                  type="button"
+                  className="quiet"
+                  aria-pressed={state.planMode}
+                  title="开启后只读调查并给出计划；批准计划前不会修改文件或运行命令"
+                  disabled={!canChangeMode || !sessionId}
+                  onClick={() =>
+                    sessionId && act({ type: "plan", sessionId, enabled: !state.planMode })
+                  }
+                >
+                  {state.planMode ? "退出计划模式" : "计划模式"}
+                </button>
+                {state.planMode ? (
+                  <button
+                    type="button"
+                    disabled={!canExecute || !sessionId}
+                    title="退出计划模式，并让 moyyi 按上面的计划执行"
+                    onClick={() => sessionId && act({ type: "execute", sessionId })}
+                  >
+                    按计划执行
+                  </button>
+                ) : null}
+                <button className="primary" type="submit" disabled={!canSend}>
+                  {pending ? "正在处理…" : "发送"}
+                </button>
+              </span>
             )}
           </div>
         </div>
