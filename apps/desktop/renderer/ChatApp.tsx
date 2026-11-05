@@ -68,9 +68,6 @@ function Tools({
   );
 }
 
-/** `native.artifact.<verb>:<effectId>`, the ids chat-world gives each handed-over file. */
-const ARTIFACT_CONTROL = /^native\.artifact\.(preview|reveal|save):(.+)$/;
-
 /** macOS draws the traffic lights in the rail and the sidebar material behind the window. */
 const MAC = typeof navigator !== "undefined" && navigator.userAgent.includes("Macintosh");
 
@@ -86,23 +83,6 @@ export function DesktopChatApp({ bridge }: { bridge: DesktopBridge }) {
   const controls = useRef<(id: string) => void>(() => {});
   controls.current = (id) => {
     const live = current.current;
-    const artifact = ARTIFACT_CONTROL.exec(id);
-    if (artifact) {
-      const [, verb, effectId = ""] = artifact;
-      const sessionId = live.state?.activeSessionId;
-      if (!sessionId) {
-        live.setViewError("请先打开这个文件所在的会话。");
-        return;
-      }
-      const identity = { sessionId, effectId };
-      live.setViewError(null);
-      if (verb === "preview") {
-        setPanel("results");
-        void live.perform(() => bridge.act({ type: "artifact.open", ...identity }));
-      } else if (verb === "reveal") void live.perform(() => bridge.revealArtifact(identity));
-      else void live.perform(() => bridge.saveArtifact(identity));
-      return;
-    }
     if (live.busy && !["native.artifacts", "native.effects", "native.materials"].includes(id)) {
       live.setViewError("请先等待当前操作结束，或停止运行。");
       return;
@@ -279,11 +259,6 @@ export function DesktopChatApp({ bridge }: { bridge: DesktopBridge }) {
             beforeComposer,
             empty,
             supportedActions: CHAT_ACTIONS,
-            onView: (view) => {
-              const sessionId = state.activeSessionId;
-              if (view === "results" && sessionId)
-                ui.act({ type: "artifacts", sessionId, offset: 0 });
-            },
             renderText: (text) => (
               <div className="desktop-tools ch-native-rich">
                 <RichMessage content={text} />

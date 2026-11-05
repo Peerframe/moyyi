@@ -127,7 +127,7 @@ Plan: [post-M6 plan v2](tasks/2026-10-28-post-m6-plan.md). Order is owned by the
 | Delivery three: settings, Skills, search | Ready for Codex | [Brief](tasks/2026-10-30-delivery-3-settings-skills-search.md) |
 | Delivery four: conditional capabilities | Triggered per item | [Plan](tasks/2026-10-28-post-m6-plan.md) |
 | moyyi Chat interface | Final `b2ef510` installed; offline package gates, native functional checks, normal/minimum layouts and final relaunch passed. No new paid quality run | [Integration record](tasks/2026-11-04-chat-desktop-integration.md), [study](tasks/2026-11-01-moyyi-chat-study.md) |
-| moyyi Chat window, rail and 成果 (owner review 2026-11-05) | Implemented on `codex/chat-desktop-integration`; `npm run check` and builds pass; not packaged or installed; native window look (traffic lights, vibrancy) not yet seen | [Handoff](../.agents/handoff/claude-chat-window.md), canvas S1–S33 |
+| moyyi Chat window and rail: 全部, 项目, 自动化, 插件, 设置 (owner review 2026-11-05) | Implemented on `codex/chat-desktop-integration`; chat, desktop renderer and boundary tests pass; full `npm run check` still to pass on an idle machine; not packaged or installed; native window look (traffic lights, vibrancy) not yet seen; 自动化 is mock-only | [Handoff](../.agents/handoff/claude-chat-window.md), canvas S1–S34 |
 
 ## Boundaries
 

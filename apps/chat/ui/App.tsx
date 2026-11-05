@@ -1,10 +1,11 @@
-// The window (boards S1, S7, S8, S12, S23–S33): folder rail, then either the chat list with the open
-// chat and its side panel, or 成果 / 设置 / 插件 with the open entry. Below 1200px the panel floats over
+// The window (boards S1, S7, S8, S12, S23–S34): rail, then either the chat list (全部, or 项目 and
+// one project's chats) with the open chat and its side panel, or 自动化 / 插件 / 设置 with the open
+// entry. Below 1200px the panel floats over
 // the chat, below 900px the rail becomes chips above the list, below 700px one pane shows at a time
 // and the panel opens as a bottom sheet.
 import { useEffect, useState, useSyncExternalStore } from "react";
 import type { ChatAction, ChatPort, FolderId, Theme } from "../port.ts";
-import { ChatList } from "./ChatList.tsx";
+import { ChatList, chatsOf } from "./ChatList.tsx";
 import { Conversation } from "./Conversation.tsx";
 import { actionError, type ChatIntegration, supports } from "./integration.ts";
 
@@ -15,22 +16,23 @@ import { PageList, PagePane } from "./Pages.tsx";
 import type { PanelActions, PanelFrame } from "./Panel.tsx";
 import { SidePanel } from "./Panel.tsx";
 import { inFolder, isFolder, type PageView, Rail, type ViewId } from "./Rail.tsx";
-import { type ResultActions, ResultList, ResultPane } from "./Results.tsx";
 
 export interface AppProps {
   readonly port: ChatPort;
   readonly theme: Theme;
   readonly initialChat?: string | undefined;
   readonly integration?: ChatIntegration | undefined;
-  /** Opens 成果, 设置 or 插件 instead of the chats, e.g. "settings/permissions". */
+  /** Opens a page or a project instead of 全部, e.g. "settings/permissions" or "project/p-lunwen". */
   readonly initialPage?: string | undefined;
   /** The host draws window controls at the top of the rail (macOS traffic lights). */
   readonly windowControls?: boolean | undefined;
 }
 
-function parsePage(value: string | undefined): { view: PageView; page: string | null } | null {
+function parsePage(value: string | undefined): { view: ViewId; page: string | null } | null {
   const [view, page = null] = value?.split("/") ?? [];
-  return view === "results" || view === "settings" || view === "plugins" ? { view, page } : null;
+  return view === "project" || view === "automations" || view === "settings" || view === "plugins"
+    ? { view, page }
+    : null;
 }
 
 function useNarrow(): boolean {
@@ -61,13 +63,17 @@ export function App({
   const start = parsePage(initialPage);
   const [view, setView] = useState<ViewId>(start?.view ?? "all");
   /** The open section of each page list; null shows only the list on narrow layouts. */
+  const startOf = (of: ViewId) => (start?.view === of ? (start.page ?? null) : null);
   const [pageOf, setPageOf] = useState<Readonly<Record<PageView, string | null>>>({
-    results: start?.view === "results" ? (start.page ?? null) : null,
-    settings: start?.view === "settings" ? (start.page ?? null) : null,
-    plugins: start?.view === "plugins" ? (start.page ?? null) : null,
+    automations: startOf("automations"),
+    settings: startOf("settings"),
+    plugins: startOf("plugins"),
   });
   /** The last folder of chats, so 设置 and back keeps the list where it was. */
-  const [folder, setFolder] = useState<FolderId>("all");
+  const [folder, setFolder] = useState<FolderId>(start?.view === "project" ? "project" : "all");
+  /** The open project under 项目. */
+  const [projectId, setProjectId] = useState<string | null>(startOf("project"));
+  const project = world.projects.find((p) => p.id === projectId) ?? null;
   const [openId, setOpenId] = useState<string | null>(
     integration ? integration.activeChatId : (initialChat ?? (world.firstRun ? "moyyi" : null)),
   );
@@ -130,7 +136,9 @@ export function App({
         (event.key === "ArrowUp" || event.key === "ArrowDown")
       ) {
         event.preventDefault();
-        const list = world.chats.filter((c) => inFolder(c, folder));
+        const list = project
+          ? chatsOf(world, project.id)
+          : world.chats.filter((c) => inFolder(c, folder));
         const at = list.findIndex((c) => c.id === openId);
         const next =
           list[at < 0 ? 0 : (at + (event.key === "ArrowDown" ? 1 : list.length - 1)) % list.length];
@@ -163,16 +171,9 @@ export function App({
   const onView = (next: ViewId) => {
     setView(next);
     if (isFolder(next)) setFolder(next);
+    // 项目 again goes back to the projects, like a second tap on a tab.
+    if (next === "project" && view === "project") setProjectId(null);
     integration?.onView?.(next);
-  };
-
-  const resultActions: ResultActions = {
-    press: pageActions.press,
-    openChat: (chatId, claim) => {
-      setView(folder);
-      open(chatId);
-      if (claim) setStack([{ kind: "claim", ...claim }]);
-    },
   };
 
   const layout = narrow ? "narrow" : "wide";
@@ -180,42 +181,9 @@ export function App({
     <Rail world={world} view={view} onView={onView} windowControls={windowControls} />
   );
 
-  if (view === "results") {
-    const chosen = pageOf.results;
-    const result =
-      world.results.find((r) => r.id === chosen) ?? (narrow ? undefined : world.results[0]);
-    return (
-      <div className={`mc mc-${theme} mc-window ch-app`} data-layout={layout}>
-        {rail}
-        {!narrow || !result ? (
-          <ResultList
-            world={world}
-            current={result?.id ?? null}
-            onOpen={(id) => setPageOf((value) => ({ ...value, results: id }))}
-            onView={onView}
-            native={Boolean(integration)}
-          />
-        ) : null}
-        {result ? (
-          <ResultPane
-            world={world}
-            result={result}
-            actions={resultActions}
-            feedback={feedback}
-            onBack={narrow ? () => setPageOf((value) => ({ ...value, results: null })) : undefined}
-          />
-        ) : narrow ? null : (
-          <section className="mc-panel ch-pane ch-empty" aria-label="没选成果">
-            <span className="ch-empty-title">还没有成果</span>
-            <span className="ch-sub">AI 交给你的文件会出现在这里</span>
-          </section>
-        )}
-      </div>
-    );
-  }
-
   if (!isFolder(view)) {
-    const pages = view === "settings" ? world.settings : world.plugins;
+    const pages =
+      view === "settings" ? world.settings : view === "plugins" ? world.plugins : world.automations;
     const chosen = pageOf[view];
     // Wide layouts always show a section; the first one until another is picked.
     const page = pages.find((p) => p.id === chosen) ?? (narrow ? undefined : pages[0]);
@@ -237,12 +205,24 @@ export function App({
         {page ? (
           <PagePane
             world={world}
+            kind={view}
             page={page}
             actions={pageActions}
             feedback={feedback}
             onBack={narrow ? () => setPageOf((value) => ({ ...value, [view]: null })) : undefined}
           />
-        ) : null}
+        ) : narrow || view !== "automations" ? null : (
+          <section className="mc-panel ch-pane ch-empty" aria-label="没有自动化">
+            <span className="ch-empty-title">
+              {integration ? "本机版本还不能定时运行" : "还没有自动化"}
+            </span>
+            <span className="ch-sub">
+              {integration
+                ? "到点自动开工要等后台运行做好；现在每件事都由你在会话里交代。"
+                : "在任意对话里说 /定时，或者让 moyyi “每天早上做一件事”"}
+            </span>
+          </section>
+        )}
       </div>
     );
   }
@@ -257,6 +237,8 @@ export function App({
         <ChatList
           world={world}
           folder={view}
+          project={view === "project" ? project : null}
+          onProject={setProjectId}
           openId={openId}
           drafts={drafts}
           onView={onView}

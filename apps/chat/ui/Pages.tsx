@@ -1,5 +1,5 @@
-// 设置 and 插件 (boards S23–S32). Either opens from the bottom of the rail in place of the chat list;
-// the section opens in the conversation pane on `panel`. Pages are data from the port, so this file
+// 自动化, 插件 and 设置 (boards S23–S32, S34). Each opens from the rail
+// in place of the chat list; the entry opens in the conversation pane on `panel`. Pages are data from the port, so this file
 // only knows how to draw the eight block kinds, not what any setting means.
 import { type ReactNode, useState } from "react";
 import type {
@@ -50,7 +50,14 @@ function PageIconTile({ icon, size = 32 }: { readonly icon: PageIcon; readonly s
   );
 }
 
-const LIST: Record<"settings" | "plugins", { title: string; search: string; foot: string }> = {
+export type PageKind = "automations" | "plugins" | "settings";
+
+const LIST: Record<PageKind, { title: string; search: string; foot: string }> = {
+  automations: {
+    title: "自动化",
+    search: "搜索自动化",
+    foot: "到点在它的对话里开工，照常先给计划卡。在任意对话里说 /定时 加一件。",
+  },
   settings: {
     title: "设置",
     search: "搜索设置",
@@ -61,6 +68,12 @@ const LIST: Record<"settings" | "plugins", { title: string; search: string; foot
     search: "搜索插件",
     foot: "插件决定 AI 能做什么。模型也是插件，在 设置 › 模型和密钥 里连。预览版只有这些内置插件。",
   },
+};
+
+const NATIVE_FOOT: Record<PageKind, string> = {
+  automations: "本机版本还不能定时运行；这里会列出到点自己开工的事。",
+  plugins: "这里列出当前应用已接入的能力。实际操作仍受会话权限与确认限制。",
+  settings: "设置作用于本机应用；当前会话的权限由运行时检查。",
 };
 
 /** The list that replaces the chat list: a row per page with its current value as the second line. */
@@ -75,7 +88,7 @@ export function PageList({
 }: {
   readonly native?: boolean;
   readonly world: ChatWorld;
-  readonly kind: "settings" | "plugins";
+  readonly kind: PageKind;
   readonly pages: readonly (SettingsPage | PluginPage)[];
   readonly current: string | null;
   readonly onOpen: (pageId: string) => void;
@@ -132,19 +145,13 @@ export function PageList({
             </span>
           </a>
         ))}
-        {shown.length === 0 ? (
+        {shown.length === 0 && needle ? (
           <div className="ch-empty-list">
             <span className="ch-empty-title">没找到“{needle}”</span>
           </div>
         ) : null}
       </div>
-      <p className="ch-page-foot">
-        {native
-          ? kind === "settings"
-            ? "设置作用于本机应用；当前会话的权限由运行时检查。"
-            : "这里列出当前应用已接入的能力。实际操作仍受会话权限与确认限制。"
-          : words.foot}
-      </p>
+      <p className="ch-page-foot">{native ? NATIVE_FOOT[kind] : words.foot}</p>
     </section>
   );
 }
@@ -152,12 +159,14 @@ export function PageList({
 /** One section or plugin, in the conversation pane. */
 export function PagePane({
   world,
+  kind,
   page,
   actions,
   onBack,
   feedback,
 }: {
   readonly world: ChatWorld;
+  readonly kind: PageKind;
   readonly page: SettingsPage | PluginPage;
   readonly feedback?: string | null | undefined;
   readonly actions: PageActions;
@@ -170,7 +179,7 @@ export function PagePane({
       {onBack ? (
         <button type="button" className="mc-panel-back ch-pane-back" onClick={onBack}>
           <Icon.back />
-          {plugin ? "插件" : "设置"}
+          {LIST[kind].title}
         </button>
       ) : null}
       <div className="ch-pane-body">
@@ -186,7 +195,13 @@ export function PagePane({
               <h2 className="ch-pane-title">{plugin.name}</h2>
               {plugin.sub ? <span className="ch-pane-sub">{plugin.sub}</span> : null}
             </span>
-            {plugin.enabled ? <span className="mc-role">在用</span> : null}
+            {kind === "automations" ? (
+              <span className={`mc-role${plugin.enabled ? "" : " ch-off"}`}>
+                {plugin.enabled ? "开着" : "已暂停"}
+              </span>
+            ) : plugin.enabled ? (
+              <span className="mc-role">在用</span>
+            ) : null}
             {plugin.toggle ? (
               <ControlButton control={plugin.toggle} onPress={actions.press} />
             ) : null}

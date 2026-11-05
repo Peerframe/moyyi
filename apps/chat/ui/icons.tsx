@@ -37,32 +37,16 @@ function stroke(paths: ReactNode, width = 1.4, viewBox = "0 0 16 16") {
 
 export const Icon = {
   all: stroke(<path d="M2.5 4.5h11M2.5 8h11M2.5 11.5h7" />),
-  ai: stroke(
+  project: stroke(
+    <path d="M2.5 4.5a1 1 0 0 1 1-1h3l1.5 1.5h4.5a1 1 0 0 1 1 1v5.5a1 1 0 0 1-1 1h-9a1 1 0 0 1-1-1z" />,
+  ),
+  automation: stroke(
     <>
-      <circle cx="8" cy="8" r="5.5" />
-      <path d="M8 5.2v1.6M8 9.2v1.6M5.2 8h1.6M9.2 8h1.6" />
+      <path d="M13.5 8a5.5 5.5 0 1 1-1.6-3.9M13.5 2.5v2.6h-2.6" />
+      <path d="M8 5.5V8l1.8 1.2" />
     </>,
   ),
-  project: stroke(<rect x="2.5" y="2.5" width="11" height="11" rx="3" />),
-  clock: stroke(
-    <>
-      <circle cx="8" cy="8" r="5.5" />
-      <path d="M8 5v3l2 1.5" />
-    </>,
-  ),
-  running: stroke(
-    <>
-      <circle cx="8" cy="8" r="5.5" />
-      <path d="M6.8 5.6l3.4 2.4-3.4 2.4z" />
-    </>,
-  ),
-  results: stroke(
-    <>
-      <path d="M4.5 8.5V2.5h7v6" />
-      <path d="M6.5 5h3M6.5 7h2" />
-      <path d="M2.5 9h3l1 1.5h3l1-1.5h3v4.5h-11z" />
-    </>,
-  ),
+  more: stroke(<path d="M3.5 8h.01M8 8h.01M12.5 8h.01" />, 2.4),
   plugins: stroke(
     <>
       <rect x="2.5" y="2.5" width="4.5" height="4.5" rx="1.2" />

@@ -76,8 +76,6 @@ describe("moyyi Chat mock backend", () => {
       check: { text: "核查对过 12/12" },
     });
     expect(port.world().messages.lunwen?.at(-1)).toMatchObject({ kind: "result" });
-    // The finished job is also the newest entry in 成果.
-    expect(port.world().results[0]).toMatchObject({ title: "改论文格式", chatId: "lunwen" });
   });
 
   it("stops through 正在停… and leaves a stopped status that can resume", async () => {

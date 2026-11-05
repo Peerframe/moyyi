@@ -1,4 +1,4 @@
-// What the mock backend does when a settings or plugin control is used. Pure functions over the
+// What the mock backend does when a settings, automation or plugin control is used. Pure functions over the
 // world, so the port only commits their result and tests can call them directly.
 import type {
   ChatWorld,
@@ -30,6 +30,7 @@ function mapPages(world: ChatWorld, change: (page: Page) => Page): ChatWorld {
   return {
     ...world,
     settings: world.settings.map((page) => change(page) as SettingsPage),
+    automations: world.automations.map((page) => change(page) as PluginPage),
     plugins: world.plugins.map((page) => change(page) as PluginPage),
   };
 }
@@ -51,7 +52,7 @@ const mapProviders = (page: Page, change: (provider: Provider) => Provider): Pag
 
 /** The option chosen for a choice anywhere on the pages, or undefined if there is none. */
 export function chosen(world: ChatWorld, choiceId: string): string | undefined {
-  for (const page of [...world.settings, ...world.plugins])
+  for (const page of [...world.settings, ...world.automations, ...world.plugins])
     for (const group of page.groups)
       for (const block of group.blocks) {
         const choices =
@@ -83,10 +84,7 @@ function summarize(world: ChatWorld): ChatWorld {
         ? `${who} · 新对话每次问你`
         : `${who} · 新对话用 ${model?.replace("DeepSeek ", "")}`;
     })(),
-    background: (() => {
-      const timers = linesOf(page("background")).filter((l) => l.id.startsWith("timer.") && !l.off);
-      return `同时做 ${chosen(world, "jobs.parallel")} · ${timers.length} 件定时`;
-    })(),
+    background: `同时做 ${chosen(world, "jobs.parallel")}`,
     budget:
       chosen(world, "budget.default") === "每次问我"
         ? "新项目每次问你给多少"
@@ -138,6 +136,57 @@ function connectedControls(id: string): readonly Control[] {
     { id: `${id}.rekey`, label: "换密钥" },
     { id: `${id}.disconnect`, label: "断开", tone: "danger" },
   ];
+}
+
+/** The chat each sample automation starts its work in. */
+const AUTOMATION_CHAT: Record<string, string> = {
+  brief: "moyyi",
+  format: "lunwen",
+  excerpt: "dushu",
+};
+
+function automate(
+  world: ChatWorld,
+  id: string,
+  verb: string,
+  ids: { next: (prefix: string) => string },
+): ChatWorld {
+  const found = world.automations.find((a) => a.id === id);
+  if (!found) return world;
+  if (verb === "delete")
+    return { ...world, automations: world.automations.filter((a) => a !== found) };
+  if (verb === "run") {
+    const chatId = AUTOMATION_CHAT[id];
+    if (!chatId) return world;
+    const notice: Message = {
+      id: ids.next("s"),
+      kind: "service",
+      text: `你让「${found.name}」现在跑一次 · 计划卡马上到`,
+    };
+    return {
+      ...world,
+      messages: { ...world.messages, [chatId]: [...(world.messages[chatId] ?? []), notice] },
+    };
+  }
+  const toggle = found.toggle;
+  if (verb !== "toggle" || !toggle) return world;
+  const enabled = !found.enabled;
+  const when = found.summary.replace(/^已暂停 · /, "");
+  return {
+    ...world,
+    automations: world.automations.map((a) =>
+      a === found
+        ? {
+            ...a,
+            enabled,
+            summary: enabled ? when : `已暂停 · ${when}`,
+            toggle: enabled
+              ? { id: toggle.id, label: "暂停" }
+              : { id: toggle.id, label: "继续", tone: "primary" },
+          }
+        : a,
+    ),
+  };
 }
 
 /** Folder grants: revoking one also leaves a line in the chat it was given in. */
@@ -192,22 +241,7 @@ export function press(
   if (scope === "memory" && verb === "delete")
     return mapPages(world, (page) => mapLines(page, (line) => (line.id === lineId ? null : line)));
 
-  if (scope === "timer" && verb === "pause")
-    return summarize(
-      mapPages(world, (page) =>
-        mapLines(page, (line) => {
-          if (line.id !== lineId) return line;
-          const paused = !line.off;
-          const sub = (line.sub ?? "").replace(/^已暂停 · /, "");
-          return {
-            ...line,
-            off: paused,
-            sub: paused ? `已暂停 · ${sub}` : sub,
-            controls: relabel(line.controls, controlId, paused ? "继续" : "暂停") ?? [],
-          };
-        }),
-      ),
-    );
+  if (scope === "automation") return automate(world, item, verb, ids);
 
   if (scope === "skill" && verb === "toggle")
     return summarize(

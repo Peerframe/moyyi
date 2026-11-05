@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { chatTestState as snapshot } from "./chat-test-state.ts";
-import { artifactControlId, projectChatWorld } from "./chat-world.ts";
+import { projectChatWorld } from "./chat-world.ts";
 
 describe("desktop Chat state projection", () => {
   it("loads without introducing sample chats, messages, providers or jobs", () => {
@@ -204,42 +204,40 @@ describe("desktop Chat state projection", () => {
     expect(text).not.toContain('"keyField"');
   });
 
-  it("lists the open session's created files in 成果 with their recorded state", () => {
+  it("lists one project per working folder and nothing under 自动化", () => {
+    const base = snapshot();
     const world = projectChatWorld(
       snapshot({
-        artifacts: {
+        sessions: {
+          ...base.sessions,
           items: [
+            ...base.sessions.items,
             {
-              effectId: "e1",
-              path: "/projects/actual-project/报告.md",
-              afterHash: "a",
-              state: "current",
+              sessionId: "session-b",
+              workspaceRoot: "/projects/other",
+              lastActivityAt: "2026-11-03T01:00:00.000Z",
+              promptPreview: null,
             },
             {
-              effectId: "e2",
-              path: "/projects/actual-project/notes/草稿.txt",
-              afterHash: "b",
-              state: "unchecked",
+              sessionId: "session-c",
+              workspaceRoot: "/projects/actual-project",
+              lastActivityAt: "2026-11-02T01:00:00.000Z",
+              promptPreview: null,
             },
           ],
-          offset: 0,
-          hasMore: false,
         },
       }),
     );
-    expect(
-      world.results.map((result) => [result.title, result.chatId, result.files[0]?.state]),
-    ).toEqual([
-      ["报告.md", "session-a", "current"],
-      ["草稿.txt", "session-a", "unknown"],
+    expect(world.projects.map((p) => [p.id, p.name, p.avatar.text])).toEqual([
+      ["/projects/actual-project", "actual-project", "a"],
+      ["/projects/other", "other", "o"],
     ]);
-    expect(world.results[0]?.files[0]?.controls?.map((control) => control.id)).toEqual([
-      artifactControlId("preview", "e1"),
-      artifactControlId("reveal", "e1"),
-      artifactControlId("save", "e1"),
+    expect(world.chats.map((chat) => chat.project)).toEqual([
+      "/projects/actual-project",
+      "/projects/other",
+      "/projects/actual-project",
     ]);
-    // No session open: nothing to list, and nothing is made up.
-    expect(projectChatWorld(snapshot({ activeSessionId: null })).results).toEqual([]);
-    expect(projectChatWorld(null).results).toEqual([]);
+    expect(world.automations).toEqual([]);
+    expect(projectChatWorld(null).projects).toEqual([]);
   });
 });

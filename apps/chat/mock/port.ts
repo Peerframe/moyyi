@@ -1,11 +1,9 @@
 // In-memory ChatPort. Every action changes the world the way the runtime will: receipts go from
 // recorded to taken, answers replace keys with a line, stop goes through 正在停… to a stopped
 // status, undo takes its dependents along or asks first. Timing is injectable so tests run instantly.
-
 import type { Chat, ChatAction, ChatPort, ChatWorld, Claim, Job, Key, Message } from "../port.ts";
 import { author, textOf } from "../text.ts";
 import { choose, press, saveKey } from "./page-actions.ts";
-import { resultsOf } from "./results.ts";
 
 export interface MockOptions {
   /** Runs `apply` after `delay` ms; tests pass a manual queue. */
@@ -116,9 +114,7 @@ export function createMockPort(initial: ChatWorld, options: MockOptions = {}): M
   const pendingUndo = new Map<string, readonly string[]>();
 
   const commit = (update: Update) => {
-    const next = update(world);
-    // 成果 follows the chats: a new result message is a new entry.
-    world = next.messages === world.messages ? next : { ...next, results: resultsOf(next) };
+    world = update(world);
     for (const listener of listeners) listener(world);
   };
   const later = (delay: number, update: Update) => schedule(delay, () => commit(update));

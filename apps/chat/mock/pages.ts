@@ -1,6 +1,13 @@
-// 设置 and 插件 as the mock backend holds them (boards S23–S32). Wording is the canvas wording; the
-// runtime will build the same pages from its own settings, grants and plugin registry.
-import type { Choice, Control, PageGroup, PluginPage, SettingsPage } from "../port.ts";
+// 设置, 自动化 and 插件 as the mock backend holds them (boards S23–S32, S34). Wording is the canvas
+// wording; the runtime will build the same pages from its own settings, schedules and plugins.
+import type {
+  AutomationPage,
+  Choice,
+  Control,
+  PageGroup,
+  PluginPage,
+  SettingsPage,
+} from "../port.ts";
 
 const GUARANTEE = "这些是 moyyi 的保证，设置里关不掉。";
 
@@ -229,22 +236,16 @@ function permissions(): SettingsPage {
 }
 
 function background(): SettingsPage {
-  const timed = (id: string, when: string, what: string, where: string) => ({
-    id,
-    text: `${when} · ${what}`,
-    sub: `在「${where}」里做`,
-    controls: [control(`${id}.pause`, "暂停")],
-  });
   return {
     id: "background",
-    name: "后台和定时",
+    name: "后台",
     icon: "timer",
-    summary: "同时做 3 件 · 2 件定时",
-    sub: "你不看着的时候，AI 怎么做事",
+    summary: "同时做 3 件",
+    sub: "你不看着的时候，AI 怎么做事。定时的事在 自动化 里",
     groups: [
       {
         title: "同时做几件事",
-        caption: "多出来的排队，在文件夹栏的「在做」里看得到。",
+        caption: "多出来的排队，在各自对话顶上的进度条里看得到。",
         blocks: [{ kind: "choice", choice: choice("jobs.parallel", ["1 件", "3 件", "5 件"], 1) }],
       },
       {
@@ -254,19 +255,6 @@ function background(): SettingsPage {
           {
             kind: "choice",
             choice: choice("jobs.atDecision", ["停下等你", "先做不用决定的部分"], 1),
-          },
-        ],
-      },
-      {
-        title: "定时的事",
-        caption: "在任意对话里说 /定时 加一件。到点在那个对话里开工，照常先给计划卡。",
-        blocks: [
-          {
-            kind: "lines",
-            lines: [
-              timed("timer.brief", "每天 8:00", "早报：今天要做什么", "moyyi"),
-              timed("timer.format", "每周一 9:00", "查一遍论文格式", "毕业论文"),
-            ],
           },
         ],
       },
@@ -528,6 +516,153 @@ function plugin(
 }
 
 const capability = (id: string, text: string, sub: string) => ({ id, text, sub });
+
+function automation(
+  page: Omit<AutomationPage, "enabled" | "toggle" | "icon" | "groups">,
+  enabled: boolean,
+  groups: readonly PageGroup[],
+): AutomationPage {
+  return {
+    ...page,
+    icon: "timer",
+    enabled,
+    toggle: control(
+      `automation.${page.id}.toggle`,
+      enabled ? "暂停" : "继续",
+      enabled ? undefined : "primary",
+    ),
+    groups: [
+      ...groups,
+      {
+        blocks: [
+          {
+            kind: "controls",
+            controls: [
+              control(`automation.${page.id}.run`, "现在跑一次"),
+              control(`automation.${page.id}.delete`, "删掉", "danger"),
+            ],
+          },
+        ],
+      },
+      locks(
+        ["到点照常先给计划卡；要你决定的那一步不会替你决定", "开工和结果都留在它的对话里"],
+        GUARANTEE,
+      ),
+    ],
+  };
+}
+
+/** 自动化 (S34): jobs that start on their own, each in the chat it belongs to. */
+export function automationPages(): readonly AutomationPage[] {
+  return [
+    automation(
+      {
+        id: "brief",
+        name: "早报",
+        summary: "每天 8:00 · 在「moyyi」",
+        sub: "每天 8:00 在「moyyi」里开工",
+      },
+      true,
+      [
+        {
+          title: "做什么",
+          caption: "你在 10月28日 说的：“每天早上告诉我要做什么”。",
+          blocks: [
+            { kind: "note", text: "看一遍各项目等你决定的事和今天到期的事，写成一条早报发给你。" },
+          ],
+        },
+        {
+          title: "什么时候",
+          blocks: [
+            {
+              kind: "choice",
+              choice: choice("automation.brief.when", ["每天", "工作日", "每周一"], 0),
+            },
+          ],
+        },
+        {
+          title: "最近几次",
+          blocks: [
+            {
+              kind: "lines",
+              lines: [
+                { id: "brief.run.today", text: "今天 8:00", sub: "发了早报 · 3 件事想问你" },
+                { id: "brief.run.yesterday", text: "昨天 8:00", sub: "发了早报 · 1 件等你决定" },
+              ],
+            },
+          ],
+        },
+      ],
+    ),
+    automation(
+      {
+        id: "format",
+        name: "查论文格式",
+        summary: "每周一 9:00 · 在「毕业论文」",
+        sub: "每周一 9:00 在「毕业论文」里开工",
+      },
+      true,
+      [
+        {
+          title: "做什么",
+          blocks: [{ kind: "note", text: "按学校模板查一遍 5 章的格式，只列出问题，不改文件。" }],
+        },
+        {
+          title: "什么时候",
+          blocks: [
+            {
+              kind: "choice",
+              choice: choice("automation.format.when", ["每天", "工作日", "每周一"], 2),
+            },
+          ],
+        },
+        {
+          title: "最近几次",
+          blocks: [
+            {
+              kind: "lines",
+              lines: [
+                { id: "format.run.last", text: "10月28日 9:00", sub: "找出 12 处 · 你让写作改了" },
+              ],
+            },
+          ],
+        },
+      ],
+    ),
+    automation(
+      {
+        id: "excerpt",
+        name: "读书会摘录",
+        summary: "已暂停 · 每周二 20:00 · 在「读书会资料」",
+        sub: "每周二 20:00 在「读书会资料」里开工",
+      },
+      false,
+      [
+        {
+          title: "做什么",
+          blocks: [{ kind: "note", text: "把这周读到的章节整理成摘录，每段对上原书页码。" }],
+        },
+        {
+          title: "什么时候",
+          blocks: [
+            { kind: "choice", choice: choice("automation.excerpt.when", ["每周二", "每周五"], 0) },
+          ],
+        },
+        {
+          title: "最近几次",
+          blocks: [
+            {
+              kind: "lines",
+              lines: [
+                { id: "excerpt.run.last", text: "周二 20:00", sub: "整理了 13 段 · 都对过页码" },
+              ],
+            },
+          ],
+        },
+      ],
+    ),
+  ];
+}
 
 export function pluginPages(): readonly PluginPage[] {
   return [

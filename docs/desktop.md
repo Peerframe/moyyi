@@ -26,9 +26,10 @@ See [ADR 0037](decisions/0037-installed-desktop-client.md),
 
 The installed moyyi Chat view reads the real local session catalog and recorded messages. Use
 **材料**, **权限**, **操作记录**, **完整历史** and **会话和回收站** in the session tools for existing
-desktop controls. **成果** in the rail lists the files the open session created, with their
-recorded state, preview, reveal in Finder and save; it uses the existing artifact actions. On
-macOS the window has no separate title bar: the traffic lights sit in the top of the rail, the
+desktop controls. The rail holds **全部** (every session by time), **项目** (one entry per
+working folder; opening it lists that folder's sessions), **自动化** (empty: this version cannot
+run scheduled jobs) and, at the bottom, **插件** and **设置**. Files a session created stay in
+that session's tools. On macOS the window has no separate title bar: the traffic lights sit in the top of the rail, the
 rail shows the window material, and the rail, list head and chat top drag the window.
 Open **设置 → 模型和密钥 → 打开模型设置** for model configuration, and **设置 → 记录和数据**
 for maintenance. Mock-only voice, multi-agent and scheduling actions are unavailable.

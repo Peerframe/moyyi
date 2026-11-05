@@ -1,8 +1,7 @@
 // The 小温 world from the study's scenario: day 1, 21:31, the moment boards S7 and S8 show.
 // Copy is taken from the canvas boards so the app and the boards say the same thing.
-import type { Chat, ChatWorld, Member, Message } from "../port.ts";
-import { pluginPages, settingsPages } from "./pages.ts";
-import { resultsOf } from "./results.ts";
+import type { Chat, ChatWorld, Member, Message, Project } from "../port.ts";
+import { automationPages, pluginPages, settingsPages } from "./pages.ts";
 
 export const MEMBERS: Readonly<Record<string, Member>> = {
   moyyi: {
@@ -47,12 +46,21 @@ const LUNWEN_MEMBERS = [
   { id: "hecha", role: "只读" },
 ] as const;
 
+/** The working folders, most recently used first. Each project chat names its folder. */
+const PROJECTS: readonly Project[] = [
+  { id: "p-lunwen", name: "毕业论文", avatar: { text: "论", tone: "accent" }, path: "~/论文" },
+  { id: "p-zufang", name: "租房", avatar: { text: "租", tone: "key" }, path: "~/租房" },
+  { id: "p-dushu", name: "读书会资料", avatar: { text: "群", tone: "quiet" }, path: "~/读书会" },
+  { id: "p-zuoye", name: "课程作业", avatar: { text: "课", tone: "quiet" }, path: "~/课程作业" },
+];
+
 export const CHATS: readonly Chat[] = [
   {
     id: "lunwen",
     kind: "project",
     name: "毕业论文",
     avatar: { text: "论", tone: "accent" },
+    project: "p-lunwen",
     time: "21:31",
     preview: { prefix: "decide", text: "参考文献用哪种格式" },
     decisions: 1,
@@ -92,6 +100,7 @@ export const CHATS: readonly Chat[] = [
     kind: "project",
     name: "租房",
     avatar: { text: "租", tone: "key" },
+    project: "p-zufang",
     time: "21:12",
     preview: { text: "核查：第 9 条改回原文了" },
     decisions: 0,
@@ -147,6 +156,7 @@ export const CHATS: readonly Chat[] = [
     kind: "project",
     name: "读书会资料",
     avatar: { text: "群", tone: "quiet" },
+    project: "p-dushu",
     time: "周二",
     preview: { text: "写作：本周摘录整理好了" },
     decisions: 0,
@@ -179,6 +189,7 @@ export const CHATS: readonly Chat[] = [
     kind: "project",
     name: "课程作业",
     avatar: { text: "课", tone: "quiet" },
+    project: "p-zuoye",
     time: "10月20日",
     preview: { text: "moyyi：交了，项目归档" },
     decisions: 0,
@@ -373,7 +384,6 @@ const ZUFANG: readonly Message[] = [
     job: "对租房合同",
     files: [{ name: "合同要点.md", count: "写了 9 条" }],
     check: { kind: "partial", text: "核查对过 8/9" },
-    undo: "reversible",
     claims: [
       {
         id: "z1",
@@ -584,7 +594,6 @@ const DUSHU: readonly Message[] = [
     job: "本周摘录",
     files: [{ name: "摘录-第6周.md", count: "13 段 · 按章节排" }],
     check: { kind: "cited", text: "13 段都对过原书页码" },
-    undo: "reversible",
     time: "周二",
   },
 ];
@@ -612,7 +621,6 @@ const ZUOYE: readonly Message[] = [
     ],
     check: { kind: "partial", text: "核查对过 10/12" },
     skipped: "第 2 题的图，你说自己画",
-    undo: "irreversible",
     time: "10月20日",
   },
   {
@@ -626,9 +634,11 @@ const ZUOYE: readonly Message[] = [
 ];
 
 export function xiaowenWorld(): ChatWorld {
-  const world: Omit<ChatWorld, "results"> = {
+  return {
     connection: { state: "online" },
     settings: settingsPages(),
+    projects: PROJECTS,
+    automations: automationPages(),
     plugins: pluginPages(),
     members: MEMBERS,
     chats: CHATS,
@@ -757,7 +767,6 @@ export function xiaowenWorld(): ChatWorld {
       },
     },
   };
-  return { ...world, results: resultsOf(world) };
 }
 
 /** Day 0 (board S12): only moyyi and 记忆 exist, and the moyyi chat opens by itself. */
@@ -801,6 +810,7 @@ export function firstRunWorld(): ChatWorld {
     jobs: [],
     changes: {},
     threads: {},
-    results: [],
+    projects: [],
+    automations: [],
   };
 }

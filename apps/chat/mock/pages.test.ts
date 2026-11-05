@@ -2,7 +2,6 @@ import { describe, expect, it } from "vitest";
 import type { ChatWorld, PageLine, PluginPage } from "../port.ts";
 import { chosen } from "./page-actions.ts";
 import { createMockPort } from "./port.ts";
-import { resultsOf } from "./results.ts";
 import { firstRunWorld, xiaowenWorld } from "./world.ts";
 
 function setup(world: ChatWorld = xiaowenWorld()) {
@@ -15,22 +14,23 @@ function setup(world: ChatWorld = xiaowenWorld()) {
   return { port, page, lines };
 }
 
-describe("设置 and 插件 on the mock backend", () => {
-  it("holds the eight sections and five plugins in rail order (S23–S32)", () => {
-    const { settings, plugins } = xiaowenWorld();
+describe("设置, 自动化 and 插件 on the mock backend", () => {
+  it("holds the eight sections, three automations and five plugins (S23–S32, S34)", () => {
+    const { settings, plugins, automations } = xiaowenWorld();
     expect(settings.map((p) => p.name)).toEqual([
       "模型和密钥",
       "关于我",
       "权限和确认",
-      "后台和定时",
+      "后台",
       "预算",
       "记录和数据",
       "通用",
       "关于 moyyi",
     ]);
     expect(plugins.map((p) => p.name)).toEqual(["文件", "命令行", "网页", "文档", "技能"]);
+    expect(automations.map((p) => p.name)).toEqual(["早报", "查论文格式", "读书会摘录"]);
     // Every choice and control id is unique: the runtime keys actions by them.
-    const ids = [...settings, ...plugins].flatMap((page) => [
+    const ids = [...settings, ...automations, ...plugins].flatMap((page) => [
       ...("toggle" in page && (page as PluginPage).toggle ? [(page as PluginPage).toggle?.id] : []),
       ...page.groups.flatMap((g) =>
         g.blocks.flatMap((b) => {
@@ -97,16 +97,8 @@ describe("设置 and 插件 on the mock backend", () => {
     expect(page("models")?.summary).toBe("还没连上模型 · 新对话用 Flash");
   });
 
-  it("pauses a scheduled job, switches skills and plugins, and deletes a memory", async () => {
+  it("switches skills and plugins, and deletes a memory", async () => {
     const { port, page, lines } = setup();
-    await port.act({ type: "control", controlId: "timer.brief.pause" });
-    expect(lines("background").find((l) => l.id === "timer.brief")).toMatchObject({
-      off: true,
-      sub: "已暂停 · 在「moyyi」里做",
-      controls: [{ label: "继续" }],
-    });
-    expect(page("background")?.summary).toBe("同时做 3 件 · 1 件定时");
-
     await port.act({ type: "control", controlId: "skill.weekly.toggle" });
     expect(lines("skills").find((l) => l.id === "skill.weekly")).toMatchObject({
       tag: "开着",
@@ -139,21 +131,26 @@ describe("设置 and 插件 on the mock backend", () => {
     expect(port.world().chats.find((c) => c.id === "moyyi")?.suggestions).toBeUndefined();
   });
 
-  it("lists every handed-over result in 成果, newest day first (S33)", () => {
-    const world = xiaowenWorld();
-    expect(world.results.map((r) => [r.day, r.title, r.by])).toEqual([
-      ["今天", "先对了第 1–2 章的引用", "hecha"],
-      ["今天", "对租房合同", "moyyi"],
-      ["周二", "本周摘录", "xiezuo"],
-      ["10月20日", "第 3 次作业", "moyyi"],
-    ]);
-    const rent = world.results.find((r) => r.chatId === "zufang");
-    expect(rent).toMatchObject({
-      messageId: "z-result",
-      files: [{ name: "合同要点.md", note: "写了 9 条" }],
-      check: { kind: "partial", text: "核查对过 8/9" },
-      undo: "reversible",
+  it("pauses, runs and deletes an automation in its own chat (S34)", () => {
+    const port = createMockPort(xiaowenWorld(), { schedule: () => undefined, now: () => "21:50" });
+    const brief = () => port.world().automations.find((a) => a.id === "brief");
+    void port.act({ type: "control", controlId: "automation.brief.toggle" });
+    expect(brief()).toMatchObject({ enabled: false, summary: "已暂停 · 每天 8:00 · 在「moyyi」" });
+    expect(brief()?.toggle).toMatchObject({ label: "继续", tone: "primary" });
+    void port.act({ type: "control", controlId: "automation.brief.toggle" });
+    expect(brief()).toMatchObject({ enabled: true, summary: "每天 8:00 · 在「moyyi」" });
+    void port.act({ type: "control", controlId: "automation.brief.run" });
+    expect(port.world().messages.moyyi?.at(-1)).toMatchObject({
+      kind: "service",
+      text: "你让「早报」现在跑一次 · 计划卡马上到",
     });
-    expect(resultsOf({ chats: [], messages: {} })).toEqual([]);
+    void port.act({ type: "control", controlId: "automation.brief.delete" });
+    expect(brief()).toBeUndefined();
+  });
+
+  it("keeps 后台 to how AIs work unattended; schedules live in 自动化", () => {
+    const background = xiaowenWorld().settings.find((p) => p.id === "background");
+    expect(background).toMatchObject({ name: "后台", summary: "同时做 3 件" });
+    expect(JSON.stringify(background)).not.toContain("timer.");
   });
 });
