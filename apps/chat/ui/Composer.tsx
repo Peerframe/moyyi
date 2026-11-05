@@ -1,9 +1,10 @@
 // The message field (boards S5, S10, S16, S18). The right slot shows send while there is text,
 // 停下 while a job runs, otherwise the microphone. `/` lists actions, `@` lists the project's AIs,
 // the paperclip asks what a file or folder grants before anything is sent.
-import { useEffect, useRef, useState } from "react";
+import { type ChangeEvent, type KeyboardEvent, useEffect, useRef, useState } from "react";
 import type { Chat, Member } from "../port.ts";
 import { Icon } from "./icons.tsx";
+import { actionError, type ChatIntegration, supports } from "./integration.ts";
 import { Avatar } from "./parts.tsx";
 
 const COMMANDS = [
@@ -39,7 +40,8 @@ export interface ComposerProps {
   readonly running: { readonly who: string; readonly step: string } | null;
   readonly sticker: string;
   readonly onDraft: (text: string) => void;
-  readonly onSend: (text: string) => void;
+  readonly onSend: (text: string) => Promise<void>;
+  readonly integration?: ChatIntegration | undefined;
   readonly onStop: () => void;
   readonly onAttach: (name: string, access: "view" | "edit") => void;
   readonly onCommand: (command: string) => void;
@@ -54,13 +56,43 @@ export interface ComposerProps {
   readonly onCancelEdit: () => void;
 }
 
+/** Keep the draft until the host has accepted the message; rejection leaves it intact. */
+export async function submitComposerMessage(
+  text: string,
+  send: (text: string) => Promise<void>,
+  clear: () => void,
+  isCurrent: () => boolean = () => true,
+): Promise<void> {
+  await send(text);
+  if (isCurrent()) clear();
+}
+
 export function Composer(props: ComposerProps) {
-  const { chat, members, draft, running, onDraft, onSend } = props;
+  const { chat, members, draft, running, onDraft: writeDraft, onSend, integration } = props;
+  const currentDraft = useRef(draft);
+  currentDraft.current = draft;
+  const onDraft = (text: string) => {
+    currentDraft.current = text;
+    writeDraft(text);
+  };
+  const [sending, setSending] = useState(false);
+  const [sendError, setSendError] = useState<string | null>(null);
+  const sendingNow = useRef(false);
+  const canSend = !sending && (!integration || (integration.canSend && !integration.busy));
+  const commandItems = integration
+    ? [
+        { name: "/预算", note: "查看当前会话的限制" },
+        ...(supports(integration, "undo") ? [{ name: "/撤回", note: "查看可撤回的改动" }] : []),
+        { name: "/新会话", note: "选择目录，开始新的会话" },
+      ]
+    : COMMANDS;
   const [popup, setPopup] = useState<Popup>(null);
   const [grant, setGrant] = useState<Grant | null>(null);
   const [selected, setSelected] = useState(0);
   const [recording, setRecording] = useState<number | null>(null);
   const input = useRef<HTMLInputElement>(null);
+  const nativeInput = useRef<HTMLTextAreaElement>(null);
+  const focusInput = () => (integration ? nativeInput.current : input.current)?.focus();
   const attachButton = useRef<HTMLButtonElement>(null);
   const suggest = Boolean(chat.suggestions?.length) && !draft && recording === null;
 
@@ -81,6 +113,7 @@ export function Composer(props: ComposerProps) {
           type="button"
           className="mc-glass mc-round-pill ch-readonly-action"
           title="项目已归档，只能看"
+          disabled={!supports(integration, "archive")}
           onClick={props.onReopen}
         >
           <span className="muted">已归档 ·</span> 重新打开
@@ -95,10 +128,10 @@ export function Composer(props: ComposerProps) {
     .filter((m): m is Member => Boolean(m));
   const commands =
     draft.startsWith("/") && !draft.includes(" ")
-      ? COMMANDS.filter((c) => c.name.startsWith(draft))
+      ? commandItems.filter((c) => c.name.startsWith(draft))
       : [];
   const mentions =
-    mention && chat.kind === "project"
+    mention && chat.kind === "project" && !integration
       ? projectMembers.filter((m) => m.name.startsWith(mention[2] ?? ""))
       : [];
   const suggestions = commands.length ? commands.length : mentions.length;
@@ -114,15 +147,78 @@ export function Composer(props: ComposerProps) {
     if (member && mention) {
       setSelected(0);
       onDraft(`${draft.slice(0, draft.length - (mention[2]?.length ?? 0) - 1)}@${member.name} `);
-      input.current?.focus();
+      focusInput();
     }
   };
-  const send = () => {
-    const text = draft.trim();
-    if (!text) return;
-    onSend(text);
-    onDraft("");
+  const sendText = async (text: string, clearDraft: boolean) => {
+    if (!text || !canSend || sendingNow.current) return;
+    sendingNow.current = true;
+    setSending(true);
+    setSendError(null);
+    try {
+      const sentDraft = draft;
+      await submitComposerMessage(
+        text,
+        onSend,
+        () => {
+          if (clearDraft) onDraft("");
+        },
+        () => currentDraft.current === sentDraft,
+      );
+    } catch (cause) {
+      setSendError(actionError(cause));
+    } finally {
+      sendingNow.current = false;
+      setSending(false);
+    }
   };
+  const send = () => void sendText(draft.trim(), true);
+  const onKeyDown = (event: KeyboardEvent<HTMLInputElement | HTMLTextAreaElement>) => {
+    if (suggestions && (event.key === "ArrowDown" || event.key === "ArrowUp")) {
+      event.preventDefault();
+      setSelected(
+        (value) => (value + (event.key === "ArrowDown" ? 1 : suggestions - 1)) % suggestions,
+      );
+    } else if (suggestions && (event.key === "Enter" || event.key === "Tab")) {
+      event.preventDefault();
+      pick(selected);
+    } else if (
+      event.key === "Enter" &&
+      (event.metaKey || event.ctrlKey) &&
+      !event.nativeEvent.isComposing
+    ) {
+      // The design system sends on ⌘ Enter only, never on plain Enter.
+      event.preventDefault();
+      send();
+    } else if (event.key === "ArrowUp" && !draft && supports(integration, "edit")) {
+      event.preventDefault();
+      props.onEditLast();
+    } else if (event.key === "Escape") {
+      if (popup || grant) {
+        event.stopPropagation();
+        setPopup(null);
+        setGrant(null);
+      } else if (props.replyTo || props.editing) {
+        event.stopPropagation();
+        props.onCancelReply();
+        props.onCancelEdit();
+      }
+    }
+  };
+
+  const fieldProps = {
+    id: `compose-${chat.id}`,
+    disabled: sending,
+    placeholder: chat.placeholder,
+    value: draft,
+    autoComplete: "off",
+    onChange: (event: ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
+      setSelected(0);
+      onDraft(event.target.value);
+    },
+    onKeyDown,
+  };
+
   const closePopup = () => {
     setPopup(null);
     attachButton.current?.focus();
@@ -130,9 +226,14 @@ export function Composer(props: ComposerProps) {
 
   return (
     <div className="ch-composer-wrap">
+      {sendError ? (
+        <p className="ch-integration-error" role="alert">
+          {sendError}
+        </p>
+      ) : null}
       {popup === "menu" ? (
         <div className="mc-suggest ch-popup mc-glass" role="menu" aria-label="操作">
-          {COMMANDS.map((command) => (
+          {commandItems.map((command) => (
             <button
               key={command.name}
               type="button"
@@ -224,30 +325,33 @@ export function Composer(props: ComposerProps) {
           aria-label="表情和贴纸"
         >
           <div className="ch-emoji-tabs">
-            <span className="mc-chip">贴纸</span>
+            {!integration ? <span className="mc-chip">贴纸</span> : null}
             <span className="mc-chip">表情</span>
           </div>
-          <div className="ch-sticker-row">
-            {STICKERS.map((moment) => (
-              <button
-                key={moment}
-                type="button"
-                aria-label={`贴纸：${moment}`}
-                title={moment}
-                onClick={() => {
-                  setPopup(null);
-                  onSend(`[贴纸：${moment}]`);
-                }}
-              >
-                <img src={props.sticker} alt="" />
-              </button>
-            ))}
-          </div>
+          {!integration ? (
+            <div className="ch-sticker-row">
+              {STICKERS.map((moment) => (
+                <button
+                  key={moment}
+                  type="button"
+                  aria-label={`贴纸：${moment}`}
+                  title={moment}
+                  onClick={() => {
+                    setPopup(null);
+                    void sendText(`[贴纸：${moment}]`, false);
+                  }}
+                >
+                  <img src={props.sticker} alt="" />
+                </button>
+              ))}
+            </div>
+          ) : null}
           <div className="ch-emoji-row">
             {EMOJI.map((emoji) => (
               <button
                 key={emoji}
                 type="button"
+                disabled={sending}
                 onClick={() => {
                   setPopup(null);
                   onDraft(draft + emoji);
@@ -344,7 +448,10 @@ export function Composer(props: ComposerProps) {
           aria-label="添加文件"
           title="添加文件"
           aria-expanded={popup === "attach"}
-          onClick={() => setPopup(popup === "attach" ? null : "attach")}
+          disabled={integration?.busy}
+          onClick={() =>
+            integration ? integration.onAttach() : setPopup(popup === "attach" ? null : "attach")
+          }
         >
           <Icon.attach size={18} />
         </button>
@@ -360,7 +467,7 @@ export function Composer(props: ComposerProps) {
                   className="mc-chip ch-chip-button"
                   onClick={() => {
                     onDraft(text);
-                    input.current?.focus();
+                    focusInput();
                   }}
                 >
                   {text}
@@ -385,53 +492,18 @@ export function Composer(props: ComposerProps) {
               <label htmlFor={`compose-${chat.id}`} className="ch-sr">
                 发消息
               </label>
-              <input
-                ref={input}
-                id={`compose-${chat.id}`}
-                type="text"
-                placeholder={chat.placeholder}
-                value={draft}
-                maxLength={4000}
-                autoComplete="off"
-                onChange={(event) => {
-                  setSelected(0);
-                  onDraft(event.target.value);
-                }}
-                onKeyDown={(event) => {
-                  if (suggestions && (event.key === "ArrowDown" || event.key === "ArrowUp")) {
-                    event.preventDefault();
-                    setSelected(
-                      (value) =>
-                        (value + (event.key === "ArrowDown" ? 1 : suggestions - 1)) % suggestions,
-                    );
-                  } else if (suggestions && (event.key === "Enter" || event.key === "Tab")) {
-                    event.preventDefault();
-                    pick(selected);
-                  } else if (
-                    event.key === "Enter" &&
-                    (event.metaKey || event.ctrlKey) &&
-                    !event.nativeEvent.isComposing
-                  ) {
-                    // The design system sends on ⌘ Enter only, never on plain Enter.
-                    event.preventDefault();
-                    send();
-                  } else if (event.key === "ArrowUp" && !draft) {
-                    event.preventDefault();
-                    props.onEditLast();
-                  } else if (event.key === "Escape") {
-                    if (popup || grant) {
-                      event.stopPropagation();
-                      setPopup(null);
-                      setGrant(null);
-                    } else if (props.replyTo || props.editing) {
-                      event.stopPropagation();
-                      props.onCancelReply();
-                      props.onCancelEdit();
-                    }
-                  }
-                }}
-              />
-              {running && !draft ? (
+              {integration ? (
+                <textarea
+                  {...fieldProps}
+                  ref={nativeInput}
+                  className="ch-native-compose-input"
+                  rows={1}
+                  maxLength={16000}
+                />
+              ) : (
+                <input {...fieldProps} ref={input} type="text" maxLength={4000} />
+              )}
+              {running && !draft && !integration ? (
                 <MicButton
                   inside
                   onRecord={setRecording}
@@ -443,6 +515,7 @@ export function Composer(props: ComposerProps) {
                 type="button"
                 className="mc-icon-btn"
                 aria-label="表情和贴纸"
+                disabled={sending}
                 title="表情和贴纸"
                 aria-expanded={popup === "emoji"}
                 onClick={() => setPopup(popup === "emoji" ? null : "emoji")}
@@ -457,7 +530,12 @@ export function Composer(props: ComposerProps) {
             type="button"
             className="mc-send mc-round"
             aria-label="发送"
-            title="⌘ Enter 发送"
+            title={
+              integration && !canSend
+                ? "当前会话暂时不能发送，请检查连接、任务和权限状态"
+                : "⌘ Enter 发送"
+            }
+            disabled={!canSend}
             onClick={send}
           >
             <Icon.send size={18} />
@@ -466,11 +544,21 @@ export function Composer(props: ComposerProps) {
           <button type="button" className="mc-stop mc-glass mc-round-pill" onClick={props.onStop}>
             停下
           </button>
+        ) : integration ? (
+          <button
+            type="button"
+            className="mc-mic mc-round"
+            disabled
+            aria-label="语音尚未接入"
+            title="当前版本尚未接入语音输入"
+          >
+            <Icon.mic size={18} />
+          </button>
         ) : (
           <MicButton onRecord={setRecording} onRelease={props.onVoice} recording={recording} />
         )}
       </div>
-      {running && draft.trim() ? (
+      {running && draft.trim() && !integration ? (
         <span className="ch-caption">{withSpace(running.who)}做完这一步就看你的话</span>
       ) : null}
     </div>

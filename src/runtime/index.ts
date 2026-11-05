@@ -20,11 +20,12 @@ import {
   type RunLimits,
   type RuntimeEvent,
   type Scheduler,
+  type SessionId,
   type SessionManagement,
   type SessionStore,
   type Timestamp,
 } from "../contracts/index.ts";
-import { AgentCore } from "../core/index.ts";
+import { AgentCore, type CoreDeps, pathToHead } from "../core/index.ts";
 import { defaultInstructionsPlugin } from "../plugins/default-instructions/index.ts";
 import { documentsPlugin } from "../plugins/documents/index.ts";
 import { fsPlugin } from "../plugins/fs/index.ts";
@@ -52,6 +53,7 @@ import {
 } from "../plugins/provider-kimi/index.ts";
 import { createShellPlugin } from "../plugins/shell/index.ts";
 import { skillsPlugin } from "../plugins/skills/index.ts";
+import { subagentPlugin } from "../plugins/subagent/index.ts";
 import { todoPlugin } from "../plugins/todo/index.ts";
 import { toolOutputPlugin } from "../plugins/tool-output/index.ts";
 import { createWebPlugin } from "../plugins/web/index.ts";
@@ -69,8 +71,10 @@ import { NodeWorkspaceDocuments } from "./documents/documents.ts";
 import { NodeWorkspaceFiles } from "./files/files.ts";
 import { NodeWorkspaceWrites } from "./files/writes.ts";
 import { collectContext } from "./guidance/instructions.ts";
+import { touchedDirectories } from "./guidance/nested.ts";
 import { type SkillSelection, selectSkills } from "./guidance/skills.ts";
 import { historyPage, sessionCatalog, sessionManagementError, sessionResults } from "./history.ts";
+import { type HookConfig, HookRunner, validateHooks } from "./hooks.ts";
 import { connectMcpServers, type McpServerConfig } from "./mcp/index.ts";
 import { type PluginEntry, PluginRegistry, type PluginStatus } from "./plugins.ts";
 import { WorkspacePreconditions } from "./preconditions.ts";
@@ -86,6 +90,7 @@ import {
 } from "./providers/model-recording.ts";
 import { SessionApprovals } from "./session-approvals.ts";
 import { sessionFacts } from "./session-facts.ts";
+import { DEFAULT_SUBAGENT_LIMITS, type SubagentLimits, SubagentRunner } from "./subagents.ts";
 import { RuntimeToolResults, readToolDeadlines } from "./tool-results.ts";
 import { AjvArgumentValidator } from "./validation.ts";
 import { NodeWebAccess, type WebAccessOptions } from "./web/web.ts";
@@ -173,6 +178,26 @@ export interface RuntimeOptions {
    * when the runtime is created and stopped when it closes; see docs/mcp.md.
    */
   readonly mcp?: { readonly servers: readonly McpServerConfig[] };
+  /**
+   * Opt-in read-only sub-agents (`agent` tool) in child sessions of the same store; `true` uses
+   * the default limits. Each sub-agent uses its own model requests.
+   */
+  readonly subagents?: boolean | Partial<SubagentLimits>;
+  /**
+   * Opt-in: also load AGENTS.md from subdirectories this session's recorded tool calls touched,
+   * under the same read grant and limits as the root file (at most 8 files, 32 KiB in total).
+   */
+  readonly nestedInstructions?: boolean;
+  /**
+   * Owner notification commands for approval requests, finished tools and finished runs. They
+   * observe only: they cannot block or change a run, and their output never reaches the model.
+   */
+  readonly hooks?: readonly HookConfig[];
+  /**
+   * Opt-in final-answer accounting: the answer-only request (and the evidence answer) also asks
+   * the model to account for every user requirement. Off until the quality gate supports it.
+   */
+  readonly finalAccounting?: boolean;
   readonly developmentPlugins?: readonly DevelopmentPlugin[];
   readonly plugins?: readonly PluginEntry[];
   readonly model?: ModelOrigin;
@@ -410,6 +435,7 @@ export async function createRuntime(
       }),
     },
     { plugin: createWebPlugin(options.web?.search?.origin) },
+    ...(options.subagents ? [{ plugin: subagentPlugin }] : []),
     ...(anthropic ? [{ plugin: anthropic }] : []),
     ...(deepseek ? [{ plugin: deepseek }] : []),
     ...(kimi ? [{ plugin: kimi }] : []),
@@ -437,6 +463,7 @@ export async function createRuntime(
 
   const listeners = new Set<(event: RuntimeEvent) => void>();
   const diagnostics: string[] = [...(mcp?.diagnostics ?? [])];
+  const hooks = options.hooks?.length ? new HookRunner(options.hooks, diagnostics) : undefined;
   const activeRuns = new Set<string>();
   const commands = new Set<Promise<void>>();
   let closed = false;
@@ -445,7 +472,17 @@ export async function createRuntime(
   let closing: Promise<void> | undefined;
   let toolResults: RuntimeToolResults | undefined;
   const sessionApprovals = new SessionApprovals();
+  /** Sessions in plan mode: their non-read effects are denied before approval. */
+  const planSessions = new Set<SessionId>();
   const backgroundProcesses = workspaceProcesses ? new BackgroundProcesses() : undefined;
+  // Validate hooks before any server or store starts, so a bad entry fails creation cleanly.
+  if (options.hooks?.length) validateHooks(options.hooks);
+  const subagentLimits = options.subagents
+    ? validateSubagentLimits({
+        ...DEFAULT_SUBAGENT_LIMITS,
+        ...(options.subagents === true ? {} : options.subagents),
+      })
+    : undefined;
   const emit = (event: RuntimeEvent) => {
     toolResults?.observe(event);
     sessionApprovals.observe(event);
@@ -453,6 +490,7 @@ export async function createRuntime(
     if (event.type === "run.finished") activeRuns.delete(event.runId);
     // Observers receive an immutable copy, so mutating a displayed approval cannot alter work.
     const copy = freeze(JSON.parse(canonicalizeJson(event))) as RuntimeEvent;
+    hooks?.observe(copy);
     for (const listener of listeners) {
       try {
         const returned: unknown = listener(copy);
@@ -503,6 +541,14 @@ export async function createRuntime(
 
   let ownedStore: SqliteSessionStore | undefined;
   let core: AgentCore | undefined;
+  let subagentCore: AgentCore | undefined;
+  const subagentRunner = subagentLimits
+    ? new SubagentRunner(
+        () => subagentCore,
+        () => store,
+        subagentLimits,
+      )
+    : undefined;
   let recorder: RecordingModelClient | undefined;
   let selectedProvider: ModelProvider | undefined;
   let selectedClient: ModelClient | undefined;
@@ -540,21 +586,29 @@ export async function createRuntime(
         registry.evaluatePolicy({ tool, profile, args, phase: "prepare" }),
       ),
     beforeExecute: (tool, profile, action, effectId, args) =>
-      stricter(
-        sessionApprovals.lift(
-          base.beforeExecute(tool, profile, action, effectId, args),
-          tool,
-          effectId,
-          args,
-        ),
-        registry.evaluatePolicy({ tool, profile, args, phase: "execute" }),
-      ),
+      profile.class !== "read" &&
+      planSessions.has(sessionApprovals.sessionOf(effectId) ?? ("" as SessionId))
+        ? {
+            kind: "deny",
+            reason:
+              "Plan mode: changes, commands and external calls are disabled until the owner approves the plan.",
+          }
+        : stricter(
+            sessionApprovals.lift(
+              base.beforeExecute(tool, profile, action, effectId, args),
+              tool,
+              effectId,
+              args,
+            ),
+            registry.evaluatePolicy({ tool, profile, args, phase: "execute" }),
+          ),
   };
   const unload = async () => {
     for (const entry of [...plugins].reverse()) await registry.unload(entry.name);
   };
   const wireCore = async (allowMissing: boolean) => {
     core = undefined;
+    subagentCore = undefined;
     if (!model || !store) return;
     const provider = registry.providers.find((item) => item.id === model?.provider);
     const profile = provider?.models.find(
@@ -636,14 +690,14 @@ export async function createRuntime(
       store,
       options.clock ?? { now: () => new Date().toISOString() as Timestamp },
     );
-    core = new AgentCore({
+    const deps: CoreDeps = {
       model: selectedClient,
       ...(recorder ? { settleModel: recorder.flush.bind(recorder) } : {}),
       profile,
       tools: registry.tools,
       store,
       policy,
-      context: new MinimalContextBuilder(),
+      context: new MinimalContextBuilder({ finalAccounting: options.finalAccounting === true }),
       validator: new AjvArgumentValidator(),
       preconditions: options.preconditions ?? new WorkspacePreconditions(),
       files,
@@ -693,17 +747,42 @@ export async function createRuntime(
           options.projectInstructions !== false,
           skills,
           workspaceNavigation,
+          options.nestedInstructions && options.projectInstructions !== false
+            ? await nestedDirectoriesOf(store, sessionId)
+            : undefined,
         )),
       ],
       ...(options.limits === undefined ? {} : { limits: options.limits }),
       ...(evidenceAnswer ? { evidenceAnswer } : {}),
+      ...(options.finalAccounting ? { finalAccounting: true } : {}),
       ...(options.autoCompact
         ? {
             autoCompactRatio:
               options.autoCompact === true ? 0.7 : options.autoCompact.thresholdRatio,
           }
         : {}),
+    };
+    core = new AgentCore({
+      ...deps,
+      ...(subagentRunner ? { subagents: subagentRunner } : {}),
     });
+    if (subagentRunner && subagentLimits) {
+      // The child core offers only read-class tools and never `agent`, so a sub-agent cannot
+      // change files, run commands, use the web or start further sub-agents.
+      const { evidenceAnswer: _parentOnly, ...shared } = deps;
+      subagentCore = new AgentCore({
+        ...shared,
+        tools: deps.tools.filter((tool) => tool.effect.class === "read" && tool.name !== "agent"),
+        limits: {
+          ...options.limits,
+          maxModelRequests: subagentLimits.maxRequests,
+          timeoutMs: subagentLimits.timeoutMs,
+        },
+        emit: (event) => {
+          if (subagentRunner.observe(event)) emit(event);
+        },
+      });
+    }
     if (!recovered) {
       await core.recover();
       recovered = true;
@@ -957,13 +1036,28 @@ export async function createRuntime(
           return Promise.resolve();
         }
       }
-      if (command.type === "session.load") sessionApprovals.forget(command.sessionId);
+      if (command.type === "session.mode") {
+        if (command.mode === "plan") planSessions.add(command.sessionId);
+        else planSessions.delete(command.sessionId);
+        return Promise.resolve();
+      }
+      if (command.type === "session.load") {
+        sessionApprovals.forget(command.sessionId);
+        planSessions.delete(command.sessionId);
+      }
+      // A sub-agent's approval belongs to the child core that is waiting for it.
+      const owner =
+        command.type === "approval.respond" &&
+        subagentRunner?.owns(command.effectId) &&
+        subagentCore
+          ? subagentCore
+          : core;
       if (command.type === "approval.respond" && command.scope === "session") {
         if (command.decision !== "approve") {
           reject(command.type, "Only an approval can be remembered for the session");
           return Promise.resolve();
         }
-        const current = core;
+        const current = owner;
         let rejected = false;
         const watch = (event: RuntimeEvent) => {
           if (event.type === "command.rejected" && event.command === "approval.respond")
@@ -981,7 +1075,7 @@ export async function createRuntime(
           })(),
         );
       }
-      return track(core.send(command));
+      return track(owner.send(command));
     },
     subscribe(listener) {
       listeners.add(listener);
@@ -1000,8 +1094,10 @@ export async function createRuntime(
         await Promise.all([...commands]);
         await stopping;
         await core?.close();
+        await subagentCore?.close();
         await backgroundProcesses?.closeAll();
         await mcp?.close();
+        await hooks?.close();
         try {
           await recorder?.flush();
         } finally {
@@ -1031,4 +1127,27 @@ function freeze(value: unknown): unknown {
     Object.freeze(value);
   }
   return value;
+}
+
+function validateSubagentLimits(limits: SubagentLimits): SubagentLimits {
+  const within = (value: number, min: number, max: number) =>
+    Number.isSafeInteger(value) && value >= min && value <= max;
+  if (
+    !within(limits.maxRequests, 2, 200) ||
+    !within(limits.timeoutMs, 10_000, 3_600_000) ||
+    !within(limits.maxConcurrent, 1, 8) ||
+    !within(limits.maxPerRun, 1, 64)
+  )
+    throw Error(
+      "Sub-agent limits: maxRequests 2..200, timeoutMs 10000..3600000, maxConcurrent 1..8, maxPerRun 1..64",
+    );
+  return Object.freeze({ ...limits });
+}
+
+async function nestedDirectoriesOf(
+  store: SessionStore | undefined,
+  sessionId: SessionId,
+): Promise<readonly string[]> {
+  const snapshot = await store?.loadSession(sessionId);
+  return snapshot ? touchedDirectories(pathToHead(snapshot)) : [];
 }

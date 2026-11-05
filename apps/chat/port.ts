@@ -117,6 +117,8 @@ export type Message =
   | (Base & {
       readonly kind: "service";
       readonly text: string;
+      /** Raw tool output, initially collapsed and rendered as escaped text. */
+      readonly detail?: string;
       readonly tone?: "danger";
       /** A day line (今天, 昨天): it stays under the header while its messages scroll by. */
       readonly day?: boolean;
@@ -414,8 +416,8 @@ export interface SettingsPage {
 
 export interface PluginPage extends SettingsPage {
   readonly enabled: boolean;
-  /** 停用 or 启用. */
-  readonly toggle: Control;
+  /** Present only when the host supports changing this capability. */
+  readonly toggle?: Control;
 }
 
 export type ChatAction =

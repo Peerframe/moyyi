@@ -192,8 +192,9 @@ export function readToolDeadlines(scheduler: Scheduler, milliseconds = 30_000): 
     throw Error("Read tool timeout must be a positive bounded integer");
   return {
     start(tool, signal) {
-      // The document parser already owns process termination and its deadline.
-      if (tool === "read_document") return undefined;
+      // These own their deadlines: the document parser, MCP calls and sub-agent runs.
+      if (tool === "read_document" || tool === "agent" || tool.startsWith("mcp__"))
+        return undefined;
       const controller = new AbortController();
       let expired = false;
       const dispose = scheduler.deadline(milliseconds, () => {

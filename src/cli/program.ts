@@ -5,6 +5,8 @@ import { connectDaemon, type DaemonConnection, startDaemonServer } from "../daem
 import { createCliRuntime, loadCliHost } from "../runtime/cli-host.ts";
 import { fileDevelopmentPlugin, watchDevelopmentPlugins } from "../runtime/development.ts";
 import type { Runtime } from "../runtime/index.ts";
+import { type CustomCommand, loadCommands } from "./commands.ts";
+import { machineOutput } from "./machine-output.ts";
 import { type CliOptions, defaultDataDirectory, parseCliOptions, usage } from "./options.ts";
 import { createCliSession, terminalText } from "./session.ts";
 
@@ -31,6 +33,14 @@ function grantNotices(options: CliOptions): string[] {
     );
   if (options.timeoutSeconds !== undefined)
     lines.push(`budget | At most ${options.timeoutSeconds} s per turn.`);
+  if (options.finalAccounting)
+    lines.push("context | Final answers account for every stated requirement (experimental).");
+  if (options.nestedInstructions)
+    lines.push("context | Nested AGENTS.md from subdirectories this session works in.");
+  if (options.subagents)
+    lines.push(
+      "agents | Read-only sub-agents: up to 12 requests and 300 s each, 4 at once, 16 per turn.",
+    );
   if (options.autoCompact)
     lines.push(
       "budget | Automatic compaction: older turns and earlier steps are summarized near the context window.",
@@ -58,6 +68,9 @@ async function localRuntime(
       allowShell: options.allowShell,
       allowShellWrite: options.allowShellWrite,
       autoCompact: options.autoCompact,
+      subagents: options.subagents,
+      nestedInstructions: options.nestedInstructions,
+      finalAccounting: options.finalAccounting,
       webOrigins: options.webOrigins,
       ...(options.shellToolchain ? { shellToolchain: options.shellToolchain } : {}),
       ...(options.webDns ? { webDns: options.webDns } : {}),
@@ -148,8 +161,21 @@ export async function main(argv: readonly string[]): Promise<number> {
     return 0;
   }
   if (options.mode === "daemon") return runDaemon(options);
+  let commands: ReadonlyMap<string, CustomCommand>;
+  try {
+    commands = loadCommands(options.commandDirectories);
+  } catch (error) {
+    process.stderr.write(
+      `moyyi: ${terminalText(error instanceof Error ? error.message : "Invalid commands directory")}\n`,
+    );
+    return 2;
+  }
   const tty = !!process.stdin.isTTY && !!process.stdout.isTTY;
   const interactive = options.interactive || (options.prompt === undefined && tty);
+  if (interactive && options.output !== "text") {
+    process.stderr.write("moyyi: --output json and stream-json need a one-shot prompt.\n");
+    return 2;
+  }
   if (interactive && !tty) {
     process.stderr.write(
       "moyyi: Interactive mode needs a terminal; supply a prompt or pipe input for one-shot mode.\n",
@@ -220,7 +246,14 @@ export async function main(argv: readonly string[]): Promise<number> {
       })
     : undefined;
   terminal?.setPrompt("moyyi> ");
+  const machine =
+    options.output === "text"
+      ? undefined
+      : machineOutput(options.output, (line) => process.stdout.write(line));
+  const offMachine = machine ? runtime.subscribe((event) => machine.observe(event)) : () => {};
   const write = (text: string) => {
+    // Machine-readable modes keep stdout for JSON; human lines are not printed.
+    if (machine) return;
     if (promptVisible) {
       process.stdout.write("\n");
       promptVisible = false;
@@ -240,6 +273,9 @@ export async function main(argv: readonly string[]): Promise<number> {
     ...(options.sessionId ? { sessionId: options.sessionId } : {}),
     ...(initialPrompt === undefined ? {} : { initialPrompt }),
     developmentPluginNames: development.map((entry) => entry.name),
+    commands,
+    continueLatest: options.continueLatest,
+    planMode: options.planMode,
   });
   const pending = new Set<string>();
   let reloadTask: Promise<void> | undefined;
@@ -326,7 +362,10 @@ export async function main(argv: readonly string[]): Promise<number> {
       );
     }
     terminal?.resume();
-    return await session.done;
+    const code = await session.done;
+    offMachine();
+    machine?.finish(code);
+    return code;
   } catch {
     await session.end();
     return 1;

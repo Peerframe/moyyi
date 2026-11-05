@@ -6,6 +6,7 @@ import type { Chat, ChatAction, ChatWorld, Job, Message } from "../port.ts";
 import { author, textOf } from "../text.ts";
 import { Composer } from "./Composer.tsx";
 import { Icon } from "./icons.tsx";
+import { actionError, type ChatIntegration, supports } from "./integration.ts";
 import type { MessageActions, Run } from "./messages.tsx";
 import { MessageView } from "./messages.tsx";
 import type { PanelFrame } from "./Panel.tsx";
@@ -28,7 +29,9 @@ export interface ConversationProps {
   readonly onPanel: (frame: PanelFrame) => void;
   readonly onBack: () => void;
   readonly onOpenChat: (chatId: string) => void;
-  readonly act: (action: ChatAction) => void;
+  readonly act: (action: ChatAction) => Promise<void>;
+  readonly integration?: ChatIntegration | undefined;
+  readonly feedback?: string | null | undefined;
 }
 
 const CARDS = new Set<Message["kind"]>(["status", "plan", "result", "decision", "change"]);
@@ -86,7 +89,8 @@ interface Menu {
 }
 
 export function Conversation(props: ConversationProps) {
-  const { world, chat, act } = props;
+  const { world, chat, integration } = props;
+  const act = (action: ChatAction) => void props.act(action).catch(() => undefined);
   const all = world.messages[chat.id] ?? [];
   const [pinnedAt, setPinnedAt] = useState(0);
   const [flash, setFlash] = useState<string | null>(null);
@@ -168,12 +172,13 @@ export function Conversation(props: ConversationProps) {
     if (element && atBottom) element.scrollTop = element.scrollHeight;
   }, [bottomHeight]);
 
-  // New messages keep the view pinned to the bottom when it already was.
-  // biome-ignore lint/correctness/useExhaustiveDependencies: follows the message count only
+  // A streamed answer updates in place, sometimes before an unchanged status or error row.
+  const contentRevision = all.map((message) => `${message.id}:${textOf(message).length}`).join("|");
+  // biome-ignore lint/correctness/useExhaustiveDependencies: only follow new content while already at the bottom
   useLayoutEffect(() => {
     const element = column.current;
     if (element && atBottom) element.scrollTop = element.scrollHeight;
-  }, [all.length]);
+  }, [contentRevision]);
 
   useEffect(() => {
     if (props.searchOpen) searchInput.current?.focus();
@@ -211,14 +216,20 @@ export function Conversation(props: ConversationProps) {
     return (from && world.members[from]?.name) ?? "moyyi";
   };
   const copy = (text: string, done: string) => {
-    navigator.clipboard?.writeText(text).catch(() => undefined);
-    setNotice(done);
+    if (!navigator.clipboard) {
+      setNotice("当前无法访问剪贴板。");
+      return;
+    }
+    void navigator.clipboard.writeText(text).then(
+      () => setNotice(done),
+      (cause: unknown) => setNotice(actionError(cause)),
+    );
   };
 
   const actions: MessageActions = {
     answer: (messageId, key) => {
       const message = find(messageId);
-      if (message?.kind === "result") {
+      if (message?.kind === "result" && !integration) {
         const claim = message.claims?.find((c) => !c.check) ?? message.claims?.[0];
         if (key === 1) setNotice("在 Finder 里打开了论文文件夹");
         else if (claim) props.onPanel({ kind: "claim", messageId, claimId: claim.id });
@@ -226,7 +237,12 @@ export function Conversation(props: ConversationProps) {
         return;
       }
       act({ type: "answer", messageId, key });
-      if (message?.kind === "decision" && message.text.includes("毕业论文") && key === 0)
+      if (
+        !integration &&
+        message?.kind === "decision" &&
+        message.text.includes("毕业论文") &&
+        key === 0
+      )
         props.onOpenChat("lunwen");
     },
     react: (messageId, emoji) => act({ type: "react", messageId, emoji }),
@@ -242,7 +258,8 @@ export function Conversation(props: ConversationProps) {
   };
 
   const command = (name: string) => {
-    if (name === "/撤回") props.onPanel({ kind: "undo" });
+    if (name === "/新会话" && integration) integration.onNew();
+    else if (name === "/撤回") props.onPanel({ kind: "undo" });
     else if (name === "/预算") props.onInfo();
     else if (name === "/对账") {
       const result = all.find(
@@ -256,6 +273,7 @@ export function Conversation(props: ConversationProps) {
   };
 
   const editLast = () => {
+    if (!supports(integration, "edit")) return;
     const last = [...all].reverse().find((m) => m.kind === "out" && !m.retracted && !m.failed);
     if (last?.kind !== "out") return;
     setEditing(last.id);
@@ -346,6 +364,12 @@ export function Conversation(props: ConversationProps) {
             </button>
           </div>
         </header>
+        {integration?.header}
+        {props.feedback ? (
+          <p className="ch-integration-error" role="alert">
+            {props.feedback}
+          </p>
+        ) : null}
         {props.searchOpen ? (
           <search className="mc-glass ch-search-bar">
             <div className="mc-composer ch-search">
@@ -415,7 +439,7 @@ export function Conversation(props: ConversationProps) {
             onStop={() => act({ type: "stop", jobId: shownJob.id })}
           />
         ) : null}
-        {world.connection.state === "offline" ? (
+        {world.connection.state === "offline" && !integration ? (
           <div className="ch-offline" role="status">
             <span className="ch-offline-title">没连上网络</span>
             <span className="muted">
@@ -484,6 +508,7 @@ export function Conversation(props: ConversationProps) {
                   run={grouped[index] ?? { first: true }}
                   actions={actions}
                   sticker={props.sticker}
+                  renderText={integration?.renderText}
                 />
               </div>
             );
@@ -493,6 +518,7 @@ export function Conversation(props: ConversationProps) {
           <MessageMenu
             menu={menu}
             message={menuMessage}
+            integration={integration}
             onClose={() => setMenu(null)}
             onReply={() => setReplyTo(menuMessage.id)}
             onCopy={() => copy(textOf(menuMessage), "已复制")}
@@ -561,11 +587,13 @@ export function Conversation(props: ConversationProps) {
         ) : null}
       </div>
       <div ref={bottom} className="mc-chat-bottom">
+        {integration?.beforeComposer}
         {selected ? (
           <SelectionBar
             count={selected.length}
             forwarding={forwarding}
             projects={projects}
+            integration={integration}
             onCheck={() => {
               const result = selected
                 .map(find)
@@ -579,16 +607,24 @@ export function Conversation(props: ConversationProps) {
               else setNotice("选中的消息里没有带出处的结论");
             }}
             onMemory={() => {
-              act({ type: "save-memory", messageIds: selected });
-              setSelected(null);
-              setNotice(`存进记忆了 · ${selected.length} 条，带着出处`);
+              void props
+                .act({ type: "save-memory", messageIds: selected })
+                .then(() => {
+                  setSelected(null);
+                  if (!integration) setNotice(`存进记忆了 · ${selected.length} 条，带着出处`);
+                })
+                .catch(() => undefined);
             }}
             onForward={() => setForwarding(true)}
             onForwardTo={(chatId) => {
-              act({ type: "forward", messageIds: selected, chatId });
-              setSelected(null);
-              setForwarding(false);
-              setNotice("转过去了 · 出处跟着走，文件权限不跟着走");
+              void props
+                .act({ type: "forward", messageIds: selected, chatId })
+                .then(() => {
+                  setSelected(null);
+                  setForwarding(false);
+                  if (!integration) setNotice("转过去了 · 出处跟着走，文件权限不跟着走");
+                })
+                .catch(() => undefined);
             }}
             onCopy={() => {
               copy(
@@ -610,6 +646,7 @@ export function Conversation(props: ConversationProps) {
           <Composer
             chat={chat}
             members={world.members}
+            integration={integration}
             draft={props.draft}
             running={
               shownJob
@@ -618,9 +655,15 @@ export function Conversation(props: ConversationProps) {
             }
             sticker={props.sticker}
             onDraft={props.onDraft}
-            onSend={(text) => {
-              if (editing) act({ type: "edit", messageId: editing, text });
-              else act({ type: "send", chatId: chat.id, text, ...(replyTo ? { replyTo } : {}) });
+            onSend={async (text) => {
+              if (editing) await props.act({ type: "edit", messageId: editing, text });
+              else
+                await props.act({
+                  type: "send",
+                  chatId: chat.id,
+                  text,
+                  ...(replyTo ? { replyTo } : {}),
+                });
               setEditing(null);
               setReplyTo(null);
               setAtBottom(true);
@@ -713,6 +756,7 @@ function PinnedBar({
 function MessageMenu({
   menu,
   message,
+  integration,
   onClose,
   onReply,
   onCopy,
@@ -724,6 +768,7 @@ function MessageMenu({
 }: {
   readonly menu: Menu;
   readonly message: Message;
+  readonly integration?: ChatIntegration | undefined;
   readonly onClose: () => void;
   readonly onReply: () => void;
   readonly onCopy: () => void;
@@ -737,15 +782,19 @@ function MessageMenu({
   useEffect(() => first.current?.focus({ preventScroll: true }), []);
   const own = message.kind === "out" && !message.retracted;
   const items: { label: string; run: () => void; danger?: boolean }[] = [
-    { label: "回复", run: onReply },
+    ...(!integration ? [{ label: "回复", run: onReply }] : []),
     { label: "复制", run: onCopy },
-    { label: "复制链接", run: onLink },
-    ...(message.kind === "text" || message.kind === "result"
+    ...(!integration ? [{ label: "复制链接", run: onLink }] : []),
+    ...((message.kind === "text" || message.kind === "result") && supports(integration, "forward")
       ? [{ label: "转发", run: onForward }]
       : []),
     { label: "选择", run: onSelect },
-    ...(own && message.receipt !== "taken" ? [{ label: "改这句", run: onEdit }] : []),
-    ...(own ? [{ label: "收回这句话", run: onRetract, danger: true }] : []),
+    ...(own && message.receipt !== "taken" && supports(integration, "edit")
+      ? [{ label: "改这句", run: onEdit }]
+      : []),
+    ...(own && supports(integration, "retract")
+      ? [{ label: "收回这句话", run: onRetract, danger: true }]
+      : []),
   ];
   return (
     <>
@@ -799,6 +848,7 @@ function SelectionBar({
   count,
   forwarding,
   projects,
+  integration,
   onCheck,
   onMemory,
   onForward,
@@ -809,6 +859,7 @@ function SelectionBar({
   readonly count: number;
   readonly forwarding: boolean;
   readonly projects: readonly Chat[];
+  readonly integration?: ChatIntegration | undefined;
   readonly onCheck: () => void;
   readonly onMemory: () => void;
   readonly onForward: () => void;
@@ -841,13 +892,31 @@ function SelectionBar({
         aria-label={`已选 ${count} 条`}
       >
         <span className="ch-grow num">已选 {count} 条</span>
-        <button type="button" className="mc-key" onClick={onCheck}>
+        <button
+          type="button"
+          className="mc-key"
+          disabled={!supports(integration, "check")}
+          title={supports(integration, "check") ? undefined : "当前版本尚未接入逐条核对"}
+          onClick={onCheck}
+        >
           对账
         </button>
-        <button type="button" className="mc-key mc-key-primary" onClick={onMemory}>
+        <button
+          type="button"
+          className="mc-key mc-key-primary"
+          disabled={!supports(integration, "save-memory")}
+          title={supports(integration, "save-memory") ? undefined : "当前版本尚未接入记忆"}
+          onClick={onMemory}
+        >
           存进记忆
         </button>
-        <button type="button" className="mc-key" onClick={onForward}>
+        <button
+          type="button"
+          className="mc-key"
+          disabled={!supports(integration, "forward")}
+          title={supports(integration, "forward") ? undefined : "当前版本尚未接入转发"}
+          onClick={onForward}
+        >
           转发
         </button>
         <button type="button" className="mc-key" onClick={onCopy}>

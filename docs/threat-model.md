@@ -70,6 +70,34 @@ Background commands outlive their call but not their grant: they stay in the san
 any grant change, their own time limit or runtime close, and are reachable only from the
 session that started them.
 
+## Plan mode
+
+[ADR 0054](decisions/0054-plan-mode.md) plan mode only removes authority: non-read effects of the
+session are denied before approval, `/always` rules and `allow` grants included. Only an owner
+command leaves it.
+
+## Regex search
+
+[ADR 0055](decisions/0055-regex-search.md) lets the model supply a regular expression to `search`.
+The pattern is a cost risk, not an authority one: it only tests text the runtime already read under
+its usual checks. Matching runs in a worker thread with a heap limit and a per-search time budget,
+so a backtracking pattern cannot block cancellation or other runs; running out is reported as
+incomplete evidence.
+
+## Notification hooks
+
+[ADR 0053](decisions/0053-notification-hooks.md) hooks are owner programs from trusted host code
+that observe events. They receive event data (paths, commands, approval previews) but cannot answer
+approvals or change results; model output cannot add or trigger a hook beyond causing ordinary
+events. Changes a hook makes are outside the journal.
+
+## Sub-agents
+
+[ADR 0051](decisions/0051-read-only-subagents.md) sub-agents run on a core with only read-class
+tools, so a delegated brief, or a prompt injection it reads, cannot write, run commands, reach
+the web or start further sub-agents. Their reports are model output returned to the main agent,
+not verified results. Request, time, concurrency and per-run limits bound their cost.
+
 ## MCP servers
 
 [ADR 0050](decisions/0050-mcp-client.md) addresses T3 for MCP: a tool's class and approval come

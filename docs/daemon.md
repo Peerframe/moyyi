@@ -24,6 +24,7 @@ moyyi --connect --session SESSION_ID -i
 ```
 
 Use `--data DIR` on both sides when the data directory is not the default `~/.moyyi/data`.
+`--commands DIR` works on the connecting client, since prompt templates are client-side.
 Session commands (`/new`, `/resume`, `/sessions`, `/results`, `/compact`, `/cancel`, `/approve`,
 `/deny`) work as in the local CLI.
 
@@ -31,7 +32,7 @@ Session commands (`/new`, `/resume`, `/sessions`, `/results`, `/compact`, `/canc
 
 - **Grants and host.** `--connect` rejects `--demo`, `--host`, `-C`, `--allow-*`, `--web-*`,
   `--shell-toolchain`, `--approve-reads`, `--max-requests`, `--timeout`, `--auto-compact`,
-  `--long` and development options. Restart the
+  `--long`, `--subagents`, `--nested-instructions` and development options. Restart the
   daemon to change them. The client prints the daemon's grant lines on connect.
 - **Workspace.** The daemon creates sessions only in its own workspace. `/resume` loads any
   recorded session of the store, as in the local CLI, under the daemon's grants.

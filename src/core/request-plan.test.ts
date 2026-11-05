@@ -147,3 +147,14 @@ describe("finished response outcome", () => {
     ).toEqual({ completeStop: true, hasAnswer: false });
   });
 });
+
+describe("opt-in final-answer accounting", () => {
+  it("appends the accounting request only to the answer-only notice", async () => {
+    const { FINAL_ACCOUNTING } = await import("./request-plan.ts");
+    const final = planRequest({ ...base, requests: 3 });
+    const middle = planRequest({ ...base, requests: 1 });
+    expect(requestBudgetNotice(final, 4, true).endsWith(FINAL_ACCOUNTING)).toBe(true);
+    expect(requestBudgetNotice(final, 4)).not.toContain("account for it");
+    expect(requestBudgetNotice(middle, 4, true)).toBe(requestBudgetNotice(middle, 4));
+  });
+});

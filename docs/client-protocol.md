@@ -46,6 +46,7 @@ recorded in diagnostics, not a reason to grant an action or stop the durable exe
 | `run.cancel` | Address the active run; cancellation preserves completed effects and partial output |
 | `approval.respond` | Echo both the displayed effect ID and exact digest, with approve or deny; optional `scope: "session"` (approve only) remembers the tool, or the exact shell command, for that session in memory ([ADR 0049](decisions/0049-long-running-sessions.md)) |
 | `session.compact` | Explicit idle request; one selected-model summary call, with normal cancellation/budget rules |
+| `session.mode` | `plan` denies every non-read effect of the session before approval until set back to `default`; memory only ([ADR 0054](decisions/0054-plan-mode.md)) |
 | `plugin.reload` | Only a host-configured development loader, while idle; no project auto-discovery |
 
 `command.rejected` is a normal protocol observation and does not mean the command executed.

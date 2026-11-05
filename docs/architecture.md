@@ -41,7 +41,7 @@ cli / desktop host ─┐   (future: automation — also a client)
 | Daemon | `src/daemon` | Local server for one runtime over a private Unix socket, its client and event routing ([ADR 0048](decisions/0048-local-daemon.md)); wire protocol in `src/contracts/wire.ts` |
 | CLI | `src/cli` | Terminal client, in process or connected to the daemon |
 | Desktop client | `apps/desktop` | Sandboxed React renderer, validated local bridge and a trusted host using the public runtime; installed acceptance is tracked separately |
-| moyyi Chat | `apps/chat` | The next interface, built from the moyyi Chat design system over its own `ChatPort`; runs on an in-memory mock backend and is not wired to the runtime yet |
+| moyyi Chat | `apps/chat` | Browser-only interface over `ChatPort`; a standalone mock preview and a desktop renderer adapter use the same views |
 
 ### Runtime layout
 
@@ -65,7 +65,7 @@ Imports between them stay inside the runtime layer and are not separate boundary
 | `provider-scripted` | model provider | exists (tests and evals) |
 | `provider-deepseek` (Responses subset; [ADR 0007](decisions/0007-first-model-provider.md)) | model provider | implemented; connection/continuation evidence and task-quality gaps are separate in the system overview |
 | `default-instructions` (original working guidance) | context source | implemented; static |
-| `project-instructions` (workspace root AGENTS.md only) | context source | implemented; refreshed per request |
+| `project-instructions` (workspace root AGENTS.md; opt-in nested files from touched directories, [ADR 0052](decisions/0052-nested-instructions.md)) | context source | implemented; refreshed per request |
 | `workspace-navigation` (opt-in bounded file paths) | context source | implemented; refreshed per request; real-model quality unverified |
 | `fs` (read, list, search; create, edit, undo) | tools | read-only merged in batch 5; writes merged in phase 2 |
 | `todo` | read-class planning tool | whole-list task updates in recorded calls; no second context copy |
@@ -75,13 +75,18 @@ Imports between them stay inside the runtime layer and are not separate boundary
 | `provider-anthropic` | model provider | merged in phase 5; live acceptance pending |
 | `provider-kimi` (Chat Completions; [ADR 0036](decisions/0036-kimi-chat-provider.md)) | model provider | opt-in K3.1 Pro; connection and task-quality evidence tracked separately |
 | `web` (fetch, search) | tools; runtime capability and base policy | merged in phase 5 |
+| `subagent` (`agent`, read-only child sessions; [ADR 0051](decisions/0051-read-only-subagents.md)) | tool; runtime `SubagentRunner` and `subagents` port | implemented; opt-in; offline-tested, not live-task-verified |
 | `skills` (explicitly activated Agent Skills documents) | context source | implemented; refreshed per request |
 | `mcp` (owner-configured stdio MCP servers; [ADR 0050](decisions/0050-mcp-client.md)) | tools; runtime transport, `mcp` port and `McpPolicy` | implemented; offline-tested, not live-task-verified |
 | `memory` (Hermes Agent–inspired learning) | context source, event observer | later |
 
-Not plugins, because they are clients of the protocol: GUI, automation and scheduling. Sub-agents
-need a decision when they are scheduled: most likely a tool that starts a child session through
-the client protocol.
+Runtime-level, not plugins: owner notification hooks (`RuntimeOptions.hooks`, observe-only external
+commands; [ADR 0053](decisions/0053-notification-hooks.md)) and CLI prompt templates (`--commands`,
+client-side text expansion).
+
+Not plugins, because they are clients of the protocol: GUI, automation and scheduling.
+Sub-agents are the `agent` tool: a read-only child session on a second core with only read-class
+tools ([ADR 0051](decisions/0051-read-only-subagents.md)).
 
 ## Extension points
 
@@ -106,6 +111,13 @@ See [CLI usage](cli.md) and [ADR 0011](decisions/0011-interactive-cli-and-develo
 Development reload is incompatible with recording/replay and refreshes only explicit ESM entries.
 
 ### Desktop feature composition
+
+The desktop renderer composition may import `apps/chat` views and their display-only `ChatPort`.
+Its adapter projects validated `DesktopState` and dispatches through the existing `DesktopBridge`.
+This dependency is one-way: Chat imports only its own files and React, and desktop host, preload,
+contracts and feature modules do not import Chat. The renderer still cannot import runtime, Node
+or Electron. Existing feature slots retain native pickers, approval identities, recovery and
+settings validation; unsupported preview actions cannot create receipts in the installed app.
 
 [ADR 0045](decisions/0045-desktop-feature-modules.md) implements the desktop UI slots planned
 in ADR 0005. `apps/desktop/feature-list.json` generates separate static contract, host, native and

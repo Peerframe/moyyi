@@ -37,6 +37,7 @@ export const hostFeature = defineHostFeature({
         effectId: command.effectId as EffectId,
         digest: command.digest as ActionDigest,
         decision: command.decision,
+        ...(command.scope ? { scope: command.scope } : {}),
       });
       if (host.approvals.get(command.effectId)?.digest === command.digest)
         host.approvals.delete(command.effectId);

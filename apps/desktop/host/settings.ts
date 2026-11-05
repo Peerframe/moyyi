@@ -142,6 +142,9 @@ export function createModelConfiguration(home: string, vault: CredentialVault) {
           }),
       workspaceNavigation: true,
       ...(value.settings.evidenceAnswer ? { evidenceAnswer: true } : {}),
+      ...(value.settings.autoCompact ? { autoCompact: true } : {}),
+      ...(value.settings.subagents ? { subagents: true } : {}),
+      ...(value.settings.nestedInstructions ? { nestedInstructions: true } : {}),
       dataDirectory: join(home, ".moyyi/deepseek-data"),
       limits: {
         maxModelRequests: value.settings.maxRequests,

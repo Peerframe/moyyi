@@ -332,12 +332,36 @@ describe("desktop data-only model configuration", () => {
     chmodSync(path, 0o644);
     expect((await createModelConfiguration(home, vault).current()).connection.ready).toBe(false);
   });
+  it("stores long-task switches only when enabled and maps them to runtime options", async () => {
+    const { config } = fixture();
+    const saved = await config.save({
+      ...settings,
+      maxRequests: 200,
+      timeoutMs: 3_600_000,
+      autoCompact: true,
+      subagents: true,
+      nestedInstructions: true,
+    });
+    expect(saved.runtimeOptions).toMatchObject({
+      autoCompact: true,
+      subagents: true,
+      nestedInstructions: true,
+      limits: { maxModelRequests: 200, timeoutMs: 3_600_000 },
+    });
+    const off = await config.save({ ...settings, autoCompact: false, subagents: false });
+    expect(off.settings).toEqual(settings);
+    expect(off.runtimeOptions.autoCompact).toBeUndefined();
+    expect(off.runtimeOptions.subagents).toBeUndefined();
+  });
+
   it("rejects executable/arbitrary endpoint options, invalid budgets and secret-bearing wrong shapes", () => {
     for (const v of [
       { ...settings, baseUrl: "https://bad.example" },
       { ...settings, getApiKey: "code" },
-      { ...settings, maxRequests: 9 },
-      { ...settings, timeoutMs: 300_001 },
+      { ...settings, maxRequests: 201 },
+      { ...settings, timeoutMs: 3_600_001 },
+      { ...settings, autoCompact: "yes" },
+      { ...settings, subagents: 1 },
       { ...settings, preset: "auto" },
       { ...settings, maxRequests: 0 },
       { ...settings, kimiReasoningEffort: "high" },

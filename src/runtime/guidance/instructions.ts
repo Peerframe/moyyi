@@ -5,6 +5,7 @@ import type {
   ContextSource,
   EffectProfile,
   ModelProfile,
+  NestedInstructionsResult,
   PermissionPolicy,
   ProjectInstructionsResult,
   SkillSource,
@@ -12,6 +13,10 @@ import type {
 } from "../../contracts/index.ts";
 import type { NodeWorkspaceFiles } from "../files/files.ts";
 import type { SkillSelection } from "./skills.ts";
+
+/** At most this many nested AGENTS.md files, and bytes in total, enter one request. */
+export const MAX_NESTED_FILES = 8;
+export const MAX_NESTED_BYTES = 32 * 1024;
 
 const readProfile: EffectProfile = Object.freeze({
   class: "read",
@@ -30,6 +35,8 @@ export async function collectContext(
   enabled: boolean,
   skills?: SkillSelection,
   navigationEnabled = false,
+  /** Touched subdirectories whose AGENTS.md may load; undefined when the host disabled it. */
+  nestedDirectories?: readonly string[],
 ): Promise<readonly ContextSection[]> {
   const controller = new AbortController();
   const scopeSignal = AbortSignal.any([signal, controller.signal]);
@@ -84,6 +91,79 @@ export async function collectContext(
     }
     const result = await pending;
     guard();
+    return result;
+  };
+  let nestedPending: Promise<readonly NestedInstructionsResult[]> | undefined;
+  let nestedRevision: number | undefined;
+  const nestedPaths = new Set<string>();
+  const nestedAllowed = (path: string) => {
+    try {
+      return (
+        policy.beforeContextRead?.(path).kind === "allow" &&
+        policy.beforePrepare("read", readProfile, { path }).kind === "allow"
+      );
+    } catch {
+      return false;
+    }
+  };
+  const nestedGuard = () => {
+    live();
+    if (
+      policy.revision?.() !== nestedRevision ||
+      [...nestedPaths].some((path) => !nestedAllowed(path))
+    )
+      throw Error("Project instruction read permission changed");
+  };
+  const readNested = async (): Promise<readonly NestedInstructionsResult[]> => {
+    live();
+    if (!nestedPending) {
+      nestedRevision = policy.revision?.();
+      nestedPending = (async () => {
+        const result: NestedInstructionsResult[] = [];
+        let total = 0;
+        for (const scope of nestedDirectories ?? []) {
+          live();
+          if (result.length >= MAX_NESTED_FILES) break;
+          const path = `${scope}/AGENTS.md`;
+          if (!nestedAllowed(path)) {
+            result.push(Object.freeze({ kind: "blocked", scope }));
+            continue;
+          }
+          nestedPaths.add(path);
+          let file: Awaited<ReturnType<NodeWorkspaceFiles["readNestedInstructions"]>>;
+          try {
+            file = await files.readNestedInstructions(
+              { workspaceRoot, signal: scopeSignal },
+              scope,
+              nestedGuard,
+            );
+          } catch {
+            // Unreadable or oversized: report it as blocked rather than inventing its contents.
+            result.push(Object.freeze({ kind: "blocked", scope }));
+            continue;
+          }
+          if (!file) continue;
+          if (total + file.bytesRead > MAX_NESTED_BYTES) {
+            result.push(Object.freeze({ kind: "blocked", scope }));
+            break;
+          }
+          total += file.bytesRead;
+          nestedGuard();
+          result.push(
+            Object.freeze({
+              kind: "loaded",
+              scope,
+              path,
+              text: file.text,
+              sha256: createHash("sha256").update(file.text).digest("hex"),
+            }),
+          );
+        }
+        return Object.freeze(result);
+      })();
+    }
+    const result = await nestedPending;
+    nestedGuard();
     return result;
   };
   let skillPending: Promise<readonly SkillSource[]> | undefined;
@@ -229,7 +309,14 @@ export async function collectContext(
             workspaceRoot,
             profile,
             signal: scopeSignal,
-            ...(enabled ? { projectInstructions: Object.freeze({ readRoot }) } : {}),
+            ...(enabled
+              ? {
+                  projectInstructions: Object.freeze({
+                    readRoot,
+                    ...(nestedDirectories ? { readNested } : {}),
+                  }),
+                }
+              : {}),
             ...(skills?.enabled.length ? { skills: Object.freeze({ readEnabled }) } : {}),
             ...(navigationEnabled
               ? { workspaceNavigation: Object.freeze({ read: readNavigation }) }
@@ -241,6 +328,7 @@ export async function collectContext(
     ]);
     live();
     if (pending) guard();
+    if (nestedPending) nestedGuard();
     if (skillPending) skillGuard();
     if (navigationPending) navigationGuard();
     return sections.flat();

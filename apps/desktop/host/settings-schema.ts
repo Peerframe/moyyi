@@ -1,11 +1,14 @@
+import { SETTINGS_LIMITS } from "../features/settings/contract.ts";
 import type { DesktopSettings } from "../shared.ts";
+
+const SWITCHES = ["autoCompact", "subagents", "nestedInstructions"] as const;
 
 export function parseSettings(value: unknown): DesktopSettings {
   if (!value || typeof value !== "object" || Array.isArray(value))
     throw Error("Invalid model settings");
   const fields = Object.getOwnPropertyDescriptors(value);
   const required = ["preset", "maxRequests", "timeoutMs"];
-  const keys = [...required, "kimiReasoningEffort", "evidenceAnswer"];
+  const keys = [...required, "kimiReasoningEffort", "evidenceAnswer", ...SWITCHES];
   if (
     Reflect.ownKeys(value).some((key) => typeof key !== "string" || !keys.includes(key)) ||
     Object.values(fields).some((field) => !("value" in field)) ||
@@ -22,10 +25,11 @@ export function parseSettings(value: unknown): DesktopSettings {
     typeof v.preset !== "string" ||
     !Number.isSafeInteger(v.maxRequests) ||
     Number(v.maxRequests) < 1 ||
-    Number(v.maxRequests) > 8 ||
+    Number(v.maxRequests) > SETTINGS_LIMITS.maxRequests ||
     !Number.isSafeInteger(v.timeoutMs) ||
-    Number(v.timeoutMs) < 30_000 ||
-    Number(v.timeoutMs) > 300_000 ||
+    Number(v.timeoutMs) < SETTINGS_LIMITS.minTimeoutMs ||
+    Number(v.timeoutMs) > SETTINGS_LIMITS.maxTimeoutMs ||
+    SWITCHES.some((key) => fields[key] !== undefined && typeof v[key] !== "boolean") ||
     (fields.kimiReasoningEffort !== undefined && effort !== "low" && effort !== "high") ||
     (v.preset === "flash" && effort === "high") ||
     (fields.evidenceAnswer !== undefined && typeof v.evidenceAnswer !== "boolean") ||
@@ -39,6 +43,9 @@ export function parseSettings(value: unknown): DesktopSettings {
     // Keep low settings readable by the previous desktop release without a migration.
     ...(effort === "high" ? { kimiReasoningEffort: "high" as const } : {}),
     ...(v.evidenceAnswer === true ? { evidenceAnswer: true } : {}),
+    // Like evidenceAnswer, switches are stored only when on, so default settings stay readable
+    // by earlier releases.
+    ...Object.fromEntries(SWITCHES.filter((key) => v[key] === true).map((key) => [key, true])),
   };
 }
 

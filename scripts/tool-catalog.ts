@@ -5,6 +5,7 @@ import { documentsPlugin } from "../src/plugins/documents/index.ts";
 import { fsPlugin } from "../src/plugins/fs/index.ts";
 import { createMcpPlugin } from "../src/plugins/mcp/index.ts";
 import { createShellPlugin } from "../src/plugins/shell/index.ts";
+import { subagentPlugin } from "../src/plugins/subagent/index.ts";
 import { todoPlugin } from "../src/plugins/todo/index.ts";
 import { toolOutputPlugin } from "../src/plugins/tool-output/index.ts";
 import { createWebPlugin } from "../src/plugins/web/index.ts";
@@ -76,6 +77,11 @@ const manifest: readonly Entry[] = [
         }),
       },
     ],
+  },
+  {
+    folder: "subagent",
+    note: "Loaded when the host enables sub-agents (`--subagents`).",
+    variants: [{ label: "default", plugin: subagentPlugin }],
   },
   {
     folder: "mcp",

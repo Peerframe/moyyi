@@ -457,6 +457,15 @@ svg {
   color: var(--muted);
   font-size: 11px;
 }
+.composer-buttons {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 8px;
+}
+button[aria-pressed="true"] {
+  background: var(--selected);
+}
 .composer-footer {
   margin: 8px 3px 0;
   color: var(--muted);
@@ -877,6 +886,17 @@ svg {
   border-radius: 8px;
   background: var(--surface);
   color: var(--text);
+}
+.settings-fields label.settings-switch {
+  flex-direction: row;
+  align-items: center;
+  font-size: 13px;
+}
+.settings-switch > input {
+  flex: none;
+  width: auto;
+  margin: 0;
+  padding: 0;
 }
 .settings-budget {
   display: grid;

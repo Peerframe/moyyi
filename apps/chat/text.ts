@@ -23,6 +23,7 @@ export function textOf(message: Message): string {
     case "unread-divider":
       return "";
     case "service":
+      return message.detail === undefined ? message.text : `${message.text}\n${message.detail}`;
     case "out":
     case "text":
     case "decision":

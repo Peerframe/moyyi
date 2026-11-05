@@ -145,6 +145,12 @@ export function parseClientCommand(value: unknown): ClientCommand {
       const v = object(value, ["type", "sessionId"], "Command");
       return { type: kind, sessionId: id(v.sessionId, "Session id") as SessionId };
     }
+    case "session.mode": {
+      const v = object(value, ["type", "sessionId", "mode"], "Command");
+      if (v.mode !== "plan" && v.mode !== "default")
+        throw new WireError("Mode must be plan or default");
+      return { type: kind, sessionId: id(v.sessionId, "Session id") as SessionId, mode: v.mode };
+    }
     case "session.list": {
       const v = object(value, ["type", "offset", "limit"], "Command");
       return { type: kind, ...page(v) };

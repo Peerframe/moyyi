@@ -27,6 +27,7 @@ interface Arguments {
   readonly include?: readonly string[];
   readonly exclude?: readonly string[];
   readonly mode?: "content" | "files";
+  readonly regex?: boolean;
 }
 type Result = FileList | FileSearch | { readonly error: string; readonly truncated: boolean };
 const encoder = new TextEncoder();
@@ -65,6 +66,7 @@ const schemas: Record<Operation, JsonSchema> = {
       include: patternsSchema,
       exclude: patternsSchema,
       mode: { type: "string", enum: ["content", "files"] },
+      regex: { type: "boolean" },
     },
     required: ["query"],
     additionalProperties: false,
@@ -74,7 +76,7 @@ const descriptions: Record<Operation, string> = {
   read: "Numbered UTF-8 + metadata. No line args: byte-bounded prefix; either: 1-based startLine/maxLines default 1/200, <=1MiB scan. Use ranges around search hits; group independent reads. complete is window-only; nextRead may repeat partial lines. Truncation cannot prove absence.",
   list: "List a workspace directory (default .).",
   search:
-    "Literal file/dir search (default .), honoring .gitignore. include/exclude: relative *, **, ?; ** whole segments; dotfiles explicit; exclude wins. mode files: unique paths; content default: hits/context (8 lines/side). maxMatches counts lines/files. Inspect hits and gaps with read startLine/maxLines; truncated/skipped cannot prove absence.",
+    "File/dir search (default .), honoring .gitignore. query is literal; regex:true tests it as a JavaScript regex per line (^/$ anchor lines). include/exclude: relative *, **, ?; ** whole segments; dotfiles explicit; exclude wins. mode files: unique paths; content default: hits/context (8 lines/side). maxMatches counts lines/files. Inspect hits and gaps with read startLine/maxLines; truncated/skipped cannot prove absence.",
 };
 
 export const fsPlugin: Plugin = {
@@ -132,6 +134,7 @@ function tool(operation: Operation): ToolDefinition {
             ...(args.include === undefined ? {} : { include: args.include }),
             ...(args.exclude === undefined ? {} : { exclude: args.exclude }),
             ...(args.mode === undefined ? {} : { mode: args.mode }),
+            ...(args.regex === undefined ? {} : { regex: args.regex }),
           });
         }
         assertActive(context);
@@ -201,7 +204,7 @@ function argumentsFor(operation: Operation, value: unknown): Arguments {
     args.query.length > 256 ||
     /[\r\n\0]/.test(args.query)
   )
-    throw new Error("Search requires a bounded literal query");
+    throw new Error("Search requires a bounded single-line query");
   if (args.caseSensitive !== undefined && typeof args.caseSensitive !== "boolean")
     throw new Error("Invalid caseSensitive");
   const maxMatches = optionalLimit("maxMatches", 100);
@@ -232,6 +235,8 @@ function argumentsFor(operation: Operation, value: unknown): Arguments {
     exclude = patterns("exclude");
   if (args.mode !== undefined && args.mode !== "content" && args.mode !== "files")
     throw new Error("Invalid mode: expected content or files");
+  if (args.regex !== undefined && typeof args.regex !== "boolean")
+    throw new Error("Invalid regex: expected a boolean");
   return {
     path,
     query: args.query,
@@ -241,6 +246,8 @@ function argumentsFor(operation: Operation, value: unknown): Arguments {
     ...(include === undefined ? {} : { include }),
     ...(exclude === undefined ? {} : { exclude }),
     ...(args.mode === undefined ? {} : { mode: args.mode }),
+    // Omitted unless set, so literal searches keep their recorded payloads and digests.
+    ...(args.regex === undefined ? {} : { regex: args.regex }),
   };
 }
 

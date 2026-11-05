@@ -196,3 +196,47 @@ describe("long tasks and writable commands", () => {
     }
   });
 });
+
+describe("sub-agents", () => {
+  it("are off by default and enabled only for a host, never for the demo or a connected client", () => {
+    expect(parseCliOptions(["--host", "h.mjs"], "/tmp").subagents).toBe(false);
+    expect(parseCliOptions(["--host", "h.mjs", "--subagents"], "/tmp").subagents).toBe(true);
+    expect(() => parseCliOptions(["--demo", "--subagents"], "/tmp")).toThrow(/fixed read-only/);
+    expect(() => parseCliOptions(["--connect", "--subagents"], "/tmp")).toThrow(/daemon's host/);
+  });
+});
+
+describe("nested instructions", () => {
+  it("are off by default, allowed for local hosts and the demo, and kept with the daemon", () => {
+    expect(parseCliOptions(["--host", "h.mjs"], "/tmp").nestedInstructions).toBe(false);
+    expect(parseCliOptions(["--demo", "--nested-instructions"], "/tmp").nestedInstructions).toBe(
+      true,
+    );
+    expect(() => parseCliOptions(["--connect", "--nested-instructions"], "/tmp")).toThrow(
+      /daemon's host/,
+    );
+  });
+});
+
+describe("continue", () => {
+  it("resumes the latest session unless a session is named", () => {
+    expect(parseCliOptions(["--demo", "--continue"], "/tmp").continueLatest).toBe(true);
+    expect(parseCliOptions(["--connect", "--continue"], "/tmp").continueLatest).toBe(true);
+    expect(() => parseCliOptions(["--demo", "--continue", "--session", "s1"], "/tmp")).toThrow(
+      /either/,
+    );
+    expect(() => parseCliOptions(["--daemon", "--demo", "--continue"], "/tmp")).toThrow();
+  });
+});
+
+describe("final-answer accounting", () => {
+  it("is off by default and kept with the daemon", () => {
+    expect(parseCliOptions(["--host", "h.mjs"], "/tmp").finalAccounting).toBe(false);
+    expect(parseCliOptions(["--host", "h.mjs", "--final-accounting"], "/tmp").finalAccounting).toBe(
+      true,
+    );
+    expect(() => parseCliOptions(["--connect", "--final-accounting"], "/tmp")).toThrow(
+      /daemon's host/,
+    );
+  });
+});

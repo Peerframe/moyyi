@@ -25,6 +25,7 @@ import type {
 import type { PermissionPolicy, PolicyDecision } from "../contracts/ports.ts";
 import type { BackgroundProcessAccessFactory } from "../contracts/processes.ts";
 import { canonicalizeJson } from "../contracts/replay.ts";
+import type { SubagentAccessFactory } from "../contracts/subagents.ts";
 import type { ReadToolDeadlines, ToolOutputReaderFactory } from "../contracts/tool-output.ts";
 import type {
   PreparedAction,
@@ -54,6 +55,7 @@ export interface ExecutionHost {
   readonly toolOutputs?: ToolOutputReaderFactory;
   readonly backgroundProcesses?: BackgroundProcessAccessFactory;
   readonly mcp?: McpToolAccessFactory;
+  readonly subagents?: SubagentAccessFactory;
   readonly readToolDeadlines?: ReadToolDeadlines;
   readonly processResult?: (result: ToolResultPart) => Promise<{
     readonly result: ToolResultPart;
@@ -326,6 +328,9 @@ async function executeCallBody(call: ToolCallPart, host: ExecutionHost): Promise
       tool.name.startsWith("mcp__") &&
       (profile.class === "read" || profile.class === "external")
         ? { mcp: host.mcp.create(invocationContext, guard) }
+        : {}),
+      ...(host.subagents && phase === "execute" && profile.class === "read" && tool.name === "agent"
+        ? { subagents: host.subagents.create(invocationContext, guard) }
         : {}),
       ...(host.files && profile.class !== "external"
         ? { files: host.files.create(invocationContext, guard) }

@@ -60,6 +60,7 @@
     "lint": "biome check .",
     "test": "vitest run",
     "eval": "node evals/run.ts",
+    "eval:gate": "node scripts/quality-gate.ts",
     "eval:core": "node evals/core/run.ts",
     "demo:scripted": "node scripts/demo-agent.ts",
     "check": "node scripts/desktop-feature-registry.ts --check && node scripts/tool-catalog.ts --check && npm run typecheck && npm run lint && npm run test",

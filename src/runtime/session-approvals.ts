@@ -47,6 +47,11 @@ export class SessionApprovals {
     }
   }
 
+  /** The session an effect's run belongs to, when this runtime started that run. */
+  sessionOf(effectId: EffectId): SessionId | undefined {
+    return this.#session(effectId);
+  }
+
   #session(effectId: EffectId): SessionId | undefined {
     const run = this.#effectRun.get(effectId);
     return run === undefined ? undefined : this.#runSession.get(run);

@@ -207,3 +207,10 @@ the daily default; Kimi high and evidence-answer remain labelled experimental an
 Existing permissions, cancellation, recording, package and CI gates are not waived. The prior
 sections are immutable historical outcomes; their then-current unmerged status is superseded
 by this explicit delivery decision and the subsequent installation receipt.
+
+## Amendment 2026-11-05: opt-in final-answer accounting
+
+With `RuntimeOptions.finalAccounting`, the evidence answer's instruction ends with: "Account for
+every requirement in the original question and steering: answer it from quoted evidence, or say
+it is not done or unverified." Off by default
+([brief](../tasks/2026-11-05-final-answer-accounting.md)).

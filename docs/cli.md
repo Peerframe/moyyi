@@ -107,6 +107,83 @@ can accompany CLI grants and still covers document reads. Noninteractive approva
 Capabilities are limited to the selected workspace/origins even if another session is resumed.
 The offline `--demo` rejects these daily capability and budget options.
 
+## Continue, usage and checklists
+
+- `--continue` resumes the most recently active session of the selected workspace (among the 50
+  most recent sessions), or starts a new one when there is none. It cannot be combined with
+  `--session ID`.
+- When a run ends, `usage | ...` shows its model requests and the reported input, output and cached
+  input tokens. Providers that report no usage are counted as such; this is not a bill.
+- When the model updates its checklist with `todo_write`, the CLI prints it as `todo | [x] ...`,
+  `[>]` for the item in progress and `[ ]` for pending ones. The list is the model's claim of
+  progress, not verified completion.
+- `/init` asks the agent to inspect the project and draft or update the root `AGENTS.md`. It is a
+  fixed brief sent as your message; saving the file needs `--allow-write` and its approval.
+
+## Plan mode
+
+`/plan` (or starting with `--plan`) switches the session to plan mode: the agent may read, search,
+use read-only MCP tools and sub-agents, but every change, command or external call is refused
+before any approval prompt, and each of your messages asks for a step-by-step plan. `/execute`
+approves the plan: plan mode ends and the agent is asked to carry it out, still under your grants
+and approvals. `/plan off` ends plan mode without a message. Resuming a session starts in normal
+mode. See [ADR 0054](decisions/0054-plan-mode.md).
+
+## Output for scripts
+
+For one-shot prompts, `--output json` prints one JSON object when the session ends:
+`{sessionId, runId, outcome, exitCode, answer, usage: {requests, input, output, cacheRead,
+unreported}, effects: [{id, tool, state}]}`. `--output stream-json` prints each protocol event
+(`session.ready`, `run.started`, `assistant.delta`, `entry.appended`, `approval.requested`,
+`effect.updated`, `run.finished`, `command.rejected`) as one JSON line as it happens. Human lines
+are not printed in either mode; errors still go to stderr and exit codes are unchanged.
+Approvals in one-shot mode are still denied. Interactive sessions use `text` only.
+
+## Notification hooks
+
+A host module can add `hooks` to run your own commands when an approval is waiting, a tool
+finishes or a run finishes, for example a desktop notification:
+
+```ts
+hooks: [
+  { on: "approval.requested", command: "/usr/bin/osascript",
+    args: ["-e", 'display notification "moyyi needs approval"'] },
+  { on: "run.finished", command: "/usr/local/bin/notify-done" },
+],
+```
+
+Each hook gets the event as one JSON line on stdin. Hooks only notify: they cannot block,
+approve or change a run, their output never reaches the model, and anything they change is outside
+moyyi's journal and undo. Failures and timeouts (default 10 s) appear as host diagnostics. See
+[ADR 0053](decisions/0053-notification-hooks.md).
+
+## Prompt templates as commands
+
+`--commands DIR` (repeatable) loads every `DIR/<name>.md` as a `/<name>` command. `$ARGUMENTS` in
+the file is replaced by the text after the command; without it, the text is appended as
+`Arguments: ...`. An optional leading `---` block may hold a one-line `description:`, shown in
+`/help`. The expanded text is sent as your own message and recorded like typed input; the CLI
+prints its size and source file. A one-shot prompt can be a command (`moyyi ... "/review src"`).
+
+Names match `^[a-z][a-z0-9-]{0,31}$`, cannot replace built-in commands and must be unique; files
+are regular UTF-8 files up to 16 KiB, at most 128 commands. Nothing is discovered from the
+workspace: only directories you name are read. `--connect` clients may use `--commands`; the
+daemon itself does not.
+
+## Nested instructions
+
+`--nested-instructions` also loads `AGENTS.md` from subdirectories this session works in (files
+read, listed, searched or edited there), from the next request on. See
+[instructions](instructions.md) and [ADR 0052](decisions/0052-nested-instructions.md).
+
+## Sub-agents
+
+`--subagents` offers the model an `agent` tool that hands a read-only investigation to a
+sub-agent in its own session (up to 12 requests and 300 s each, 4 at once, 16 per turn). The
+sub-agent can read, list and search but cannot edit, run commands or use the web; only its final
+report returns to the main conversation. `/sessions` lists sub-agent sessions like any other.
+See [ADR 0051](decisions/0051-read-only-subagents.md).
+
 ## MCP servers
 
 Configure MCP servers in the host module's `mcp` option; the CLI starts them and prints one line

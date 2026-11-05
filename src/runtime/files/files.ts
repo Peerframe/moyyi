@@ -18,6 +18,7 @@ import type {
 import { assertUnprotected } from "../preconditions.ts";
 import { searchContext } from "../web/search-context.ts";
 import { searchSelection } from "../web/search-selection.ts";
+import { compileLinePattern, RegexLines } from "./regex-lines.ts";
 
 const MAX_FILE_BYTES = 1024 * 1024;
 const MAX_SCAN_BYTES = 16 * 1024 * 1024;
@@ -96,6 +97,17 @@ export class NodeWorkspaceFiles implements WorkspaceFilesFactory {
     assertAuthorized: () => void,
   ): Promise<FileRead> {
     return new ReadScope(context, assertAuthorized, this.excluded).readSkillDocument(name);
+  }
+
+  /** `<directory>/AGENTS.md` under the same rules as the root file; null when absent. */
+  readNestedInstructions(
+    context: Pick<ToolContext, "workspaceRoot" | "signal">,
+    directory: string,
+    assertAuthorized: () => void,
+  ): Promise<FileRead | null> {
+    return new ReadScope(context, assertAuthorized, this.excluded).readNestedInstructions(
+      directory,
+    );
   }
 
   readWorkspaceNavigation(
@@ -343,6 +355,45 @@ class ReadScope {
       // Auto-discovery never follows an alias, even one the ordinary explicit read tool permits.
       const after = await this.io(() => lstat(resolve(root.path, "AGENTS.md")));
       if (after.isSymbolicLink() || !same(stat, after) || result.path !== "AGENTS.md")
+        throw new FileAccessError("denied", "Project instructions changed during access");
+      if (result.truncated)
+        throw new FileAccessError("unavailable", "Project instructions exceed the 16 KiB limit");
+      return result;
+    });
+  }
+
+  readNestedInstructions(directory: string): Promise<FileRead | null> {
+    const parts = directory.split("/");
+    if (
+      !directory ||
+      directory.length > 1024 ||
+      directory.startsWith("/") ||
+      parts.some((part) => !part || part === "." || part === ".." || part.includes("\0"))
+    )
+      return Promise.reject(new FileAccessError("denied", "Invalid instruction directory"));
+    return this.operation(async (root) => {
+      // Every directory on the way must be a real directory, never an alias.
+      for (let index = 1; index <= parts.length; index++) {
+        const stat = await this.io(() => lstat(resolve(root.path, ...parts.slice(0, index))));
+        if (!stat.isDirectory() || stat.isSymbolicLink())
+          throw new FileAccessError("denied", "Instruction directories must not be aliases");
+      }
+      const path = `${directory}/AGENTS.md`;
+      let before: Stats;
+      try {
+        before = await this.io(() => lstat(resolve(root.path, path)));
+      } catch (error) {
+        if (isMissing(error)) {
+          await this.root();
+          return null;
+        }
+        throw error;
+      }
+      if (!before.isFile() || before.isSymbolicLink() || before.nlink !== 1)
+        throw new FileAccessError("denied", "Project instructions must be a regular unlinked file");
+      const result = await this.readFile(root, path, 16 * 1024);
+      const after = await this.io(() => lstat(resolve(root.path, path)));
+      if (after.isSymbolicLink() || !same(before, after) || result.path !== path)
         throw new FileAccessError("denied", "Project instructions changed during access");
       if (result.truncated)
         throw new FileAccessError("unavailable", "Project instructions exceed the 16 KiB limit");
@@ -707,6 +758,9 @@ class ReadScope {
       const caseSensitive = options.caseSensitive === undefined ? true : options.caseSensitive;
       const contextLines = options.contextLines === undefined ? 0 : options.contextLines;
       const mode = options.mode === undefined ? "content" : options.mode;
+      const regex = options.regex === undefined ? false : options.regex;
+      if (typeof regex !== "boolean")
+        throw new FileAccessError("denied", "Search regex must be boolean");
       if (mode !== "content" && mode !== "files")
         throw new FileAccessError("denied", "Search mode must be content or files");
       let selected: (path: string) => boolean;
@@ -726,8 +780,15 @@ class ReadScope {
       )
         throw new FileAccessError(
           "denied",
-          "Search requires a single-line literal query of 1 to 256 characters",
+          `Search requires a single-line ${regex ? "regular expression" : "literal query"} of 1 to 256 characters`,
         );
+      let pattern: { pattern: string; flags: string } | undefined;
+      if (regex)
+        try {
+          pattern = compileLinePattern(query, caseSensitive);
+        } catch (error) {
+          throw new FileAccessError("denied", (error as Error).message);
+        }
       const start = await this.target(root, path);
       if (!start.stat.isDirectory() && !start.stat.isFile())
         throw new FileAccessError("denied", "Search requires a regular file or directory");
@@ -743,52 +804,65 @@ class ReadScope {
       let visited = 0,
         scanned = 0,
         truncated = false,
+        timeLimited = false,
         skippedFiles = 0;
       const needle = caseSensitive ? query : query.toLowerCase();
       const count = () => (mode === "files" ? files.length : matches.length);
+      const stopped = () => count() >= cap || timeLimited;
       const result = (withContext = true): FileSearch => ({
         path: start.relative,
         matches,
         truncated,
         skippedFiles,
         ...(mode === "files" ? { mode, files } : withContext && contextLines ? { context } : {}),
+        ...(timeLimited ? { regexTimeLimit: true as const } : {}),
       });
-      const loadRules = this.ignoreRules(root);
-      let inherited: Rules = [];
-      // Exact files and subdirectories inherit every ancestor rule; a file is never a rule root.
-      let ancestor = await this.target(root, ".");
-      inherited = await loadRules(ancestor, inherited);
-      const segments = start.relative === "." ? [] : start.relative.split("/");
-      const directories = start.stat.isFile() ? segments.length - 1 : segments.length;
-      for (let index = 0; index < directories; index++) {
-        const name = segments.slice(0, index + 1).join("/");
-        if (ignored(name, true, inherited)) return result(false);
-        ancestor = await this.target(root, name);
+      const matcher = pattern ? new RegexLines(pattern, this.context.signal) : undefined;
+      try {
+        const loadRules = this.ignoreRules(root);
+        let inherited: Rules = [];
+        // Exact files and subdirectories inherit every ancestor rule; a file is never a rule root.
+        let ancestor = await this.target(root, ".");
         inherited = await loadRules(ancestor, inherited);
-      }
-      const scanFile = async (item: Target, path: string): Promise<void> => {
-        // Filters are selection, not authority. Never open excluded candidate contents.
-        if (!selected(path)) return;
-        const bytes = Math.max(
-          1,
-          Math.min(MAX_FILE_BYTES, MAX_SCAN_BYTES - scanned, item.stat.size + 1),
-        );
-        scanned += bytes;
-        try {
-          await this.unchanged(root, item);
-          const read = await this.readFile(root, path, bytes);
-          await this.unchanged(root, item);
-          if (start.stat.isFile()) {
-            const lexical = await this.io(() => lstat(start.lexical));
-            if (lexical.isSymbolicLink() || lexical.nlink !== 1 || !same(lexical, start.stat))
-              throw new FileAccessError("denied", "Search target changed during access");
-          }
-          truncated ||= read.truncated;
-          const lines = read.text.split("\n");
-          const hits: number[] = [];
-          for (let index = 0; index < lines.length; index++) {
-            const line = lines[index] as string;
-            if ((caseSensitive ? line : line.toLowerCase()).includes(needle)) {
+        const segments = start.relative === "." ? [] : start.relative.split("/");
+        const directories = start.stat.isFile() ? segments.length - 1 : segments.length;
+        for (let index = 0; index < directories; index++) {
+          const name = segments.slice(0, index + 1).join("/");
+          if (ignored(name, true, inherited)) return result(false);
+          ancestor = await this.target(root, name);
+          inherited = await loadRules(ancestor, inherited);
+        }
+        const scanFile = async (item: Target, path: string): Promise<void> => {
+          // Filters are selection, not authority. Never open excluded candidate contents.
+          if (!selected(path)) return;
+          const bytes = Math.max(
+            1,
+            Math.min(MAX_FILE_BYTES, MAX_SCAN_BYTES - scanned, item.stat.size + 1),
+          );
+          scanned += bytes;
+          try {
+            await this.unchanged(root, item);
+            const read = await this.readFile(root, path, bytes);
+            await this.unchanged(root, item);
+            if (start.stat.isFile()) {
+              const lexical = await this.io(() => lstat(start.lexical));
+              if (lexical.isSymbolicLink() || lexical.nlink !== 1 || !same(lexical, start.stat))
+                throw new FileAccessError("denied", "Search target changed during access");
+            }
+            truncated ||= read.truncated;
+            const lines = read.text.split("\n");
+            const limit = mode === "files" ? 1 : cap - matches.length;
+            const found = matcher
+              ? await matcher.match(read.text, limit)
+              : literalHits(lines, needle, caseSensitive, limit);
+            if (found === "time_limit") {
+              timeLimited = true;
+              truncated = true;
+              return;
+            }
+            const hits: number[] = [];
+            for (const index of found) {
+              const line = lines[index] as string;
               if (mode === "files") {
                 files.push(path);
                 break;
@@ -805,71 +879,87 @@ class ReadScope {
                 break;
               }
             }
-          }
-          if (mode === "content" && contextLines > 0 && hits.length) {
-            const windows = searchContext(
-              read,
-              hits,
-              contextLines,
-              MAX_SEARCH_CONTEXT_BYTES - contextBytes,
-            );
-            context.push(...windows.context);
-            contextBytes += windows.bytes;
-            truncated ||= windows.truncated;
-          }
-        } catch (error) {
-          this.guard();
-          if (error instanceof FileAccessError || isMissing(error)) {
-            skippedFiles++;
-            truncated = true;
-          } else throw error;
-        }
-      };
-      if (start.stat.isFile()) {
-        if (!ignored(start.relative, false, inherited)) await scanFile(start, start.relative);
-        return result();
-      }
-      const walk = async (directory: Target, rules: Rules, depth: number): Promise<void> => {
-        if (depth > MAX_DEPTH) {
-          truncated = true;
-          return;
-        }
-        await this.directory(root, directory, async (name, symbolic) => {
-          if (++visited > MAX_ENTRIES || scanned >= MAX_SCAN_BYTES || count() >= cap) {
-            truncated = true;
-            return false;
-          }
-          const path = portable(relative(root.path, resolve(directory.path, name)));
-          if (symbolic) {
-            skippedFiles++;
-            return true;
-          }
-          let item: Target;
-          try {
-            item = await this.target(root, path);
+            if (mode === "content" && contextLines > 0 && hits.length) {
+              const windows = searchContext(
+                read,
+                hits,
+                contextLines,
+                MAX_SEARCH_CONTEXT_BYTES - contextBytes,
+              );
+              context.push(...windows.context);
+              contextBytes += windows.bytes;
+              truncated ||= windows.truncated;
+            }
           } catch (error) {
             this.guard();
             if (error instanceof FileAccessError || isMissing(error)) {
               skippedFiles++;
+              truncated = true;
+            } else throw error;
+          }
+        };
+        if (start.stat.isFile()) {
+          if (!ignored(start.relative, false, inherited)) await scanFile(start, start.relative);
+          return result();
+        }
+        const walk = async (directory: Target, rules: Rules, depth: number): Promise<void> => {
+          if (depth > MAX_DEPTH) {
+            truncated = true;
+            return;
+          }
+          await this.directory(root, directory, async (name, symbolic) => {
+            if (++visited > MAX_ENTRIES || scanned >= MAX_SCAN_BYTES || stopped()) {
+              truncated = true;
+              return false;
+            }
+            const path = portable(relative(root.path, resolve(directory.path, name)));
+            if (symbolic) {
+              skippedFiles++;
               return true;
             }
-            throw error;
-          }
-          if (ignored(path, item.stat.isDirectory(), rules)) return true;
-          if (item.stat.isDirectory()) {
-            await walk(item, await loadRules(item, rules), depth + 1);
-          } else if (item.stat.isFile()) {
-            await scanFile(item, path);
-          } else skippedFiles++;
-          const complete = visited < MAX_ENTRIES && scanned < MAX_SCAN_BYTES && count() < cap;
-          if (!complete) truncated = true;
-          return complete;
-        });
-      };
-      await walk(start, inherited, 0);
-      return result();
+            let item: Target;
+            try {
+              item = await this.target(root, path);
+            } catch (error) {
+              this.guard();
+              if (error instanceof FileAccessError || isMissing(error)) {
+                skippedFiles++;
+                return true;
+              }
+              throw error;
+            }
+            if (ignored(path, item.stat.isDirectory(), rules)) return true;
+            if (item.stat.isDirectory()) {
+              await walk(item, await loadRules(item, rules), depth + 1);
+            } else if (item.stat.isFile()) {
+              await scanFile(item, path);
+            } else skippedFiles++;
+            const complete = visited < MAX_ENTRIES && scanned < MAX_SCAN_BYTES && !stopped();
+            if (!complete) truncated = true;
+            return complete;
+          });
+        };
+        await walk(start, inherited, 0);
+        return result();
+      } finally {
+        await matcher?.close();
+      }
     });
   }
+}
+
+function literalHits(
+  lines: readonly string[],
+  needle: string,
+  caseSensitive: boolean,
+  limit: number,
+): number[] {
+  const hits: number[] = [];
+  for (let index = 0; index < lines.length && hits.length < limit; index++) {
+    const line = lines[index] as string;
+    if ((caseSensitive ? line : line.toLowerCase()).includes(needle)) hits.push(index);
+  }
+  return hits;
 }
 
 function ignored(name: string, directory: boolean, rules: Rules): boolean {

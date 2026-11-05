@@ -17,6 +17,10 @@ Options:
   -C, --cwd DIR          Workspace root (default: current directory)
       --data DIR         Private session data directory (default: ~/.moyyi/data)
       --session ID       Resume a stored session
+      --continue         Resume the most recent session of this workspace (or start one)
+      --plan             Start in plan mode: read-only planning until /execute
+      --output FORMAT    text (default), json (one summary) or stream-json (event lines);
+                         one-shot prompts only
   -i, --interactive      Keep a terminal session open after an initial prompt
       --approve-reads    Ask before each read/list/search/document execution
       --allow-write      Ask before snapshot-backed writes in this workspace
@@ -30,13 +34,17 @@ Options:
       --auto-compact     Summarize older turns, or earlier steps of a long turn, when a request
                          nears the model's context window (one request per summary)
       --long             Long tasks: --max-requests 200 --timeout 3600 --auto-compact unless set
+      --subagents        Offer read-only sub-agents (agent tool); each uses its own requests
+      --nested-instructions  Also load AGENTS.md from subdirectories the session works in
+      --final-accounting Ask the final answer to account for every requirement (experimental)
+      --commands DIR     Load prompt templates DIR/<name>.md as /<name> commands (repeatable)
       --dev              Enable development-only plugin loading and reload
       --dev-plugin N=P   Explicit plugin name and local module path (repeatable)
       --daemon           Serve this runtime to local clients until Ctrl-C; grants stay fixed
       --connect          Use the running daemon for --data instead of a local runtime
 
-Commands: /help /new /resume ID /compact /cancel /exit /approve EFFECT_ID /always EFFECT_ID
-          /deny EFFECT_ID
+Commands: /help /new /resume ID /compact /cancel /exit /init /plan /execute
+          /approve EFFECT_ID /always EFFECT_ID /deny EFFECT_ID
 Compaction: /compact makes one request to the selected model; originals remain in history.
 Development: /reload NAME. Ctrl-C cancels an active run, or exits when idle.
 No workspace configuration, environment credential or plugin is auto-discovered.`;
@@ -50,6 +58,9 @@ export interface CliOptions {
   readonly workspaceRoot: string;
   readonly dataDirectory?: string;
   readonly sessionId?: SessionId;
+  readonly continueLatest: boolean;
+  readonly planMode: boolean;
+  readonly output: "text" | "json" | "stream-json";
   readonly interactive: boolean;
   readonly approveReads: boolean;
   readonly allowWrite: boolean;
@@ -61,6 +72,10 @@ export interface CliOptions {
   readonly maxRequests?: number;
   readonly timeoutSeconds?: number;
   readonly autoCompact: boolean;
+  readonly subagents: boolean;
+  readonly nestedInstructions: boolean;
+  readonly finalAccounting: boolean;
+  readonly commandDirectories: readonly string[];
   readonly dev: boolean;
   readonly development: readonly { name: string; path: string }[];
   readonly prompt?: string;
@@ -77,6 +92,9 @@ export function parseCliOptions(argv: readonly string[], cwd = process.cwd()): C
       host: { type: "string" },
       data: { type: "string" },
       session: { type: "string" },
+      continue: { type: "boolean" },
+      plan: { type: "boolean" },
+      output: { type: "string" },
       interactive: { type: "boolean", short: "i" },
       "approve-reads": { type: "boolean" },
       "allow-write": { type: "boolean" },
@@ -85,6 +103,10 @@ export function parseCliOptions(argv: readonly string[], cwd = process.cwd()): C
       timeout: { type: "string" },
       "auto-compact": { type: "boolean" },
       long: { type: "boolean" },
+      subagents: { type: "boolean" },
+      "nested-instructions": { type: "boolean" },
+      "final-accounting": { type: "boolean" },
+      commands: { type: "string", multiple: true },
       "shell-toolchain": { type: "string" },
       "web-origin": { type: "string", multiple: true },
       "web-dns": { type: "string" },
@@ -116,6 +138,9 @@ export function parseCliOptions(argv: readonly string[], cwd = process.cwd()): C
       "timeout",
       "auto-compact",
       "long",
+      "subagents",
+      "nested-instructions",
+      "final-accounting",
       "dev",
       "dev-plugin",
     ] as const;
@@ -131,9 +156,22 @@ export function parseCliOptions(argv: readonly string[], cwd = process.cwd()): C
       values.interactive ||
       values.session !== undefined ||
       values.dev ||
-      values["dev-plugin"]?.length)
+      values["dev-plugin"]?.length ||
+      values.commands?.length)
   )
-    throw Error("--daemon takes no prompt, session, -i or development plugins");
+    throw Error("--daemon takes no prompt, session, -i, commands or development plugins");
+  if (values.output !== undefined && !["text", "json", "stream-json"].includes(values.output))
+    throw Error("--output must be text, json or stream-json");
+  if (
+    values.output !== undefined &&
+    values.output !== "text" &&
+    (values.interactive || mode === "daemon")
+  )
+    throw Error("--output json and stream-json are for one-shot prompts");
+  if (values.continue && values.session !== undefined)
+    throw Error("Use either --continue or --session ID");
+  if (mode === "daemon" && (values.continue || values.plan))
+    throw Error("--daemon takes no --continue or --plan");
   if (values.session !== undefined && !/^[A-Za-z0-9_-]{1,512}$/.test(values.session))
     throw Error("Invalid session ID");
   if (values["dev-plugin"]?.length && !values.dev)
@@ -184,6 +222,7 @@ export function parseCliOptions(argv: readonly string[], cwd = process.cwd()): C
       requestText ||
       timeoutText ||
       values["auto-compact"] ||
+      values.subagents ||
       long)
   )
     throw Error("Daily capability options require --host; --demo is a fixed read-only script");
@@ -212,6 +251,13 @@ export function parseCliOptions(argv: readonly string[], cwd = process.cwd()): C
     allowShell: shell,
     allowShellWrite: values["allow-shell-write"] ?? false,
     autoCompact: values["auto-compact"] ?? long,
+    subagents: values.subagents ?? false,
+    nestedInstructions: values["nested-instructions"] ?? false,
+    finalAccounting: values["final-accounting"] ?? false,
+    commandDirectories: (values.commands ?? []).map((path) => resolve(cwd, path)),
+    continueLatest: values.continue ?? false,
+    planMode: values.plan ?? false,
+    output: (values.output ?? "text") as CliOptions["output"],
     webOrigins,
     ...(toolchain === undefined ? {} : { shellToolchain: toolchain as "node" }),
     ...(dns === undefined ? {} : { webDns: dns as "system" | "cloudflare-doh" }),

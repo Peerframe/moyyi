@@ -25,6 +25,7 @@ export const fileNavigationScenarios = [
   "files-mode-deduplicates-and-bounds",
   "schema-feedback-repaired-without-preparation",
   "selection-preserves-protected-and-ignored-paths",
+  "regex-finds-definitions-in-one-search",
 ] as const;
 export type FileNavigationScenario = (typeof fileNavigationScenarios)[number];
 
@@ -105,6 +106,18 @@ const calls: Record<FileNavigationScenario, readonly Record<string, unknown>[]> 
     { query: "BOUNDARY_SECRET", include: ["**/*.txt", ".env"], mode: "files" },
     { path: ".env", query: "BOUNDARY_SECRET", include: [".env"], mode: "files" },
     { path: "outside-link", query: "BOUNDARY_SECRET", mode: "files" },
+  ],
+  "regex-finds-definitions-in-one-search": [
+    // Alternation and an anchor select both definitions without filters; test noise and the
+    // sibling mention never start with these declarations.
+    {
+      path: "src",
+      query: "^export (function|const) (publishRecord|alias)\\b",
+      regex: true,
+      contextLines: 1,
+    },
+    { path: "src", query: "(unclosed", regex: true },
+    { query: "BOUNDARY_SECRET_\\w+", regex: true, include: ["**/*.txt", ".env"] },
   ],
 };
 
@@ -381,6 +394,11 @@ export async function runFileNavigationScenario(
       assert.ok(retained === "src/main.ts" || retained === "src/sibling.ts");
       checkFiles(results[1], [retained], true);
       checkFiles(results[2], ["src/main.ts"], false);
+    } else if (scenario === "regex-finds-definitions-in-one-search") {
+      checkSource(results[0]);
+      assert.equal(results[1]?.status, "failed");
+      assert.match(resultText(results[1]), /Invalid regular expression/);
+      assert.deepEqual(value(results[2]).matches, []);
     } else if (scenario === "schema-feedback-repaired-without-preparation") {
       assert.equal(results[0]?.status, "failed");
       checkSource(results[1]);

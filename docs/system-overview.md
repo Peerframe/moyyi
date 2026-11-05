@@ -1,6 +1,6 @@
 # System overview
 
-Current product, what users can do, and where delivery stands. Rewritten on **2026-10-29**; the
+Current product, what users can do, and where delivery stands. Updated on **2026-11-04**; the
 previous text is kept unchanged in the [archive](tasks/2026-10-29-system-overview-archive.md).
 [Architecture](architecture.md) owns layer boundaries, [ADRs](decisions/) own decisions,
 [roadmap](roadmap.md) owns delivery order, and the [delivery record](tasks/2026-10-26-optimization-plan.md)
@@ -24,10 +24,9 @@ working loop, normal completion or a large passing test suite does not prove fac
 
 | Item | Current |
 |---|---|
-| Desktop app | M6, verified package source `e0c26bd7`, ZIP SHA-256 `ebc157f9…6441`; merged at `8dd5343` ([PR #50](https://github.com/Peerframe/moyyi/pull/50)); macOS arm64 only |
+| Desktop app | Chat interface, local source `b2ef510`, ZIP SHA-256 `3534f0c0…858c`; [integration record](tasks/2026-11-04-chat-desktop-integration.md); installed and native-verified; macOS arm64 only |
 | CLI | Installed from the same verified tarball; shares the session store with the desktop |
-| Session store | Schema 3, persisted format 1. M5 and the older PR #41 CLI cannot open it; rollback requires the paired pre-upgrade backup kept with the old programs |
-| Main, not installed | Deliveries one and two. Opening the store upgrades it to format 2 (schema stays 3), which the installed M6 CLI and desktop reject: back up, then upgrade both programs together ([installation](installation.md)) |
+| Session store | Schema 3, persisted format 2. The M6 format 1 programs cannot open it; rollback needs the paired old app, CLI and pre-upgrade data backup ([installation](installation.md)) |
 | Daily settings | Flash, low, 3 requests, 120 s, zero retries; optional Kimi `kimi-k3.1-pro` connection |
 | Public version | None |
 
@@ -41,7 +40,7 @@ commands and limits.
 
 | User outcome | Evidence | Limits |
 |---|---|---|
-| Open the app, find and resume work | [Desktop](desktop.md): installed M6; native launch, history paging, organization, recycle/restore and restart passed | macOS arm64; one SQLite writer; reopened sessions start read-only |
+| Open the app, find and resume work | [Desktop](desktop.md): native history, Markdown/tools, composer and controls passed; final `b2ef510` notice passed the 780 × 560 native-copy check, and the installed app reopened successfully | macOS arm64; one SQLite writer; reopened sessions start read-only |
 | Read files and explain a project | Guarded search, ranged numbered reads, navigation; original public report task passed | The original complex source explanation still fails its rubric |
 | Read PDF, DOCX, XLSX, PPTX, ODT, ODS, ODP | [Native parser](documents.md); two fixed document tasks passed through the desktop | Body text only; no OCR, legacy or macro files, formulas or layout |
 | Import materials and inspect results | M6: external PDF/DOCX import, report with full readback, Markdown table and PNG preview, save a copy; one 4-request Flash task met all six criteria | Office/PDF preview is identity only; images are not sent to the model; no original export or quoted reply |
@@ -49,8 +48,8 @@ commands and limits.
 | Continue longer work | [Long sessions](long-sessions.md): eight turns across reopen and summary kept all ten checked facts | One bounded case |
 | Read websites | M5: per-site and per-request approval, recorded sources, report readback; CLI [web](web.md) revision task passed | First report and revision attempts failed; no search service; no autonomous correction shown |
 | Transform data and documents | Quoted CSV, format-preserving homework edit and roster merge passed | The model checked bytes and counts, not an independent recomputation |
-| Apply guidance and Skills | [Root instructions](instructions.md) and explicitly selected [Skills](skills.md) | Loading guidance does not guarantee following it; nested instructions are not auto-loaded |
-| Back up, restore, roll back | M4 [maintenance](desktop.md#backup-restore-and-software-rollback-m4-candidate): native backup, rescue restore and software rollback passed | Rollback across the schema 3 upgrade needs the paired backup |
+| Apply guidance and Skills | [Root instructions](instructions.md) and explicitly selected [Skills](skills.md) | Loading guidance does not guarantee following it; nested instructions load only with `--nested-instructions` (not yet merged) |
+| Back up, restore, roll back | M4 [maintenance](desktop.md#backup-restore-and-software-rollback-m4-candidate): native backup, rescue restore and software rollback passed | Rollback across schema 3 or persisted format 2 needs the paired backup |
 
 ## Answer quality
 
@@ -121,17 +120,24 @@ Plan: [post-M6 plan v2](tasks/2026-10-28-post-m6-plan.md). Order is owned by the
 | M3 editing, checks, undo | Accepted, installed | [PR #46](https://github.com/Peerframe/moyyi/pull/46) |
 | M4 maintenance and combined acceptance | Owner-accepted with the known quality gap | [PR #47](https://github.com/Peerframe/moyyi/pull/47), [receipt](tasks/2026-10-28-desktop-m4.md) |
 | M5 web pages and recorded sources | Accepted, installed | [PR #48](https://github.com/Peerframe/moyyi/pull/48), [receipt](tasks/2026-10-28-desktop-m5.md) |
-| M6 materials, previews, history | Accepted, installed daily | [PR #50](https://github.com/Peerframe/moyyi/pull/50), [receipt](tasks/2026-10-28-desktop-m6.md) |
+| M6 materials, previews, history | Accepted; previous installed baseline | [PR #50](https://github.com/Peerframe/moyyi/pull/50), [receipt](tasks/2026-10-28-desktop-m6.md) |
 | Delivery zero: agent environment | Accepted, merged | [PR #51](https://github.com/Peerframe/moyyi/pull/51), [brief](tasks/2026-10-29-delivery-0-vibe-coding-env.md) |
-| Delivery one: model experience aligned with DSH | Accepted, merged; not installed. Gate 6/6, original task still FAIL | [PR #53](https://github.com/Peerframe/moyyi/pull/53), [record](tasks/2026-10-29-delivery-1-model-experience-record.md) |
-| Delivery two: desktop feature modules | Accepted, merged; not installed. No behavior change | [PR #52](https://github.com/Peerframe/moyyi/pull/52), [record](tasks/2026-10-29-desktop-modules-delivery.md) |
+| Delivery one: model experience aligned with DSH | Accepted, merged; included in installed Chat runtime. Gate 6/6, original task still FAIL | [PR #53](https://github.com/Peerframe/moyyi/pull/53), [record](tasks/2026-10-29-delivery-1-model-experience-record.md) |
+| Delivery two: desktop feature modules | Accepted, merged; included in installed Chat runtime. No behavior change | [PR #52](https://github.com/Peerframe/moyyi/pull/52), [record](tasks/2026-10-29-desktop-modules-delivery.md) |
 | Delivery three: settings, Skills, search | Ready for Codex | [Brief](tasks/2026-10-30-delivery-3-settings-skills-search.md) |
 | Delivery four: conditional capabilities | Triggered per item | [Plan](tasks/2026-10-28-post-m6-plan.md) |
-| moyyi Chat interface | In review; mock backend only, offline-tested, not wired to the runtime | [Study and plan](tasks/2026-11-01-moyyi-chat-study.md) |
-| Long-running CLI: `--long`, `--timeout`, `--auto-compact`, `--allow-shell-write`, `/always`, background commands ([ADR 0049](decisions/0049-long-running-sessions.md)) | On branch, not merged; opt-in, defaults unchanged; offline-tested, not live-task-verified | [CLI](cli.md) |
-| MCP tools from owner-configured stdio servers ([ADR 0050](decisions/0050-mcp-client.md)) | On branch, not merged; host-module configuration (CLI, daemon); offline-tested, not live-task-verified | [MCP](mcp.md) |
-| Local daemon: `--daemon` / `--connect` over a private Unix socket ([ADR 0048](decisions/0048-local-daemon.md)) | On branch, not merged; CLI only, desktop unchanged | [Daemon guide](daemon.md) |
-| Repository structure: runtime folders, generated tool catalog | On branch, not merged; no behavior change. `check`, `verify:package`, `desktop:package` and `verify:desktop` passed on macOS arm64; not installed | [Record](tasks/2026-11-05-repository-structure.md) |
+| moyyi Chat interface | Final `b2ef510` installed; offline package gates, native functional checks, normal/minimum layouts and final relaunch passed. No new paid quality run | [Integration record](tasks/2026-11-04-chat-desktop-integration.md), [study](tasks/2026-11-01-moyyi-chat-study.md) |
+| Long-running CLI: `--long`, `--timeout`, `--auto-compact`, `--allow-shell-write`, `/always`, background commands ([ADR 0049](decisions/0049-long-running-sessions.md)) | Merged ([PR #61](https://github.com/Peerframe/moyyi/pull/61), [PR #65](https://github.com/Peerframe/moyyi/pull/65)); not installed; opt-in, defaults unchanged; offline-tested, not live-task-verified | [CLI](cli.md) |
+| Desktop (Chat interface): budgets up to 200 requests / 3600 s, long-task switches, "本会话始终允许", plan mode with "按计划执行" | On branch, stacked on the Chat integration ([PR #60](https://github.com/Peerframe/moyyi/pull/60)), not merged; unit-tested; headless renderer check only; native check and installation pending | [Desktop](desktop.md) |
+| CLI ergonomics: `--continue`, per-run usage, checklist display, `/init`, `--output json\|stream-json`, plan mode ([ADR 0054](decisions/0054-plan-mode.md)) | On branch, not merged; client-side; offline-tested | [CLI](cli.md#continue-usage-and-checklists) |
+| Regex search: `search` with `regex: true`, worker-bounded ([ADR 0055](decisions/0055-regex-search.md)) | On branch, not merged; model-visible tool change; offline-tested, not live-task-verified | [fs plugin](../src/plugins/fs/README.md) |
+| Notification hooks in the host module ([ADR 0053](decisions/0053-notification-hooks.md)) | On branch, not merged; observe-only; offline-tested | [CLI](cli.md#notification-hooks) |
+| Prompt templates as `/commands`: `--commands DIR` | On branch, not merged; client-side; offline-tested | [CLI](cli.md#prompt-templates-as-commands) |
+| Nested AGENTS.md from touched directories: `--nested-instructions` ([ADR 0052](decisions/0052-nested-instructions.md)) | On branch, not merged; opt-in; offline-tested, not live-task-verified | [Instructions](instructions.md) |
+| Read-only sub-agents: `--subagents`, `agent` tool ([ADR 0051](decisions/0051-read-only-subagents.md)) | On branch, not merged; opt-in; offline-tested, not live-task-verified | [CLI](cli.md#sub-agents) |
+| MCP tools from owner-configured stdio servers ([ADR 0050](decisions/0050-mcp-client.md)) | Merged ([PR #61](https://github.com/Peerframe/moyyi/pull/61), [PR #65](https://github.com/Peerframe/moyyi/pull/65)); not installed; host-module configuration (CLI, daemon); offline-tested, not live-task-verified | [MCP](mcp.md) |
+| Local daemon: `--daemon` / `--connect` over a private Unix socket ([ADR 0048](decisions/0048-local-daemon.md)) | Merged ([PR #61](https://github.com/Peerframe/moyyi/pull/61), [PR #65](https://github.com/Peerframe/moyyi/pull/65)); not installed; CLI only, desktop unchanged | [Daemon guide](daemon.md) |
+| Repository structure: runtime folders, generated tool catalog | Merged ([PR #61](https://github.com/Peerframe/moyyi/pull/61), [PR #65](https://github.com/Peerframe/moyyi/pull/65)); not installed; no behavior change. `check`, `verify:package`, `desktop:package` and `verify:desktop` passed on macOS arm64; not installed | [Record](tasks/2026-11-05-repository-structure.md) |
 
 ## Boundaries
 

@@ -119,4 +119,17 @@ describe("daemon event routing", () => {
     router.begin(1, { type: "session.list" });
     expect(() => router.begin(2, { type: "session.list" })).toThrow("serialized");
   });
+
+  it("shows an approval from a session nobody views to every client", () => {
+    const router = setup();
+    const child = "run_child" as RunId;
+    router.route({ type: "run.started", runId: child, sessionId: s2 });
+    router.route({
+      type: "effect.updated",
+      effect: { id: effectId, runId: child } as EffectRecord,
+    });
+    expect(
+      router.route({ type: "approval.requested", effectId, digest: "d" as never, summary: "s" }),
+    ).toEqual([1, 2]);
+  });
 });

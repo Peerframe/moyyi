@@ -32,6 +32,7 @@ import {
   type SessionId,
   type SessionSnapshot,
   type SessionStore,
+  type SubagentAccessFactory,
   type ToolCallPart,
   type ToolDefinition,
   type ToolOutputReaderFactory,
@@ -97,6 +98,8 @@ export interface CoreDeps {
    * unchanged and the turn proceeds; a storage failure while publishing fails the turn.
    */
   readonly autoCompactRatio?: number;
+  /** Opt-in: ask the answer-only request to account for every user requirement. */
+  readonly finalAccounting?: boolean;
   /** Acknowledge model recording/transport cleanup before the independent answer phase. */
   readonly settleModel?: () => Promise<void>;
   readonly files?: WorkspaceFilesFactory;
@@ -110,6 +113,8 @@ export interface CoreDeps {
   readonly backgroundProcesses?: BackgroundProcessAccessFactory;
   /** Owner-configured MCP servers; core hands them only to `mcp__` tools. */
   readonly mcp?: McpToolAccessFactory;
+  /** Read-only sub-agents; core hands them only to the `agent` tool. */
+  readonly subagents?: SubagentAccessFactory;
   readonly readToolDeadlines?: ReadToolDeadlines;
 }
 
@@ -820,7 +825,11 @@ export class AgentCore {
       await this.#append(run, {
         kind: "notice",
         code: "model_request_budget",
-        text: requestBudgetNotice(plan, this.#limits.maxModelRequests),
+        text: requestBudgetNotice(
+          plan,
+          this.#limits.maxModelRequests,
+          this.#deps.finalAccounting === true,
+        ),
       });
       const snapshot = await this.#session(run.sessionId);
       const consumedSteering = snapshot.entries.filter(
@@ -1019,6 +1028,7 @@ export class AgentCore {
           ? { backgroundProcesses: this.#deps.backgroundProcesses }
           : {}),
         ...(this.#deps.mcp ? { mcp: this.#deps.mcp } : {}),
+        ...(this.#deps.subagents ? { subagents: this.#deps.subagents } : {}),
         ...(this.#deps.readToolDeadlines
           ? { readToolDeadlines: this.#deps.readToolDeadlines }
           : {}),

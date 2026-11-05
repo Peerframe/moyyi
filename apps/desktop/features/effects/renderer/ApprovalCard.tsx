@@ -14,10 +14,10 @@ export function ApprovalCard({
 }: {
   approval: Approval;
   hostError: string | null;
-  onDecide(approval: Approval, decision: "approve" | "deny"): Promise<void>;
+  onDecide(approval: Approval, decision: "approve" | "deny", scope?: "session"): Promise<void>;
 }) {
   const gate = useRef(createActionGate());
-  const [decision, setDecision] = useState<"approve" | "deny" | null>(null);
+  const [decision, setDecision] = useState<"approve" | "deny" | "always" | null>(null);
   const [error, setError] = useState<string | null>(null);
   const mounted = useRef(true);
 
@@ -33,12 +33,13 @@ export function ApprovalCard({
     setDecision(null);
   }, [hostError]);
 
-  async function decide(next: "approve" | "deny") {
+  async function decide(next: "approve" | "deny" | "always") {
     if (!gate.current.begin()) return;
     setDecision(next);
     setError(null);
     try {
-      await onDecide(approval, next);
+      if (next === "always") await onDecide(approval, "approve", "session");
+      else await onDecide(approval, next);
       // An ACK does not prove the effect ran. Wait for the host to replace this card.
     } catch (cause) {
       if (!mounted.current) return;
@@ -58,6 +59,9 @@ export function ApprovalCard({
         <button type="button" disabled={decision !== null} onClick={() => void decide("deny")}>
           {decision === "deny" ? "正在拒绝…" : "拒绝"}
         </button>
+        <button type="button" disabled={decision !== null} onClick={() => void decide("always")}>
+          {decision === "always" ? "正在批准…" : "本会话始终允许"}
+        </button>
         <button
           className="primary"
           type="button"
@@ -67,6 +71,9 @@ export function ApprovalCard({
           {decision === "approve" ? "正在批准…" : "批准本次操作"}
         </button>
       </div>
+      <p className="approval-note">
+        “本会话始终允许”会批准本次，并在本会话内不再询问同一工具（命令只限完全相同的一条）；重新打开会话即失效，拒绝和撤销授权仍然有效。
+      </p>
       {error ? (
         <p className="error" role="alert">
           {error}

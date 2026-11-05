@@ -1,6 +1,7 @@
 # 0009: Runtime-confined workspace reads and bounded literal search
 
-Status: accepted for batch 5 (2026-10-25)
+Status: accepted for batch 5 (2026-10-25). Regex search was added later by
+[ADR 0055](0055-regex-search.md); the rest of this decision stands.
 
 ## Context
 
