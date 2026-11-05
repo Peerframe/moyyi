@@ -34,12 +34,18 @@
   - compaction is on by default (`auto: true`), with manual `/compact`;
   - 意见反馈 opens an external questionnaire.
   - WorkBuddy's bundle has no settings strings, so only the owner's screenshot was used.
-- Canvas v59 (generator `scratchpad/settings3.py`, rail `scratchpad/rail.py`). The list is:
+- Canvas v59, then v60 (generator `scratchpad/settings3.py`, rail `scratchpad/rail.py`). The list is:
   - 设置: 通用, 快捷键;
   - 功能: 模型, 个性化, 记忆;
   - 数据安全: 权限, 数据;
   - then a rule, 获取帮助 and 关于 moyyi.
 - Boards: S23 通用, S24 快捷键, S25 模型, S26 个性化, S27 记忆, S28 权限, S29 数据, S30 获取帮助, S35 关于. Every rail is now 全部 / 项目 / 自动化 / 插件 | 设置.
+- Canvas v60 redraws 通用 and 个性化 after the owner's WorkBuddy screenshots:
+  - 通用: small grey section headings (外观, 通知, 运行) over cards. Each row has a bold name, a grey line and a control on the right (dropdown, slider, link, switch).
+  - 运行 adds 做事时不让电脑睡着 and 开机自动打开, because automations need the app open.
+  - Left out: language, link opening, proxy and an improvement programme. moyyi has none of these today.
+  - 个性化: two cards, 关于你 and 怎么回你, each with 编辑 at the top right and a read-only bordered preview.
+  - The list summary for 通用 is now 跟随系统 · 默认字号 · 只提醒决定.
 - Code on this branch is a wip and does not match v59 yet:
   - rail with 插件 up;
   - card pages with switches, number fields and a dashed add card;
