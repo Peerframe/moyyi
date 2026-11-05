@@ -54,7 +54,6 @@ function Root() {
     <App
       port={port}
       theme={theme}
-      sticker="./assets/character.png"
       initialChat={params.get("chat") ?? undefined}
       initialPage={params.get("page") ?? undefined}
     />

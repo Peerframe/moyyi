@@ -2,6 +2,7 @@
 // Copy is taken from the canvas boards so the app and the boards say the same thing.
 import type { Chat, ChatWorld, Member, Message } from "../port.ts";
 import { pluginPages, settingsPages } from "./pages.ts";
+import { resultsOf } from "./results.ts";
 
 export const MEMBERS: Readonly<Record<string, Member>> = {
   moyyi: {
@@ -309,7 +310,6 @@ const LUNWEN: readonly Message[] = [
     note: "不回答就停在这里，不会自己选",
     time: "21:31",
   },
-  { id: "l-wait", kind: "sticker", from: "moyyi", moment: "等你" },
 ];
 
 const ZUFANG: readonly Message[] = [
@@ -373,6 +373,7 @@ const ZUFANG: readonly Message[] = [
     job: "对租房合同",
     files: [{ name: "合同要点.md", count: "写了 9 条" }],
     check: { kind: "partial", text: "核查对过 8/9" },
+    undo: "reversible",
     claims: [
       {
         id: "z1",
@@ -578,9 +579,12 @@ const DUSHU: readonly Message[] = [
   { id: "s-unread", kind: "unread-divider" },
   {
     id: "s-done",
-    kind: "text",
+    kind: "result",
     from: "xiezuo",
-    text: "本周摘录整理好了，按章节排，每段带页码。",
+    job: "本周摘录",
+    files: [{ name: "摘录-第6周.md", count: "13 段 · 按章节排" }],
+    check: { kind: "cited", text: "13 段都对过原书页码" },
+    undo: "reversible",
     time: "周二",
   },
 ];
@@ -598,6 +602,20 @@ const FANYI: readonly Message[] = [
 
 const ZUOYE: readonly Message[] = [
   {
+    id: "o-result",
+    kind: "result",
+    from: "moyyi",
+    job: "第 3 次作业",
+    files: [
+      { name: "作业3.docx", count: "写了 4 页" },
+      { name: "参考文献.bib", count: "12 条" },
+    ],
+    check: { kind: "partial", text: "核查对过 10/12" },
+    skipped: "第 2 题的图，你说自己画",
+    undo: "irreversible",
+    time: "10月20日",
+  },
+  {
     id: "o-done",
     kind: "text",
     from: "moyyi",
@@ -608,7 +626,7 @@ const ZUOYE: readonly Message[] = [
 ];
 
 export function xiaowenWorld(): ChatWorld {
-  return {
+  const world: Omit<ChatWorld, "results"> = {
     connection: { state: "online" },
     settings: settingsPages(),
     plugins: pluginPages(),
@@ -739,6 +757,7 @@ export function xiaowenWorld(): ChatWorld {
       },
     },
   };
+  return { ...world, results: resultsOf(world) };
 }
 
 /** Day 0 (board S12): only moyyi and 记忆 exist, and the moyyi chat opens by itself. */
@@ -782,5 +801,6 @@ export function firstRunWorld(): ChatWorld {
     jobs: [],
     changes: {},
     threads: {},
+    results: [],
   };
 }

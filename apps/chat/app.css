@@ -41,7 +41,12 @@ html {
   text-align: center;
   padding: 2px 0 8px;
 }
-/* 插件 starts the bottom group; a hairline splits state folders from kinds. */
+/* The desktop app's traffic lights sit here; the strip also drags the window (desktop chat.css). */
+.ch-rail-lights {
+  height: 28px;
+  flex: 0 0 auto;
+}
+/* 插件 starts the bottom group; a hairline splits the folders from 成果. */
 .ch-rail-bottom {
   margin-top: auto;
 }
@@ -404,22 +409,6 @@ html {
   font-size: 13px;
   padding: 0 var(--space-10);
 }
-.ch-sticker {
-  width: 120px;
-}
-.ch-sticker img {
-  width: 100%;
-  display: block;
-}
-.ch-tilt-left img {
-  transform: rotate(-6deg);
-}
-.ch-tilt-right img {
-  transform: rotate(6deg);
-}
-.ch-flip img {
-  transform: scaleX(-1);
-}
 .ch-tag-inline {
   margin-left: var(--space-4);
 }
@@ -545,9 +534,6 @@ html {
   gap: var(--space-6);
   text-align: center;
 }
-.ch-empty-sticker {
-  width: 120px;
-}
 .ch-empty-title {
   font-size: 15px;
   font-weight: 500;
@@ -651,20 +637,11 @@ html {
 .ch-emoji {
   gap: var(--space-8);
 }
-.ch-emoji-tabs {
-  display: flex;
-  gap: var(--space-4);
-}
-.ch-sticker-row,
 .ch-emoji-row {
   display: grid;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
+  grid-template-columns: repeat(8, minmax(0, 1fr));
   gap: var(--space-4);
 }
-.ch-emoji-row {
-  grid-template-columns: repeat(8, minmax(0, 1fr));
-}
-.ch-sticker-row button,
 .ch-emoji-row button {
   border: none;
   background: transparent;
@@ -673,11 +650,6 @@ html {
   font-size: 20px;
   padding: var(--space-4);
 }
-.ch-sticker-row img {
-  width: 100%;
-  display: block;
-}
-.ch-sticker-row button:hover,
 .ch-emoji-row button:hover {
   background: var(--hover);
 }
@@ -1223,4 +1195,27 @@ html {
   cursor: pointer;
   font: inherit;
   font-size: 12px;
+}
+
+/* ---- 成果 (S33) ---- */
+
+.ch-result-day {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+.ch-result-day + .ch-result-day {
+  margin-top: var(--space-8);
+}
+.ch-result-claim {
+  width: 100%;
+  text-align: left;
+}
+.ch-result-claim:disabled {
+  cursor: default;
+}
+.ch-result-controls {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-8);
 }

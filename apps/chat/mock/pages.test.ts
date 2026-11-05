@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import type { ChatWorld, PageLine, PluginPage } from "../port.ts";
 import { chosen } from "./page-actions.ts";
 import { createMockPort } from "./port.ts";
+import { resultsOf } from "./results.ts";
 import { firstRunWorld, xiaowenWorld } from "./world.ts";
 
 function setup(world: ChatWorld = xiaowenWorld()) {
@@ -136,5 +137,23 @@ describe("设置 and 插件 on the mock backend", () => {
     expect(port.world().chats.find((c) => c.id === "moyyi")?.suggestions).toHaveLength(3);
     await port.act({ type: "send", chatId: "moyyi", text: "对一下租房合同" });
     expect(port.world().chats.find((c) => c.id === "moyyi")?.suggestions).toBeUndefined();
+  });
+
+  it("lists every handed-over result in 成果, newest day first (S33)", () => {
+    const world = xiaowenWorld();
+    expect(world.results.map((r) => [r.day, r.title, r.by])).toEqual([
+      ["今天", "先对了第 1–2 章的引用", "hecha"],
+      ["今天", "对租房合同", "moyyi"],
+      ["周二", "本周摘录", "xiezuo"],
+      ["10月20日", "第 3 次作业", "moyyi"],
+    ]);
+    const rent = world.results.find((r) => r.chatId === "zufang");
+    expect(rent).toMatchObject({
+      messageId: "z-result",
+      files: [{ name: "合同要点.md", note: "写了 9 条" }],
+      check: { kind: "partial", text: "核查对过 8/9" },
+      undo: "reversible",
+    });
+    expect(resultsOf({ chats: [], messages: {} })).toEqual([]);
   });
 });

@@ -56,6 +56,13 @@ export const Icon = {
       <path d="M6.8 5.6l3.4 2.4-3.4 2.4z" />
     </>,
   ),
+  results: stroke(
+    <>
+      <path d="M4.5 8.5V2.5h7v6" />
+      <path d="M6.5 5h3M6.5 7h2" />
+      <path d="M2.5 9h3l1 1.5h3l1-1.5h3v4.5h-11z" />
+    </>,
+  ),
   plugins: stroke(
     <>
       <rect x="2.5" y="2.5" width="4.5" height="4.5" rx="1.2" />

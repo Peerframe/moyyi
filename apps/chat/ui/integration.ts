@@ -14,6 +14,8 @@ export interface ChatIntegration {
   /** The host's safe rich-text renderer for assistant message bodies. */
   readonly renderText?: (text: string) => ReactNode;
   readonly supportedActions: readonly ChatAction["type"][];
+  /** The rail changed what fills the list, e.g. "results", so the host can load its data. */
+  readonly onView?: (view: string) => void;
 }
 
 export function supports(

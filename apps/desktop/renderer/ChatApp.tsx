@@ -68,6 +68,12 @@ function Tools({
   );
 }
 
+/** `native.artifact.<verb>:<effectId>`, the ids chat-world gives each handed-over file. */
+const ARTIFACT_CONTROL = /^native\.artifact\.(preview|reveal|save):(.+)$/;
+
+/** macOS draws the traffic lights in the rail and the sidebar material behind the window. */
+const MAC = typeof navigator !== "undefined" && navigator.userAgent.includes("Macintosh");
+
 /** The new view shares the existing controller/feature graph and validated native bridge. */
 export function DesktopChatApp({ bridge }: { bridge: DesktopBridge }) {
   const ui = useRenderer(bridge);
@@ -80,6 +86,23 @@ export function DesktopChatApp({ bridge }: { bridge: DesktopBridge }) {
   const controls = useRef<(id: string) => void>(() => {});
   controls.current = (id) => {
     const live = current.current;
+    const artifact = ARTIFACT_CONTROL.exec(id);
+    if (artifact) {
+      const [, verb, effectId = ""] = artifact;
+      const sessionId = live.state?.activeSessionId;
+      if (!sessionId) {
+        live.setViewError("请先打开这个文件所在的会话。");
+        return;
+      }
+      const identity = { sessionId, effectId };
+      live.setViewError(null);
+      if (verb === "preview") {
+        setPanel("results");
+        void live.perform(() => bridge.act({ type: "artifact.open", ...identity }));
+      } else if (verb === "reveal") void live.perform(() => bridge.revealArtifact(identity));
+      else void live.perform(() => bridge.saveArtifact(identity));
+      return;
+    }
     if (live.busy && !["native.artifacts", "native.effects", "native.materials"].includes(id)) {
       live.setViewError("请先等待当前操作结束，或停止运行。");
       return;
@@ -164,39 +187,26 @@ export function DesktopChatApp({ bridge }: { bridge: DesktopBridge }) {
     if (state.activeSessionId)
       void ui.perform(() => bridge.selectDocuments({ sessionId: state.activeSessionId as string }));
   };
+  // Session tools that have no place in the chat yet open the existing complete dialogs.
+  const tool = (id: string, label: string, disabled = ui.busy) => (
+    <button
+      key={id}
+      type="button"
+      className="ch-native-tool"
+      disabled={disabled}
+      onClick={() => command(id)}
+    >
+      {label}
+    </button>
+  );
   const header = (
-    <div className="ch-native-toolbar">
-      <button
-        type="button"
-        className="mc-btn"
-        disabled={ui.busy}
-        onClick={() => command("native.materials")}
-      >
-        材料 {state.materials.length || ""}
-      </button>
-      <button
-        type="button"
-        className="mc-btn"
-        disabled={ui.busy}
-        onClick={() => command("native.permissions")}
-      >
-        会话权限
-      </button>
-      <button type="button" className="mc-btn" onClick={() => command("native.artifacts")}>
-        成果与记录
-      </button>
-      <button
-        type="button"
-        className="mc-btn"
-        disabled={ui.busy}
-        onClick={() => command("native.history")}
-      >
-        完整历史
-      </button>
-      <button type="button" className="mc-btn" onClick={() => command("native.sessions")}>
-        管理会话
-      </button>
-    </div>
+    <nav className="mc-glass ch-native-tools" aria-label="会话工具">
+      {tool("native.materials", state.materials.length ? `材料 ${state.materials.length}` : "材料")}
+      {tool("native.permissions", "权限")}
+      {tool("native.effects", "操作记录", false)}
+      {tool("native.history", "完整历史")}
+      {tool("native.sessions", "会话和回收站", false)}
+    </nav>
   );
   const beforeComposer = (
     <div className="desktop-tools ch-native-notices">
@@ -225,30 +235,40 @@ export function DesktopChatApp({ bridge }: { bridge: DesktopBridge }) {
     </div>
   );
   const empty = (
-    <section className="mc-wallpaper ch-conversation ch-empty">
-      <img src="./character.png" alt="" className="ch-empty-sticker" />
-      <h1 className="ch-empty-title">从你的工作目录开始</h1>
-      <p className="ch-sub">打开已有会话，或选择一个目录开始只读任务。</p>
-      <div className="ch-native-toolbar">
-        <button type="button" className="mc-btn" disabled={ui.busy} onClick={newChat}>
-          选择工作目录
+    <section
+      className="mc-wallpaper ch-conversation ch-empty ch-native-empty"
+      aria-label="没选会话"
+    >
+      <span className="mc-av mc-av-ai ch-native-empty-mark" aria-hidden="true">
+        m
+      </span>
+      <h1 className="ch-empty-title">选一个会话，或交代一件新事</h1>
+      <p className="ch-sub">moyyi 在你选的文件夹里做事。新会话从只读开始，权限由你在会话里决定。</p>
+      <div className="ch-native-empty-keys">
+        <button
+          type="button"
+          className="mc-key mc-key-primary"
+          disabled={ui.busy}
+          onClick={newChat}
+        >
+          选文件夹，开始新会话
         </button>
-        <button type="button" className="mc-btn" onClick={() => command("native.sessions")}>
-          全部会话与回收站
+        <button type="button" className="mc-key" onClick={() => command("native.sessions")}>
+          会话和回收站
         </button>
       </div>
-      <div className="desktop-tools">
+      <div className="desktop-tools ch-native-empty-notice">
         <FeatureSlot name="connection-notice" />
       </div>
     </section>
   );
   return (
     <RendererContext value={ui as ReadyRendererUI}>
-      <div className={`mc mc-${theme} desktop-chat-root`}>
+      <div className={`mc mc-${theme} desktop-chat-root${MAC ? " ch-native-mac" : ""}`}>
         <ChatApp
           port={adapter.port}
           theme={theme}
-          sticker="./character.png"
+          windowControls={MAC}
           integration={{
             activeChatId: state.activeSessionId,
             onNew: newChat,
@@ -259,6 +279,11 @@ export function DesktopChatApp({ bridge }: { bridge: DesktopBridge }) {
             beforeComposer,
             empty,
             supportedActions: CHAT_ACTIONS,
+            onView: (view) => {
+              const sessionId = state.activeSessionId;
+              if (view === "results" && sessionId)
+                ui.act({ type: "artifacts", sessionId, offset: 0 });
+            },
             renderText: (text) => (
               <div className="desktop-tools ch-native-rich">
                 <RichMessage content={text} />

@@ -27,5 +27,4 @@ writeFileSync(join(output, "tokens.css"), tokensCss(tokens));
 cpSync(join(source, "design/bundle.css"), join(output, "bundle.css"));
 cpSync(join(source, "app.css"), join(output, "app.css"));
 cpSync(join(source, "index.html"), join(output, "index.html"));
-cpSync(join(source, "assets/character.png"), join(output, "assets/character.png"));
 console.log(output);

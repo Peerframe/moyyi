@@ -217,7 +217,7 @@ export function PagePane({
   );
 }
 
-function ControlButton({
+export function ControlButton({
   control,
   onPress,
 }: {
@@ -269,7 +269,7 @@ function Segment({
 }
 
 /** Cards join their rows with a hairline, as on the boards. */
-function Card({
+export function Card({
   children,
   className = "",
 }: {

@@ -1,9 +1,11 @@
 // In-memory ChatPort. Every action changes the world the way the runtime will: receipts go from
 // recorded to taken, answers replace keys with a line, stop goes through 正在停… to a stopped
 // status, undo takes its dependents along or asks first. Timing is injectable so tests run instantly.
+
 import type { Chat, ChatAction, ChatPort, ChatWorld, Claim, Job, Key, Message } from "../port.ts";
 import { author, textOf } from "../text.ts";
 import { choose, press, saveKey } from "./page-actions.ts";
+import { resultsOf } from "./results.ts";
 
 export interface MockOptions {
   /** Runs `apply` after `delay` ms; tests pass a manual queue. */
@@ -114,7 +116,9 @@ export function createMockPort(initial: ChatWorld, options: MockOptions = {}): M
   const pendingUndo = new Map<string, readonly string[]>();
 
   const commit = (update: Update) => {
-    world = update(world);
+    const next = update(world);
+    // 成果 follows the chats: a new result message is a new entry.
+    world = next.messages === world.messages ? next : { ...next, results: resultsOf(next) };
     for (const listener of listeners) listener(world);
   };
   const later = (delay: number, update: Update) => schedule(delay, () => commit(update));
@@ -168,7 +172,6 @@ export function createMockPort(initial: ChatWorld, options: MockOptions = {}): M
     const chat = world.chats.find((c) => c.id === chatId);
     if (!chat) return;
     const id = nextId("o");
-    const sticker = /^\[贴纸：(.+)\]$/.exec(text);
     const voice = /^\[语音 (\d+:\d+)\]$/.exec(text);
     const quoted = replyTo ? messageById(world, replyTo) : undefined;
     const message: Message = voice
@@ -183,7 +186,7 @@ export function createMockPort(initial: ChatWorld, options: MockOptions = {}): M
       : {
           id,
           kind: "out",
-          text: sticker ? `［${sticker[1]}］` : text,
+          text,
           receipt: "recorded",
           time: now(),
           ...(quoted ? { quote: `${previewOf(world, quoted)}` } : {}),
@@ -405,12 +408,6 @@ export function createMockPort(initial: ChatWorld, options: MockOptions = {}): M
         skipped: "第 4 条参考文献，你说先放一放",
         time: now(),
       })(next);
-      next = post("lunwen", {
-        id: "l-done-sticker",
-        kind: "sticker",
-        from: "moyyi",
-        moment: "做完了",
-      })(next);
       return mapChat(next, "lunwen", (chat) => ({
         ...chat,
         subtitle: projectSubtitle(next, "lunwen"),
@@ -486,14 +483,11 @@ export function createMockPort(initial: ChatWorld, options: MockOptions = {}): M
       for (const message of next.messages[chatId] ?? [])
         if (message.kind === "change" && message.changeId && asked.has(message.changeId))
           next = mapMessage(next, message.id, (m) => ({ ...m, undo: "undone" }) as Message);
-      next = post(chatId, {
+      return post(chatId, {
         id: nextId("s"),
         kind: "service",
         text: `已撤回 ${gone.length} 处：${gone.map((e) => e.file).join("、")}`,
       })(next);
-      return post(chatId, { id: nextId("k"), kind: "sticker", from: "moyyi", moment: "撤回了" })(
-        next,
-      );
     });
   }
 

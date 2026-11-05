@@ -1,4 +1,5 @@
-// The chat list (boards S1, S7, S8): one list, filtered by the folder the rail picked.
+// The chat list (boards S1, S7, S8): one list, filtered by the folder the rail picked. Chats that
+// wait on you carry the 等你决定 prefix and an attention badge wherever they are listed.
 import { useState } from "react";
 import type { Chat, ChatWorld, FolderId } from "../port.ts";
 import { Icon } from "./icons.tsx";
@@ -9,8 +10,12 @@ const EMPTY: Record<FolderId, readonly [string, string]> = {
   all: ["这里没有对话", "跟 moyyi 说一件想做的事，项目和 AI 会出现在这里"],
   ai: ["还没有 AI", "交代第一件事之后，moyyi 会拉合适的 AI 进来"],
   project: ["还没有项目", "计划卡上点开始，才会建项目群"],
-  mine: ["没有等你的事", "有决定要你做时，这里会出现橙色数字"],
-  running: ["没有在做的事", "计划卡上点开始之后，正在做的项目和 AI 会列在这里"],
+};
+/** The desktop app: every session works in one folder, so sessions are listed as projects. */
+const NATIVE_EMPTY: Record<FolderId, readonly [string, string]> = {
+  all: ["还没有会话", "点右上角的笔，选一个文件夹，交代第一件事"],
+  ai: ["还没有 AI 私聊", "本机版本的会话都在文件夹里，列在 项目"],
+  project: ["还没有会话", "点右上角的笔，选一个文件夹，交代第一件事"],
 };
 
 export function ChatList({
@@ -41,21 +46,12 @@ export function ChatList({
   const archived = showArchive ? world.chats.filter((chat) => chat.archived) : [];
   const chats = world.chats.filter(
     (chat) =>
-      (archive ? chat.archived : inFolder(world, chat, folder)) &&
+      (archive ? chat.archived : inFolder(chat, folder)) &&
       (!needle || chat.name.includes(needle) || chat.preview.text.includes(needle)),
   );
   const [emptyTitle, emptyNote] = needle
-    ? [`没找到“${needle}”`, "试试搜文件名，或者到项目里 /对账"]
-    : native
-      ? [
-          folder === "mine"
-            ? "没有等你确认的操作"
-            : folder === "running"
-              ? "没有正在运行的任务"
-              : "这里没有会话",
-          "选择已有会话，或点击右上角开始新会话",
-        ]
-      : EMPTY[folder];
+    ? [`没找到“${needle}”`, "试试搜文件名，或者到 成果 里找交付的文件"]
+    : (native ? NATIVE_EMPTY : EMPTY)[folder];
   return (
     <section className="mc-panel ch-list" aria-label="对话列表">
       <div className="ch-list-head">
@@ -107,7 +103,7 @@ export function ChatList({
             key={chat.id}
             chat={chat}
             draft={drafts[chat.id]}
-            mixed={folder === "all" || folder === "mine" || folder === "running"}
+            mixed={folder === "all"}
             open={chat.id === openId}
             onOpen={() => onOpen(chat.id)}
           />

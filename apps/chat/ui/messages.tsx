@@ -30,16 +30,8 @@ interface Props {
   readonly run: Run;
   readonly actions: MessageActions;
   readonly highlighted?: boolean;
-  readonly sticker: string;
   readonly renderText?: ((text: string) => ReactNode) | undefined;
 }
-
-const STICKER_TILT: Record<string, string> = {
-  开始了: "",
-  等你: " ch-tilt-left",
-  做完了: " ch-flip",
-  撤回了: " ch-tilt-right",
-};
 
 export function MessageView(props: Props) {
   const { message, actions } = props;
@@ -113,7 +105,6 @@ function FromAI({
   run,
   actions,
   highlighted,
-  sticker,
   renderText,
 }: Props & { readonly message: AIMessage }) {
   const member = members[message.from];
@@ -121,17 +112,6 @@ function FromAI({
   const role = chat.members?.find((m) => m.id === message.from)?.role;
   const showSender = Boolean(message.senderNote) || (run.first && chat.kind === "project");
   const avatar = member ? <MemberAvatar member={member} /> : <span className="ch-av-space" />;
-  if (message.kind === "sticker") {
-    return (
-      <div className="mc-line">
-        {avatar}
-        <div className={`mc-sticker ch-sticker${STICKER_TILT[message.moment] ?? ""}`}>
-          <img src={sticker} alt={message.moment} />
-          <span className="mc-sticker-label">{message.moment}</span>
-        </div>
-      </div>
-    );
-  }
   const sender = showSender ? (
     <Sender message={message} name={name} role={chat.kind === "project" ? role : undefined} />
   ) : null;

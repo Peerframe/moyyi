@@ -1,5 +1,5 @@
-// The window (boards S1, S7, S8, S12, S23–S32): folder rail, then either the chat list with the open
-// chat and its side panel, or 设置 / 插件 with the open section. Below 1200px the panel floats over
+// The window (boards S1, S7, S8, S12, S23–S33): folder rail, then either the chat list with the open
+// chat and its side panel, or 成果 / 设置 / 插件 with the open entry. Below 1200px the panel floats over
 // the chat, below 900px the rail becomes chips above the list, below 700px one pane shows at a time
 // and the panel opens as a bottom sheet.
 import { useEffect, useState, useSyncExternalStore } from "react";
@@ -14,21 +14,23 @@ import type { PageActions } from "./Pages.tsx";
 import { PageList, PagePane } from "./Pages.tsx";
 import type { PanelActions, PanelFrame } from "./Panel.tsx";
 import { SidePanel } from "./Panel.tsx";
-import { inFolder, isFolder, Rail, type ViewId } from "./Rail.tsx";
+import { inFolder, isFolder, type PageView, Rail, type ViewId } from "./Rail.tsx";
+import { type ResultActions, ResultList, ResultPane } from "./Results.tsx";
 
 export interface AppProps {
   readonly port: ChatPort;
   readonly theme: Theme;
-  readonly sticker: string;
   readonly initialChat?: string | undefined;
   readonly integration?: ChatIntegration | undefined;
-  /** Opens 设置 or 插件 instead of the chats, e.g. "settings/permissions". */
+  /** Opens 成果, 设置 or 插件 instead of the chats, e.g. "settings/permissions". */
   readonly initialPage?: string | undefined;
+  /** The host draws window controls at the top of the rail (macOS traffic lights). */
+  readonly windowControls?: boolean | undefined;
 }
 
-function parsePage(value: string | undefined): { view: ViewId; page: string | null } | null {
+function parsePage(value: string | undefined): { view: PageView; page: string | null } | null {
   const [view, page = null] = value?.split("/") ?? [];
-  return view === "settings" || view === "plugins" ? { view, page } : null;
+  return view === "results" || view === "settings" || view === "plugins" ? { view, page } : null;
 }
 
 function useNarrow(): boolean {
@@ -46,13 +48,21 @@ function useNarrow(): boolean {
   return narrow;
 }
 
-export function App({ port, theme, sticker, initialChat, initialPage, integration }: AppProps) {
+export function App({
+  port,
+  theme,
+  initialChat,
+  initialPage,
+  integration,
+  windowControls,
+}: AppProps) {
   const world = useSyncExternalStore(port.subscribe, port.world, port.world);
   const narrow = useNarrow();
   const start = parsePage(initialPage);
   const [view, setView] = useState<ViewId>(start?.view ?? "all");
   /** The open section of each page list; null shows only the list on narrow layouts. */
-  const [pageOf, setPageOf] = useState<Readonly<Record<"settings" | "plugins", string | null>>>({
+  const [pageOf, setPageOf] = useState<Readonly<Record<PageView, string | null>>>({
+    results: start?.view === "results" ? (start.page ?? null) : null,
     settings: start?.view === "settings" ? (start.page ?? null) : null,
     plugins: start?.view === "plugins" ? (start.page ?? null) : null,
   });
@@ -120,7 +130,7 @@ export function App({ port, theme, sticker, initialChat, initialPage, integratio
         (event.key === "ArrowUp" || event.key === "ArrowDown")
       ) {
         event.preventDefault();
-        const list = world.chats.filter((c) => inFolder(world, c, folder));
+        const list = world.chats.filter((c) => inFolder(c, folder));
         const at = list.findIndex((c) => c.id === openId);
         const next =
           list[at < 0 ? 0 : (at + (event.key === "ArrowDown" ? 1 : list.length - 1)) % list.length];
@@ -153,9 +163,56 @@ export function App({ port, theme, sticker, initialChat, initialPage, integratio
   const onView = (next: ViewId) => {
     setView(next);
     if (isFolder(next)) setFolder(next);
+    integration?.onView?.(next);
+  };
+
+  const resultActions: ResultActions = {
+    press: pageActions.press,
+    openChat: (chatId, claim) => {
+      setView(folder);
+      open(chatId);
+      if (claim) setStack([{ kind: "claim", ...claim }]);
+    },
   };
 
   const layout = narrow ? "narrow" : "wide";
+  const rail = narrow ? null : (
+    <Rail world={world} view={view} onView={onView} windowControls={windowControls} />
+  );
+
+  if (view === "results") {
+    const chosen = pageOf.results;
+    const result =
+      world.results.find((r) => r.id === chosen) ?? (narrow ? undefined : world.results[0]);
+    return (
+      <div className={`mc mc-${theme} mc-window ch-app`} data-layout={layout}>
+        {rail}
+        {!narrow || !result ? (
+          <ResultList
+            world={world}
+            current={result?.id ?? null}
+            onOpen={(id) => setPageOf((value) => ({ ...value, results: id }))}
+            onView={onView}
+            native={Boolean(integration)}
+          />
+        ) : null}
+        {result ? (
+          <ResultPane
+            world={world}
+            result={result}
+            actions={resultActions}
+            feedback={feedback}
+            onBack={narrow ? () => setPageOf((value) => ({ ...value, results: null })) : undefined}
+          />
+        ) : narrow ? null : (
+          <section className="mc-panel ch-pane ch-empty" aria-label="没选成果">
+            <span className="ch-empty-title">还没有成果</span>
+            <span className="ch-sub">AI 交给你的文件会出现在这里</span>
+          </section>
+        )}
+      </div>
+    );
+  }
 
   if (!isFolder(view)) {
     const pages = view === "settings" ? world.settings : world.plugins;
@@ -165,7 +222,7 @@ export function App({ port, theme, sticker, initialChat, initialPage, integratio
     const openPage = (pageId: string) => setPageOf((value) => ({ ...value, [view]: pageId }));
     return (
       <div className={`mc mc-${theme} mc-window ch-app`} data-layout={layout}>
-        {narrow ? null : <Rail world={world} view={view} onView={onView} />}
+        {rail}
         {!narrow || !page ? (
           <PageList
             world={world}
@@ -195,7 +252,7 @@ export function App({ port, theme, sticker, initialChat, initialPage, integratio
 
   return (
     <div className={`mc mc-${theme} mc-window ch-app`} data-layout={layout}>
-      {narrow ? null : <Rail world={world} view={view} onView={onView} />}
+      {rail}
       {showList ? (
         <ChatList
           world={world}
@@ -223,7 +280,6 @@ export function App({ port, theme, sticker, initialChat, initialPage, integratio
             world={world}
             chat={chat}
             draft={drafts[chat.id] ?? ""}
-            sticker={sticker}
             infoOpen={stack[0]?.kind === "info"}
             narrow={narrow}
             searchOpen={searchOpen}
@@ -246,7 +302,7 @@ export function App({ port, theme, sticker, initialChat, initialPage, integratio
                 {feedback}
               </p>
             ) : null}
-            {integration?.empty ?? <EmptyChat sticker={sticker} />}
+            {integration?.empty ?? <EmptyChat />}
           </section>
         )
       ) : null}
@@ -273,10 +329,9 @@ export function App({ port, theme, sticker, initialChat, initialPage, integratio
   );
 }
 
-function EmptyChat({ sticker }: { readonly sticker: string }) {
+function EmptyChat() {
   return (
     <>
-      <img src={sticker} alt="" className="ch-empty-sticker" />
       <span className="ch-empty-title">选一个对话开始</span>
       <span className="ch-sub">或者直接跟 moyyi 说想做什么</span>
     </>

@@ -46,7 +46,5 @@ export function textOf(message: Message): string {
       return message.name;
     case "voice":
       return message.transcript;
-    case "sticker":
-      return `[贴纸：${message.moment}]`;
   }
 }

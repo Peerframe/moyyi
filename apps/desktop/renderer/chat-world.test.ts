@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { chatTestState as snapshot } from "./chat-test-state.ts";
-import { projectChatWorld } from "./chat-world.ts";
+import { artifactControlId, projectChatWorld } from "./chat-world.ts";
 
 describe("desktop Chat state projection", () => {
   it("loads without introducing sample chats, messages, providers or jobs", () => {
@@ -202,5 +202,44 @@ describe("desktop Chat state projection", () => {
     expect(text).not.toContain("刚测过");
     expect(text).not.toContain('"kind":"meters"');
     expect(text).not.toContain('"keyField"');
+  });
+
+  it("lists the open session's created files in 成果 with their recorded state", () => {
+    const world = projectChatWorld(
+      snapshot({
+        artifacts: {
+          items: [
+            {
+              effectId: "e1",
+              path: "/projects/actual-project/报告.md",
+              afterHash: "a",
+              state: "current",
+            },
+            {
+              effectId: "e2",
+              path: "/projects/actual-project/notes/草稿.txt",
+              afterHash: "b",
+              state: "unchecked",
+            },
+          ],
+          offset: 0,
+          hasMore: false,
+        },
+      }),
+    );
+    expect(
+      world.results.map((result) => [result.title, result.chatId, result.files[0]?.state]),
+    ).toEqual([
+      ["报告.md", "session-a", "current"],
+      ["草稿.txt", "session-a", "unknown"],
+    ]);
+    expect(world.results[0]?.files[0]?.controls?.map((control) => control.id)).toEqual([
+      artifactControlId("preview", "e1"),
+      artifactControlId("reveal", "e1"),
+      artifactControlId("save", "e1"),
+    ]);
+    // No session open: nothing to list, and nothing is made up.
+    expect(projectChatWorld(snapshot({ activeSessionId: null })).results).toEqual([]);
+    expect(projectChatWorld(null).results).toEqual([]);
   });
 });

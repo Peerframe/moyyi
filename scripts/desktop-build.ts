@@ -69,7 +69,6 @@ writeFileSync(
 );
 cpSync(join(chat, "design/bundle.css"), join(output, "bundle.css"));
 cpSync(join(chat, "app.css"), join(output, "chat.css"));
-cpSync(join(chat, "assets/character.png"), join(output, "character.png"));
 // Existing feature controls keep their styles within an explicit scope. Their global button,
 // body and layout rules must never restyle the approved Chat interface.
 writeFileSync(

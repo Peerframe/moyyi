@@ -19,7 +19,6 @@ export interface ConversationProps {
   readonly world: ChatWorld;
   readonly chat: Chat;
   readonly draft: string;
-  readonly sticker: string;
   readonly infoOpen: boolean;
   readonly narrow: boolean;
   readonly searchOpen: boolean;
@@ -507,7 +506,6 @@ export function Conversation(props: ConversationProps) {
                   members={world.members}
                   run={grouped[index] ?? { first: true }}
                   actions={actions}
-                  sticker={props.sticker}
                   renderText={integration?.renderText}
                 />
               </div>
@@ -653,7 +651,6 @@ export function Conversation(props: ConversationProps) {
                 ? { who: chat.kind === "project" ? "负责人 moyyi" : chat.name, step: shownJob.step }
                 : null
             }
-            sticker={props.sticker}
             onDraft={props.onDraft}
             onSend={async (text) => {
               if (editing) await props.act({ type: "edit", messageId: editing, text });

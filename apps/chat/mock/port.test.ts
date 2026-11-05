@@ -75,10 +75,9 @@ describe("moyyi Chat mock backend", () => {
       kind: "result",
       check: { text: "核查对过 12/12" },
     });
-    expect(port.world().messages.lunwen?.at(-1)).toMatchObject({
-      kind: "sticker",
-      moment: "做完了",
-    });
+    expect(port.world().messages.lunwen?.at(-1)).toMatchObject({ kind: "result" });
+    // The finished job is also the newest entry in 成果.
+    expect(port.world().results[0]).toMatchObject({ title: "改论文格式", chatId: "lunwen" });
   });
 
   it("stops through 正在停… and leaves a stopped status that can resume", async () => {
@@ -104,7 +103,10 @@ describe("moyyi Chat mock backend", () => {
     await port.act({ type: "answer", messageId: ask?.id ?? "", key: 0 });
     expect(port.world().changes.lunwen?.map((c) => c.id)).toEqual(["ch-2"]);
     expect(messageById(port.world(), "l-change")).toMatchObject({ undo: "undone" });
-    expect(last("lunwen")).toMatchObject({ kind: "sticker", moment: "撤回了" });
+    expect(last("lunwen")).toMatchObject({
+      kind: "service",
+      text: "已撤回 2 处：第3章.docx 格式、第3章.docx 目录",
+    });
   });
 
   it("undoes a change with no dependents at once", async () => {

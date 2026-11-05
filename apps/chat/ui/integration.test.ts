@@ -43,7 +43,6 @@ describe("host-backed Chat interface", () => {
       createElement(App, {
         port: createMockPort(world),
         theme: "dark",
-        sticker: "sticker.png",
         integration: { ...integration, renderText },
       }),
     );
@@ -65,7 +64,6 @@ describe("host-backed Chat interface", () => {
       createElement(App, {
         port: createMockPort(world),
         theme: "dark",
-        sticker: "sticker.png",
         initialChat: "lunwen",
         integration: {
           ...integration,
@@ -91,7 +89,6 @@ describe("host-backed Chat interface", () => {
       createElement(App, {
         port: createMockPort(world),
         theme: "light",
-        sticker: "sticker.png",
         integration: {
           ...integration,
           activeChatId: null,
@@ -123,7 +120,6 @@ describe("host-backed Chat interface", () => {
       createElement(App, {
         port: createMockPort(world),
         theme: "dark",
-        sticker: "sticker.png",
         initialPage: "plugins",
         integration,
       }),
@@ -142,7 +138,6 @@ describe("host-backed Chat interface", () => {
       members: world.members,
       draft: `保留这条草稿\n${"多行内容".repeat(1200)}`,
       running: null,
-      sticker: "sticker.png",
       onDraft: () => undefined,
       onSend: async () => undefined,
       onStop: () => undefined,

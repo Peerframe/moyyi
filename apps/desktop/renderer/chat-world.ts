@@ -1,5 +1,17 @@
-import type { Chat, ChatInfo, ChatWorld, Message } from "../../chat/port.ts";
-import type { DesktopMessage, DesktopSessionSummary, DesktopState } from "../shared.ts";
+import type {
+  Chat,
+  ChatInfo,
+  ChatWorld,
+  Message,
+  ResultFileState,
+  ResultItem,
+} from "../../chat/port.ts";
+import type {
+  DesktopArtifact,
+  DesktopMessage,
+  DesktopSessionSummary,
+  DesktopState,
+} from "../shared.ts";
 import { chatBudgetLabel, chatModelLabel, projectChatPages } from "./chat-pages.ts";
 import { permissionLabel } from "./effects-state.ts";
 import { noticeLabel, outcomeLabel, toolStateLabel, workspaceName } from "./view-state.ts";
@@ -118,6 +130,47 @@ function sessionInfo(state: DesktopState, summary: DesktopSessionSummary): ChatI
   };
 }
 
+const ARTIFACT_STATE: Record<DesktopArtifact["state"], ResultFileState> = {
+  current: "current",
+  changed: "changed",
+  missing: "missing",
+  unchecked: "unknown",
+  unavailable: "unknown",
+};
+
+/** Native control ids for one handed-over file; ChatApp routes them to the existing bridge. */
+export function artifactControlId(verb: "preview" | "reveal" | "save", effectId: string): string {
+  return `native.artifact.${verb}:${effectId}`;
+}
+
+/**
+ * 成果 for the open session: the files its runs created, with the runtime's recorded check of
+ * whether each is still what was written. Other sessions list theirs once opened.
+ */
+function sessionResults(state: DesktopState): readonly ResultItem[] {
+  const sessionId = state.activeSessionId;
+  if (!sessionId) return [];
+  return state.artifacts.items.map((artifact) => ({
+    id: `artifact:${artifact.effectId}`,
+    chatId: sessionId,
+    title: artifact.path.split(/[\\/]/).at(-1) || artifact.path,
+    by: "moyyi",
+    day: "当前会话",
+    time: "",
+    files: [
+      {
+        name: artifact.path,
+        state: ARTIFACT_STATE[artifact.state],
+        controls: [
+          { id: artifactControlId("preview", artifact.effectId), label: "预览" },
+          { id: artifactControlId("reveal", artifact.effectId), label: "在 Finder 里显示" },
+          { id: artifactControlId("save", artifact.effectId), label: "另存为" },
+        ],
+      },
+    ],
+  }));
+}
+
 /** A browser-safe projection of recorded desktop state. It contains no sample world or effects. */
 export function projectChatWorld(
   state: DesktopState | null,
@@ -138,6 +191,7 @@ export function projectChatWorld(
       threads: {},
       settings: [],
       plugins: [],
+      results: [],
     };
 
   const summaries = [...state.sessions.items];
@@ -228,6 +282,7 @@ export function projectChatWorld(
     ),
     changes: {},
     threads: {},
+    results: sessionResults(state),
     ...projectChatPages(state),
   };
 }

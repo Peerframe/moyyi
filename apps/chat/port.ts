@@ -4,8 +4,11 @@
 // checks, undo results) arrive as data; the interface never invents them.
 
 export type Theme = "dark" | "light";
-/** Folders filter the one chat list: states first (全部, 等我的, 在做), then kinds (AI, 项目). */
-export type FolderId = "all" | "mine" | "running" | "ai" | "project";
+/**
+ * Folders filter the one chat list by who you talk to: everyone, AIs, projects. What waits on you
+ * or is running is a state of a chat, shown by badges, prefixes and dots, never a folder.
+ */
+export type FolderId = "all" | "ai" | "project";
 
 /** Avatar fill roles from the design system: accent (moyyi), key, ink (dark roles), quiet. */
 export type AvatarTone = "accent" | "key" | "ink" | "quiet";
@@ -190,10 +193,8 @@ export type Message =
       readonly check: { readonly kind: ClaimKind; readonly text: string };
       readonly skipped?: string;
       readonly claims?: readonly Claim[];
-    })
-  | (FromAI & {
-      readonly kind: "sticker";
-      readonly moment: "开始了" | "等你" | "做完了" | "撤回了";
+      /** Recorded undo state of the changes this job made, when it made any. */
+      readonly undo?: "reversible" | "undone" | "irreversible";
     })
   | (FromAI & {
       readonly kind: "link";
@@ -299,6 +300,43 @@ export interface ChatWorld {
   readonly settings: readonly SettingsPage[];
   /** 插件 (S31–S32): what AIs can do. */
   readonly plugins: readonly PluginPage[];
+  /** 成果 (S33): what the AIs handed over, newest first, across every chat. */
+  readonly results: readonly ResultItem[];
+}
+
+// ---- results ----
+// One entry per handed-over job. What was checked and whether a file still matches what was
+// handed over are recorded facts from the runtime; the interface never works them out itself.
+
+/** Whether a handed-over file is still what the AI wrote. */
+export type ResultFileState = "current" | "changed" | "missing" | "unknown";
+
+export interface ResultFile {
+  readonly name: string;
+  /** What happened to it, e.g. "写了 9 条". */
+  readonly note?: string;
+  readonly state?: ResultFileState;
+  readonly controls?: readonly Control[];
+}
+
+export interface ResultItem {
+  readonly id: string;
+  readonly chatId: string;
+  /** The result message in that chat, when there is one to jump back to. */
+  readonly messageId?: string;
+  readonly title: string;
+  /** Member id of the AI that handed it over. */
+  readonly by: string;
+  /** Day group in the list, e.g. "今天". */
+  readonly day: string;
+  readonly time: string;
+  readonly files: readonly ResultFile[];
+  readonly check?: { readonly kind: ClaimKind; readonly text: string };
+  readonly claims?: readonly Claim[];
+  readonly skipped?: string;
+  /** Recorded undo state of the changes behind it. */
+  readonly undo?: "reversible" | "undone" | "irreversible";
+  readonly controls?: readonly Control[];
 }
 
 // ---- settings and plugin pages ----

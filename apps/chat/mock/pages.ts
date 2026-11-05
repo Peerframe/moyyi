@@ -351,7 +351,7 @@ function records(): SettingsPage {
     groups: [
       {
         title: "放在哪",
-        caption: "没有云端副本。记录、文件改动的留底和贴纸都只在这里。",
+        caption: "没有云端副本。记录和文件改动的留底都只在这里。",
         blocks: [
           {
             kind: "lines",

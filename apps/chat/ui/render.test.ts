@@ -10,16 +10,12 @@ import { folderBadge, inFolder } from "./Rail.tsx";
 
 function render(world: ChatWorld, chat?: string, theme: "dark" | "light" = "dark") {
   const port = createMockPort(world, { schedule: () => undefined });
-  return renderToString(
-    createElement(App, { port, theme, sticker: "sticker.png", initialChat: chat }),
-  );
+  return renderToString(createElement(App, { port, theme, initialChat: chat }));
 }
 
 function renderPage(world: ChatWorld, page: string, theme: "dark" | "light" = "dark") {
   const port = createMockPort(world, { schedule: () => undefined });
-  return renderToString(
-    createElement(App, { port, theme, sticker: "sticker.png", initialPage: page }),
-  );
+  return renderToString(createElement(App, { port, theme, initialPage: page }));
 }
 
 /** Text content only, so assertions read like what the person sees. */
@@ -31,8 +27,7 @@ describe("moyyi Chat interface", () => {
     const seen = text(html);
     for (const words of [
       "全部",
-      "等我的",
-      "在做",
+      "成果",
       "插件",
       "设置",
       "等你决定：参考文献用哪种格式",
@@ -149,20 +144,22 @@ describe("moyyi Chat interface", () => {
     const world = xiaowenWorld();
     const { chats } = world;
     expect(folderBadge(world, "all")).toEqual({ kind: "decide", count: 3 });
-    expect(folderBadge(world, "running")).toEqual({ kind: "quiet", count: world.jobs.length });
+    expect(folderBadge(world, "project")).toEqual({ kind: "decide", count: 1 });
     expect(folderBadge({ ...world, chats: chats.filter((c) => !c.decisions) }, "all")).toEqual({
       kind: "unread",
       count: 1,
     });
-    expect(chats.filter((c) => inFolder(world, c, "mine")).map((c) => c.id)).toEqual([
-      "lunwen",
-      "moyyi",
-    ]);
-    expect(chats.some((c) => c.archived && inFolder(world, c, "all"))).toBe(false);
-    // 在做: chats with a running job, and AIs that are working.
-    const running = chats.filter((c) => inFolder(world, c, "running")).map((c) => c.id);
-    for (const job of world.jobs) expect(running).toContain(job.chatId);
-    expect(folderBadge({ ...world, jobs: [] }, "running")).toBeNull();
+    expect(chats.some((c) => c.archived && inFolder(c, "all"))).toBe(false);
+    expect(chats.filter((c) => inFolder(c, "project")).every((c) => c.kind === "project")).toBe(
+      true,
+    );
+  });
+
+  it("keeps waiting and running as states of a chat, not folders (S33 review)", () => {
+    const html = render(xiaowenWorld(), "lunwen");
+    const rail = html.slice(html.indexOf('aria-label="文件夹"'), html.indexOf("</nav>"));
+    expect(text(rail)).not.toMatch(/等我的|在做/);
+    expect(text(rail)).toMatch(/全部.*AI.*项目.*成果.*插件.*设置/);
   });
 
   it("groups bubbles into runs and finds open decisions", () => {
@@ -172,5 +169,29 @@ describe("moyyi Chat interface", () => {
     const decide = messages.findIndex((m) => m.id === "l-decide");
     expect(grouped[decide]).toEqual({ first: true });
     expect(openDecisions(messages).map((m) => m.id)).toEqual(["l-decide"]);
+  });
+
+  it("renders 成果 with what was handed over, checked and not done (S33)", () => {
+    const seen = text(renderPage(xiaowenWorld(), "results/result:z-result"));
+    for (const words of [
+      "成果",
+      "今天",
+      "先对了第 1–2 章的引用",
+      "核查 · 毕业论文",
+      "对租房合同",
+      "moyyi 交给你 · 在「租房」 · 今天 21:11",
+      "回到对话",
+      "交付的文件",
+      "合同要点.md",
+      "写了 9 条",
+      "核对",
+      "核查对过 8/9",
+      "押金 3000 元，退租后 7 天内退还",
+      "这次的改动都能撤回",
+    ])
+      expect(seen).toContain(words);
+    expect(text(renderPage(xiaowenWorld(), "results/result:o-result"))).toContain(
+      "第 2 题的图，你说自己画",
+    );
   });
 });
