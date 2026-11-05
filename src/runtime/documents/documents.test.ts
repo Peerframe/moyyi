@@ -102,6 +102,7 @@ describe("document snapshots and real parsers", () => {
     });
     await expect(absent.read()).rejects.toThrow(/durable/u);
   });
+  // Sequential sandboxed parser launches took ~5 s even alone on macOS arm64 (2026-11-05).
   it("rejects unsupported, corrupt, empty and encrypted containers distinctly", async () => {
     await writeFile(join(workspace, "old.doc"), "OLD");
     await expect(capability("old.doc").read()).rejects.toThrow(/unsupported/u);
@@ -128,7 +129,7 @@ describe("document snapshots and real parsers", () => {
         () => {},
       ),
     ).rejects.toMatchObject({ code: "password_required" });
-  });
+  }, 20_000);
   it("enforces input, ZIP entry and expansion bounds", async () => {
     await writeFile(join(workspace, "huge.pdf"), Buffer.alloc(10 * 1024 * 1024 + 1));
     await expect(capability("huge.pdf").read()).rejects.toThrow(/10 MiB/u);

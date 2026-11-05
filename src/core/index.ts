@@ -45,6 +45,14 @@ import {
 } from "../contracts/index.ts";
 import { type ExecutionHost, executeCalls } from "./executor.ts";
 import { recoverSession } from "./recovery.ts";
+import {
+  answerState,
+  evidenceAnswerNotice,
+  finishedOutcome,
+  planRequest,
+  requestBudgetNotice,
+  unexecutedCallText,
+} from "./request-plan.ts";
 import { consumeResponse, type Response } from "./response.ts";
 
 export const DEFAULT_LIMITS: RunLimits = Object.freeze({
@@ -673,11 +681,15 @@ export class AgentCore {
         return { kind: "budget_exhausted", budget: "model_requests" };
       }
       await run.queue;
-      const remaining = this.#limits.maxModelRequests - run.requests;
-      const timeToAnswer = run.investigation?.expired === true;
-      const evidenceAnswer =
-        this.#deps.evidenceAnswer === true && (draftReady || remaining === 1 || timeToAnswer);
-      const finalRequest = remaining === 1 || evidenceAnswer;
+      const plan = planRequest({
+        maxModelRequests: this.#limits.maxModelRequests,
+        requests: run.requests,
+        evidenceAnswerEnabled: this.#deps.evidenceAnswer === true,
+        draftReady,
+        investigationExpired: run.investigation?.expired === true,
+      });
+      const evidenceAnswer = plan.evidenceAnswer !== undefined;
+      const { finalRequest } = plan;
       if (evidenceAnswer && !investigationSettled) {
         try {
           const terminalOutcome = await this.#settleInvestigation(run, lastResponse);
@@ -690,35 +702,16 @@ export class AgentCore {
         investigationSettled = true;
         if (run.controller.signal.aborted) break;
       }
-      if (evidenceAnswer)
+      if (plan.evidenceAnswer)
         await this.#append(run, {
           kind: "notice",
           code: "evidence_answer",
-          text:
-            `Evidence answer: ${draftReady ? "draft ready" : timeToAnswer ? "investigation time elapsed" : "last request"}. ` +
-            "One tool-free answer from the original question and recorded observations follows within the existing budget. " +
-            "Earlier assistant text is retained as investigation, not supplied to this request. This is not task acceptance.",
+          text: evidenceAnswerNotice(plan.evidenceAnswer),
         });
       await this.#append(run, {
         kind: "notice",
         code: "model_request_budget",
-        text:
-          `Model request budget: attempt ${run.requests + 1} of ${this.#limits.maxModelRequests}; ` +
-          `${remaining} request(s) remaining including this one. ` +
-          `${finalRequest ? 0 : remaining - 1} tool-enabled request(s) remain before the answer-only final request. ` +
-          (finalRequest
-            ? "This is the final request. New tool calls are disabled. Give the user your final answer " +
-              "using only evidence already available. Distinguish verified findings, incomplete work " +
-              "and uncertainty; do not invent results or claim unperformed actions. If evidence is " +
-              "insufficient, explain the partial result and what remains unverified."
-            : remaining === 2
-              ? "This is the last tool-enabled request. Complete any still-required artifact creation " +
-                "and verification in this tool batch; the next request cannot use tools. A proposed " +
-                "artifact in chat is not a created file. Retries consume this same budget. This notice " +
-                "does not grant permissions or override user constraints."
-              : "Reserve the final request for an answer. Gather necessary evidence; group independent " +
-                "reads; finish early when ready. Retries use this budget. Existing permissions and " +
-                "user constraints apply."),
+        text: requestBudgetNotice(plan, this.#limits.maxModelRequests),
       });
       const snapshot = await this.#session(run.sessionId);
       const consumedSteering = snapshot.entries.filter(
@@ -833,9 +826,7 @@ export class AgentCore {
               type: "tool_result",
               callId: call.callId,
               status: "cancelled",
-              content: [
-                { type: "text", text: "Investigation time elapsed; tool was not executed." },
-              ],
+              content: [{ type: "text", text: unexecutedCallText.investigationElapsed }],
             })),
           });
         continue;
@@ -848,12 +839,7 @@ export class AgentCore {
             type: "tool_result",
             callId: call.callId,
             status: "denied",
-            content: [
-              {
-                type: "text",
-                text: "Tool was not executed: the final model request is reserved for an answer.",
-              },
-            ],
+            content: [{ type: "text", text: unexecutedCallText.finalRequest }],
           })),
         });
         if (run.controller.signal.aborted) break;
@@ -871,20 +857,11 @@ export class AgentCore {
               type: "tool_result",
               callId: call.callId,
               status: run.controller.signal.aborted ? "cancelled" : "failed",
-              content: [
-                {
-                  type: "text",
-                  text: "Tool was not executed: assistant did not complete a tool-use turn.",
-                },
-              ],
+              content: [{ type: "text", text: unexecutedCallText.incompleteTurn }],
             })),
           });
         if (run.controller.signal.aborted) break;
-        const completeStop = ["end_turn", "refusal"].includes(response.stopReason);
-        const hasAnswer = response.parts.some(
-          (part) =>
-            (part.type === "text" || part.type === "refusal") && part.text.trim().length > 0,
-        );
+        const { completeStop, hasAnswer } = answerState(response);
         // A stream terminal is not necessarily a complete answer. Pending steering remains
         // recorded, but cannot turn a truncated/empty response into an automatic continuation.
         if (!response.error && completeStop && hasAnswer && calls.length === 0) {
@@ -905,25 +882,7 @@ export class AgentCore {
           }
         }
         run.finishing = true;
-        if (response.error) return { kind: "failed", reason: response.error.message };
-        // The provider's output ceiling remains the cause even on the last allowed request.
-        if (response.stopReason === "max_tokens")
-          return { kind: "budget_exhausted", budget: "model_output_tokens" };
-        if (finalRequest && (!completeStop || !hasAnswer))
-          return { kind: "budget_exhausted", budget: "model_requests" };
-        if (!completeStop)
-          return {
-            kind: "failed",
-            reason: `Model response did not complete (stop reason: ${response.stopReason})`,
-          };
-        if (calls.length)
-          return {
-            kind: "failed",
-            reason: "Model response ended without completing its tool calls",
-          };
-        if (!hasAnswer)
-          return { kind: "failed", reason: "Model response contained no answer text" };
-        return { kind: "completed" };
+        return finishedOutcome(response, finalRequest, calls.length);
       }
       retries = 0;
       const processor = this.#deps.toolResults;
