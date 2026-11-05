@@ -3,7 +3,7 @@
 // status, undo takes its dependents along or asks first. Timing is injectable so tests run instantly.
 import type { Chat, ChatAction, ChatPort, ChatWorld, Claim, Job, Key, Message } from "../port.ts";
 import { author, textOf } from "../text.ts";
-import { choose, press, saveKey } from "./page-actions.ts";
+import { choose, press, saveKey, setNumber } from "./page-actions.ts";
 
 export interface MockOptions {
   /** Runs `apply` after `delay` ms; tests pass a manual queue. */
@@ -724,6 +724,8 @@ export function createMockPort(initial: ChatWorld, options: MockOptions = {}): M
           return commit((w) => press(w, action.controlId, { next: nextId }));
         case "save-key":
           return commit((w) => saveKey(w, action.providerId, action.key));
+        case "set-number":
+          return commit((w) => setNumber(w, action.fieldId, action.value));
       }
     },
     play(pace = 1) {

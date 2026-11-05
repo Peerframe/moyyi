@@ -9,10 +9,55 @@
   - put working folders inside 项目, because the rail holds only functional places;
   - the rail is "全部 / 自动化 / 更多", with 插件 and 设置 at the bottom;
   - keep 更多 as a hidden slot (端口) until its contents are decided.
-- Canvas: https://claude.ai/artifact/Cfhj4xyxqATonqeGXDaVS2, version 55.
+- Canvas: https://claude.ai/artifact/Cfhj4xyxqATonqeGXDaVS2, version 59.
 - Design system: https://claude.ai/artifact/3yRcxDo7PaDuuQcSy6D8pP, version 22.
-- Branch: codex/chat-desktop-integration, on top of Codex's b2ef510/ab09588. Work in this worktree.
-- Last agent: Claude, 2026-11-05.
+- Branch: claude/chat-settings (from codex/chat-desktop-integration plus origin/main at 3e91c8b; PR #60 is merged). Work in this worktree.
+- Last agent: Claude, 2026-11-06.
+
+## 2026-11-06: 设置 redesign (canvas first)
+- Owner review:
+  - 插件 moves up with the places, and 设置 sits alone at the bottom;
+  - learn from WorkBuddy's settings and memory, combined with the DSH desktop look;
+  - keep settings in place (not a modal);
+  - automatic memory that says nothing when it records;
+  - no 智能体 page: AIs are sub-agents, and plugins can add them later;
+  - include main's 11-05 work and delivery 3 (PR #56, draft, unmerged);
+  - 后台 and 预算 were unreal and are dropped;
+  - "设置不能太复杂";
+  - keep 快捷键 as its own page;
+  - groups 设置 / 功能 / 数据安全;
+  - add 获取帮助;
+  - draw it on the canvas first.
+- Research: DSH bundle docs (`/Applications/DeepSeek Harness.app`, app.asar):
+  - settings sections are 账号与余额, 通用, 模型, 内置插件, Agent 预设, 插件市场;
+  - sub-agent, search, agent-loop and terminal options sit on 插件 › 内置插件 pages;
+  - compaction is on by default (`auto: true`), with manual `/compact`;
+  - 意见反馈 opens an external questionnaire.
+  - WorkBuddy's bundle has no settings strings, so only the owner's screenshot was used.
+- Canvas v59 (generator `scratchpad/settings3.py`, rail `scratchpad/rail.py`). The list is:
+  - 设置: 通用, 快捷键;
+  - 功能: 模型, 个性化, 记忆;
+  - 数据安全: 权限, 数据;
+  - then a rule, 获取帮助 and 关于 moyyi.
+- Boards: S23 通用, S24 快捷键, S25 模型, S26 个性化, S27 记忆, S28 权限, S29 数据, S30 获取帮助, S35 关于. Every rail is now 全部 / 项目 / 自动化 / 插件 | 设置.
+- Code on this branch is a wip and does not match v59 yet:
+  - rail with 插件 up;
+  - card pages with switches, number fields and a dashed add card;
+  - grouped list;
+  - mock pages with the superseded 10-section structure, which still has 后台 and 预算.
+  - Align the code to the boards after the owner reviews them.
+- Native wiring (real settings editing through `configure` replacing the old dialog) was started in design only: `chat-settings.ts` is not written.
+  - Note: every `configure` reopens the runtime and reloads the session.
+- Proposed separately, needs a brief and eval evidence:
+  - automatic compaction on by default;
+  - nested AGENTS.md on by default;
+  - larger per-run defaults, with a continue card in the chat instead of settings numbers;
+  - the sub-agent switch moving to 插件 › 子智能体;
+  - search connection moving to 插件 › 网页.
+- Open for the owner:
+  - where 反馈问题 goes (moyyi has no feedback channel);
+  - memory needs its own capability brief (none exists);
+  - whether AI private chats stay in 全部.
 
 ## Decisions taken
 - **Rail.** The rail holds places only, from top to bottom:

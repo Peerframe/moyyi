@@ -79,25 +79,50 @@ describe("moyyi Chat interface", () => {
     expect(html).toContain('placeholder="说一件想做的事"');
   });
 
-  it("opens 设置 in place of the chat list, first section by default (S23)", () => {
+  it("opens 设置 in place of the chat list, grouped like the boards, 通用 first (S23)", () => {
     const html = renderPage(xiaowenWorld(), "settings");
+    const list = text(html.slice(html.indexOf('aria-label="设置"'), html.indexOf("ch-page-foot")));
+    expect(list).toMatch(
+      /通用.*快捷键.*AI模型.*个性化.*记忆.*后台.*预算.*数据与安全权限和确认.*记录和数据.*关于 moyyi/,
+    );
+    expect(html).toContain('class="ch-page-list-rule"');
     const seen = text(html);
-    for (const name of [
-      "模型和密钥",
-      "关于我",
-      "权限和确认",
-      "后台",
-      "预算",
-      "记录和数据",
-      "通用",
-      "关于 moyyi",
-    ])
-      expect(seen).toContain(name);
-    expect(seen).toContain("AI 用哪些模型，密钥放在哪");
+    expect(seen).toContain("颜色、字号和通知。");
     expect(seen).toContain("这里只放管全部 AI 的事。");
     expect(html).not.toContain('aria-label="对话列表"');
-    expect(html).toContain('type="password"');
     expect(html).toMatch(/title="⌘,"[^>]*aria-current="true"/);
+  });
+
+  it("draws 模型 as connection cards with a dashed card to add one (S23)", () => {
+    const html = renderPage(xiaowenWorld(), "settings/models", "light");
+    const seen = text(html);
+    for (const words of [
+      "DeepSeek · 主力",
+      "默认",
+      "DeepSeek · 备用",
+      "添加模型连接",
+      "网页搜索用",
+      "额度用完的时候",
+      "对话停在原处，不会自己换连接",
+    ])
+      expect(seen).toContain(words);
+    expect(html).toContain('class="ch-group ch-group-bare"');
+    expect(html).toContain('class="ch-add-card"');
+    expect(html).toContain('aria-label="已连上"');
+    expect(html).toContain('type="password"');
+  });
+
+  it("draws 记忆 with its switch, the 导入 action and where each memory came from", () => {
+    const html = renderPage(xiaowenWorld(), "settings/memory");
+    const seen = text(html);
+    expect(seen).toContain("自动记忆");
+    expect(seen).toContain("记的时候不打断你。");
+    expect(seen).toContain("从「毕业论文」记下 · 10月30日");
+    expect(html).toMatch(/role="switch"[^>]*aria-checked="true"/);
+    expect(html).toMatch(/ch-group-head.*导入/);
+    const budget = renderPage(xiaowenWorld(), "settings/budget");
+    expect(budget).toMatch(/type="number"[^>]*min="1"[^>]*max="200"/);
+    expect(text(budget)).toContain("子智能体帮忙查");
   });
 
   it("shows guarantees as locked lines, never as switches (S25)", () => {
@@ -152,22 +177,23 @@ describe("moyyi Chat interface", () => {
     expect(chats.filter((c) => inFolder(c, "project")).every((c) => c.project)).toBe(true);
   });
 
-  it("keeps the rail to places: 全部, 项目, 自动化, then 插件 and 设置 (owner review)", () => {
+  it("keeps the rail to places: 全部, 项目, 自动化, 插件, then 设置 (owner review)", () => {
     const html = render(xiaowenWorld(), "lunwen");
     const rail = html.slice(html.indexOf('aria-label="导航"'), html.indexOf("</nav>"));
     expect(text(rail)).not.toMatch(/等我的|在做|AI|成果|更多/);
     expect(text(rail)).toMatch(/全部.*项目.*自动化.*插件.*设置/);
-    expect(rail.indexOf("ch-rail-bottom")).toBeLessThan(rail.indexOf("插件"));
+    expect(rail.indexOf("插件")).toBeLessThan(rail.indexOf("ch-rail-bottom"));
+    expect(rail.indexOf("ch-rail-bottom")).toBeLessThan(rail.indexOf("设置"));
   });
 
-  it("keeps 更多 as a hidden slot under 自动化 until something is put in it", () => {
+  it("keeps 更多 as a hidden slot under 插件 until something is put in it", () => {
     expect(MORE).toEqual([]);
     const world = xiaowenWorld();
     const rail = (more?: Parameters<typeof Rail>[0]["more"]) =>
       renderToString(createElement(Rail, { world, view: "all", onView: () => undefined, more }));
     expect(rail()).not.toContain("更多");
-    const shown = rail([{ id: "plugins", label: "插件", icon: "plugins" }]);
-    expect(text(shown)).toMatch(/自动化更多.*插件.*设置/);
+    const shown = rail([{ id: "settings", label: "设置", icon: "settings" }]);
+    expect(text(shown)).toMatch(/自动化插件更多设置/);
     expect(shown).toContain('aria-haspopup="menu" aria-expanded="false"');
   });
 

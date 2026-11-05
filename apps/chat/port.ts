@@ -334,7 +334,9 @@ export type PageIcon =
   | "term"
   | "globe"
   | "doc"
-  | "skill";
+  | "skill"
+  | "memory"
+  | "keyboard";
 
 /** A button on a page. */
 export interface Control {
@@ -384,9 +386,30 @@ export interface Provider {
   readonly name: string;
   readonly status: string;
   readonly connected: boolean;
+  /** A quiet pill after the name ("默认", "搜索用这个"). */
+  readonly tag?: string;
   readonly controls: readonly Control[];
   /** A password field whose value goes straight to the system keychain. */
   readonly keyField?: { readonly placeholder: string; readonly save: Control };
+}
+
+/** An on/off setting: a row with its own switch. Guarantees are locks, never switches. */
+export interface Switch {
+  readonly id: string;
+  readonly label: string;
+  readonly note?: string;
+  readonly on: boolean;
+}
+
+/** A whole number with a unit, saved when the field is left or Enter is pressed. */
+export interface NumberField {
+  readonly id: string;
+  readonly label: string;
+  readonly note?: string;
+  readonly value: number;
+  readonly min: number;
+  readonly max: number;
+  readonly unit: string;
 }
 
 export interface Shortcut {
@@ -403,6 +426,10 @@ export type PageBlock =
   | { readonly kind: "chips"; readonly chips: readonly string[]; readonly add?: Control }
   | { readonly kind: "meters"; readonly meters: readonly Meter[] }
   | { readonly kind: "providers"; readonly providers: readonly Provider[] }
+  | { readonly kind: "switches"; readonly switches: readonly Switch[] }
+  | { readonly kind: "numbers"; readonly fields: readonly NumberField[] }
+  /** A dashed card that adds one more of what is above it ("添加模型连接"). */
+  | { readonly kind: "add"; readonly control: Control }
   | {
       readonly kind: "shortcuts";
       readonly shortcuts: readonly Shortcut[];
@@ -412,9 +439,11 @@ export type PageBlock =
   | { readonly kind: "controls"; readonly controls: readonly Control[] }
   | { readonly kind: "brand"; readonly tagline: string };
 
+/** A card: its title and caption on top, its one action at the top right. */
 export interface PageGroup {
   readonly title?: string;
   readonly caption?: string;
+  readonly action?: Control;
   readonly blocks: readonly PageBlock[];
 }
 
@@ -426,6 +455,8 @@ export interface SettingsPage {
   readonly summary: string;
   /** The pane's line under the title. */
   readonly sub?: string;
+  /** The heading this page sits under in the list ("AI", "数据与安全"); none for the first. */
+  readonly section?: string;
   readonly groups: readonly PageGroup[];
 }
 
@@ -467,7 +498,8 @@ export type ChatAction =
   | { readonly type: "archive"; readonly chatId: string; readonly archived: boolean }
   | { readonly type: "choose"; readonly choiceId: string; readonly option: number }
   | { readonly type: "control"; readonly controlId: string }
-  | { readonly type: "save-key"; readonly providerId: string; readonly key: string };
+  | { readonly type: "save-key"; readonly providerId: string; readonly key: string }
+  | { readonly type: "set-number"; readonly fieldId: string; readonly value: number };
 
 export interface ChatPort {
   world(): ChatWorld;

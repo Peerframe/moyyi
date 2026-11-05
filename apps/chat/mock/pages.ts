@@ -37,67 +37,63 @@ const locks = (lines: readonly string[], caption?: string, title = "一直是这
 function models(): SettingsPage {
   return {
     id: "models",
-    name: "模型和密钥",
+    name: "模型",
     icon: "key",
-    summary: "DeepSeek 已连上 · 新对话用 Flash",
-    sub: "AI 用哪些模型，密钥放在哪",
+    section: "AI",
+    summary: "2 个连接 · 新对话用 Flash",
+    sub: "AI 通过这些连接找模型。同一家可以连好几个，比如两把 DeepSeek 密钥；密钥只进系统钥匙串，不会出现在聊天、记录和 AI 看到的内容里。",
     groups: [
       {
-        title: "已连上",
+        title: "连接",
         blocks: [
           {
             kind: "providers",
             providers: [
               {
-                id: "deepseek",
+                id: "deepseek-main",
                 letter: "D",
-                name: "DeepSeek",
-                status: "已连上 · 密钥在系统钥匙串里 · 6 个对话在用",
+                name: "DeepSeek · 主力",
+                tag: "默认",
+                status: "密钥在系统钥匙串里 · 6 个对话在用",
                 connected: true,
                 controls: [
-                  control("deepseek.test", "测一下"),
-                  control("deepseek.rekey", "换密钥"),
-                  control("deepseek.disconnect", "断开", "danger"),
+                  control("deepseek-main.test", "测一下"),
+                  control("deepseek-main.rekey", "换密钥"),
+                  control("deepseek-main.remove", "删掉", "danger"),
                 ],
               },
-            ],
-          },
-        ],
-      },
-      {
-        title: "还可以连",
-        caption: "密钥只进系统钥匙串。它不会出现在聊天、记录和 AI 看到的内容里，也不会被同步。",
-        blocks: [
-          {
-            kind: "providers",
-            providers: [
+              {
+                id: "deepseek-spare",
+                letter: "D",
+                name: "DeepSeek · 备用",
+                status: "密钥在系统钥匙串里 · 额度用完时换到这个",
+                connected: true,
+                controls: [
+                  control("deepseek-spare.test", "测一下"),
+                  control("deepseek-spare.rekey", "换密钥"),
+                  control("deepseek-spare.remove", "删掉", "danger"),
+                ],
+              },
               {
                 id: "kimi",
                 letter: "K",
                 name: "Kimi",
                 status: "没连上",
                 connected: false,
-                controls: [],
+                controls: [control("kimi.remove", "删掉", "danger")],
                 keyField: {
                   placeholder: "粘贴 Kimi 的密钥",
                   save: control("kimi.save", "存进钥匙串", "primary"),
                 },
               },
-              {
-                id: "anthropic",
-                letter: "A",
-                name: "Anthropic",
-                status: "没连上",
-                connected: false,
-                controls: [control("anthropic.connect", "连上")],
-              },
             ],
           },
+          { kind: "add", control: control("models.add", "添加模型连接") },
         ],
       },
       {
         title: "新对话默认用",
-        caption: "已经在跑的对话不变。某个 AI 或项目要换模型，去它的资料里换。",
+        caption: "用默认连接。已经在跑的对话不变，对话里随时能换连接。",
         blocks: [
           {
             kind: "choice",
@@ -105,6 +101,21 @@ function models(): SettingsPage {
           },
         ],
       },
+      {
+        title: "网页搜索用",
+        caption: "搜索按次计费，每次搜之前都问你；搜到的来源记进对话，能写进报告。",
+        blocks: [
+          {
+            kind: "choice",
+            choice: choice("models.search", ["DeepSeek · 主力", "DeepSeek · 备用", "不搜索"], 0),
+          },
+        ],
+      },
+      locks(
+        ["对话停在原处，不会自己换连接", "你换一个连接，在同一个对话里接着做"],
+        GUARANTEE,
+        "额度用完的时候",
+      ),
     ],
   };
 }
@@ -112,10 +123,11 @@ function models(): SettingsPage {
 function aboutMe(): SettingsPage {
   return {
     id: "me",
-    name: "关于我",
+    name: "个性化",
     icon: "me",
-    summary: "每个 AI 都知道的称呼、语言和规矩",
-    sub: "每个 AI 开工前都会读到这些",
+    section: "AI",
+    summary: "跟着你的语言 · 先说结论 · 4 条规矩",
+    sub: "每个 AI 开工前都会读到这些：怎么回你，守哪些规矩。",
     groups: [
       {
         title: "怎么回你",
@@ -130,8 +142,8 @@ function aboutMe(): SettingsPage {
         ],
       },
       {
-        title: "所有 AI 都要守的",
-        caption: "只给某个 AI 的，在它资料里的「你教过它的」加。",
+        title: "个人指令",
+        caption: "所有 AI 都要守的。存成这台电脑上的一份个人指令，每个对话都带上；只给某个 AI 的，在它资料里的「你教过它的」加。",
         blocks: [
           {
             kind: "chips",
@@ -140,9 +152,39 @@ function aboutMe(): SettingsPage {
           },
         ],
       },
+      locks(["这些内容原样放进每次发给模型的内容里，在「AI 看到什么」里查得到"]),
+    ],
+  };
+}
+
+function memory(): SettingsPage {
+  return {
+    id: "memory",
+    name: "记忆",
+    icon: "memory",
+    section: "AI",
+    summary: "自动记忆开着 · 记下 2 条",
+    sub: "AI 从对话里记下你的偏好和习惯，对话越多越懂你。记忆只在这台电脑上。",
+    groups: [
       {
-        title: "记忆记下的你",
-        caption: "每条都写着从哪个对话来。删掉后不会再给 AI 看；以前的记录不变。",
+        blocks: [
+          {
+            kind: "switches",
+            switches: [
+              {
+                id: "memory.auto",
+                label: "自动记忆",
+                note: "从对话里记下你的偏好和习惯，以后的对话直接用上。记的时候不打断你。",
+                on: true,
+              },
+            ],
+          },
+        ],
+      },
+      {
+        title: "记下的",
+        caption: "每条都写着从哪个对话来。改了以后 AI 按新的用；删掉后不会再给 AI 看，以前的记录不变。",
+        action: control("memory.import", "导入"),
         blocks: [
           {
             kind: "lines",
@@ -151,19 +193,19 @@ function aboutMe(): SettingsPage {
                 id: "memory.cite",
                 text: "论文引用用 GB/T 7714",
                 sub: "从「毕业论文」记下 · 10月30日",
-                controls: [control("memory.cite.delete", "删掉")],
+                controls: [control("memory.cite.edit", "改"), control("memory.cite.delete", "删掉")],
               },
               {
                 id: "memory.rent",
                 text: "房租每月 15 号交",
                 sub: "从「租房」记下 · 10月28日",
-                controls: [control("memory.rent.delete", "删掉")],
+                controls: [control("memory.rent.edit", "改"), control("memory.rent.delete", "删掉")],
               },
             ],
           },
         ],
       },
-      locks(["这些内容原样放进每次发给模型的内容里，在「AI 看到什么」里查得到"]),
+      locks(["记忆原样放进每次发给模型的内容里，在「AI 看到什么」里查得到"]),
     ],
   };
 }
@@ -173,8 +215,9 @@ function permissions(): SettingsPage {
     id: "permissions",
     name: "权限和确认",
     icon: "shield",
+    section: "数据与安全",
     summary: "改文件、跑命令前先问你",
-    sub: "AI 动手之前，什么时候要先问你",
+    sub: "AI 动手之前，什么时候要先问你。",
     groups: [
       {
         title: "先问你的时候",
@@ -240,8 +283,9 @@ function background(): SettingsPage {
     id: "background",
     name: "后台",
     icon: "timer",
+    section: "AI",
     summary: "同时做 3 件",
-    sub: "你不看着的时候，AI 怎么做事。定时的事在 自动化 里",
+    sub: "你不看着的时候，AI 怎么做事。定时的事在 自动化 里。",
     groups: [
       {
         title: "同时做几件事",
@@ -274,9 +318,59 @@ function budget(): SettingsPage {
     id: "budget",
     name: "预算",
     icon: "gauge",
+    section: "AI",
     summary: "新项目默认每周 40 次",
-    sub: "AI 每次找模型都算一次。新项目给多少，用完了怎么办",
+    sub: "AI 每次找模型都算一次。一轮最多多少、新项目给多少、用完了怎么办。",
     groups: [
+      {
+        title: "每一轮",
+        caption: "你发一句话，AI 做到停下算一轮。到了上限就停下等你。",
+        blocks: [
+          {
+            kind: "numbers",
+            fields: [
+              {
+                id: "budget.requests",
+                label: "最多找模型",
+                value: 30,
+                min: 1,
+                max: 200,
+                unit: "次",
+              },
+              { id: "budget.timeout", label: "最长做", value: 600, min: 30, max: 3600, unit: "秒" },
+            ],
+          },
+        ],
+      },
+      {
+        title: "长任务",
+        caption: "这几样会多用请求，默认关着。改了以后，新的一轮开始生效。",
+        blocks: [
+          {
+            kind: "switches",
+            switches: [
+              {
+                id: "long.compact",
+                label: "自动压缩上下文",
+                note: "对话快装不下时，把较早的部分压成摘要接着做；原始记录都留着。",
+                on: false,
+              },
+              {
+                id: "long.subagents",
+                label: "子智能体帮忙查",
+                note: "把只读的调查交给子智能体，它只交回报告，不能改文件、跑命令或上网。",
+                on: false,
+              },
+              {
+                id: "long.nested",
+                label: "读子目录的 AGENTS.md",
+                note: "AI 进了哪个子目录，就把那里的 AGENTS.md 也读上。",
+                on: false,
+              },
+            ],
+          },
+        ],
+      },
       {
         title: "新项目默认每周",
         caption: "计划卡上会写这个数，你点开始之前都能改。",
@@ -334,8 +428,9 @@ function records(): SettingsPage {
     id: "records",
     name: "记录和数据",
     icon: "db",
+    section: "数据与安全",
     summary: "全在这台电脑上 · 可以导出",
-    sub: "你和 AI 说过的、做过的，都在哪",
+    sub: "你和 AI 说过的、做过的，都在哪。",
     groups: [
       {
         title: "放在哪",
@@ -390,7 +485,7 @@ function general(): SettingsPage {
     name: "通用",
     icon: "sliders",
     summary: "深色 · 字号 15 · 只提醒决定",
-    sub: "颜色、字号、通知和快捷键",
+    sub: "颜色、字号和通知。",
     groups: [
       {
         title: "看起来",
@@ -432,8 +527,20 @@ function general(): SettingsPage {
           },
         ],
       },
+      locks(["等你决定的事，静音和免打扰时也会叫你"], GUARANTEE),
+    ],
+  };
+}
+
+function shortcuts(): SettingsPage {
+  return {
+    id: "shortcuts",
+    name: "快捷键",
+    icon: "keyboard",
+    summary: "⌘K 跳到任意聊天 · ⌘, 打开设置",
+    sub: "不碰鼠标也能做的事。",
+    groups: [
       {
-        title: "快捷键",
         blocks: [
           {
             kind: "shortcuts",
@@ -446,7 +553,6 @@ function general(): SettingsPage {
           },
         ],
       },
-      locks(["等你决定的事，静音和免打扰时也会叫你"], GUARANTEE),
     ],
   };
 }
@@ -456,6 +562,7 @@ function about(): SettingsPage {
     id: "about",
     name: "关于 moyyi",
     icon: "info",
+    section: "",
     summary: "版本和更新",
     groups: [
       { blocks: [{ kind: "brand", tagline: "AI 是联系人，项目是群，你是每个群的群主。" }] },
@@ -497,13 +604,15 @@ function about(): SettingsPage {
 
 export function settingsPages(): readonly SettingsPage[] {
   return [
+    general(),
+    shortcuts(),
     models(),
     aboutMe(),
-    permissions(),
+    memory(),
     background(),
     budget(),
+    permissions(),
     records(),
-    general(),
     about(),
   ];
 }

@@ -1,7 +1,7 @@
 // Rail (boards S1, S7, S8, S12, S33, S34): only places, never states. 全部 lists every chat by
-// time, 项目 lists the working folders and 自动化 the jobs that start on their own; 插件 and 设置
-// sit at the bottom. 更多 is a slot under 自动化 for places used less often; it stays hidden
-// until something is put in it. What waits on you or is running shows as a badge, the row's prefix and the
+// time, 项目 lists the working folders, 自动化 the jobs that start on their own and 插件 what the
+// AIs can do; 设置 sits alone at the bottom. 更多 is a slot under 插件 for places used less often;
+// it stays hidden until something is put in it. What waits on you or is running shows as a badge, the row's prefix and the
 // avatar's dot. The rail is frosted glass over the window material; in the desktop app the system
 // draws the traffic lights in its top strip, which also drags the window.
 // Below 900px the rail becomes a strip of chips above whichever list is showing.
@@ -25,22 +25,24 @@ export const FOLDERS: readonly RailItem<FolderId>[] = [
   { id: "all", label: "全部", icon: "all" },
   { id: "project", label: "项目", icon: "project" },
 ];
-const AUTOMATIONS: RailItem<"automations"> = {
-  id: "automations",
-  label: "自动化",
-  icon: "automation",
-};
-/** At the bottom of the rail. */
-const TOOLS: readonly RailItem<"plugins" | "settings">[] = [
+/** Places that open a page instead of chats. */
+const PLACES: readonly RailItem<"automations" | "plugins">[] = [
+  { id: "automations", label: "自动化", icon: "automation" },
   { id: "plugins", label: "插件", icon: "plugins" },
-  { id: "settings", label: "设置", icon: "settings", title: "⌘," },
 ];
+/** At the bottom of the rail. */
+const SETTINGS: RailItem<"settings"> = {
+  id: "settings",
+  label: "设置",
+  icon: "settings",
+  title: "⌘,",
+};
 /**
  * What 更多 opens. Empty for now: the owner has not decided what goes here (2026-11-05), and a
  * button that opens nothing is not shown.
  */
 export const MORE: readonly RailItem[] = [];
-const ITEMS: readonly RailItem[] = [...FOLDERS, AUTOMATIONS, ...MORE, ...TOOLS];
+const ITEMS: readonly RailItem[] = [...FOLDERS, ...PLACES, ...MORE, SETTINGS];
 
 export function viewLabel(view: ViewId): string {
   return ITEMS.find((item) => item.id === view)?.label ?? "";
@@ -110,7 +112,7 @@ export function Rail({ world, view, onView, windowControls, more = MORE }: RailP
           <span className="ch-wordmark">moyyi</span>
         )}
         {FOLDERS.map((folder) => item(folder))}
-        {item(AUTOMATIONS)}
+        {PLACES.map((place) => item(place))}
         {more.length ? (
           <button
             type="button"
@@ -124,7 +126,7 @@ export function Rail({ world, view, onView, windowControls, more = MORE }: RailP
             <span>更多</span>
           </button>
         ) : null}
-        <div className="ch-rail-bottom">{TOOLS.map((tool) => item(tool))}</div>
+        <div className="ch-rail-bottom">{item(SETTINGS)}</div>
       </nav>
       {open ? (
         <MoreMenu
@@ -206,7 +208,7 @@ function MoreMenu({
   );
 }
 
-/** Below 900px: the same places as chips (更多's among them), with 插件 and 设置 at the end. */
+/** Below 900px: the same places as chips (更多's among them), with 设置 at the end. */
 export function FolderStrip({
   world,
   view,

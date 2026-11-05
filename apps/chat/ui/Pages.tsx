@@ -1,12 +1,17 @@
-// 自动化, 插件 and 设置 (boards S23–S32, S34). Each opens from the rail
-// in place of the chat list; the entry opens in the conversation pane on `panel`. Pages are data from the port, so this file
-// only knows how to draw the eight block kinds, not what any setting means.
+// 自动化, 插件 and 设置 (boards S23–S32, S34). Each opens from the rail in place of the chat
+// list, grouped under headings; the entry opens in the conversation pane. A page is a title, a
+// line saying what it is for, then one card per group: its title and caption on top, its action
+// at the top right, its rows below. Model connections are cards of their own with a dashed card
+// to add one. Pages are data from the port, so this file only knows how to draw the block kinds,
+// not what any setting means.
 import { type ReactNode, useState } from "react";
 import type {
   ChatWorld,
   Choice,
   Control,
+  NumberField,
   PageBlock,
+  PageGroup,
   PageIcon,
   PageLine,
   PluginPage,
@@ -30,12 +35,15 @@ const PAGE_ICON: Record<PageIcon, keyof typeof Icon> = {
   globe: "globe",
   doc: "doc",
   skill: "skill",
+  memory: "memory",
+  keyboard: "keyboard",
 };
 
 export interface PageActions {
   choose(choiceId: string, option: number): void;
   press(controlId: string): void;
   saveKey(providerId: string, key: string): void;
+  setNumber(fieldId: string, value: number): void;
 }
 
 function PageIconTile({ icon, size = 32 }: { readonly icon: PageIcon; readonly size?: 32 | 48 }) {
@@ -66,7 +74,7 @@ const LIST: Record<PageKind, { title: string; search: string; foot: string }> = 
   plugins: {
     title: "插件",
     search: "搜索插件",
-    foot: "插件决定 AI 能做什么。模型也是插件，在 设置 › 模型和密钥 里连。预览版只有这些内置插件。",
+    foot: "插件决定 AI 能做什么。模型也是插件，在 设置 › 模型 里连。预览版只有这些内置插件。",
   },
 };
 
@@ -123,7 +131,14 @@ export function PageList({
         <span className="mc-section-h ch-page-list-h">内置 · {pages.length} 个</span>
       ) : null}
       <div className="ch-page-rows">
-        {shown.map((page) => (
+        {shown.map((page, index) => [
+          index === 0 || page.section === shown[index - 1]?.section ? null : page.section ? (
+            <span key={`h-${page.id}`} className="mc-section-h ch-page-list-h">
+              {page.section}
+            </span>
+          ) : (
+            <span key={`h-${page.id}`} className="ch-page-list-rule" />
+          ),
           <a
             key={page.id}
             className="mc-row ch-page-row"
@@ -143,8 +158,8 @@ export function PageList({
                 <span className="mc-row-preview ch-one-line">{page.summary}</span>
               </span>
             </span>
-          </a>
-        ))}
+          </a>,
+        ])}
         {shown.length === 0 && needle ? (
           <div className="ch-empty-list">
             <span className="ch-empty-title">没找到“{needle}”</span>
@@ -209,25 +224,58 @@ export function PagePane({
         ) : (
           <div className="ch-pane-titles">
             <h2 className="ch-pane-title">{page.name}</h2>
-            {page.sub ? <span className="ch-pane-sub">{page.sub}</span> : null}
+            {page.sub ? <p className="ch-pane-sub">{page.sub}</p> : null}
           </div>
         )}
         {page.groups.map((group, index) => (
-          <div key={group.title ?? index} className="ch-group">
-            {group.title ? <span className="mc-section-h">{group.title}</span> : null}
-            {group.blocks.map((block, at) => (
-              <Block
-                // biome-ignore lint/suspicious/noArrayIndexKey: blocks have no id and never reorder
-                key={at}
-                world={world}
-                block={block}
-                actions={actions}
-              />
-            ))}
-            {group.caption ? <span className="ch-group-caption">{group.caption}</span> : null}
-          </div>
+          <Group
+            // biome-ignore lint/suspicious/noArrayIndexKey: groups have no id and never reorder
+            key={index}
+            world={world}
+            group={group}
+            actions={actions}
+          />
         ))}
       </div>
+    </section>
+  );
+}
+
+/** Connections are cards of their own, so their group draws no card around them. */
+const BARE: ReadonlySet<PageBlock["kind"]> = new Set(["providers", "add"]);
+
+function Group({
+  world,
+  group,
+  actions,
+}: {
+  readonly world: ChatWorld;
+  readonly group: PageGroup;
+  readonly actions: PageActions;
+}) {
+  const bare = group.blocks.every((block) => BARE.has(block.kind));
+  const head =
+    group.title || group.caption || group.action ? (
+      <div className="ch-group-head">
+        <span className="ch-grow ch-min ch-line-text">
+          {group.title ? <h3 className="ch-group-title">{group.title}</h3> : null}
+          {group.caption ? <span className="ch-group-caption">{group.caption}</span> : null}
+        </span>
+        {group.action ? <ControlButton control={group.action} onPress={actions.press} /> : null}
+      </div>
+    ) : null;
+  return (
+    <section className={`ch-group${bare ? " ch-group-bare" : ""}`}>
+      {head}
+      {group.blocks.map((block, at) => (
+        <Block
+          // biome-ignore lint/suspicious/noArrayIndexKey: blocks have no id and never reorder
+          key={at}
+          world={world}
+          block={block}
+          actions={actions}
+        />
+      ))}
     </section>
   );
 }
@@ -387,6 +435,91 @@ function KeyField({
   );
 }
 
+function SwitchRow({
+  id,
+  label,
+  note,
+  on,
+  onPress,
+}: {
+  readonly id: string;
+  readonly label: string;
+  readonly note?: string | undefined;
+  readonly on: boolean;
+  readonly onPress: (controlId: string) => void;
+}) {
+  return (
+    <div className="ch-line">
+      <span className="ch-grow ch-min ch-line-text">
+        <span className="ch-line-main" id={`${id}-label`}>
+          {label}
+        </span>
+        {note ? <span className="ch-line-sub">{note}</span> : null}
+      </span>
+      <button
+        type="button"
+        role="switch"
+        className="ch-switch"
+        aria-checked={on}
+        aria-labelledby={`${id}-label`}
+        onClick={() => onPress(id)}
+      />
+    </div>
+  );
+}
+
+/** Saved when the field is left or Enter is pressed; out of range snaps back to the saved value. */
+function NumberRow({
+  field,
+  onSet,
+}: {
+  readonly field: NumberField;
+  readonly onSet: (fieldId: string, value: number) => void;
+}) {
+  const [text, setText] = useState(String(field.value));
+  const [seen, setSeen] = useState(field.value);
+  if (seen !== field.value) {
+    setSeen(field.value);
+    setText(String(field.value));
+  }
+  const commit = () => {
+    const value = Number(text);
+    if (Number.isSafeInteger(value) && value >= field.min && value <= field.max) {
+      if (value !== field.value) onSet(field.id, value);
+    } else setText(String(field.value));
+  };
+  return (
+    <div className="ch-line">
+      <span className="ch-grow ch-min ch-line-text">
+        <label className="ch-line-main" htmlFor={field.id}>
+          {field.label}
+        </label>
+        <span className="ch-line-sub">
+          {field.note ? `${field.note} · ` : ""}
+          {field.min}–{field.max} {field.unit}
+        </span>
+      </span>
+      <span className="mc-composer ch-number">
+        <input
+          id={field.id}
+          type="number"
+          inputMode="numeric"
+          min={field.min}
+          max={field.max}
+          step={1}
+          value={text}
+          onChange={(event) => setText(event.target.value)}
+          onBlur={commit}
+          onKeyDown={(event) => {
+            if (event.key === "Enter") commit();
+          }}
+        />
+        <span className="ch-number-unit">{field.unit}</span>
+      </span>
+    </div>
+  );
+}
+
 function Block({
   world,
   block,
@@ -476,14 +609,17 @@ function Block({
           {block.providers.map((provider) => (
             <div key={provider.id} className="ch-card">
               <div className="ch-line">
-                <Avatar
-                  avatar={{ text: provider.letter, tone: "key" }}
-                  shape="ai"
-                  size={32}
-                  presence={provider.connected ? "working" : undefined}
-                />
+                <Avatar avatar={{ text: provider.letter, tone: "key" }} shape="ai" size={32} />
                 <span className="ch-grow ch-min ch-line-text">
-                  <span className="ch-provider-name">{provider.name}</span>
+                  <span className="ch-provider-top">
+                    <span className="ch-provider-name">{provider.name}</span>
+                    <span
+                      className={`ch-dot${provider.connected ? " ch-dot-on" : ""}`}
+                      role="img"
+                      aria-label={provider.connected ? "已连上" : "未连上"}
+                    />
+                    {provider.tag ? <span className="mc-role">{provider.tag}</span> : null}
+                  </span>
                   <span className="ch-line-sub">{provider.status}</span>
                 </span>
                 {provider.controls.map((control) => (
@@ -502,6 +638,36 @@ function Block({
             </div>
           ))}
         </>
+      );
+    case "switches":
+      return (
+        <Card>
+          {block.switches.map((entry) => (
+            <SwitchRow
+              key={entry.id}
+              id={entry.id}
+              label={entry.label}
+              note={entry.note}
+              on={entry.on}
+              onPress={actions.press}
+            />
+          ))}
+        </Card>
+      );
+    case "numbers":
+      return (
+        <Card>
+          {block.fields.map((field) => (
+            <NumberRow key={field.id} field={field} onSet={actions.setNumber} />
+          ))}
+        </Card>
+      );
+    case "add":
+      return (
+        <button type="button" className="ch-add-card" onClick={() => actions.press(block.control.id)}>
+          <span aria-hidden="true">＋</span>
+          {block.control.label}
+        </button>
       );
     case "shortcuts":
       return (

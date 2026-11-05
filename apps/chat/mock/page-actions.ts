@@ -45,10 +45,71 @@ const mapLines = (page: Page, change: (line: PageLine) => PageLine | null): Page
     return lines.length ? { ...block, lines } : null;
   });
 
-const mapProviders = (page: Page, change: (provider: Provider) => Provider): Page =>
+const mapProviders = (page: Page, change: (provider: Provider) => Provider | null): Page =>
   mapBlocks(page, (block) =>
-    block.kind === "providers" ? { ...block, providers: block.providers.map(change) } : block,
+    block.kind === "providers"
+      ? {
+          ...block,
+          providers: block.providers.flatMap((provider) => {
+            const next = change(provider);
+            return next ? [next] : [];
+          }),
+        }
+      : block,
   );
+
+/** Flips the switch with this id anywhere on the pages; false if there is none. */
+function flip(world: ChatWorld, id: string): ChatWorld | null {
+  let found = false;
+  const next = mapPages(world, (page) =>
+    mapBlocks(page, (block) =>
+      block.kind === "switches"
+        ? {
+            ...block,
+            switches: block.switches.map((entry) => {
+              if (entry.id !== id) return entry;
+              found = true;
+              return { ...entry, on: !entry.on };
+            }),
+          }
+        : block,
+    ),
+  );
+  return found ? next : null;
+}
+
+/** Whether a switch is on anywhere on the pages. */
+export function switchedOn(world: ChatWorld, id: string): boolean | undefined {
+  for (const page of [...world.settings, ...world.automations, ...world.plugins])
+    for (const group of page.groups)
+      for (const block of group.blocks)
+        if (block.kind === "switches") {
+          const found = block.switches.find((entry) => entry.id === id);
+          if (found) return found.on;
+        }
+  return undefined;
+}
+
+/** A number field set within its range; anything else changes nothing. */
+export function setNumber(world: ChatWorld, fieldId: string, value: number): ChatWorld {
+  return mapPages(world, (page) =>
+    mapBlocks(page, (block) =>
+      block.kind === "numbers"
+        ? {
+            ...block,
+            fields: block.fields.map((field) =>
+              field.id === fieldId &&
+              Number.isSafeInteger(value) &&
+              value >= field.min &&
+              value <= field.max
+                ? { ...field, value }
+                : field,
+            ),
+          }
+        : block,
+    ),
+  );
+}
 
 /** The option chosen for a choice anywhere on the pages, or undefined if there is none. */
 export function chosen(world: ChatWorld, choiceId: string): string | undefined {
@@ -76,15 +137,18 @@ function summarize(world: ChatWorld): ChatWorld {
       const connected = page("models")
         ?.groups.flatMap((g) => g.blocks)
         .flatMap((b) => (b.kind === "providers" ? b.providers : []))
-        .filter((p) => p.connected)
-        .map((p) => p.name);
+        .filter((p) => p.connected).length;
       const model = chosen(world, "models.default");
-      const who = connected?.length ? `${connected.join("、")} 已连上` : "还没连上模型";
+      const who = connected ? `${connected} 个连接` : "还没连上模型";
+      // The default model is named without its maker.
       return model === "每次问我"
         ? `${who} · 新对话每次问你`
         : `${who} · 新对话用 ${model?.replace("DeepSeek ", "")}`;
     })(),
     background: `同时做 ${chosen(world, "jobs.parallel")}`,
+    memory: `自动记忆${switchedOn(world, "memory.auto") ? "开着" : "关着"} · 记下 ${
+      linesOf(page("memory")).length
+    } 条`,
     budget:
       chosen(world, "budget.default") === "每次问我"
         ? "新项目每次问你给多少"
@@ -129,12 +193,12 @@ export function choose(world: ChatWorld, choiceId: string, option: number): Chat
 const relabel = (controls: readonly Control[] | undefined, id: string, label: string) =>
   controls?.map((control) => (control.id === id ? { ...control, label } : control));
 
-const CONNECTED = "已连上 · 密钥在系统钥匙串里";
+const CONNECTED = "密钥在系统钥匙串里";
 function connectedControls(id: string): readonly Control[] {
   return [
     { id: `${id}.test`, label: "测一下" },
     { id: `${id}.rekey`, label: "换密钥" },
-    { id: `${id}.disconnect`, label: "断开", tone: "danger" },
+    { id: `${id}.remove`, label: "删掉", tone: "danger" },
   ];
 }
 
@@ -200,6 +264,8 @@ export function press(
   controlId: string,
   ids: { next: (prefix: string) => string },
 ): ChatWorld {
+  const flipped = flip(world, controlId);
+  if (flipped) return summarize(flipped);
   const [scope = "", item = "", verb = ""] = controlId.split(".");
   const lineId = `${scope}.${item}`;
 
@@ -239,7 +305,39 @@ export function press(
   }
 
   if (scope === "memory" && verb === "delete")
-    return mapPages(world, (page) => mapLines(page, (line) => (line.id === lineId ? null : line)));
+    return summarize(
+      mapPages(world, (page) => mapLines(page, (line) => (line.id === lineId ? null : line))),
+    );
+
+  if (controlId === "models.add") {
+    const id = ids.next("conn");
+    return summarize(
+      mapPages(world, (page) =>
+        mapBlocks(page, (block) =>
+          block.kind === "providers" && page.id === "models"
+            ? {
+                ...block,
+                providers: [
+                  ...block.providers,
+                  {
+                    id,
+                    letter: "D",
+                    name: "DeepSeek · 新连接",
+                    status: "没连上",
+                    connected: false,
+                    controls: [{ id: `${id}.remove`, label: "删掉", tone: "danger" }],
+                    keyField: {
+                      placeholder: "粘贴 DeepSeek 的密钥",
+                      save: { id: `${id}.save`, label: "存进钥匙串", tone: "primary" },
+                    },
+                  },
+                ],
+              }
+            : block,
+        ),
+      ),
+    );
+  }
 
   if (scope === "automation") return automate(world, item, verb, ids);
 
@@ -280,8 +378,9 @@ export function press(
   }
 
   // Provider controls: the id's first part names the provider.
-  const provider = (id: string, change: (p: Provider) => Provider) =>
+  const provider = (id: string, change: (p: Provider) => Provider | null) =>
     summarize(mapPages(world, (page) => mapProviders(page, (p) => (p.id === id ? change(p) : p))));
+  if (item === "remove") return provider(scope, () => null);
   if (item === "disconnect")
     return provider(scope, (p) => ({
       ...p,

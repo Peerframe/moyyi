@@ -934,6 +934,14 @@ html {
 .ch-page-list-h {
   padding: var(--space-4) var(--space-10) 0;
 }
+.ch-page-rows .ch-page-list-h {
+  padding-top: var(--space-12);
+}
+.ch-page-list-rule {
+  height: 1px;
+  margin: var(--space-8) var(--space-10);
+  background: var(--line);
+}
 .ch-page-rows {
   display: flex;
   flex-direction: column;
@@ -973,10 +981,10 @@ html {
   margin-bottom: var(--space-12);
 }
 .ch-pane-body {
-  max-width: 640px;
+  max-width: 680px;
   display: flex;
   flex-direction: column;
-  gap: 18px;
+  gap: var(--space-16);
 }
 .ch-pane-titles {
   display: flex;
@@ -985,12 +993,17 @@ html {
 }
 .ch-pane-title {
   margin: 0;
-  font-size: 18px;
+  font-size: 20px;
   font-weight: 650;
 }
 .ch-pane-sub {
-  font-size: 13px;
+  margin: 0;
+  font-size: 14px;
+  line-height: 1.6;
   color: var(--muted);
+}
+.ch-plugin-head .ch-pane-sub {
+  font-size: 13px;
 }
 .ch-plugin-head {
   display: flex;
@@ -1000,17 +1013,9 @@ html {
 .ch-plugin-head .ch-pane-titles {
   gap: 2px;
 }
-.ch-group {
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-8);
-}
-.ch-group-caption {
-  font-size: 12px;
-  line-height: 1.5;
-  color: var(--muted);
-}
-/* Light theme cards would vanish on white: the hairline keeps them. */
+/* A group is one card: title and caption on top, the action at the top right, rows below.
+   Light theme cards would vanish on white: the hairline keeps them. */
+.ch-group,
 .ch-card {
   background: var(--raised);
   box-shadow: inset 0 0 0 1px var(--line);
@@ -1019,6 +1024,142 @@ html {
   display: flex;
   flex-direction: column;
   gap: var(--space-10);
+}
+.ch-group {
+  gap: 14px;
+}
+.ch-group-head {
+  display: flex;
+  align-items: center;
+  gap: var(--space-12);
+}
+.ch-group-title {
+  margin: 0;
+  font-size: 15px;
+  font-weight: 600;
+}
+.ch-group-caption {
+  font-size: 13px;
+  line-height: 1.5;
+  color: var(--muted);
+}
+/* Rows inside a group card sit flat on it. */
+.ch-group:not(.ch-group-bare) > .ch-card {
+  background: none;
+  box-shadow: none;
+  border-radius: 0;
+  padding: 0;
+}
+.ch-group:not(.ch-group-bare) > .ch-group-head + .ch-card,
+.ch-group:not(.ch-group-bare) > .ch-card + .ch-card {
+  border-top: 1px solid var(--line);
+  padding-top: 14px;
+}
+/* A card with no title: its rows are the titles (自动记忆). */
+.ch-group > .ch-card:only-child .ch-line-main {
+  font-size: 15px;
+  font-weight: 600;
+}
+/* Connections are cards of their own, with the dashed card to add one below. */
+.ch-group-bare {
+  background: none;
+  box-shadow: none;
+  padding: 0;
+  gap: var(--space-10);
+}
+.ch-group-bare > .ch-group-head {
+  padding: 0 var(--space-4);
+}
+.ch-group-bare .ch-group-title {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--muted);
+}
+.ch-add-card {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-8);
+  min-height: 52px;
+  border: 1px dashed var(--line);
+  border-radius: 14px;
+  background: none;
+  color: var(--text);
+  font: inherit;
+  font-size: 14px;
+  cursor: pointer;
+}
+.ch-add-card:hover {
+  background: var(--hover);
+}
+.ch-provider-top {
+  display: flex;
+  align-items: center;
+  gap: var(--space-8);
+  min-width: 0;
+}
+.ch-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  flex: 0 0 auto;
+  background: var(--muted);
+  opacity: 0.5;
+}
+.ch-dot-on {
+  background: var(--working);
+  opacity: 1;
+}
+.ch-switch {
+  position: relative;
+  flex: 0 0 auto;
+  width: 44px;
+  height: 26px;
+  padding: 0;
+  border: 0;
+  border-radius: 13px;
+  background: var(--line);
+  cursor: pointer;
+  transition: background var(--duration-fast);
+}
+.ch-switch::after {
+  content: "";
+  position: absolute;
+  top: 3px;
+  left: 3px;
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  background: #fff;
+  box-shadow: 0 1px 2px color-mix(in srgb, var(--shade) 30%, transparent);
+  transition: transform var(--duration-fast);
+}
+.ch-switch[aria-checked="true"] {
+  background: var(--accent);
+}
+.ch-switch[aria-checked="true"]::after {
+  transform: translateX(18px);
+}
+.ch-switch:focus-visible {
+  outline: 2px solid var(--focus);
+  outline-offset: 2px;
+}
+.ch-number {
+  flex: 0 0 auto;
+  display: flex;
+  align-items: center;
+  gap: var(--space-6);
+  padding: 2px var(--space-12);
+}
+.ch-number input {
+  width: 64px;
+  height: 30px;
+  font-size: 14px;
+  text-align: right;
+}
+.ch-number-unit {
+  font-size: 13px;
+  color: var(--muted);
 }
 .ch-card-rule {
   height: 1px;

@@ -124,6 +124,12 @@ export const Icon = {
       <path d="M3 11.5a2 2 0 0 1 2-2h7.5" />
     </>,
   ),
+  memory: stroke(
+    <path d="M5.5 10.5a4 4 0 1 1 5 0v1.5h-5zM6.5 14h3M8 2V1M3 3.5l-.7-.7M13 3.5l.7-.7" />,
+  ),
+  keyboard: stroke(
+    <path d="M1.5 4.5h13v7h-13zM4 7h.01M6.5 7h.01M9 7h.01M11.5 7h.01M5 9.5h6" />,
+  ),
   lock: stroke(
     <>
       <rect x="3.5" y="7" width="9" height="6.5" rx="1.5" />

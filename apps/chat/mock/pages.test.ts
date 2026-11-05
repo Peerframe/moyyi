@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
-import type { ChatWorld, PageLine, PluginPage } from "../port.ts";
-import { chosen } from "./page-actions.ts";
+import type { ChatWorld, PageLine, PluginPage, SettingsPage } from "../port.ts";
+import { chosen, switchedOn } from "./page-actions.ts";
 import { createMockPort } from "./port.ts";
 import { firstRunWorld, xiaowenWorld } from "./world.ts";
 
@@ -14,26 +14,34 @@ function setup(world: ChatWorld = xiaowenWorld()) {
   return { port, page, lines };
 }
 
+const providers = (page: (id: string) => SettingsPage | PluginPage | undefined) =>
+  page("models")
+    ?.groups.flatMap((g) => g.blocks)
+    .flatMap((b) => (b.kind === "providers" ? b.providers : [])) ?? [];
+
 describe("设置, 自动化 and 插件 on the mock backend", () => {
-  it("holds the eight sections, three automations and five plugins (S23–S32, S34)", () => {
+  it("holds ten sections under their headings, three automations and five plugins", () => {
     const { settings, plugins, automations } = xiaowenWorld();
-    expect(settings.map((p) => p.name)).toEqual([
-      "模型和密钥",
-      "关于我",
-      "权限和确认",
-      "后台",
-      "预算",
-      "记录和数据",
-      "通用",
-      "关于 moyyi",
+    expect(settings.map((p) => `${p.section ?? "-"} ${p.name}`)).toEqual([
+      "- 通用",
+      "- 快捷键",
+      "AI 模型",
+      "AI 个性化",
+      "AI 记忆",
+      "AI 后台",
+      "AI 预算",
+      "数据与安全 权限和确认",
+      "数据与安全 记录和数据",
+      " 关于 moyyi",
     ]);
     expect(plugins.map((p) => p.name)).toEqual(["文件", "命令行", "网页", "文档", "技能"]);
     expect(automations.map((p) => p.name)).toEqual(["早报", "查论文格式", "读书会摘录"]);
     // Every choice and control id is unique: the runtime keys actions by them.
     const ids = [...settings, ...automations, ...plugins].flatMap((page) => [
       ...("toggle" in page && (page as PluginPage).toggle ? [(page as PluginPage).toggle?.id] : []),
-      ...page.groups.flatMap((g) =>
-        g.blocks.flatMap((b) => {
+      ...page.groups.flatMap((g) => [
+        ...(g.action ? [g.action.id] : []),
+        ...g.blocks.flatMap((b) => {
           if (b.kind === "choice") return [b.choice.id];
           if (b.kind === "choices") return b.choices.map((c) => c.id);
           if (b.kind === "lines")
@@ -43,9 +51,12 @@ describe("设置, 自动化 and 插件 on the mock backend", () => {
               ...p.controls.map((c) => c.id),
               ...(p.keyField ? [p.keyField.save.id] : []),
             ]);
+          if (b.kind === "switches") return b.switches.map((x) => x.id);
+          if (b.kind === "numbers") return b.fields.map((x) => x.id);
+          if (b.kind === "add") return [b.control.id];
           return [];
         }),
-      ),
+      ]),
     ]);
     expect(new Set(ids).size).toBe(ids.length);
   });
@@ -82,22 +93,55 @@ describe("设置, 自动化 and 插件 on the mock backend", () => {
       ?.groups.flatMap((g) => g.blocks)
       .flatMap((b) => (b.kind === "providers" ? b.providers : []))
       .find((p) => p.id === "kimi");
-    expect(kimi).toMatchObject({ connected: true, status: "已连上 · 密钥在系统钥匙串里" });
+    expect(kimi).toMatchObject({ connected: true, status: "密钥在系统钥匙串里" });
     expect(kimi?.keyField).toBeUndefined();
-    expect(page("models")?.summary).toBe("DeepSeek、Kimi 已连上 · 新对话用 Flash");
+    expect(page("models")?.summary).toBe("3 个连接 · 新对话用 Flash");
     // An empty key connects nothing.
-    await port.act({ type: "control", controlId: "anthropic.connect" });
-    await port.act({ type: "save-key", providerId: "anthropic", key: "  " });
-    expect(page("models")?.summary).toBe("DeepSeek、Kimi 已连上 · 新对话用 Flash");
+    await port.act({ type: "control", controlId: "models.add" });
+    const added = providers(page).at(-1);
+    expect(added).toMatchObject({ name: "DeepSeek · 新连接", connected: false });
+    await port.act({ type: "save-key", providerId: added?.id ?? "", key: "  " });
+    expect(page("models")?.summary).toBe("3 个连接 · 新对话用 Flash");
   });
 
-  it("disconnects a provider and offers to connect it again", async () => {
+  it("adds and removes model connections like cards (two keys for one maker)", async () => {
     const { port, page } = setup();
-    await port.act({ type: "control", controlId: "deepseek.disconnect" });
+    expect(providers(page).map((p) => p.name)).toEqual([
+      "DeepSeek · 主力",
+      "DeepSeek · 备用",
+      "Kimi",
+    ]);
+    await port.act({ type: "control", controlId: "deepseek-spare.remove" });
+    await port.act({ type: "control", controlId: "deepseek-main.remove" });
+    expect(providers(page).map((p) => p.name)).toEqual(["Kimi"]);
     expect(page("models")?.summary).toBe("还没连上模型 · 新对话用 Flash");
   });
 
-  it("switches skills and plugins, and deletes a memory", async () => {
+  it("flips switches, keeps numbers in range and manages memories (记忆)", async () => {
+    const { port, page, lines } = setup();
+    expect(page("memory")?.summary).toBe("自动记忆开着 · 记下 2 条");
+    await port.act({ type: "control", controlId: "memory.auto" });
+    expect(switchedOn(port.world(), "memory.auto")).toBe(false);
+    expect(page("memory")?.summary).toBe("自动记忆关着 · 记下 2 条");
+    await port.act({ type: "control", controlId: "memory.cite.delete" });
+    expect(lines("memory").map((l) => l.id)).toEqual(["memory.rent"]);
+    expect(page("memory")?.summary).toBe("自动记忆关着 · 记下 1 条");
+
+    await port.act({ type: "control", controlId: "long.subagents" });
+    expect(switchedOn(port.world(), "long.subagents")).toBe(true);
+    const requests = () =>
+      page("budget")
+        ?.groups.flatMap((g) => g.blocks)
+        .flatMap((b) => (b.kind === "numbers" ? b.fields : []))
+        .find((f) => f.id === "budget.requests")?.value;
+    await port.act({ type: "set-number", fieldId: "budget.requests", value: 80 });
+    expect(requests()).toBe(80);
+    for (const value of [0, 201, 2.5])
+      await port.act({ type: "set-number", fieldId: "budget.requests", value });
+    expect(requests()).toBe(80);
+  });
+
+  it("switches skills and plugins", async () => {
     const { port, page, lines } = setup();
     await port.act({ type: "control", controlId: "skill.weekly.toggle" });
     expect(lines("skills").find((l) => l.id === "skill.weekly")).toMatchObject({
@@ -112,9 +156,6 @@ describe("设置, 自动化 and 插件 on the mock backend", () => {
       toggle: { label: "启用", tone: "primary" },
       summary: "已停用 · 在这台电脑上跑命令 · 跑前问你",
     });
-
-    await port.act({ type: "control", controlId: "memory.cite.delete" });
-    expect(lines("me").map((l) => l.id)).toEqual(["memory.rent"]);
   });
 
   it("leaves the world alone for host-only controls", async () => {
