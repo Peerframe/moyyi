@@ -3,7 +3,7 @@
 - 参照：`deepseek-ai/deepseek-harness`，提交 `fcc0ad462172522aaf5c93a7b2e01f6b9f0b0159`
   （2026-11-04）。方法按 [moyyi-learn-from-dsh](../../.agents/skills/moyyi-learn-from-dsh/SKILL.md)：
   读每个候选包 README 的用途、模型体验和已知限制；本轮没有读或复制任何源码。
-- 对照对象：分支 `claude/adoring-maxwell-rad278`（PR #66，已含 #59、#60 的 Chat 界面）。
+- 对照对象：`main`，含已合并的 #59、#60（Chat 界面）和 #66。
 - 编写：Claude。用途：给主人挑选下一批交付；每批开工前再写正式简报。
 
 ## 1. 已经有的，不再重复
