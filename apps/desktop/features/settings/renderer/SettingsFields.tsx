@@ -1,6 +1,31 @@
 import type { SettingsSectionProps } from "../../../renderer/slot-types.ts";
 import type { DesktopSettings } from "../../../shared.ts";
-import { presetLabel, selectKimiReasoningEffort, selectSettingsPreset } from "./settings-state.ts";
+import { SETTINGS_LIMITS } from "../contract.ts";
+import {
+  presetLabel,
+  type SettingsSwitch,
+  selectKimiReasoningEffort,
+  selectSettingsPreset,
+  setSettingsSwitch,
+} from "./settings-state.ts";
+
+const SWITCH_TEXT: readonly { key: SettingsSwitch; label: string; note: string }[] = [
+  {
+    key: "autoCompact",
+    label: "自动压缩上下文",
+    note: "上下文接近模型窗口的 70% 时，先用一次请求把较早的对话或较早的步骤压缩成摘要；原始记录保留。默认关闭。",
+  },
+  {
+    key: "subagents",
+    label: "只读子 agent",
+    note: "允许模型把只读调查交给独立会话中的子 agent（每个最多 12 次请求、300 秒），只返回报告；子 agent 不能写入、运行命令或联网，会额外消耗请求。默认关闭。",
+  },
+  {
+    key: "nestedInstructions",
+    label: "子目录 AGENTS.md",
+    note: "模型在某个子目录中读过或改过文件后，从下一次请求起也载入该目录的 AGENTS.md（最多 8 个，共 32 KiB）。默认关闭。",
+  },
+];
 export function SettingsFields({ draft, setDraft, setNotice, setError }: SettingsSectionProps) {
   return (
     <>
@@ -67,7 +92,7 @@ export function SettingsFields({ draft, setDraft, setNotice, setError }: Setting
           <input
             type="number"
             min={1}
-            max={8}
+            max={SETTINGS_LIMITS.maxRequests}
             step={1}
             required
             value={draft.settings.maxRequests}
@@ -85,8 +110,8 @@ export function SettingsFields({ draft, setDraft, setNotice, setError }: Setting
           <span>每轮时限（秒）</span>
           <input
             type="number"
-            min={30}
-            max={300}
+            min={SETTINGS_LIMITS.minTimeoutMs / 1000}
+            max={SETTINGS_LIMITS.maxTimeoutMs / 1000}
             step={1}
             required
             value={draft.settings.timeoutMs / 1000}
@@ -102,8 +127,27 @@ export function SettingsFields({ draft, setDraft, setNotice, setError }: Setting
         </label>
       </div>
       <p className="panel-note">
-        输出上限固定 8192 tokens，自动重试 0 次。保存设置不授予写入权限。
+        输出上限固定 8192 tokens，自动重试 0 次。保存设置不授予写入权限。长任务可把上限调到{" "}
+        {SETTINGS_LIMITS.maxRequests} 次、{SETTINGS_LIMITS.maxTimeoutMs / 1000} 秒；超过 8 次或 300
+        秒的设置，早于本版本的桌面端无法读取，回滚前请先改回。
       </p>
+      {SWITCH_TEXT.map(({ key, label, note }) => (
+        <div key={key}>
+          <label>
+            <input
+              type="checkbox"
+              checked={draft.settings[key] ?? false}
+              onChange={(event) => {
+                const enabled = event.target.checked;
+                setDraft((current) => setSettingsSwitch(current, key, enabled));
+                setNotice(null);
+              }}
+            />
+            <span>{label}</span>
+          </label>
+          <p className="panel-note">{note}</p>
+        </div>
+      ))}
       <label>
         <input
           type="checkbox"

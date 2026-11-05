@@ -66,8 +66,19 @@ It requires at least two requests, disallows steering and requires disabling the
 continuing an old conversation. Cancellation still works. Switching to Flash clears the option;
 old applications cannot read the enabled setting, so disable it before a compatible rollback.
 See [ADR0042](decisions/0042-direct-evidence-answer.md) for the experimental acceptance boundary.
-Endpoints are fixed presets. The form accepts1–8 requests and30–300 seconds per turn;8192 output
-tokens and zero retries stay fixed. An empty API Key preserves that preset's existing key.
+Endpoints are fixed presets. The form accepts 1–200 requests and 30–3600 seconds per turn;
+8192 output tokens and zero retries stay fixed. Values above 8 requests or 300 seconds, and the
+three long-task switches below when enabled, cannot be read by earlier desktop releases: set them
+back before a compatible rollback.
+
+Long-task switches, each default off and stored only when enabled:
+**自动压缩上下文** (automatic compaction, [ADR 0049](decisions/0049-long-running-sessions.md)),
+**只读子 agent** (read-only sub-agents, [ADR 0051](decisions/0051-read-only-subagents.md); the
+desktop runs reads one at a time, so sub-agents do not run in parallel there) and
+**子目录 AGENTS.md** (nested instructions, [ADR 0052](decisions/0052-nested-instructions.md)).
+An approval card also offers **本会话始终允许**: it approves the displayed action and stops asking
+for the same tool (or exact command) in this session until it is reopened. Plan mode, MCP servers
+and hooks are not configurable in the desktop app yet. An empty API Key preserves that preset's existing key.
 Changing preset, saving or closing clears the input. Save stores local configuration only: it
 does not probe the provider, incur model usage or prove that the remote key is valid. An absent
 or inaccessible credential leaves sending disabled while history remains accessible. If applying

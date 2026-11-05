@@ -42,6 +42,8 @@ export type FeatureCommand =
       readonly effectId: string;
       readonly digest: string;
       readonly decision: "approve" | "deny";
+      /** Approve and stop asking for the same tool (or exact command) in this session. */
+      readonly scope?: "session";
     }
   | { readonly type: "effects"; readonly sessionId: string; readonly offset: number }
   | { readonly type: "effect.inspect"; readonly sessionId: string; readonly effectId: string };

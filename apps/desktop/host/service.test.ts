@@ -1018,11 +1018,28 @@ describe("desktop command validation", () => {
       { type: "report.target", sessionId: "x", path: false },
       { type: "artifact.open", sessionId: "x", effectId: "effect", path: "/private" },
       { type: "configure", settings: { preset: "flash", maxRequests: 0, timeoutMs: 120_000 } },
+      { type: "approve", effectId: "e", digest: "d", decision: "deny", scope: "session" },
+      { type: "approve", effectId: "e", digest: "d", decision: "approve", scope: "forever" },
       Object.create({ type: "close" }),
       getter,
     ])
       expect(() => parseDesktopCommand(value)).toThrow("Invalid desktop command");
     expect(parseDesktopCommand({ type: "close" })).toEqual({ type: "close" });
+    expect(
+      parseDesktopCommand({
+        type: "approve",
+        effectId: "e",
+        digest: "d",
+        decision: "approve",
+        scope: "session",
+      }),
+    ).toEqual({
+      type: "approve",
+      effectId: "e",
+      digest: "d",
+      decision: "approve",
+      scope: "session",
+    });
   });
 });
 
