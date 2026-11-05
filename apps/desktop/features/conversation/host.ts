@@ -99,7 +99,17 @@ function entry(host: Host, entry: TranscriptEntry): void {
     const role = body.kind === "user_message" ? "user" : "assistant";
     for (const [index, part] of body.content.entries()) {
       const id = `${entry.id}:${index}`;
-      if (part.type === "text" || part.type === "refusal") add(host, { id, role, text: part.text });
+      if (part.type === "text" && role === "user" && part.text.endsWith(PLAN_MODE_SUFFIX)) {
+        // The fixed plan-mode paragraph stays in the recorded message and complete history; the
+        // conversation shows the owner's words and says the paragraph was attached.
+        add(host, { id, role, text: part.text.slice(0, -PLAN_MODE_SUFFIX.length) });
+        add(host, {
+          id: `${id}:plan`,
+          role: "notice",
+          text: "以计划模式发送：附带了只读调查并给出计划的固定说明。",
+        });
+      } else if (part.type === "text" || part.type === "refusal")
+        add(host, { id, role, text: part.text });
       else if (part.type === "tool_call") {
         host.toolNames.set(part.callId, part.name);
         add(host, {

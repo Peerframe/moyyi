@@ -37,6 +37,28 @@ body,
   opacity: 0.5;
   cursor: default;
 }
+.ch-native-toolbar button[aria-pressed="true"] {
+  color: var(--accent);
+  background: var(--selected);
+  border-color: var(--accent);
+}
+.ch-plan-mode {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: var(--space-8);
+  padding: var(--space-8) var(--space-12);
+}
+.ch-plan-mode p {
+  margin: 0;
+  flex: 1 1 280px;
+  font-size: 13px;
+}
+.ch-plan-actions {
+  display: flex;
+  gap: var(--space-8);
+}
 .desktop-tools {
   --page: var(--window);
   --sidebar: var(--panel);

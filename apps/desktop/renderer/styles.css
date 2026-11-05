@@ -887,6 +887,17 @@ button[aria-pressed="true"] {
   background: var(--surface);
   color: var(--text);
 }
+.settings-fields label.settings-switch {
+  flex-direction: row;
+  align-items: center;
+  font-size: 13px;
+}
+.settings-fields .settings-switch input {
+  flex: none;
+  width: auto;
+  margin: 0;
+  padding: 0;
+}
 .settings-budget {
   display: grid;
   grid-template-columns: 1fr 1fr;

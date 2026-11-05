@@ -133,7 +133,7 @@ export function SettingsFields({ draft, setDraft, setNotice, setError }: Setting
       </p>
       {SWITCH_TEXT.map(({ key, label, note }) => (
         <div key={key}>
-          <label>
+          <label className="settings-switch">
             <input
               type="checkbox"
               checked={draft.settings[key] ?? false}
@@ -148,7 +148,7 @@ export function SettingsFields({ draft, setDraft, setNotice, setError }: Setting
           <p className="panel-note">{note}</p>
         </div>
       ))}
-      <label>
+      <label className="settings-switch">
         <input
           type="checkbox"
           checked={draft.settings.evidenceAnswer ?? false}

@@ -23,9 +23,10 @@ of them through without asking.
   paragraph asking for a read-only investigation and a step-by-step plan. `/execute` leaves plan
   mode and sends a fixed approval message; `/plan off` leaves without a message. Changing modes is
   refused while a run is active.
-- Desktop: the composer's **计划模式** toggle sends `session.mode` through the conversation
-  feature, which appends the same paragraph (shared from `src/contracts/plan-mode.ts`) to each
-  message. **按计划执行** is a host command, not renderer text: after the start checks pass, the
+- Desktop: the **计划模式** toggle (in the Chat toolbar; the legacy renderer has it in the
+  composer) sends `session.mode` through the conversation feature, which appends the same
+  paragraph (shared from `src/contracts/plan-mode.ts`) to each message. A notice above the Chat
+  composer shows the mode and holds **按计划执行** and **退出计划模式**. **按计划执行** is a host command, not renderer text: after the start checks pass, the
   host turns plan mode off and sends the same fixed approval message. Opening, creating or
   removing a session resets the toggle, matching the runtime reset on `session.load`. Changing
   permissions, site access or settings rebuilds the runtime; the host then sends `session.mode`

@@ -859,6 +859,13 @@ it("plan mode survives a permission change, refuses writes without asking, then 
   expect(f.host.getState().messages.some((m) => m.tool === "create" && m.state === "denied")).toBe(
     true,
   );
+  // The conversation shows the owner's words; the fixed paragraph becomes a notice.
+  const sent = f.host.getState().messages.filter((m) => m.role === "user");
+  expect(sent.map((m) => m.text)).toEqual(["Add plan.txt"]);
+  expect(f.host.getState().messages.some((m) => m.text.includes("以计划模式发送"))).toBe(true);
+  expect(
+    f.host.getState().sessions.items.find((item) => item.sessionId === sessionId)?.promptPreview,
+  ).toBe("Add plan.txt");
   steps.push(answer("Executed"));
   await f.host.dispatch({ type: "execute", sessionId });
   await waitFor(f.host, (s) => s.outcome?.kind === "completed" && s.messages.length > 4);

@@ -9,3 +9,12 @@ export const PLAN_MODE_SUFFIX =
 /** Sent when the owner approves the plan and leaves plan mode. */
 export const PLAN_EXECUTE_PROMPT =
   "The plan is approved. Carry it out now, then verify the result and report what changed.";
+
+/**
+ * A session-list preview without the plan-mode paragraph. Previews are clipped, so this cuts at the
+ * paragraph's start rather than requiring the whole suffix.
+ */
+export function previewWithoutPlanMode(text: string): string {
+  const at = text.indexOf(PLAN_MODE_SUFFIX.slice(0, PLAN_MODE_SUFFIX.indexOf("]") + 1));
+  return at < 0 ? text : text.slice(0, at);
+}

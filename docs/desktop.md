@@ -25,7 +25,9 @@ See [ADR 0037](decisions/0037-installed-desktop-client.md),
 ## Use
 
 The installed moyyi Chat view reads the real local session catalog and recorded messages. Use
-**材料**, **会话权限**, **成果与记录**, **完整历史** and **管理会话** for existing desktop controls.
+**材料**, **会话权限**, **计划模式**, **成果与记录**, **完整历史** and **管理会话** for existing desktop
+controls. **设置 → 预算** shows the saved long-task switches and **设置 → 权限和确认** explains
+session approvals and plan mode.
 Open **设置 → 模型和密钥 → 打开模型设置** for model configuration, and **设置 → 记录和数据**
 for maintenance. Mock-only voice, multi-agent and scheduling actions are unavailable.
 
@@ -82,10 +84,11 @@ desktop runs reads one at a time, so sub-agents do not run in parallel there) an
 **子目录 AGENTS.md** (nested instructions, [ADR 0052](decisions/0052-nested-instructions.md)).
 An approval card also offers **本会话始终允许**: it approves the displayed action and stops asking
 for the same tool (or exact command) in this session until it is reopened. **计划模式** in the
-composer turns on plan mode ([ADR 0054](decisions/0054-plan-mode.md)) for the open session: each
+toolbar turns on plan mode ([ADR 0054](decisions/0054-plan-mode.md)) for the open session: each
 message asks for a read-only investigation and a plan, and changes, commands and external calls
-are refused without an approval card. After a plan-mode run completes, **按计划执行** turns plan mode
-off and sends the fixed execute request; existing grants and approvals then apply as usual.
+are refused without an approval card. A notice above the composer says so while it is on. After a
+plan-mode run completes, its **按计划执行** turns plan mode off and sends the fixed execute request;
+existing grants and approvals then apply as usual. **退出计划模式** leaves without sending.
 Reopening or switching sessions turns plan mode off; changing permissions, site access or settings
 keeps it on. MCP servers and hooks are not configurable in
 the desktop app yet. An empty API Key preserves that preset's existing key.

@@ -2,6 +2,7 @@ import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import type { Theme } from "../../chat/port.ts";
 import { App as ChatApp } from "../../chat/ui/App.tsx";
 import type { DesktopBridge } from "../shared.ts";
+import { PlanModeNotice, planAvailability } from "./chat-plan.tsx";
 import { CHAT_ACTIONS, createDesktopChatPort } from "./chat-port.ts";
 import { RichMessage } from "./RichMessage.tsx";
 import { useRenderer } from "./runtime.ts";
@@ -160,6 +161,11 @@ export function DesktopChatApp({ bridge }: { bridge: DesktopBridge }) {
     !ui.newSession &&
     !ui.composerBlocked &&
     !!state.connection.ready;
+  const sessionId = state.activeSessionId;
+  const plan = planAvailability(state, ui);
+  const setPlan = (enabled: boolean) => {
+    if (sessionId) ui.act({ type: "plan", sessionId, enabled });
+  };
   const attach = () => {
     if (state.activeSessionId)
       void ui.perform(() => bridge.selectDocuments({ sessionId: state.activeSessionId as string }));
@@ -181,6 +187,16 @@ export function DesktopChatApp({ bridge }: { bridge: DesktopBridge }) {
         onClick={() => command("native.permissions")}
       >
         会话权限
+      </button>
+      <button
+        type="button"
+        className="mc-btn"
+        aria-pressed={state.planMode}
+        title="开启后只读调查并给出计划；批准计划前不会修改文件、运行命令或访问外部"
+        disabled={!plan.canChange}
+        onClick={() => setPlan(!state.planMode)}
+      >
+        计划模式
       </button>
       <button type="button" className="mc-btn" onClick={() => command("native.artifacts")}>
         成果与记录
@@ -205,6 +221,12 @@ export function DesktopChatApp({ bridge }: { bridge: DesktopBridge }) {
       {state.historyOnly ? (
         <p role="status">当前只能查看历史。工作目录不可用或会话已在回收站。</p>
       ) : null}
+      <PlanModeNotice
+        state={state}
+        availability={plan}
+        onExecute={() => sessionId && ui.act({ type: "execute", sessionId })}
+        onExit={() => setPlan(false)}
+      />
       {ui.draft ? (
         <div className="ch-prepared-draft">
           <p>已准备可编辑请求。发送后使用当前模型预算，权限与审批照常生效。</p>

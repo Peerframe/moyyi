@@ -1,5 +1,5 @@
 import { realpath, stat } from "node:fs/promises";
-import type { SessionId, SessionQuery } from "moyyi/contracts";
+import { previewWithoutPlanMode, type SessionId, type SessionQuery } from "moyyi/contracts";
 import { BoundaryError, defineHostFeature } from "../../host/feature.ts";
 import type { DesktopSessionSummary } from "../../shared.ts";
 import { commandTypes, stateKeys } from "./contract.ts";
@@ -220,17 +220,22 @@ export const hostFeature = defineHostFeature({
         });
         break;
       }
-      case "session.listed":
-        for (const session of event.page.sessions)
-          host.knownSessions.set(session.sessionId, session);
+      case "session.listed": {
+        const items = event.page.sessions.map((item) =>
+          item.promptPreview
+            ? { ...item, promptPreview: previewWithoutPlanMode(item.promptPreview) }
+            : item,
+        );
+        for (const session of items) host.knownSessions.set(session.sessionId, session);
         host.update({
           sessions: {
-            items: event.page.sessions,
+            items,
             offset: event.page.offset,
             hasMore: event.page.hasMore,
           },
         });
         break;
+      }
       case "entry.appended": {
         const entry = event.entry,
           body = entry.body;
@@ -239,7 +244,8 @@ export const hostFeature = defineHostFeature({
         if (summary && !host.expectedSession) {
           let preview = summary.promptPreview;
           if (body.kind === "user_message") {
-            preview = body.content.find((part) => part.type === "text")?.text.slice(0, 160) ?? null;
+            const text = body.content.find((part) => part.type === "text")?.text;
+            preview = text === undefined ? null : previewWithoutPlanMode(text).slice(0, 160);
             if (preview && /[\uD800-\uDBFF]$/u.test(preview)) preview = preview.slice(0, -1);
           }
           const next = { ...summary, promptPreview: preview, lastActivityAt: entry.createdAt };
