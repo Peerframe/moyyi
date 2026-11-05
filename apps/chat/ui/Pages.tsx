@@ -1,21 +1,21 @@
-// 自动化, 插件 and 设置 (boards S23–S32, S34). Each opens from the rail in place of the chat
+// 自动化, 插件 and 设置 (boards S23–S32, S34, S35). Each opens from the rail in place of the chat
 // list, grouped under headings; the entry opens in the conversation pane. A page is a title, a
 // line saying what it is for, then one card per group: its title and caption on top, its action
 // at the top right, its rows below. Model connections are cards of their own with a dashed card
-// to add one. Pages are data from the port, so this file only knows how to draw the block kinds,
+// to add one; the brand on 关于 sits on the pane itself. Pages are data from the port, so this file only knows how to draw the block kinds,
 // not what any setting means.
 import { type ReactNode, useState } from "react";
 import type {
   ChatWorld,
   Choice,
   Control,
-  NumberField,
   PageBlock,
   PageGroup,
   PageIcon,
   PageLine,
   PluginPage,
   SettingsPage,
+  TextField,
 } from "../port.ts";
 import { Icon } from "./icons.tsx";
 import { Avatar } from "./parts.tsx";
@@ -26,7 +26,6 @@ const PAGE_ICON: Record<PageIcon, keyof typeof Icon> = {
   me: "me",
   shield: "shield",
   timer: "timer",
-  gauge: "gauge",
   db: "db",
   sliders: "sliders",
   info: "info",
@@ -37,13 +36,14 @@ const PAGE_ICON: Record<PageIcon, keyof typeof Icon> = {
   skill: "skill",
   memory: "memory",
   keyboard: "keyboard",
+  help: "help",
 };
 
 export interface PageActions {
   choose(choiceId: string, option: number): void;
   press(controlId: string): void;
   saveKey(providerId: string, key: string): void;
-  setNumber(fieldId: string, value: number): void;
+  saveText(fieldId: string, text: string): void;
 }
 
 function PageIconTile({ icon, size = 32 }: { readonly icon: PageIcon; readonly size?: 32 | 48 }) {
@@ -69,7 +69,8 @@ const LIST: Record<PageKind, { title: string; search: string; foot: string }> = 
   settings: {
     title: "设置",
     search: "搜索设置",
-    foot: "这里只放管全部 AI 的事。某个 AI 或项目自己的模型、权限和预算，在它的资料里改；AI 能用的能力在插件里。",
+    // The boards end the settings list at 关于 moyyi.
+    foot: "",
   },
   plugins: {
     title: "插件",
@@ -132,7 +133,11 @@ export function PageList({
       ) : null}
       <div className="ch-page-rows">
         {shown.map((page, index) => [
-          index === 0 || page.section === shown[index - 1]?.section ? null : page.section ? (
+          (
+            index === 0
+              ? !page.section
+              : page.section === shown[index - 1]?.section
+          ) ? null : page.section ? (
             <span key={`h-${page.id}`} className="mc-section-h ch-page-list-h">
               {page.section}
             </span>
@@ -166,7 +171,9 @@ export function PageList({
           </div>
         ) : null}
       </div>
-      <p className="ch-page-foot">{native ? NATIVE_FOOT[kind] : words.foot}</p>
+      {native || words.foot ? (
+        <p className="ch-page-foot">{native ? NATIVE_FOOT[kind] : words.foot}</p>
+      ) : null}
     </section>
   );
 }
@@ -241,8 +248,8 @@ export function PagePane({
   );
 }
 
-/** Connections are cards of their own, so their group draws no card around them. */
-const BARE: ReadonlySet<PageBlock["kind"]> = new Set(["providers", "add"]);
+/** Connections are cards of their own and the brand stands alone, so their group draws no card. */
+const BARE: ReadonlySet<PageBlock["kind"]> = new Set(["providers", "add", "brand"]);
 
 function Group({
   world,
@@ -358,6 +365,18 @@ function Line({
   readonly line: PageLine;
   readonly onPress: (controlId: string) => void;
 }) {
+  if (line.link)
+    return (
+      <button type="button" className="ch-line ch-line-link" onClick={() => onPress(line.id)}>
+        <span className="ch-grow ch-min ch-line-text">
+          <span className="ch-line-main">{line.text}</span>
+          {line.sub ? <span className="ch-line-sub">{line.sub}</span> : null}
+        </span>
+        <span className="muted ch-line-chevron" aria-hidden="true">
+          <Icon.chevron />
+        </span>
+      </button>
+    );
   return (
     <div className="ch-line">
       {line.icon ? <PageIconTile icon={line.icon} /> : null}
@@ -468,55 +487,53 @@ function SwitchRow({
   );
 }
 
-/** Saved when the field is left or Enter is pressed; out of range snaps back to the saved value. */
-function NumberRow({
+/** Written in place and saved only on its button; the count is the field's own limit. */
+function TextBlock({
   field,
-  onSet,
+  onSave,
 }: {
-  readonly field: NumberField;
-  readonly onSet: (fieldId: string, value: number) => void;
+  readonly field: TextField;
+  readonly onSave: (fieldId: string, text: string) => void;
 }) {
-  const [text, setText] = useState(String(field.value));
+  const [text, setText] = useState(field.value);
   const [seen, setSeen] = useState(field.value);
   if (seen !== field.value) {
     setSeen(field.value);
-    setText(String(field.value));
+    setText(field.value);
   }
-  const commit = () => {
-    const value = Number(text);
-    if (Number.isSafeInteger(value) && value >= field.min && value <= field.max) {
-      if (value !== field.value) onSet(field.id, value);
-    } else setText(String(field.value));
-  };
   return (
-    <div className="ch-line">
-      <span className="ch-grow ch-min ch-line-text">
-        <label className="ch-line-main" htmlFor={field.id}>
+    <form
+      className="ch-text-field"
+      onSubmit={(event) => {
+        event.preventDefault();
+        if (text !== field.value) onSave(field.id, text);
+      }}
+    >
+      <div className="mc-composer ch-text-box">
+        <label htmlFor={field.id} className="ch-sr">
           {field.label}
         </label>
-        <span className="ch-line-sub">
-          {field.note ? `${field.note} · ` : ""}
-          {field.min}–{field.max} {field.unit}
-        </span>
-      </span>
-      <span className="mc-composer ch-number">
-        <input
+        <textarea
           id={field.id}
-          type="number"
-          inputMode="numeric"
-          min={field.min}
-          max={field.max}
-          step={1}
+          rows={4}
+          maxLength={field.max}
           value={text}
           onChange={(event) => setText(event.target.value)}
-          onBlur={commit}
-          onKeyDown={(event) => {
-            if (event.key === "Enter") commit();
-          }}
         />
-        <span className="ch-number-unit">{field.unit}</span>
-      </span>
-    </div>
+      </div>
+      <div className="ch-text-foot">
+        <span className="ch-grow ch-line-sub">
+          {text.length} / {field.max} 字{field.note ? ` · ${field.note}` : ""}
+        </span>
+        <button
+          type="submit"
+          className={`mc-key ch-page-key${field.save.tone ? ` mc-key-${field.save.tone}` : ""}`}
+          disabled={text === field.value}
+        >
+          {field.save.label}
+        </button>
+      </div>
+    </form>
   );
 }
 
@@ -564,42 +581,6 @@ function Block({
               </span>
               {line}
             </span>
-          ))}
-        </div>
-      );
-    case "chips":
-      return (
-        <div className="ch-chips ch-page-chips">
-          {block.chips.map((chip) => (
-            <span key={chip} className="mc-chip">
-              {chip}
-            </span>
-          ))}
-          {block.add ? <ControlButton control={block.add} onPress={actions.press} /> : null}
-        </div>
-      );
-    case "meters":
-      return (
-        <div className="ch-card ch-meters">
-          {block.meters.map((meter) => (
-            <div key={meter.id} className="ch-meter-row">
-              <Avatar avatar={meter.avatar} shape={meter.shape} size={32} />
-              <span className="ch-grow ch-min ch-meter-text">
-                <span className="ch-meter-top">
-                  <span>{meter.name}</span>
-                  {meter.alert ? (
-                    <span className="ch-meter-alert">{meter.alert}</span>
-                  ) : (
-                    <span className="num muted">
-                      {meter.used}/{meter.total} 次
-                    </span>
-                  )}
-                </span>
-                <span className="mc-meter">
-                  <span style={{ width: `${Math.round((meter.used * 100) / meter.total)}%` }} />
-                </span>
-              </span>
-            </div>
           ))}
         </div>
       );
@@ -654,17 +635,15 @@ function Block({
           ))}
         </Card>
       );
-    case "numbers":
-      return (
-        <Card>
-          {block.fields.map((field) => (
-            <NumberRow key={field.id} field={field} onSet={actions.setNumber} />
-          ))}
-        </Card>
-      );
+    case "text":
+      return <TextBlock field={block.field} onSave={actions.saveText} />;
     case "add":
       return (
-        <button type="button" className="ch-add-card" onClick={() => actions.press(block.control.id)}>
+        <button
+          type="button"
+          className="ch-add-card"
+          onClick={() => actions.press(block.control.id)}
+        >
           <span aria-hidden="true">＋</span>
           {block.control.label}
         </button>
@@ -684,11 +663,6 @@ function Block({
               <span>{shortcut.what}</span>
             </div>
           ))}
-          {block.more ? (
-            <span className="ch-start">
-              <ControlButton control={block.more} onPress={actions.press} />
-            </span>
-          ) : null}
         </div>
       );
     case "note":

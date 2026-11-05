@@ -81,14 +81,17 @@ describe("moyyi Chat interface", () => {
 
   it("opens 设置 in place of the chat list, grouped like the boards, 通用 first (S23)", () => {
     const html = renderPage(xiaowenWorld(), "settings");
-    const list = text(html.slice(html.indexOf('aria-label="设置"'), html.indexOf("ch-page-foot")));
-    expect(list).toMatch(
-      /通用.*快捷键.*AI模型.*个性化.*记忆.*后台.*预算.*数据与安全权限和确认.*记录和数据.*关于 moyyi/,
+    const list = text(
+      html.slice(html.indexOf('aria-label="设置"'), html.indexOf('class="mc-panel ch-pane"')),
     );
+    expect(list).toMatch(
+      /设置通用.*快捷键.*功能模型.*个性化.*记忆.*数据安全权限.*数据.*获取帮助.*关于 moyyi/,
+    );
+    expect(list).not.toMatch(/后台|预算/);
     expect(html).toContain('class="ch-page-list-rule"');
     const seen = text(html);
     expect(seen).toContain("颜色、字号和通知。");
-    expect(seen).toContain("这里只放管全部 AI 的事。");
+    expect(html).not.toContain("ch-page-foot");
     expect(html).not.toContain('aria-label="对话列表"');
     expect(html).toMatch(/title="⌘,"[^>]*aria-current="true"/);
   });
@@ -101,7 +104,7 @@ describe("moyyi Chat interface", () => {
       "默认",
       "DeepSeek · 备用",
       "添加模型连接",
-      "网页搜索用",
+      "新对话默认用",
       "额度用完的时候",
       "对话停在原处，不会自己换连接",
     ])
@@ -120,9 +123,21 @@ describe("moyyi Chat interface", () => {
     expect(seen).toContain("从「毕业论文」记下 · 10月30日");
     expect(html).toMatch(/role="switch"[^>]*aria-checked="true"/);
     expect(html).toMatch(/ch-group-head.*导入/);
-    const budget = renderPage(xiaowenWorld(), "settings/budget");
-    expect(budget).toMatch(/type="number"[^>]*min="1"[^>]*max="200"/);
-    expect(text(budget)).toContain("子智能体帮忙查");
+  });
+
+  it("writes 个人指令 in place with its count and a save button (S26)", () => {
+    const html = renderPage(xiaowenWorld(), "settings/me", "light");
+    expect(html).toMatch(/<textarea[^>]*maxLength="4000"[^>]*>叫我小文。/);
+    expect(text(html)).toContain("46 / 4000 字 · 只存在这台电脑上");
+    // Nothing to save until it changes.
+    expect(html).toMatch(/type="submit"[^>]*disabled=""[^>]*>保存/);
+  });
+
+  it("lists help topics as rows that open, and keeps 反馈 a button (S30)", () => {
+    const html = renderPage(xiaowenWorld(), "settings/help", "light");
+    expect(html.match(/class="ch-line ch-line-link"/g)).toHaveLength(7);
+    expect(text(html)).toContain("复制版本和系统信息");
+    expect(text(html)).toContain("去反馈");
   });
 
   it("shows guarantees as locked lines, never as switches (S25)", () => {
@@ -190,7 +205,14 @@ describe("moyyi Chat interface", () => {
     expect(MORE).toEqual([]);
     const world = xiaowenWorld();
     const rail = (more?: Parameters<typeof Rail>[0]["more"]) =>
-      renderToString(createElement(Rail, { world, view: "all", onView: () => undefined, more }));
+      renderToString(
+        createElement(Rail, {
+          world,
+          view: "all",
+          onView: () => undefined,
+          ...(more ? { more } : {}),
+        }),
+      );
     expect(rail()).not.toContain("更多");
     const shown = rail([{ id: "settings", label: "设置", icon: "settings" }]);
     expect(text(shown)).toMatch(/自动化插件更多设置/);

@@ -7,10 +7,11 @@ import type { RendererUI } from "./ui.ts";
 function fixture() {
   const state = chatTestState();
   const act = vi.fn(async () => state);
+  const configure = vi.fn(async () => state);
   const control = vi.fn();
   const ui = {
     state,
-    bridge: { act } as unknown as DesktopBridge,
+    bridge: { act, configure } as unknown as DesktopBridge,
     pending: false,
     composerBlocked: false,
     newSession: false,
@@ -21,7 +22,7 @@ function fixture() {
   } as unknown as RendererUI;
   const adapter = createDesktopChatPort(() => ui, control);
   adapter.update(state, null, false);
-  return { ui, act, control, adapter };
+  return { ui, act, configure, control, adapter };
 }
 
 describe("native Chat action routing", () => {
@@ -92,6 +93,46 @@ describe("native Chat action routing", () => {
       "尚不支持",
     );
     expect(f.act).not.toHaveBeenCalled();
+  });
+
+  it("changes the model service, Kimi strength and key only through configure", async () => {
+    const f = fixture();
+    await f.adapter.port.act({ type: "choose", choiceId: "native.preset", option: 1 });
+    expect(f.configure).toHaveBeenLastCalledWith({
+      settings: expect.objectContaining({ preset: "kimi-cn" }),
+    });
+    // Choosing the service already in use saves nothing.
+    f.configure.mockClear();
+    await f.adapter.port.act({ type: "choose", choiceId: "native.preset", option: 0 });
+    expect(f.configure).not.toHaveBeenCalled();
+    // Flash has no strength to choose, and unknown options change nothing.
+    await expect(
+      f.adapter.port.act({ type: "choose", choiceId: "native.kimiEffort", option: 1 }),
+    ).rejects.toThrow("只有 Kimi");
+    await expect(
+      f.adapter.port.act({ type: "choose", choiceId: "native.preset", option: 9 }),
+    ).rejects.toThrow("没有这个模型服务");
+    const secret = "sk-test-not-a-real-key-0001";
+    await f.adapter.port.act({ type: "save-key", providerId: "native.model", key: ` ${secret} ` });
+    expect(f.configure).toHaveBeenLastCalledWith({
+      settings: expect.objectContaining({ preset: "flash" }),
+      apiKey: secret,
+    });
+    expect(JSON.stringify(f.adapter.port.world())).not.toContain(secret);
+    await expect(
+      f.adapter.port.act({ type: "save-key", providerId: "native.model", key: "has space" }),
+    ).rejects.toThrow("API Key");
+    expect(f.configure).toHaveBeenCalledTimes(1);
+    expect(f.act).not.toHaveBeenCalled();
+  });
+
+  it("refuses settings changes while a run is going", async () => {
+    const f = fixture();
+    f.ui.state = chatTestState({ run: { id: "run-a", state: "running" } });
+    await expect(
+      f.adapter.port.act({ type: "choose", choiceId: "native.preset", option: 1 }),
+    ).rejects.toThrow("等待当前操作结束");
+    expect(f.configure).not.toHaveBeenCalled();
   });
 
   it("does not replace a newer pushed snapshot with a delayed command return", async () => {

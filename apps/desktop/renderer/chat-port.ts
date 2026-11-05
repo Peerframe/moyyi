@@ -1,10 +1,32 @@
 import type { ChatAction, ChatPort } from "../../chat/port.ts";
+import {
+  newSettingsDraft,
+  type SettingsDraft,
+  saveSettingsDraft,
+  selectKimiReasoningEffort,
+  selectSettingsPreset,
+} from "../features/settings/renderer/settings-state.ts";
 import type { DesktopState } from "../shared.ts";
+import {
+  KIMI_EFFORTS,
+  NATIVE_KIMI_EFFORT,
+  NATIVE_MODEL,
+  NATIVE_PRESET,
+  PRESETS,
+} from "./chat-pages.ts";
 import { projectChatWorld } from "./chat-world.ts";
 import type { RendererUI } from "./ui.ts";
 import { errorMessage } from "./ui.ts";
 
-export const CHAT_ACTIONS = ["open", "send", "stop", "mute", "control"] as const;
+export const CHAT_ACTIONS = [
+  "open",
+  "send",
+  "stop",
+  "mute",
+  "control",
+  "choose",
+  "save-key",
+] as const;
 
 /** Display adapter only. The existing bridge remains the sole authority for every effect. */
 export function createDesktopChatPort(current: () => RendererUI, control: (id: string) => void) {
@@ -60,6 +82,32 @@ export function createDesktopChatPort(current: () => RendererUI, control: (id: s
         ui.bridge.act({ type: "start", sessionId: action.chatId, text }),
       );
       if (!result) throw Error("消息未能确认发送，草稿已保留。");
+      return;
+    }
+    if (action.type === "choose" || action.type === "save-key") {
+      // The same validation and keychain path as the settings window; the key leaves this
+      // function only inside the configure call.
+      let draft: SettingsDraft = newSettingsDraft(state.settings);
+      if (action.type === "save-key") {
+        if (action.providerId !== NATIVE_MODEL) throw Error("这个连接已不在设置里，请重新打开。");
+        draft = { ...draft, apiKey: action.key.trim() };
+        if (!draft.apiKey) throw Error("请先粘贴密钥。");
+      } else if (action.choiceId === NATIVE_PRESET) {
+        const preset = PRESETS[action.option];
+        if (!preset) throw Error("没有这个模型服务。");
+        if (preset === state.settings.preset) return;
+        draft = selectSettingsPreset(draft, preset);
+      } else if (action.choiceId === NATIVE_KIMI_EFFORT) {
+        const effort = KIMI_EFFORTS[action.option];
+        if (!effort || state.settings.preset === "flash") throw Error("只有 Kimi 能选推理强度。");
+        draft = selectKimiReasoningEffort(draft, effort);
+      } else throw Error("当前本地版本尚不支持这项操作。");
+      const result = await saveSettingsDraft(
+        draft,
+        () => undefined,
+        (options) => ui.perform(() => ui.bridge.configure(options)),
+      );
+      if (!result) throw Error("设置未能确认应用。请核对模型设置，或处理系统授权后重试。");
       return;
     }
     if (action.type === "mute") {

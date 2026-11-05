@@ -166,7 +166,7 @@ export function App({
     choose: (choiceId, option) => dispatch({ type: "choose", choiceId, option }),
     press: (controlId) => dispatch({ type: "control", controlId }),
     saveKey: (providerId, key) => dispatch({ type: "save-key", providerId, key }),
-    setNumber: (fieldId, value) => dispatch({ type: "set-number", fieldId, value }),
+    saveText: (fieldId, text) => dispatch({ type: "save-text", fieldId, text }),
   };
 
   const onView = (next: ViewId) => {

@@ -127,9 +127,7 @@ export const Icon = {
   memory: stroke(
     <path d="M5.5 10.5a4 4 0 1 1 5 0v1.5h-5zM6.5 14h3M8 2V1M3 3.5l-.7-.7M13 3.5l.7-.7" />,
   ),
-  keyboard: stroke(
-    <path d="M1.5 4.5h13v7h-13zM4 7h.01M6.5 7h.01M9 7h.01M11.5 7h.01M5 9.5h6" />,
-  ),
+  keyboard: stroke(<path d="M1.5 4.5h13v7h-13zM4 7h.01M6.5 7h.01M9 7h.01M11.5 7h.01M5 9.5h6" />),
   lock: stroke(
     <>
       <rect x="3.5" y="7" width="9" height="6.5" rx="1.5" />
@@ -164,6 +162,13 @@ export const Icon = {
       <path d="M8 7.5v3.5M8 5h.01" />
     </>,
   ),
+  help: stroke(
+    <>
+      <circle cx="8" cy="8" r="5.5" />
+      <path d="M6.3 6.3a1.8 1.8 0 1 1 2.4 1.7c-.5.2-.7.6-.7 1.1v.4M8 11.5h.01" />
+    </>,
+  ),
+  chevron: stroke(<path d="M6 3.5L10.5 8 6 12.5" />),
   attach: stroke(
     <path d="M10.5 4.5l-5 5a1.5 1.5 0 0 0 2 2l5.5-5.5a3 3 0 0 0-4-4L3.5 7.5a4.5 4.5 0 0 0 6.5 6.5l3-3" />,
   ),

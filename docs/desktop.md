@@ -26,14 +26,27 @@ See [ADR 0037](decisions/0037-installed-desktop-client.md),
 
 The installed moyyi Chat view reads the real local session catalog and recorded messages. Use
 **材料**, **权限**, **计划模式**, **操作记录**, **完整历史** and **会话和回收站** in the session tools
-for existing desktop controls. **设置 → 预算** shows the saved long-task switches and
-**设置 → 权限和确认** explains session approvals and plan mode. The rail holds **全部** (every session by time), **项目** (one entry per
-working folder; opening it lists that folder's sessions), **自动化** (empty: this version cannot
-run scheduled jobs) and, at the bottom, **插件** and **设置**. Files a session created stay in
-that session's tools. On macOS the window has no separate title bar: the traffic lights sit in the top of the rail, the
+for existing desktop controls.
+
+The rail holds **全部** (every session by time), **项目** (one entry per working folder; opening
+it lists that folder's sessions), **自动化** (empty: this version cannot run scheduled jobs) and
+**插件**, with **设置** alone at the bottom. Files a session created stay in that session's tools.
+On macOS the window has no separate title bar: the traffic lights sit in the top of the rail, the
 rail shows the window material, and the rail, list head and chat top drag the window.
-Open **设置 → 模型和密钥 → 打开模型设置** for model configuration, and **设置 → 记录和数据**
-for maintenance. Mock-only voice, multi-agent and scheduling actions are unavailable.
+
+设置 is grouped like the canvas boards, keeping only what this version does:
+
+- **设置**: 通用 (colour follows the system) and 快捷键.
+- **功能 → 模型**: choose the service, Kimi's reasoning strength and save a key to the keychain
+  in place. Each change is saved with `configure`, which reopens the runtime and reloads the open
+  session, so it is refused while a run or import is going. The per-turn limits and long-task
+  switches are still changed in the model settings window behind **调整**.
+- **数据安全**: 权限 (the current session's folder, web access and the approval rules) and 数据
+  (history, materials, reports, sessions, backup and rollback).
+- **获取帮助** opens the usage guide, and **关于 moyyi** shows the version.
+
+个性化 and 记忆 are not shown until those capabilities exist. Mock-only voice, multi-agent and
+scheduling actions are unavailable.
 
 Open `Moyyi.app`, choose **新建 → 选择工作目录**, and describe the file or question. Send with
 the button or Command+Enter. The selected directory is the read scope, including supported

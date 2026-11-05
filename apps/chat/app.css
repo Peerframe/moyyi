@@ -1055,11 +1055,6 @@ html {
   border-top: 1px solid var(--line);
   padding-top: 14px;
 }
-/* A card with no title: its rows are the titles (自动记忆). */
-.ch-group > .ch-card:only-child .ch-line-main {
-  font-size: 15px;
-  font-weight: 600;
-}
 /* Connections are cards of their own, with the dashed card to add one below. */
 .ch-group-bare {
   background: none;
@@ -1130,7 +1125,8 @@ html {
   width: 20px;
   height: 20px;
   border-radius: 50%;
-  background: #fff;
+  /* White in both themes until the design system has its own switch tokens. */
+  background: var(--on-out);
   box-shadow: 0 1px 2px color-mix(in srgb, var(--shade) 30%, transparent);
   transition: transform var(--duration-fast);
 }
@@ -1143,23 +1139,6 @@ html {
 .ch-switch:focus-visible {
   outline: 2px solid var(--focus);
   outline-offset: 2px;
-}
-.ch-number {
-  flex: 0 0 auto;
-  display: flex;
-  align-items: center;
-  gap: var(--space-6);
-  padding: 2px var(--space-12);
-}
-.ch-number input {
-  width: 64px;
-  height: 30px;
-  font-size: 14px;
-  text-align: right;
-}
-.ch-number-unit {
-  font-size: 13px;
-  color: var(--muted);
 }
 .ch-card-rule {
   height: 1px;
@@ -1178,12 +1157,41 @@ html {
 .ch-line-main {
   font-size: 14px;
 }
+/* A card with no title: its rows are the titles (自动记忆). */
+.ch-group > .ch-card:only-child .ch-line-main {
+  font-size: 15px;
+  font-weight: 600;
+}
 .ch-line-mono {
   font-size: 13px;
 }
 .ch-line-sub {
   font-size: 12px;
   color: var(--muted);
+}
+/* A help topic: the whole row is the button, with a chevron at the end. */
+.ch-line-link {
+  width: 100%;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+.ch-line-link:hover {
+  color: var(--accent);
+}
+.ch-line-link:focus-visible {
+  outline: 2px solid var(--focus);
+  outline-offset: 4px;
+  border-radius: 6px;
+}
+.ch-line-chevron {
+  display: inline-flex;
+  flex: 0 0 auto;
 }
 .ch-line-members {
   display: flex;
@@ -1200,6 +1208,10 @@ html {
   min-height: 32px;
   font-size: 13px;
   flex: 0 0 auto;
+}
+.ch-page-key:disabled {
+  opacity: 0.5;
+  cursor: default;
 }
 /* The design system's segment is a three-column grid; inline ones size to their options. */
 .ch-seg-inline {
@@ -1220,30 +1232,39 @@ html {
   align-items: center;
   gap: var(--space-8);
 }
-.ch-page-chips {
-  align-items: center;
-}
-.ch-meters {
+.ch-text-field {
+  display: flex;
+  flex-direction: column;
   gap: 14px;
+  margin: 0;
 }
-.ch-meter-row {
+.ch-text-box {
+  align-items: flex-start;
+  padding: var(--space-10) 14px;
+  border-radius: 12px;
+}
+.ch-text-box textarea {
+  width: 100%;
+  resize: none;
+  border: 0;
+  background: none;
+  color: inherit;
+  font: inherit;
+  font-size: 14px;
+  line-height: 1.6;
+}
+.ch-text-box textarea:focus {
+  outline: none;
+}
+.ch-text-foot {
   display: flex;
   align-items: center;
   gap: var(--space-12);
+  border-top: 1px solid var(--line);
+  padding-top: 14px;
 }
-.ch-meter-text {
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-6);
-}
-.ch-meter-top {
-  display: flex;
-  justify-content: space-between;
-  font-size: 14px;
-}
-.ch-meter-alert {
-  color: var(--attention);
-  font-weight: 600;
+.ch-text-foot .ch-line-sub {
+  font-size: 13px;
 }
 .ch-key-field {
   display: flex;
@@ -1265,7 +1286,7 @@ html {
   font-size: 14px;
 }
 .ch-shortcut-keys {
-  width: 84px;
+  width: 96px;
   display: flex;
   gap: var(--space-4);
   flex: 0 0 auto;

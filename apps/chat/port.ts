@@ -326,7 +326,6 @@ export type PageIcon =
   | "me"
   | "shield"
   | "timer"
-  | "gauge"
   | "db"
   | "sliders"
   | "info"
@@ -336,7 +335,8 @@ export type PageIcon =
   | "doc"
   | "skill"
   | "memory"
-  | "keyboard";
+  | "keyboard"
+  | "help";
 
 /** A button on a page. */
 export interface Control {
@@ -354,7 +354,7 @@ export interface Choice {
   readonly selected: number;
 }
 
-/** One row in a card: a folder, a memory, a scheduled job, a skill. */
+/** One row in a card: a folder, a memory, a scheduled job, a skill, a help topic. */
 export interface PageLine {
   readonly id: string;
   readonly text: string;
@@ -367,17 +367,8 @@ export interface PageLine {
   readonly tag?: string;
   readonly off?: boolean;
   readonly controls?: readonly Control[];
-}
-
-export interface Meter {
-  readonly id: string;
-  readonly avatar: Avatar;
-  readonly shape: "ai" | "project";
-  readonly name: string;
-  readonly used: number;
-  readonly total: number;
-  /** Said instead of the count when it matters more ("用完了 · 已暂停"). */
-  readonly alert?: string;
+  /** The whole row opens something (a help topic): drawn with a chevron, pressed as its id. */
+  readonly link?: boolean;
 }
 
 export interface Provider {
@@ -401,15 +392,15 @@ export interface Switch {
   readonly on: boolean;
 }
 
-/** A whole number with a unit, saved when the field is left or Enter is pressed. */
-export interface NumberField {
+/** Free text the user writes once and every AI reads (个人指令); saved only on its button. */
+export interface TextField {
   readonly id: string;
   readonly label: string;
-  readonly note?: string;
-  readonly value: number;
-  readonly min: number;
+  readonly value: string;
   readonly max: number;
-  readonly unit: string;
+  /** Said after the count ("只存在这台电脑上"). */
+  readonly note?: string;
+  readonly save: Control;
 }
 
 export interface Shortcut {
@@ -423,18 +414,12 @@ export type PageBlock =
   | { readonly kind: "lines"; readonly lines: readonly PageLine[] }
   /** moyyi's guarantees: shown with a lock, never as switches. */
   | { readonly kind: "locks"; readonly lines: readonly string[] }
-  | { readonly kind: "chips"; readonly chips: readonly string[]; readonly add?: Control }
-  | { readonly kind: "meters"; readonly meters: readonly Meter[] }
   | { readonly kind: "providers"; readonly providers: readonly Provider[] }
   | { readonly kind: "switches"; readonly switches: readonly Switch[] }
-  | { readonly kind: "numbers"; readonly fields: readonly NumberField[] }
+  | { readonly kind: "text"; readonly field: TextField }
   /** A dashed card that adds one more of what is above it ("添加模型连接"). */
   | { readonly kind: "add"; readonly control: Control }
-  | {
-      readonly kind: "shortcuts";
-      readonly shortcuts: readonly Shortcut[];
-      readonly more?: Control;
-    }
+  | { readonly kind: "shortcuts"; readonly shortcuts: readonly Shortcut[] }
   | { readonly kind: "note"; readonly text: string }
   | { readonly kind: "controls"; readonly controls: readonly Control[] }
   | { readonly kind: "brand"; readonly tagline: string };
@@ -455,7 +440,7 @@ export interface SettingsPage {
   readonly summary: string;
   /** The pane's line under the title. */
   readonly sub?: string;
-  /** The heading this page sits under in the list ("AI", "数据与安全"); none for the first. */
+  /** The heading this page sits under in the list ("设置", "功能"); "" draws a rule instead. */
   readonly section?: string;
   readonly groups: readonly PageGroup[];
 }
@@ -499,7 +484,7 @@ export type ChatAction =
   | { readonly type: "choose"; readonly choiceId: string; readonly option: number }
   | { readonly type: "control"; readonly controlId: string }
   | { readonly type: "save-key"; readonly providerId: string; readonly key: string }
-  | { readonly type: "set-number"; readonly fieldId: string; readonly value: number };
+  | { readonly type: "save-text"; readonly fieldId: string; readonly text: string };
 
 export interface ChatPort {
   world(): ChatWorld;

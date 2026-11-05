@@ -34,26 +34,27 @@
   - compaction is on by default (`auto: true`), with manual `/compact`;
   - 意见反馈 opens an external questionnaire.
   - WorkBuddy's bundle has no settings strings, so only the owner's screenshot was used.
-- Canvas v59, then v60 (generator `scratchpad/settings3.py`, rail `scratchpad/rail.py`). The list is:
+- Canvas v61 (generator `scratchpad/settings3.py`, rail `scratchpad/rail.py`). The list is:
   - 设置: 通用, 快捷键;
   - 功能: 模型, 个性化, 记忆;
   - 数据安全: 权限, 数据;
   - then a rule, 获取帮助 and 关于 moyyi.
 - Boards: S23 通用, S24 快捷键, S25 模型, S26 个性化, S27 记忆, S28 权限, S29 数据, S30 获取帮助, S35 关于. Every rail is now 全部 / 项目 / 自动化 / 插件 | 设置.
-- Canvas v60 redraws 通用 and 个性化 after the owner's WorkBuddy screenshots:
-  - 通用: small grey section headings (外观, 通知, 运行) over cards. Each row has a bold name, a grey line and a control on the right (dropdown, slider, link, switch).
-  - 运行 adds 做事时不让电脑睡着 and 开机自动打开, because automations need the app open.
-  - Left out: language, link opening, proxy and an improvement programme. moyyi has none of these today.
-  - 个性化: two cards, 关于你 and 怎么回你, each with 编辑 at the top right and a read-only bordered preview.
-  - The list summary for 通用 is now 跟随系统 · 默认字号 · 只提醒决定.
-- Code on this branch is a wip and does not match v59 yet:
-  - rail with 插件 up;
-  - card pages with switches, number fields and a dashed add card;
-  - grouped list;
-  - mock pages with the superseded 10-section structure, which still has 后台 and 预算.
-  - Align the code to the boards after the owner reviews them.
-- Native wiring (real settings editing through `configure` replacing the old dialog) was started in design only: `chat-settings.ts` is not written.
-  - Note: every `configure` reopens the runtime and reloads the session.
+- v60 tried a WorkBuddy-style 通用 and 个性化. The owner asked to revert it, so v61 is the v59 boards again. The v60 generator is kept as `scratchpad/settings3-v60.py`.
+- Code now follows v61:
+  - mock: the nine pages (`apps/chat/mock/pages.ts`). 个人指令 is a text block with a count and 保存 (`save-text` action). Help topics are link rows with a chevron.
+  - 快捷键 is one shared page, `apps/chat/ui/shortcuts.ts`, used by both the mock and the desktop.
+  - Removed with 后台 and 预算: the number, meter and chip blocks, `set-number` and the 看全部快捷键 button.
+  - desktop (`apps/desktop/renderer/chat-pages.ts`) shows only real pages: 通用, 快捷键, 模型, 权限, 数据, 获取帮助, 关于.
+    - 模型 saves the service, Kimi strength and key in place, through `configure` (`chat-port.ts`). These changes are refused during a run or import.
+    - Per-turn limits and long-task switches are still in the old dialog, behind 调整.
+    - 获取帮助 opens the usage guide.
+    - 个性化 and 记忆 wait for their capabilities.
+  - Every `configure` reopens the runtime and reloads the session.
+  - Checks: `npm run check` (3362 tests) and `desktop:build` pass. The chat build was screenshotted against each board. The desktop app has not been opened: a second instance on the owner's store is not allowed.
+- Collected:
+  - the switch knob uses `--on-out` until the design system has a switch (design system v22 still lacks it);
+  - the chat preview with `?chrome=mac` does not fill the height (preview-only: desktop's chat.css sizes `desktop-chat-root`).
 - Proposed separately, needs a brief and eval evidence:
   - automatic compaction on by default;
   - nested AGENTS.md on by default;

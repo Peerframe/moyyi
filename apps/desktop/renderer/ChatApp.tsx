@@ -84,13 +84,20 @@ export function DesktopChatApp({ bridge }: { bridge: DesktopBridge }) {
   const controls = useRef<(id: string) => void>(() => {});
   controls.current = (id) => {
     const live = current.current;
-    if (live.busy && !["native.artifacts", "native.effects", "native.materials"].includes(id)) {
+    if (
+      live.busy &&
+      !["native.artifacts", "native.effects", "native.materials", "native.help"].includes(id)
+    ) {
       live.setViewError("请先等待当前操作结束，或停止运行。");
       return;
     }
     live.setViewError(null);
     if (id === "native.settings") {
       live.setSettingsOpen(true);
+      return;
+    }
+    if (id === "native.help") {
+      live.setHelpOpen(true);
       return;
     }
     if (id === "native.maintenance") {

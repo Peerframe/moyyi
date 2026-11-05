@@ -20,18 +20,17 @@ const providers = (page: (id: string) => SettingsPage | PluginPage | undefined) 
     .flatMap((b) => (b.kind === "providers" ? b.providers : [])) ?? [];
 
 describe("设置, 自动化 and 插件 on the mock backend", () => {
-  it("holds ten sections under their headings, three automations and five plugins", () => {
+  it("holds nine sections under 设置, 功能 and 数据安全, three automations and five plugins", () => {
     const { settings, plugins, automations } = xiaowenWorld();
     expect(settings.map((p) => `${p.section ?? "-"} ${p.name}`)).toEqual([
-      "- 通用",
-      "- 快捷键",
-      "AI 模型",
-      "AI 个性化",
-      "AI 记忆",
-      "AI 后台",
-      "AI 预算",
-      "数据与安全 权限和确认",
-      "数据与安全 记录和数据",
+      "设置 通用",
+      "设置 快捷键",
+      "功能 模型",
+      "功能 个性化",
+      "功能 记忆",
+      "数据安全 权限",
+      "数据安全 数据",
+      " 获取帮助",
       " 关于 moyyi",
     ]);
     expect(plugins.map((p) => p.name)).toEqual(["文件", "命令行", "网页", "文档", "技能"]);
@@ -45,14 +44,17 @@ describe("设置, 自动化 and 插件 on the mock backend", () => {
           if (b.kind === "choice") return [b.choice.id];
           if (b.kind === "choices") return b.choices.map((c) => c.id);
           if (b.kind === "lines")
-            return b.lines.flatMap((l) => (l.controls ?? []).map((c) => c.id));
+            return b.lines.flatMap((l) => [
+              ...(l.link ? [l.id] : []),
+              ...(l.controls ?? []).map((c) => c.id),
+            ]);
           if (b.kind === "providers")
             return b.providers.flatMap((p) => [
               ...p.controls.map((c) => c.id),
               ...(p.keyField ? [p.keyField.save.id] : []),
             ]);
           if (b.kind === "switches") return b.switches.map((x) => x.id);
-          if (b.kind === "numbers") return b.fields.map((x) => x.id);
+          if (b.kind === "text") return [b.field.id, b.field.save.id];
           if (b.kind === "add") return [b.control.id];
           return [];
         }),
@@ -66,8 +68,8 @@ describe("设置, 自动化 and 插件 on the mock backend", () => {
     await port.act({ type: "choose", choiceId: "general.theme", option: 1 });
     expect(chosen(port.world(), "general.theme")).toBe("浅色");
     expect(page("general")?.summary).toBe("浅色 · 字号 15 · 只提醒决定");
-    await port.act({ type: "choose", choiceId: "budget.default", option: 2 });
-    expect(page("budget")?.summary).toBe("新项目每次问你给多少");
+    await port.act({ type: "choose", choiceId: "models.default", option: 2 });
+    expect(page("models")?.summary).toBe("2 个连接 · 新对话每次问你");
     // An option that does not exist changes nothing.
     await port.act({ type: "choose", choiceId: "general.theme", option: 9 });
     expect(chosen(port.world(), "general.theme")).toBe("浅色");
@@ -117,7 +119,7 @@ describe("设置, 自动化 and 插件 on the mock backend", () => {
     expect(page("models")?.summary).toBe("还没连上模型 · 新对话用 Flash");
   });
 
-  it("flips switches, keeps numbers in range and manages memories (记忆)", async () => {
+  it("flips switches and manages memories (记忆)", async () => {
     const { port, page, lines } = setup();
     expect(page("memory")?.summary).toBe("自动记忆开着 · 记下 2 条");
     await port.act({ type: "control", controlId: "memory.auto" });
@@ -126,19 +128,29 @@ describe("设置, 自动化 and 插件 on the mock backend", () => {
     await port.act({ type: "control", controlId: "memory.cite.delete" });
     expect(lines("memory").map((l) => l.id)).toEqual(["memory.rent"]);
     expect(page("memory")?.summary).toBe("自动记忆关着 · 记下 1 条");
+  });
 
-    await port.act({ type: "control", controlId: "long.subagents" });
-    expect(switchedOn(port.world(), "long.subagents")).toBe(true);
-    const requests = () =>
-      page("budget")
+  it("saves the personal instructions as written, within their limit (个性化)", async () => {
+    const { port, page } = setup();
+    const field = () =>
+      page("me")
         ?.groups.flatMap((g) => g.blocks)
-        .flatMap((b) => (b.kind === "numbers" ? b.fields : []))
-        .find((f) => f.id === "budget.requests")?.value;
-    await port.act({ type: "set-number", fieldId: "budget.requests", value: 80 });
-    expect(requests()).toBe(80);
-    for (const value of [0, 201, 2.5])
-      await port.act({ type: "set-number", fieldId: "budget.requests", value });
-    expect(requests()).toBe(80);
+        .flatMap((b) => (b.kind === "text" ? [b.field] : []))[0];
+    expect(field()?.value.split("\n")[0]).toBe("叫我小文。");
+    await port.act({ type: "save-text", fieldId: "me.instructions", text: "先说结论。" });
+    expect(field()?.value).toBe("先说结论。");
+    await port.act({ type: "save-text", fieldId: "me.instructions", text: "长".repeat(4100) });
+    expect(field()?.value).toHaveLength(4000);
+  });
+
+  it("opens a broken key for editing (编辑) and keeps its connection", async () => {
+    const { port, page } = setup();
+    await port.act({ type: "control", controlId: "deepseek-spare.edit" });
+    const spare = providers(page).find((p) => p.id === "deepseek-spare");
+    expect(spare).toMatchObject({
+      connected: true,
+      keyField: { save: { id: "deepseek-spare.save" } },
+    });
   });
 
   it("switches skills and plugins", async () => {
@@ -161,7 +173,8 @@ describe("设置, 自动化 and 插件 on the mock backend", () => {
   it("leaves the world alone for host-only controls", async () => {
     const { port } = setup();
     const before = port.world();
-    await port.act({ type: "control", controlId: "records.export" });
+    for (const controlId of ["data.export.all", "help.folder", "help.feedback.open"])
+      await port.act({ type: "control", controlId });
     expect(port.world()).toBe(before);
   });
 
@@ -189,9 +202,9 @@ describe("设置, 自动化 and 插件 on the mock backend", () => {
     expect(brief()).toBeUndefined();
   });
 
-  it("keeps 后台 to how AIs work unattended; schedules live in 自动化", () => {
-    const background = xiaowenWorld().settings.find((p) => p.id === "background");
-    expect(background).toMatchObject({ name: "后台", summary: "同时做 3 件" });
-    expect(JSON.stringify(background)).not.toContain("timer.");
+  it("has no 后台 or 预算: engineering limits are defaults, not settings", () => {
+    const ids = xiaowenWorld().settings.map((p) => p.id);
+    expect(ids).not.toContain("background");
+    expect(ids).not.toContain("budget");
   });
 });

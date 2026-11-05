@@ -90,22 +90,12 @@ export function switchedOn(world: ChatWorld, id: string): boolean | undefined {
   return undefined;
 }
 
-/** A number field set within its range; anything else changes nothing. */
-export function setNumber(world: ChatWorld, fieldId: string, value: number): ChatWorld {
+/** The text field saved as written, cut to its limit. */
+export function saveText(world: ChatWorld, fieldId: string, text: string): ChatWorld {
   return mapPages(world, (page) =>
     mapBlocks(page, (block) =>
-      block.kind === "numbers"
-        ? {
-            ...block,
-            fields: block.fields.map((field) =>
-              field.id === fieldId &&
-              Number.isSafeInteger(value) &&
-              value >= field.min &&
-              value <= field.max
-                ? { ...field, value }
-                : field,
-            ),
-          }
+      block.kind === "text" && block.field.id === fieldId
+        ? { ...block, field: { ...block.field, value: text.slice(0, block.field.max) } }
         : block,
     ),
   );
@@ -145,14 +135,9 @@ function summarize(world: ChatWorld): ChatWorld {
         ? `${who} · 新对话每次问你`
         : `${who} · 新对话用 ${model?.replace("DeepSeek ", "")}`;
     })(),
-    background: `同时做 ${chosen(world, "jobs.parallel")}`,
     memory: `自动记忆${switchedOn(world, "memory.auto") ? "开着" : "关着"} · 记下 ${
       linesOf(page("memory")).length
     } 条`,
-    budget:
-      chosen(world, "budget.default") === "每次问我"
-        ? "新项目每次问你给多少"
-        : `新项目默认每周 ${chosen(world, "budget.default")}`,
     general: `${chosen(world, "general.theme")} · 字号 ${chosen(world, "general.size")} · ${chosen(world, "notify.messages")}`,
   };
   const skills = linesOf(world.plugins.find((p) => p.id === "skills")).filter(
@@ -197,7 +182,7 @@ const CONNECTED = "密钥在系统钥匙串里";
 function connectedControls(id: string): readonly Control[] {
   return [
     { id: `${id}.test`, label: "测一下" },
-    { id: `${id}.rekey`, label: "换密钥" },
+    { id: `${id}.edit`, label: "编辑" },
     { id: `${id}.remove`, label: "删掉", tone: "danger" },
   ];
 }
@@ -388,7 +373,7 @@ export function press(
       status: "没连上",
       controls: [{ id: `${p.id}.connect`, label: "连上" }],
     }));
-  if (item === "connect" || item === "rekey")
+  if (item === "connect" || item === "edit")
     return provider(scope, (p) => ({
       ...p,
       keyField: {
@@ -399,7 +384,7 @@ export function press(
   if (item === "test")
     return provider(scope, (p) => ({ ...p, status: `${CONNECTED} · 刚测过，能用` }));
 
-  // Everything else (reveal, export, update, licenses, feedback, quiet hours, add a rule) is a
+  // Everything else (reveal, backup, export, help topics, licenses, feedback, quiet hours) is a
   // host action outside the mock; it changes nothing here.
   return world;
 }

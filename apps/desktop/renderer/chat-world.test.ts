@@ -170,7 +170,12 @@ describe("desktop Chat state projection", () => {
     const ids = world.settings.flatMap((page) =>
       page.groups.flatMap((group) =>
         group.blocks.flatMap((block) =>
-          block.kind === "controls" ? block.controls.map((control) => control.id) : [],
+          block.kind === "lines"
+            ? block.lines.flatMap((line) => [
+                ...(line.link ? [line.id] : []),
+                ...(line.controls ?? []).map((control) => control.id),
+              ])
+            : [],
         ),
       ),
     );
@@ -181,27 +186,38 @@ describe("desktop Chat state projection", () => {
         "native.web",
         "native.materials",
         "native.artifacts",
-        "native.effects",
         "native.history",
         "native.maintenance",
         "native.sessions",
-        "native.new",
+        "native.help",
       ]),
     );
     expect(world.plugins.every((plugin) => !plugin.toggle)).toBe(true);
-    expect(world.settings.map((page) => page.id)).toEqual([
-      "models",
-      "budget",
-      "permissions",
-      "records",
-      "about",
+    // The boards' groups, without 个性化 and 记忆 until those capabilities exist.
+    expect(world.settings.map((page) => `${page.section} ${page.name}`)).toEqual([
+      "设置 通用",
+      "设置 快捷键",
+      "功能 模型",
+      "数据安全 权限",
+      "数据安全 数据",
+      " 获取帮助",
+      " 关于 moyyi",
     ]);
     const text = JSON.stringify(world.settings);
-    expect(text).toContain("deepseek-v4-flash");
-    expect(text).toContain("本机配置已就绪");
+    expect(text).toContain("DeepSeek Flash · 已连上");
+    expect(text).toContain("还没发请求验证");
     expect(text).not.toContain("刚测过");
-    expect(text).not.toContain('"kind":"meters"');
-    expect(text).not.toContain('"keyField"');
+    expect(text).not.toMatch(/后台|预算|"kind":"switches"/);
+    const models = world.settings.find((page) => page.id === "models");
+    const choices = models?.groups.flatMap((g) =>
+      g.blocks.flatMap((b) => (b.kind === "choice" ? [b.choice.id] : [])),
+    );
+    // Kimi's strength only shows for Kimi.
+    expect(choices).toEqual(["native.preset"]);
+    const kimi = projectChatWorld(
+      snapshot({ settings: { ...snapshot().settings, preset: "kimi-cn" } }),
+    ).settings.find((page) => page.id === "models");
+    expect(JSON.stringify(kimi)).toContain("native.kimiEffort");
   });
 
   it("lists one project per working folder and nothing under 自动化", () => {
