@@ -12,7 +12,7 @@ import {
 import { scriptedProfile, scriptedProvider } from "../src/plugins/provider-scripted/index.ts";
 import { WorkspaceProcessPolicy } from "../src/policy/index.ts";
 import { createRuntime, type RuntimeOptions } from "../src/runtime/index.ts";
-import { discoverNodeToolchain } from "../src/runtime/node-toolchain.ts";
+import { discoverNodeToolchain } from "../src/runtime/processes/node-toolchain.ts";
 import { SqliteSessionStore } from "../src/store/index.ts";
 
 const cleanups: (() => Promise<void>)[] = [];

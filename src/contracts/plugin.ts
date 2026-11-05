@@ -63,6 +63,11 @@ export interface ContextSourceInput {
   /** Fixed-path, read-only capability; expires when this collection finishes. */
   readonly projectInstructions?: {
     readRoot(): Promise<ProjectInstructionsResult>;
+    /**
+     * AGENTS.md files of subdirectories this session's tool calls already touched, when the host
+     * enabled nested instructions; nearest scope last. Absent files are omitted.
+     */
+    readNested?(): Promise<readonly NestedInstructionsResult[]>;
   };
 }
 
@@ -90,6 +95,17 @@ export type ProjectInstructionsResult =
   | {
       readonly kind: "loaded";
       readonly path: "AGENTS.md";
+      readonly text: string;
+      readonly sha256: string;
+    };
+
+export type NestedInstructionsResult =
+  | { readonly kind: "blocked"; readonly scope: string }
+  | {
+      readonly kind: "loaded";
+      /** Workspace-relative directory the guidance applies to. */
+      readonly scope: string;
+      readonly path: string;
       readonly text: string;
       readonly sha256: string;
     };

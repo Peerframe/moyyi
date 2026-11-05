@@ -2,7 +2,12 @@ import type { StateInitialization } from "../../native/contract.ts";
 import { choice, object, string } from "../../native/state-validation.ts";
 import type { FeatureState } from "./contract.ts";
 export function validateState(s: Record<string, unknown>): boolean {
-  if (typeof s.historyTruncated !== "boolean" || !string(s.streamText)) return false;
+  if (
+    typeof s.historyTruncated !== "boolean" ||
+    typeof s.planMode !== "boolean" ||
+    !string(s.streamText)
+  )
+    return false;
   if (
     !Array.isArray(s.messages) ||
     s.messages.length > 400 ||
@@ -38,5 +43,12 @@ export function validateState(s: Record<string, unknown>): boolean {
   return true;
 }
 export function initialState(_context: StateInitialization): FeatureState {
-  return { messages: [], historyTruncated: false, streamText: "", run: null, outcome: null };
+  return {
+    messages: [],
+    historyTruncated: false,
+    streamText: "",
+    run: null,
+    outcome: null,
+    planMode: false,
+  };
 }

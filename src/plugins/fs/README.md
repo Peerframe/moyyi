@@ -9,10 +9,10 @@ There is no direct-I/O fallback and no plugin configuration.
 |---|---|---|
 | `read` | Required workspace-relative `path`; optional `maxBytes` (1–65,536), `startLine` (1–1,000,000), `maxLines` (1–1,000) | `file-read-v1` metadata followed by numbered UTF-8 source, in separate text parts |
 | `list` | `path` defaults to `.`; optional `maxEntries` (1–200) | `path`, typed `entries`, `skippedEntries`, `truncated` |
-| `search` | Required single-line literal `query` (1–256 characters); existing file/directory `path` defaults to `.`; optional `maxMatches` (1–100), `caseSensitive` (default `true`), `contextLines` (0–20 per side, default 8), `include`/`exclude` globs, `mode` (`content` default or `files`) | `path`, `matches` with file/line/text, optional merged `context` windows, `skippedFiles`, `truncated`; files mode has `mode`, distinct `files`, empty `matches`, no context |
+| `search` | Required single-line `query` (1–256 characters), literal unless `regex: true`; existing file/directory `path` defaults to `.`; optional `maxMatches` (1–100), `caseSensitive` (default `true`), `contextLines` (0–20 per side, default 8), `include`/`exclude` globs, `mode` (`content` default or `files`), `regex` (default `false`) | `path`, `matches` with file/line/text, optional merged `context` windows, `skippedFiles`, `truncated`, `regexTimeLimit` when regex matching ran out of time; files mode has `mode`, distinct `files`, empty `matches`, no context |
 
 Paths cannot be absolute, contain parent traversal, backslashes or NUL. Requests contain no
-permission override, alternate workspace, ignore bypass, regex or process flag. The host also
+permission override, alternate workspace, ignore bypass or process flag. The host also
 validates paths at the actual operation; plugin validation is not the security boundary.
 
 Read-tool preparation only validates and snapshots arguments. It does not read file contents or list a
@@ -82,8 +82,13 @@ remains 0; the model-facing tool explicitly selects 8. See [ADR 0024](../../../d
 Without line arguments, `read` retains its prefix behavior. Supplying either `startLine` or
 `maxLines` selects a range, defaulting the missing option to line 1 or 200 lines. For example,
 after a search hit on line 420, read `{"path":"src/example.ts","startLine":400,"maxLines":60}`
-to inspect the surrounding implementation. `search` accepts one literal, so `a|b` is the exact
-three-character string, not two alternative patterns. An exact file scope never expands to siblings.
+to inspect the surrounding implementation. Without `regex`, `search` matches one literal, so
+`a|b` is the exact three-character string. With `regex: true` the query is a JavaScript regular
+expression tested against each line (Unicode mode when the pattern allows it, otherwise the
+lenient legacy syntax, so `\"` and other ripgrep-style escapes work); `^` and `$` anchor lines and
+no match spans lines. Matching runs in a worker thread with a 5-second budget per search; when it
+runs out, the result sets `regexTimeLimit` and `truncated`, and later files are not searched
+([ADR 0055](../../../docs/decisions/0055-regex-search.md)). An exact file scope never expands to siblings.
 Search applies ancestor ignore rules to files as well as directories; a missing path fails.
 
 Range selection scans the complete file through the same guarded read path, up to 1 MiB;
@@ -128,6 +133,9 @@ The model receives six stable tool schemas with the arguments and limits describ
 `read` description owns guidance to inspect ranges around search hits, group independent reads,
 and avoid treating truncation as proof of absence. The `search` description tells the model to
 inspect hits and gaps with `read startLine/maxLines`; its truncated/skipped warning remains.
+It says the query is literal and that `regex:true` tests it as a JavaScript regex per line, with
+`^`/`$` anchoring lines; the optional `regex` property adds a few schema tokens. Literal searches
+keep their earlier recorded payloads, because `regex` is stored only when the model sets it.
 These instructions live beside the tools and are not repeated in the default system prompt.
 Tool registration order, schemas, execution and result boundaries are unchanged by this wording.
 

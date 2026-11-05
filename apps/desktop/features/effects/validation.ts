@@ -3,11 +3,16 @@ import type { FeatureCommand } from "./contract.ts";
 export function validateCommand(input: Record<string, unknown>, exact: ExactKeys): FeatureCommand {
   switch (input.type) {
     case "approve":
-      exact(["type", "effectId", "digest", "decision"]);
+      exact(
+        input.scope === undefined
+          ? ["type", "effectId", "digest", "decision"]
+          : ["type", "effectId", "digest", "decision", "scope"],
+      );
       if (
         !identifier(input.effectId) ||
         !identifier(input.digest) ||
-        (input.decision !== "approve" && input.decision !== "deny")
+        (input.decision !== "approve" && input.decision !== "deny") ||
+        (input.scope !== undefined && (input.scope !== "session" || input.decision !== "approve"))
       )
         throw invalid();
       break;

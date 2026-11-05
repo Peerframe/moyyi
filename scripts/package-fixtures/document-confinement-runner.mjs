@@ -3,8 +3,8 @@ import { fileURLToPath } from "node:url";
 import { assertDocumentConfinement } from "./document-confinement.mjs";
 
 const runtime = import.meta.resolve("moyyi/runtime");
-const { documentSandbox } = await import(new URL("document-sandbox.js", runtime));
-const worker = fileURLToPath(new URL("document-worker.js", runtime));
+const { documentSandbox } = await import(new URL("documents/document-sandbox.js", runtime));
+const worker = fileURLToPath(new URL("documents/document-worker.js", runtime));
 const result = await assertDocumentConfinement(documentSandbox, worker);
 assert.equal(result.normalExecution, true);
 assert.equal(result.networkDenied, true);

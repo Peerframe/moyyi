@@ -68,7 +68,7 @@ const body = (p: (typeof projects)[number]) =>
   `Project ${p.project}; Owner ${p.owner}; Allocation ${p.amount} CNY; Status ${p.status}; Due ${p.due}.`;
 const bytes = (p: (typeof projects)[number]) =>
   readFileSync(
-    new URL(`../../src/runtime/fixtures/documents/standard/eval/${p.path}`, import.meta.url),
+    new URL(`../../src/runtime/documents/fixtures/standard/eval/${p.path}`, import.meta.url),
   );
 const sha256 = (value: Uint8Array) => createHash("sha256").update(value).digest("hex");
 const fixtureDir = fileURLToPath(new URL("./fixture", import.meta.url));

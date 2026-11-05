@@ -12,7 +12,7 @@ import {
 } from "node:fs";
 import { tmpdir } from "node:os";
 import { basename, delimiter, dirname, join } from "node:path";
-import { writeDocumentFixtures } from "../src/runtime/fixtures/document-fixtures.ts";
+import { writeDocumentFixtures } from "../src/runtime/documents/fixtures/document-fixtures.ts";
 import { assertInstalledDependencyGraph } from "./package-dependencies.ts";
 import { buildCandidate, command, repository } from "./packaging.ts";
 

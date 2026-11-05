@@ -68,6 +68,8 @@ audit export (P24) and remaining preferences and menus (P22). They stay in the
 
 Answer quality is measured, not assumed:
 
+- Next quality brief: [final-answer accounting](tasks/2026-11-05-final-answer-accounting.md)
+  (owner approval of its paid budget pending).
 - The frozen [quality gate](tasks/2026-10-28-post-m6-plan.md#5-质量门) runs at the end of each
   delivery that changes prompts, tools, providers or the loop. A task that passed at baseline must
   not fail on the candidate; a failure goes to the fix pass with a single baseline comparison.

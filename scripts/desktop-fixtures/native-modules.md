@@ -24,7 +24,7 @@ moyyi-desktop-modules-candidate/
   home/                   isolated HOME for the app launch
 ```
 
-Copy the source documents from `src/runtime/fixtures/documents/standard/eval/`. Their committed
+Copy the source documents from `src/runtime/documents/fixtures/standard/eval/`. Their committed
 manifest and `inputs.json` define the public contents. Put `qa-config.json` beside the replacement
 worker, using actual absolute paths:
 

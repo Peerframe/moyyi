@@ -1,5 +1,6 @@
 import type { WorkspaceDocuments } from "./documents.ts";
 import type { WorkspaceFiles, WorkspaceWrites } from "./files.ts";
+import type { McpToolAccess } from "./mcp.ts";
 import type {
   ActionDigest,
   EffectProfile,
@@ -10,7 +11,8 @@ import type {
   TextPart,
   ToolResultStatus,
 } from "./persisted/index.ts";
-import type { WorkspaceProcesses } from "./processes.ts";
+import type { BackgroundProcessAccess, WorkspaceProcesses } from "./processes.ts";
+import type { SubagentAccess } from "./subagents.ts";
 import type { ToolOutputReader } from "./tool-output.ts";
 import type { WebAccess } from "./web.ts";
 
@@ -88,4 +90,10 @@ export interface ToolContext {
   readonly web?: WebAccess;
   /** Session-bound recorded output retrieval; only supplied to read_tool_output execution. */
   readonly toolOutputs?: ToolOutputReader;
+  /** Session-bound background commands; only supplied to shell_output and shell_stop. */
+  readonly backgroundProcesses?: BackgroundProcessAccess;
+  /** Owner-configured MCP servers; only supplied to tools named `mcp__...`. */
+  readonly mcp?: McpToolAccess;
+  /** Read-only sub-agents in child sessions; only supplied to the `agent` tool. */
+  readonly subagents?: SubagentAccess;
 }

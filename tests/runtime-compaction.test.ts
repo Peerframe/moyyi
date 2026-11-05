@@ -1,7 +1,7 @@
 import { mkdirSync, mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { afterEach, expect, it, vi } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import { fixtureTransport } from "../evals/deepseek/scenario.ts";
 import { MinimalContextBuilder } from "../src/context/index.ts";
 import {
@@ -22,7 +22,7 @@ import { pathToHead } from "../src/core/index.ts";
 import { deepSeekTextFixture } from "../src/plugins/provider-deepseek/fixtures.ts";
 import { deepSeekProfile } from "../src/plugins/provider-deepseek/index.ts";
 import { ScriptedModelClient, scriptedProfile } from "../src/plugins/provider-scripted/index.ts";
-import { createRuntime } from "../src/runtime/index.ts";
+import { createRuntime, type RuntimeOptions } from "../src/runtime/index.ts";
 import { SqliteSessionStore } from "../src/store/index.ts";
 
 const cleanups: (() => Promise<void>)[] = [];
@@ -50,6 +50,8 @@ async function harness(
     size?: number;
     reasoning?: boolean;
     sections?: readonly ContextSection[];
+    autoCompact?: RuntimeOptions["autoCompact"];
+    maxModelRequests?: number;
   } = {},
 ) {
   const directory = mkdtempSync(join(tmpdir(), "moyyi-compaction-"));
@@ -131,6 +133,8 @@ async function harness(
   const runtime = await createRuntime({
     store: delegated,
     model: scriptedProfile.origin,
+    ...(options.autoCompact ? { autoCompact: options.autoCompact } : {}),
+    ...(options.maxModelRequests ? { limits: { maxModelRequests: options.maxModelRequests } } : {}),
     scheduler: {
       sleep: async () => {},
       deadline: (_ms, callback) => {
@@ -180,6 +184,11 @@ async function harness(
     events,
     snapshot,
     expire: () => expire(),
+    async turn(text = "Next request") {
+      await runtime.send({ type: "run.start", sessionId, input: [{ type: "text", text }] });
+      await runtime.idle();
+      return events.findLast((event) => event.type === "run.finished")?.outcome;
+    },
     async compact() {
       await runtime.send({ type: "session.compact", sessionId });
       await runtime.idle();
@@ -566,4 +575,83 @@ it("compacts and continues through real DeepSeek rendering and synthetic reasoni
     usage: { status: "final", cacheReadTokens: 4 },
   });
   expect(network).not.toHaveBeenCalled();
+});
+
+describe("automatic compaction before a turn", () => {
+  const large = { size: 2000 };
+  it("summarizes older turns first when history nears the threshold, then answers in the same run", async () => {
+    const test = await harness([final(summary), final("Answered after compaction.")], {
+      ...large,
+      autoCompact: { thresholdRatio: 0.1 },
+    });
+    expect(await test.turn()).toEqual({ kind: "completed" });
+    expect(test.client.requests).toHaveLength(2);
+    const snapshot = await test.snapshot();
+    const compaction = snapshot.entries.find((entry) => entry.body.kind === "compaction");
+    expect(compaction).toBeDefined();
+    // The original turns stay in history; only the request path uses the summary.
+    expect(
+      snapshot.entries.filter((entry) => test.seed.some((original) => original.id === entry.id)),
+    ).toEqual(test.seed);
+    const path = pathToHead(snapshot);
+    expect(path.some((entry) => entry.id === compaction?.id)).toBe(true);
+    expect(path.at(-1)?.body.kind).toBe("assistant_message");
+    const [summaryRequest, answerRequest] = test.client.requests;
+    expect(JSON.stringify(answerRequest).length).toBeLessThan(
+      JSON.stringify(summaryRequest).length,
+    );
+    expect(JSON.stringify(answerRequest)).toContain("Next request");
+  });
+
+  it("does nothing below the threshold or when it is not enabled", async () => {
+    const below = await harness([final("Answered.")], { autoCompact: { thresholdRatio: 0.95 } });
+    expect(await below.turn()).toEqual({ kind: "completed" });
+    expect(below.client.requests).toHaveLength(1);
+    const off = await harness([final("Answered.")], large);
+    expect(await off.turn()).toEqual({ kind: "completed" });
+    expect(off.client.requests).toHaveLength(1);
+    expect((await off.snapshot()).entries.some((entry) => entry.body.kind === "compaction")).toBe(
+      false,
+    );
+  });
+
+  it("keeps the turn's only request for the answer", async () => {
+    const test = await harness([final("Answered.")], {
+      ...large,
+      autoCompact: { thresholdRatio: 0.1 },
+      maxModelRequests: 1,
+    });
+    expect(await test.turn()).toEqual({ kind: "completed" });
+    expect(test.client.requests).toHaveLength(1);
+  });
+
+  it("continues with the original history when the summary does not help", async () => {
+    const test = await harness(
+      [final("x ".repeat(200_000)), final("Answered without compaction.")],
+      { ...large, autoCompact: { thresholdRatio: 0.1 } },
+    );
+    expect(await test.turn()).toEqual({ kind: "completed" });
+    expect(test.client.requests).toHaveLength(2);
+    const snapshot = await test.snapshot();
+    expect(snapshot.entries.some((entry) => entry.body.kind === "compaction")).toBe(false);
+  });
+
+  it("fails the turn instead of hiding a storage failure while publishing the summary", async () => {
+    const test = await harness([final(summary), final("Never sent.")], {
+      ...large,
+      autoCompact: { thresholdRatio: 0.1 },
+      failCompaction: true,
+    });
+    expect(await test.turn()).toMatchObject({ kind: "failed" });
+    expect(test.client.requests).toHaveLength(1);
+    expect((await test.snapshot()).entries.some((entry) => entry.body.kind === "compaction")).toBe(
+      false,
+    );
+  });
+
+  it("rejects an invalid ratio when the runtime is created", async () => {
+    await expect(harness([], { autoCompact: { thresholdRatio: 0.99 } })).rejects.toThrow(
+      "Automatic compaction",
+    );
+  });
 });

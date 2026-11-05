@@ -93,6 +93,9 @@ export async function reloadSelected(host: HostContext): Promise<void> {
   });
   try {
     await host.send({ type: "session.load", sessionId: sessionId as SessionId });
+    // A rebuilt runtime starts in default mode; keep the owner's plan mode (ADR 0054).
+    if (host.state.planMode)
+      await host.send({ type: "session.mode", sessionId: sessionId as SessionId, mode: "plan" });
   } finally {
     host.pendingWorkspace = undefined;
     host.expectedSession = undefined;

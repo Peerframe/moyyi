@@ -398,3 +398,16 @@ function userText(entry: TranscriptEntry | undefined): string {
     throw Error("fixture");
   return entry.body.content[0].text;
 }
+
+describe("opt-in final-answer accounting in the evidence answer", () => {
+  it("adds the accounting sentence to the instruction only when enabled", async () => {
+    const { EVIDENCE_ACCOUNTING } = await import("./evidence-answer.ts");
+    const plain = new MinimalContextBuilder().buildEvidenceAnswer(input());
+    const accounted = new MinimalContextBuilder({ finalAccounting: true }).buildEvidenceAnswer(
+      input(),
+    );
+    expect(JSON.stringify(plain.request.system)).not.toContain("Account for every requirement");
+    expect(JSON.stringify(accounted.request.system)).toContain(EVIDENCE_ACCOUNTING.trim());
+    expect(accounted.request.messages).toEqual(plain.request.messages);
+  });
+});

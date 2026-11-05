@@ -60,8 +60,9 @@ not install a credential reader. Do not put a key in source, command-line argume
 No host/credential settings from the interactive CLI are loaded automatically.
 
 The eval helper accepts `none`, `low`, `high` or `max`, captured when the host is constructed.
-Omitting `reasoningEffort` retains the provider's existing `high` default; the example explicitly
-chooses `low`. Record the returned `reasoningEffort` and `apiProfile` with the trial manifest.
+`reasoningEffort` is required: the helper throws before reading a key when it is omitted, so a paid
+run cannot silently use the provider's `high` default. The example chooses `low`. Record the
+returned `reasoningEffort` and `apiProfile` with the trial manifest.
 The generic eval summary records the model identifier, not these provider-specific settings.
 This helper registers its own model client, so a separate interactive runtime setting cannot
 configure its effort. Invalid efforts fail before credentials or transport are used.

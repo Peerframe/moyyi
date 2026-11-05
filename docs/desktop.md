@@ -25,8 +25,9 @@ See [ADR 0037](decisions/0037-installed-desktop-client.md),
 ## Use
 
 The installed moyyi Chat view reads the real local session catalog and recorded messages. Use
-**材料**, **权限**, **操作记录**, **完整历史** and **会话和回收站** in the session tools for existing
-desktop controls. The rail holds **全部** (every session by time), **项目** (one entry per
+**材料**, **权限**, **计划模式**, **操作记录**, **完整历史** and **会话和回收站** in the session tools
+for existing desktop controls. **设置 → 预算** shows the saved long-task switches and
+**设置 → 权限和确认** explains session approvals and plan mode. The rail holds **全部** (every session by time), **项目** (one entry per
 working folder; opening it lists that folder's sessions), **自动化** (empty: this version cannot
 run scheduled jobs) and, at the bottom, **插件** and **设置**. Files a session created stay in
 that session's tools. On macOS the window has no separate title bar: the traffic lights sit in the top of the rail, the
@@ -75,8 +76,26 @@ It requires at least two requests, disallows steering and requires disabling the
 continuing an old conversation. Cancellation still works. Switching to Flash clears the option;
 old applications cannot read the enabled setting, so disable it before a compatible rollback.
 See [ADR0042](decisions/0042-direct-evidence-answer.md) for the experimental acceptance boundary.
-Endpoints are fixed presets. The form accepts1–8 requests and30–300 seconds per turn;8192 output
-tokens and zero retries stay fixed. An empty API Key preserves that preset's existing key.
+Endpoints are fixed presets. The form accepts 1–200 requests and 30–3600 seconds per turn;
+8192 output tokens and zero retries stay fixed. Values above 8 requests or 300 seconds, and the
+three long-task switches below when enabled, cannot be read by earlier desktop releases: set them
+back before a compatible rollback.
+
+Long-task switches, each default off and stored only when enabled:
+**自动压缩上下文** (automatic compaction, [ADR 0049](decisions/0049-long-running-sessions.md)),
+**只读子 agent** (read-only sub-agents, [ADR 0051](decisions/0051-read-only-subagents.md); the
+desktop runs reads one at a time, so sub-agents do not run in parallel there) and
+**子目录 AGENTS.md** (nested instructions, [ADR 0052](decisions/0052-nested-instructions.md)).
+An approval card also offers **本会话始终允许**: it approves the displayed action and stops asking
+for the same tool (or exact command) in this session until it is reopened. **计划模式** in the
+toolbar turns on plan mode ([ADR 0054](decisions/0054-plan-mode.md)) for the open session: each
+message asks for a read-only investigation and a plan, and changes, commands and external calls
+are refused without an approval card. A notice above the composer says so while it is on. After a
+plan-mode run completes, its **按计划执行** turns plan mode off and sends the fixed execute request;
+existing grants and approvals then apply as usual. **退出计划模式** leaves without sending.
+Reopening or switching sessions turns plan mode off; changing permissions, site access or settings
+keeps it on. MCP servers and hooks are not configurable in
+the desktop app yet. An empty API Key preserves that preset's existing key.
 Changing preset, saving or closing clears the input. Save stores local configuration only: it
 does not probe the provider, incur model usage or prove that the remote key is valid. An absent
 or inaccessible credential leaves sending disabled while history remains accessible. If applying

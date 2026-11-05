@@ -1,5 +1,11 @@
 import { Buffer } from "node:buffer";
-import type { RunId, SessionId, TranscriptEntry } from "moyyi/contracts";
+import {
+  PLAN_EXECUTE_PROMPT,
+  PLAN_MODE_SUFFIX,
+  type RunId,
+  type SessionId,
+  type TranscriptEntry,
+} from "moyyi/contracts";
 import type { FeatureContext } from "../../host/feature.ts";
 import { BoundaryError, clip, defineHostFeature, MESSAGE_BYTES } from "../../host/feature.ts";
 import { inspectMaterials } from "../../host/materials.ts";
@@ -16,34 +22,20 @@ export const hostFeature = defineHostFeature({
       return;
     }
     if (command.type === "start") {
+      await start(host, command.sessionId, command.text);
+      return;
+    }
+    if (command.type === "plan") {
+      if (host.state.run) throw new BoundaryError("Change plan mode between runs");
       if (host.state.historyOnly)
         throw new BoundaryError("Workspace is unavailable; this session is open for history only");
-      host.transition("conversation.starting", {});
-      const workspace = host.selected(command.sessionId);
-      if (!host.state.connection.ready)
-        throw new BoundaryError("The model connection is unavailable");
-      const input = [{ type: "text" as const, text: command.text }];
-      if (host.state.materials.length) {
-        const current = inspectMaterials(
-          workspace,
-          host.state.materials.map((item) => item.path),
-          host.excluded(),
-        );
-        if (JSON.stringify(current) !== JSON.stringify(host.state.materials))
-          throw new BoundaryError("Selected documents changed; select them again before sending");
-        input.push({
-          type: "text",
-          text: `Selected workspace materials (file identity only; contents have not been extracted). Use read_document for Office/PDF, read for text. PNG/JPEG are local preview only; do not claim to have seen their contents:\n${JSON.stringify(current)}`,
-        });
-      }
-      if (host.state.reportTarget)
-        input.push({
-          type: "text",
-          text: `Selected new report destination: ${JSON.stringify(host.state.reportTarget)}. Only create at this exact relative path is enabled, with approval; existing files cannot be edited or overwritten.`,
-        });
-      if (Buffer.byteLength(JSON.stringify(input)) > (host.options.limits?.maxInputBytes ?? 65_536))
-        throw new BoundaryError("Message exceeds the configured input limit");
-      await host.send({ type: "run.start", sessionId: command.sessionId as SessionId, input });
+      host.selected(command.sessionId);
+      await setPlanMode(host, command.sessionId, command.enabled);
+      return;
+    }
+    if (command.type === "execute") {
+      if (!host.state.planMode) throw new BoundaryError("Plan mode is not on");
+      await start(host, command.sessionId, PLAN_EXECUTE_PROMPT, true);
       return;
     }
     if (command.type === "cancel") {
@@ -90,7 +82,7 @@ export const hostFeature = defineHostFeature({
   },
 });
 
-function add(host: FeatureContext<(typeof stateKeys)[number]>, message: DesktopMessage): void {
+function add(host: Host, message: DesktopMessage): void {
   const text = clip(message.text);
   const messages = [...host.state.messages, { ...message, text }];
   let truncated = host.state.historyTruncated || text !== message.text;
@@ -101,13 +93,23 @@ function add(host: FeatureContext<(typeof stateKeys)[number]>, message: DesktopM
   host.update({ messages, historyTruncated: truncated });
 }
 
-function entry(host: FeatureContext<(typeof stateKeys)[number]>, entry: TranscriptEntry): void {
+function entry(host: Host, entry: TranscriptEntry): void {
   const body = entry.body;
   if (body.kind === "user_message" || body.kind === "assistant_message") {
     const role = body.kind === "user_message" ? "user" : "assistant";
     for (const [index, part] of body.content.entries()) {
       const id = `${entry.id}:${index}`;
-      if (part.type === "text" || part.type === "refusal") add(host, { id, role, text: part.text });
+      if (part.type === "text" && role === "user" && part.text.endsWith(PLAN_MODE_SUFFIX)) {
+        // The fixed plan-mode paragraph stays in the recorded message and complete history; the
+        // conversation shows the owner's words and says the paragraph was attached.
+        add(host, { id, role, text: part.text.slice(0, -PLAN_MODE_SUFFIX.length) });
+        add(host, {
+          id: `${id}:plan`,
+          role: "notice",
+          text: "以计划模式发送：附带了只读调查并给出计划的固定说明。",
+        });
+      } else if (part.type === "text" || part.type === "refusal")
+        add(host, { id, role, text: part.text });
       else if (part.type === "tool_call") {
         host.toolNames.set(part.callId, part.name);
         add(host, {
@@ -173,4 +175,56 @@ function entry(host: FeatureContext<(typeof stateKeys)[number]>, entry: Transcri
       role: "notice",
       text: "Earlier conversation was summarized; original entries remain in history.",
     });
+}
+
+type Host = FeatureContext<(typeof stateKeys)[number]>;
+
+/**
+ * Starts a run. In plan mode the owner's text gets the plan-mode instruction; `executePlan`
+ * instead turns plan mode off after the boundary checks pass, so a refused start keeps it on.
+ */
+async function start(
+  host: Host,
+  sessionId: string,
+  text: string,
+  executePlan = false,
+): Promise<void> {
+  if (host.state.historyOnly)
+    throw new BoundaryError("Workspace is unavailable; this session is open for history only");
+  host.transition("conversation.starting", {});
+  const workspace = host.selected(sessionId);
+  if (!host.state.connection.ready) throw new BoundaryError("The model connection is unavailable");
+  const planned = host.state.planMode && !executePlan;
+  const input = [{ type: "text" as const, text: planned ? `${text}${PLAN_MODE_SUFFIX}` : text }];
+  if (host.state.materials.length) {
+    const current = inspectMaterials(
+      workspace,
+      host.state.materials.map((item) => item.path),
+      host.excluded(),
+    );
+    if (JSON.stringify(current) !== JSON.stringify(host.state.materials))
+      throw new BoundaryError("Selected documents changed; select them again before sending");
+    input.push({
+      type: "text",
+      text: `Selected workspace materials (file identity only; contents have not been extracted). Use read_document for Office/PDF, read for text. PNG/JPEG are local preview only; do not claim to have seen their contents:\n${JSON.stringify(current)}`,
+    });
+  }
+  if (host.state.reportTarget)
+    input.push({
+      type: "text",
+      text: `Selected new report destination: ${JSON.stringify(host.state.reportTarget)}. Only create at this exact relative path is enabled, with approval; existing files cannot be edited or overwritten.`,
+    });
+  if (Buffer.byteLength(JSON.stringify(input)) > (host.options.limits?.maxInputBytes ?? 65_536))
+    throw new BoundaryError("Message exceeds the configured input limit");
+  if (executePlan) await setPlanMode(host, sessionId, false);
+  await host.send({ type: "run.start", sessionId: sessionId as SessionId, input });
+}
+
+async function setPlanMode(host: Host, sessionId: string, enabled: boolean): Promise<void> {
+  await host.send({
+    type: "session.mode",
+    sessionId: sessionId as SessionId,
+    mode: enabled ? "plan" : "default",
+  });
+  host.update({ planMode: enabled });
 }

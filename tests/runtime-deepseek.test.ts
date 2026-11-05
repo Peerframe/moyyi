@@ -20,7 +20,7 @@ import {
 import { deepSeekFixture } from "../src/plugins/provider-deepseek/fixtures.ts";
 import { DEEPSEEK_API_PROFILE, deepSeekProfile } from "../src/plugins/provider-deepseek/index.ts";
 import { createRuntime } from "../src/runtime/index.ts";
-import { MemoryRecordingSink } from "../src/runtime/model-recording.ts";
+import { MemoryRecordingSink } from "../src/runtime/providers/model-recording.ts";
 
 afterEach(() => {
   vi.restoreAllMocks();

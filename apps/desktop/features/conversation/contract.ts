@@ -12,10 +12,16 @@ export interface DesktopMessage {
 export type FeatureCommand =
   | { readonly type: "start"; readonly sessionId: string; readonly text: string }
   | { readonly type: "cancel"; readonly runId: string }
+  /** Plan mode (ADR 0054): non-read effects of the session are refused until it is turned off. */
+  | { readonly type: "plan"; readonly sessionId: string; readonly enabled: boolean }
+  /** Approves the plan: turns plan mode off and starts the fixed execute request. */
+  | { readonly type: "execute"; readonly sessionId: string }
   | { readonly type: "close" };
 export const commandTypes = [
   "start",
   "cancel",
+  "plan",
+  "execute",
   "close",
 ] as const satisfies readonly FeatureCommand["type"][];
 export interface FeatureState {
@@ -27,6 +33,7 @@ export interface FeatureState {
     readonly kind: "completed" | "cancelled" | "budget_exhausted" | "failed";
     readonly detail?: string;
   } | null;
+  readonly planMode: boolean;
 }
 export const stateKeys = [
   "messages",
@@ -34,12 +41,18 @@ export const stateKeys = [
   "streamText",
   "run",
   "outcome",
+  "planMode",
 ] as const satisfies readonly (keyof FeatureState)[];
 export interface FeatureBridge {
   act(command: DesktopAction): Promise<DesktopState>;
 }
 
-export const actionTypes = ["start", "cancel"] as const satisfies readonly FeatureCommand["type"][];
+export const actionTypes = [
+  "start",
+  "cancel",
+  "plan",
+  "execute",
+] as const satisfies readonly FeatureCommand["type"][];
 export type FeatureAction = Extract<
   FeatureCommand,
   { readonly type: (typeof actionTypes)[number] }

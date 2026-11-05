@@ -8,13 +8,18 @@ import { EffectsPanel } from "./EffectsPanel.tsx";
 
 function Approval() {
   const { state, bridge, setViewError } = useDesktopUI();
-  async function approve(approval: DesktopApproval, decision: "approve" | "deny") {
+  async function approve(
+    approval: DesktopApproval,
+    decision: "approve" | "deny",
+    scope?: "session",
+  ) {
     setViewError(null);
     await bridge.act({
       type: "approve",
       effectId: approval.effectId,
       digest: approval.digest,
       decision,
+      ...(scope ? { scope } : {}),
     });
   }
   return (

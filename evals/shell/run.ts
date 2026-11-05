@@ -11,7 +11,7 @@ import {
 } from "../../src/contracts/index.ts";
 import { scriptedProfile, scriptedProvider } from "../../src/plugins/provider-scripted/index.ts";
 import { createRuntime, type Runtime } from "../../src/runtime/index.ts";
-import { discoverNodeToolchain } from "../../src/runtime/node-toolchain.ts";
+import { discoverNodeToolchain } from "../../src/runtime/processes/node-toolchain.ts";
 
 const cases = [
   {

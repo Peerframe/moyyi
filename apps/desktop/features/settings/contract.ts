@@ -8,7 +8,18 @@ export interface DesktopSettings {
   readonly timeoutMs: number;
   readonly kimiReasoningEffort?: "low" | "high";
   readonly evidenceAnswer?: boolean;
+  /** Opt-in long-task helpers; written only when enabled (ADR 0049, 0051, 0052). */
+  readonly autoCompact?: boolean;
+  readonly subagents?: boolean;
+  readonly nestedInstructions?: boolean;
 }
+
+/** Budget ranges; values above the earlier 8 requests / 300 s are for long tasks. */
+export const SETTINGS_LIMITS = Object.freeze({
+  maxRequests: 200,
+  minTimeoutMs: 30_000,
+  maxTimeoutMs: 3_600_000,
+});
 export type FeatureCommand = {
   readonly type: "configure";
   readonly settings: DesktopSettings;

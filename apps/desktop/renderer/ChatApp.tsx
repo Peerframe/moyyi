@@ -2,6 +2,7 @@ import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import type { Theme } from "../../chat/port.ts";
 import { App as ChatApp } from "../../chat/ui/App.tsx";
 import type { DesktopBridge } from "../shared.ts";
+import { PlanModeNotice, planAvailability } from "./chat-plan.tsx";
 import { CHAT_ACTIONS, createDesktopChatPort } from "./chat-port.ts";
 import { RichMessage } from "./RichMessage.tsx";
 import { useRenderer } from "./runtime.ts";
@@ -163,6 +164,11 @@ export function DesktopChatApp({ bridge }: { bridge: DesktopBridge }) {
     !ui.newSession &&
     !ui.composerBlocked &&
     !!state.connection.ready;
+  const sessionId = state.activeSessionId;
+  const plan = planAvailability(state, ui);
+  const setPlan = (enabled: boolean) => {
+    if (sessionId) ui.act({ type: "plan", sessionId, enabled });
+  };
   const attach = () => {
     if (state.activeSessionId)
       void ui.perform(() => bridge.selectDocuments({ sessionId: state.activeSessionId as string }));
@@ -183,6 +189,16 @@ export function DesktopChatApp({ bridge }: { bridge: DesktopBridge }) {
     <nav className="mc-glass ch-native-tools" aria-label="会话工具">
       {tool("native.materials", state.materials.length ? `材料 ${state.materials.length}` : "材料")}
       {tool("native.permissions", "权限")}
+      <button
+        type="button"
+        className="ch-native-tool"
+        aria-pressed={state.planMode}
+        title="开启后只读调查并给出计划；批准计划前不会修改文件、运行命令或访问外部"
+        disabled={!plan.canChange}
+        onClick={() => setPlan(!state.planMode)}
+      >
+        计划模式
+      </button>
       {tool("native.effects", "操作记录", false)}
       {tool("native.history", "完整历史")}
       {tool("native.sessions", "会话和回收站", false)}
@@ -195,6 +211,12 @@ export function DesktopChatApp({ bridge }: { bridge: DesktopBridge }) {
       {state.historyOnly ? (
         <p role="status">当前只能查看历史。工作目录不可用或会话已在回收站。</p>
       ) : null}
+      <PlanModeNotice
+        state={state}
+        availability={plan}
+        onExecute={() => sessionId && ui.act({ type: "execute", sessionId })}
+        onExit={() => setPlan(false)}
+      />
       {ui.draft ? (
         <div className="ch-prepared-draft">
           <p>已准备可编辑请求。发送后使用当前模型预算，权限与审批照常生效。</p>

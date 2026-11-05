@@ -7,7 +7,7 @@ import {
   UNKNOWN_USAGE,
 } from "../../src/contracts/index.ts";
 import type { ModelRecording } from "../../src/contracts/recording.ts";
-import { parseModelRecording } from "../../src/runtime/model-recording.ts";
+import { parseModelRecording } from "../../src/runtime/providers/model-recording.ts";
 
 export interface RequestDifference {
   readonly index: number;

@@ -12,7 +12,7 @@ import {
   anthropicProfile,
 } from "../../src/plugins/provider-anthropic/index.ts";
 import { createRuntime, type Runtime } from "../../src/runtime/index.ts";
-import { MemoryRecordingSink } from "../../src/runtime/model-recording.ts";
+import { MemoryRecordingSink } from "../../src/runtime/providers/model-recording.ts";
 
 export const anthropicScenarios = [
   "tools-record-replay",

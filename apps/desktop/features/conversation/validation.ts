@@ -13,6 +13,14 @@ export function validateCommand(input: Record<string, unknown>, exact: ExactKeys
       )
         throw invalid();
       break;
+    case "plan":
+      exact(["type", "sessionId", "enabled"]);
+      if (!identifier(input.sessionId) || typeof input.enabled !== "boolean") throw invalid();
+      break;
+    case "execute":
+      exact(["type", "sessionId"]);
+      if (!identifier(input.sessionId)) throw invalid();
+      break;
     case "cancel":
       exact(["type", "runId"]);
       if (!identifier(input.runId)) throw invalid();

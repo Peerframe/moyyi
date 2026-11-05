@@ -15,6 +15,7 @@ import type {
   TranscriptEntry,
 } from "../contracts/index.ts";
 import type { Runtime } from "../runtime/index.ts";
+import type { CustomCommand } from "./commands.ts";
 import { createCliSession, terminalText } from "./session.ts";
 
 const sessionId = "session_test" as SessionId;
@@ -80,6 +81,9 @@ function setup(
     initialPrompt?: string;
     sessionId?: SessionId;
     developmentPluginNames?: readonly string[];
+    commands?: ReadonlyMap<string, CustomCommand>;
+    continueLatest?: boolean;
+    planMode?: boolean;
   } = {},
 ) {
   const host = fake();
@@ -961,5 +965,199 @@ describe("terminal text", () => {
     expect(text).toContain("\\u009b");
     expect(text).toContain("\\u202e");
     expect(text.endsWith("\n中文😀")).toBe(true);
+  });
+});
+
+describe("custom slash commands", () => {
+  const review: CustomCommand = {
+    name: "review",
+    description: "Review a path",
+    template: "Review $ARGUMENTS for bugs.",
+    source: "/commands/review.md",
+  };
+  const commands = new Map([["review", review]]);
+  it("sends the expanded template as an ordinary user message and lists it in /help", async () => {
+    const t = setup({ commands });
+    await t.cli.start();
+    await t.cli.line("/help");
+    expect(t.output()).toContain("/review: Review a path (your command)");
+    await t.cli.line("/review src/core");
+    expect(t.sent.at(-1)).toEqual({
+      type: "run.start",
+      sessionId,
+      input: [{ type: "text", text: "Review src/core for bugs." }],
+    });
+    expect(t.output()).toContain("command | /review sends 25 bytes from /commands/review.md");
+  });
+  it("expands a command given as the one-shot prompt", async () => {
+    const t = setup({ commands, interactive: false, initialPrompt: "/review docs" });
+    await t.cli.start();
+    expect(t.sent.at(-1)).toMatchObject({
+      type: "run.start",
+      input: [{ type: "text", text: "Review docs for bugs." }],
+    });
+  });
+  it("keeps unknown commands unknown", async () => {
+    const t = setup({ commands });
+    await t.cli.start();
+    await t.cli.line("/nope x");
+    expect(t.output()).toContain("Unknown command or invalid arguments");
+    expect(t.sent.some((command) => command.type === "run.start")).toBe(false);
+  });
+});
+
+describe("CLI ergonomics", () => {
+  const usage = (input: number, output: number) => ({
+    status: "final" as const,
+    inputTokens: input,
+    outputTokens: output,
+    cacheReadTokens: 10,
+    cacheWriteTokens: null,
+    reasoningTokens: null,
+  });
+  it("shows the model's checklist and a usage summary when the run ends", async () => {
+    const t = setup();
+    await t.cli.start();
+    await t.cli.line("Do it");
+    const call = assistant("", "entry_todo");
+    t.emit({
+      type: "entry.appended",
+      entry: {
+        ...call,
+        body: {
+          ...(call.body as Extract<TranscriptEntry["body"], { kind: "assistant_message" }>),
+          content: [
+            {
+              type: "tool_call",
+              callId: "call_todo" as ToolCallId,
+              providerCallId: "call_todo",
+              providerItemId: null,
+              name: "todo_write",
+              rawArguments: JSON.stringify({
+                todos: [
+                  { content: "Read the code", status: "completed" },
+                  { content: "Fix the bug", status: "in_progress" },
+                  { content: "Run tests", status: "pending" },
+                ],
+              }),
+              argumentsSource: "verbatim",
+            },
+          ],
+          usage: usage(100, 20),
+        },
+      },
+    });
+    const answer = assistant("Done", "entry_done");
+    t.emit({
+      type: "entry.appended",
+      entry: {
+        ...answer,
+        body: {
+          ...(answer.body as Extract<TranscriptEntry["body"], { kind: "assistant_message" }>),
+          usage: usage(150, 30),
+        },
+      },
+    });
+    t.emit({ type: "run.finished", runId, outcome: { kind: "completed" } });
+    expect(t.output()).toContain("todo | [x] Read the code");
+    expect(t.output()).toContain("todo | [>] Fix the bug");
+    expect(t.output()).toContain("todo | [ ] Run tests");
+    expect(t.output()).toContain(
+      "usage | 2 model request(s); 250 input, 50 output tokens (20 input tokens from cache).",
+    );
+  });
+
+  it("sends the fixed /init brief as the owner's message", async () => {
+    const t = setup();
+    await t.cli.start();
+    await t.cli.line("/init");
+    const sent = t.sent.at(-1);
+    expect(sent?.type).toBe("run.start");
+    expect(JSON.stringify(sent)).toContain("Create or update AGENTS.md at the workspace root");
+    expect(t.output()).toContain("writing it still needs a write grant");
+  });
+
+  it("continues the latest session of this workspace, or starts one", async () => {
+    const t = setup({ continueLatest: true });
+    t.setHook((command) => {
+      if (command.type === "session.list")
+        t.emit({
+          type: "session.listed",
+          page: {
+            offset: 0,
+            limit: 50,
+            hasMore: false,
+            sessions: [
+              {
+                sessionId: "session_other" as SessionId,
+                workspaceRoot: "/elsewhere",
+                lastActivityAt: "2026-11-05T09:00:00Z" as Timestamp,
+                promptPreview: null,
+              },
+              {
+                sessionId: "session_old" as SessionId,
+                workspaceRoot: "/synthetic/workspace",
+                lastActivityAt: "2026-11-01T09:00:00Z" as Timestamp,
+                promptPreview: null,
+              },
+              {
+                sessionId: "session_new" as SessionId,
+                workspaceRoot: "/synthetic/workspace",
+                lastActivityAt: "2026-11-04T09:00:00Z" as Timestamp,
+                promptPreview: null,
+              },
+            ],
+          },
+        });
+      else if (command.type === "session.load")
+        t.emit({ type: "session.ready", sessionId: command.sessionId });
+    });
+    await t.cli.start();
+    expect(t.sent.find((command) => command.type === "session.load")).toEqual({
+      type: "session.load",
+      sessionId: "session_new",
+    });
+    expect(t.output()).not.toContain("session history");
+    const fresh = setup({ continueLatest: true });
+    await fresh.cli.start();
+    expect(fresh.output()).toContain("No earlier session in this workspace");
+    expect(fresh.sent.some((command) => command.type === "session.create")).toBe(true);
+  });
+});
+
+describe("plan mode", () => {
+  it("marks the session, frames each message and approves the plan with /execute", async () => {
+    const t = setup();
+    await t.cli.start();
+    await t.cli.line("/plan");
+    expect(t.sent.at(-1)).toEqual({ type: "session.mode", sessionId, mode: "plan" });
+    await t.cli.line("Refactor the parser");
+    const start = t.sent.at(-1);
+    expect(start?.type).toBe("run.start");
+    expect(JSON.stringify(start)).toContain("Refactor the parser\\n\\n[Plan mode]");
+    t.emit({ type: "run.finished", runId, outcome: { kind: "completed" } });
+    await t.cli.line("/execute");
+    expect(t.sent.slice(-2)).toEqual([
+      { type: "session.mode", sessionId, mode: "default" },
+      {
+        type: "run.start",
+        sessionId,
+        input: [
+          {
+            type: "text",
+            text: "The plan is approved. Carry it out now, then verify the result and report what changed.",
+          },
+        ],
+      },
+    ]);
+  });
+  it("starts in plan mode with --plan and can leave it without sending a message", async () => {
+    const t = setup({ planMode: true });
+    await t.cli.start();
+    expect(t.sent).toContainEqual({ type: "session.mode", sessionId, mode: "plan" });
+    await t.cli.line("/plan off");
+    expect(t.sent.at(-1)).toEqual({ type: "session.mode", sessionId, mode: "default" });
+    await t.cli.line("/execute");
+    expect(t.output()).toContain("Not in plan mode.");
   });
 });

@@ -30,10 +30,16 @@ interface Call {
   };
 }
 
+/** Opt-in suffix for the evidence answer's instruction (final-answer accounting). */
+export const EVIDENCE_ACCOUNTING =
+  " Account for every requirement in the original question and steering: answer it from quoted " +
+  "evidence, or say it is not done or unverified.";
+
 /** Builds a fresh request from recorded observations, without interpreting their contents. */
 export function buildEvidenceAnswer(
   input: ContextInput,
   checkCapacity: (request: ModelRequest) => number,
+  accounting = false,
 ): ContextResult {
   const userInputs: (Source & {
     readonly steering: boolean;
@@ -128,7 +134,7 @@ export function buildEvidenceAnswer(
           .filter((section) => section.stability === stability)
           .flatMap((section) => section.content),
       ),
-      { type: "text", text: instruction },
+      { type: "text", text: accounting ? instruction + EVIDENCE_ACCOUNTING : instruction },
     ],
     messages: [
       {

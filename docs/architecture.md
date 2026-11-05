@@ -15,8 +15,9 @@ core through five fixed points and can be added or removed without touching anyt
 
 ```
 cli / desktop host ─┐   (future: automation — also a client)
-             ▼
-          runtime ─────────── plugin registry ◄──── src/plugins/<name>/
+             │   cli --connect ──► daemon (private Unix socket, ADR 0048)
+             ▼                        │
+          runtime ◄───────────────────┘ ─────────── plugin registry ◄──── src/plugins/<name>/
              │                                       provider-*, fs, shell,
    ┌─────────┼──────────┬──────────┐                 web, mcp, skills, memory …
    ▼         ▼          ▼          ▼
@@ -36,10 +37,26 @@ cli / desktop host ─┐   (future: automation — also a client)
 | Store | `src/store` | SQLite, blob store, migrations, durability levels |
 | Context | `src/context` | Rendering a model request, section ordering for prompt caching, compaction |
 | Policy | `src/policy` | Base permission policy and approval modes |
-| Runtime | `src/runtime` | Plugin registry, wiring, the client protocol |
-| CLI | `src/cli` | Terminal client |
+| Runtime | `src/runtime` | Plugin registry, wiring, the client protocol, and the confined capabilities plugins use through ports (layout below) |
+| Daemon | `src/daemon` | Local server for one runtime over a private Unix socket, its client and event routing ([ADR 0048](decisions/0048-local-daemon.md)); wire protocol in `src/contracts/wire.ts` |
+| CLI | `src/cli` | Terminal client, in process or connected to the daemon |
 | Desktop client | `apps/desktop` | Sandboxed React renderer, validated local bridge and a trusted host using the public runtime; installed acceptance is tracked separately |
 | moyyi Chat | `apps/chat` | Browser-only interface over `ChatPort`; a standalone mock preview and a desktop renderer adapter use the same views |
+
+### Runtime layout
+
+Runtime is one layer; its subfolders group the capabilities it owns so each concern has one place.
+Imports between them stay inside the runtime layer and are not separate boundary rules.
+
+| Folder | Owns |
+|---|---|
+| `src/runtime` (root) | `createRuntime` wiring, plugin registry, development reload, CLI host, history, session facts, argument validation, tool-result processing, local maintenance |
+| `providers/` | DeepSeek, Kimi and Anthropic HTTP transports; model request recording and replay |
+| `files/` | Confined workspace reads, navigation and controlled writes |
+| `processes/` | Native process sandbox, Node toolchain discovery, confined command execution |
+| `web/` | Granted fetch and search, DNS-over-HTTPS, search context and source selection |
+| `documents/` | Sandboxed document parser worker, its dependency graph and fixtures |
+| `guidance/` | Fixed-path instruction and Skill document reading for context sources |
 
 ### Plugin inventory
 
@@ -48,7 +65,7 @@ cli / desktop host ─┐   (future: automation — also a client)
 | `provider-scripted` | model provider | exists (tests and evals) |
 | `provider-deepseek` (Responses subset; [ADR 0007](decisions/0007-first-model-provider.md)) | model provider | implemented; connection/continuation evidence and task-quality gaps are separate in the system overview |
 | `default-instructions` (original working guidance) | context source | implemented; static |
-| `project-instructions` (workspace root AGENTS.md only) | context source | implemented; refreshed per request |
+| `project-instructions` (workspace root AGENTS.md; opt-in nested files from touched directories, [ADR 0052](decisions/0052-nested-instructions.md)) | context source | implemented; refreshed per request |
 | `workspace-navigation` (opt-in bounded file paths) | context source | implemented; refreshed per request; real-model quality unverified |
 | `fs` (read, list, search; create, edit, undo) | tools | read-only merged in batch 5; writes merged in phase 2 |
 | `todo` | read-class planning tool | whole-list task updates in recorded calls; no second context copy |
@@ -58,13 +75,18 @@ cli / desktop host ─┐   (future: automation — also a client)
 | `provider-anthropic` | model provider | merged in phase 5; live acceptance pending |
 | `provider-kimi` (Chat Completions; [ADR 0036](decisions/0036-kimi-chat-provider.md)) | model provider | opt-in K3.1 Pro; connection and task-quality evidence tracked separately |
 | `web` (fetch, search) | tools; runtime capability and base policy | merged in phase 5 |
+| `subagent` (`agent`, read-only child sessions; [ADR 0051](decisions/0051-read-only-subagents.md)) | tool; runtime `SubagentRunner` and `subagents` port | implemented; opt-in; offline-tested, not live-task-verified |
 | `skills` (explicitly activated Agent Skills documents) | context source | implemented; refreshed per request |
-| `mcp` (bridge to MCP servers) | tools, policy rule | later |
+| `mcp` (owner-configured stdio MCP servers; [ADR 0050](decisions/0050-mcp-client.md)) | tools; runtime transport, `mcp` port and `McpPolicy` | implemented; offline-tested, not live-task-verified |
 | `memory` (Hermes Agent–inspired learning) | context source, event observer | later |
 
-Not plugins, because they are clients of the protocol: GUI, automation and scheduling. Sub-agents
-need a decision when they are scheduled: most likely a tool that starts a child session through
-the client protocol.
+Runtime-level, not plugins: owner notification hooks (`RuntimeOptions.hooks`, observe-only external
+commands; [ADR 0053](decisions/0053-notification-hooks.md)) and CLI prompt templates (`--commands`,
+client-side text expansion).
+
+Not plugins, because they are clients of the protocol: GUI, automation and scheduling.
+Sub-agents are the `agent` tool: a read-only child session on a second core with only read-class
+tools ([ADR 0051](decisions/0051-read-only-subagents.md)).
 
 ## Extension points
 

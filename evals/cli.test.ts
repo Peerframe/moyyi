@@ -131,7 +131,7 @@ describe("evaluation command selection", () => {
   it("accepts an explicitly authorized live host without reading a key or sending HTTP", async () => {
     const key = vi.fn(() => "SYNTHETIC_KEY");
     const http = vi.fn<typeof fetch>();
-    const live = deepSeekEvalHost({ getApiKey: key, fetch: http });
+    const live = deepSeekEvalHost({ getApiKey: key, fetch: http, reasoningEffort: "low" });
     const args = [...base.map((arg) => (arg === "synthetic" ? "live" : arg)), "--allow-live"];
     const selected = await selectEvaluation(args, tasks, { host: async () => live });
     expect(selected.metadata.source).toBe("live");

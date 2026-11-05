@@ -105,7 +105,7 @@ cancellation, HTML extraction and HTML depth rejection. They check actual canari
 including after restart. The adversarial tool attempts are scripted: this proves enforcement
 for the tested actions, not that a real model will ignore every malicious page.
 
-`src/runtime/web-http.test.ts` additionally uses real disposable local TLS to check the production
+`src/runtime/web/web-http.test.ts` additionally uses real disposable local TLS to check the production
 request/lookup path, certificate and hostname rejection. Tests require an existing OpenSSL binary
 and remove their temporary certificates/keys. Runtime test-only HTTP substitutions are trusted
 fixtures, never proof of real-service compatibility. Live SearXNG acceptance remains unverified.

@@ -12,7 +12,10 @@ import {
 } from "../src/contracts/index.ts";
 import { scriptedProfile } from "../src/plugins/provider-scripted/index.ts";
 import { createRuntime } from "../src/runtime/index.ts";
-import { FileRecordingSink, loadModelRecordings } from "../src/runtime/model-recording.ts";
+import {
+  FileRecordingSink,
+  loadModelRecordings,
+} from "../src/runtime/providers/model-recording.ts";
 import { SqliteSessionStore } from "../src/store/index.ts";
 
 const cleanups: (() => Promise<void>)[] = [];

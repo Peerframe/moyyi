@@ -4,6 +4,7 @@ import { EMPTY_WEB_ACCESS } from "./web.ts";
 /** Shared lifecycle invalidations; features supply only their own state changes. */
 const transitions = {
   "session.removed": {
+    planMode: false,
     messages: [],
     materials: [],
     library: { items: [], offset: 0, hasMore: false, housekeeping: false },
@@ -15,6 +16,7 @@ const transitions = {
     outcome: null,
   },
   "session.recycled": {
+    planMode: false,
     messages: [],
     streamText: "",
     materials: [],
@@ -28,6 +30,7 @@ const transitions = {
     sources: { items: [], truncated: false },
   },
   "session.unavailable": {
+    planMode: false,
     library: { items: [], offset: 0, hasMore: false, housekeeping: false },
     materialPreview: null,
     messages: [],
@@ -45,6 +48,7 @@ const transitions = {
     outcome: null,
   },
   "session.opening": {
+    planMode: false,
     messages: [],
     streamText: "",
     historyTruncated: false,

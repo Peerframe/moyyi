@@ -24,6 +24,8 @@ export const installedGuides = [
   "docs/desktop.md",
   "docs/client-protocol.md",
   "docs/cli.md",
+  "docs/daemon.md",
+  "docs/mcp.md",
   "docs/deepseek.md",
   "docs/anthropic.md",
   "docs/kimi.md",

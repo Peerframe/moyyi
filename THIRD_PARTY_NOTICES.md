@@ -5,7 +5,7 @@
 `src/plugins/skills/parse.ts` adapts the bounded YAML AST-validation approach from
 `packages/employee-publisher/src/agent-skills.ts`, OpenBot revision
 `010439bb9002fabb7e1facd8450ee85edbafa309`. The moyyi schema checks and runtime integration are new.
-`src/runtime/document-worker.ts` also adapts the PDF/Office extraction methods from
+`src/runtime/documents/document-worker.ts` also adapts the PDF/Office extraction methods from
 `apps/server-python/src/openbot_server/parser_worker.ts` at the same fixed commit. Two synthetic
 PDF test fixtures (encrypted and image-only) are copied from that commit.
 `apps/desktop/renderer/ApprovalCard.tsx` adapts its approval view's pending/error handling,

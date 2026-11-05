@@ -248,3 +248,71 @@ export class WebPolicy implements PermissionPolicy {
     return decision.kind === "allow" ? { kind: this.approval } : decision;
   }
 }
+
+/**
+ * Owner-configured MCP tools (`mcp__...`). Each tool's class and approval come from the host's
+ * MCP configuration: owner-declared read-only tools still need the ordinary read grant, other
+ * tools are external effects with the configured approval. Unknown `mcp__` tools are denied.
+ * Every other tool is decided by the previous policy, unchanged.
+ */
+export class McpPolicy implements PermissionPolicy {
+  private readonly previous: PermissionPolicy;
+  private readonly rules: ReadonlyMap<
+    string,
+    { readonly effect: "read" | "external"; readonly approval: "ask" | "allow" }
+  >;
+
+  constructor(
+    previous: PermissionPolicy,
+    rules: ReadonlyMap<
+      string,
+      { readonly effect: "read" | "external"; readonly approval: "ask" | "allow" }
+    >,
+  ) {
+    this.previous = previous;
+    this.rules = new Map(rules);
+  }
+  revision(): number {
+    return this.previous.revision?.() ?? 0;
+  }
+  beforeContextRead(path: string, operation: "read" | "list" = "read"): PolicyDecision {
+    return (
+      this.previous.beforeContextRead?.(path, operation) ?? {
+        kind: "deny",
+        reason: "No automatic context read grant",
+      }
+    );
+  }
+  beforePrepare(tool: string, profile: EffectProfile, args: unknown): PolicyDecision {
+    if (!tool.startsWith("mcp__")) return this.previous.beforePrepare(tool, profile, args);
+    const rule = this.rules.get(tool);
+    if (!rule) return { kind: "deny", reason: "MCP tool is not configured" };
+    if (rule.effect === "read")
+      return profile.class === "read"
+        ? this.previous.beforePrepare(tool, profile, args)
+        : { kind: "deny", reason: "MCP tool class does not match its configuration" };
+    if (
+      profile.class !== "external" ||
+      profile.reversibility !== "none" ||
+      profile.verification !== "none"
+    )
+      return { kind: "deny", reason: "MCP tools cannot claim rollback or inferred recovery" };
+    return { kind: "allow" };
+  }
+  beforeExecute(
+    tool: string,
+    profile: EffectProfile,
+    action: PreparedAction,
+    effectId: EffectId,
+    args?: unknown,
+  ): PolicyDecision {
+    if (!tool.startsWith("mcp__"))
+      return this.previous.beforeExecute(tool, profile, action, effectId, args);
+    const prepared = this.beforePrepare(tool, profile, args);
+    if (prepared.kind !== "allow") return prepared;
+    const rule = this.rules.get(tool);
+    if (rule?.effect === "read")
+      return this.previous.beforeExecute(tool, profile, action, effectId, args);
+    return { kind: rule?.approval ?? "ask" };
+  }
+}

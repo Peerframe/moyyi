@@ -48,7 +48,7 @@ commands and limits.
 | Continue longer work | [Long sessions](long-sessions.md): eight turns across reopen and summary kept all ten checked facts | One bounded case |
 | Read websites | M5: per-site and per-request approval, recorded sources, report readback; CLI [web](web.md) revision task passed | First report and revision attempts failed; no search service; no autonomous correction shown |
 | Transform data and documents | Quoted CSV, format-preserving homework edit and roster merge passed | The model checked bytes and counts, not an independent recomputation |
-| Apply guidance and Skills | [Root instructions](instructions.md) and explicitly selected [Skills](skills.md) | Loading guidance does not guarantee following it; nested instructions are not auto-loaded |
+| Apply guidance and Skills | [Root instructions](instructions.md) and explicitly selected [Skills](skills.md) | Loading guidance does not guarantee following it; nested instructions load only with `--nested-instructions` (not yet merged) |
 | Back up, restore, roll back | M4 [maintenance](desktop.md#backup-restore-and-software-rollback-m4-candidate): native backup, rescue restore and software rollback passed | Rollback across schema 3 or persisted format 2 needs the paired backup |
 
 ## Answer quality
@@ -101,7 +101,7 @@ successful tool return does not certify the task is correct.
 | Concern | Start in | First evidence |
 |---|---|---|
 | Launch, configuration, version | [CLI](../src/cli/program.ts), [runtime](../src/runtime/index.ts), `apps/desktop` | [Installation](installation.md), installation manifests |
-| Wrong or unhelpful tool output | [fs plugin](../src/plugins/fs/index.ts), [files](../src/runtime/files.ts) | [File contract](files.md), `eval:files` |
+| Wrong or unhelpful tool output | [fs plugin](../src/plugins/fs/index.ts), [files](../src/runtime/files/files.ts) | [File contract](files.md), `eval:files` |
 | Evidence missing from the request | [Context](../src/context/index.ts), [core loop](../src/core/index.ts) | Request records, `eval:instructions` |
 | Evidence arrived, answer wrong | [Provider](../src/plugins/provider-deepseek/), prompts and tool descriptions | Fixed-source answer vs required facts; [runtime evaluation](runtime-evaluation.md) |
 | Wrong execution or authority | [Executor](../src/core/executor.ts), [policy](../src/policy/index.ts) | Effect and policy tests, [threat model](threat-model.md) |
@@ -128,6 +128,17 @@ Plan: [post-M6 plan v2](tasks/2026-10-28-post-m6-plan.md). Order is owned by the
 | Delivery four: conditional capabilities | Triggered per item | [Plan](tasks/2026-10-28-post-m6-plan.md) |
 | moyyi Chat interface | Final `b2ef510` installed; offline package gates, native functional checks, normal/minimum layouts and final relaunch passed. No new paid quality run | [Integration record](tasks/2026-11-04-chat-desktop-integration.md), [study](tasks/2026-11-01-moyyi-chat-study.md) |
 | moyyi Chat window and rail: 全部, 项目, 自动化, 插件, 设置 (owner review 2026-11-05) | Implemented on `codex/chat-desktop-integration`; chat, desktop renderer and boundary tests pass; full `npm run check` still to pass on an idle machine; not packaged or installed; native window look (traffic lights, vibrancy) not yet seen; 自动化 is mock-only | [Handoff](../.agents/handoff/claude-chat-window.md), canvas S1–S34 |
+| Long-running CLI: `--long`, `--timeout`, `--auto-compact`, `--allow-shell-write`, `/always`, background commands ([ADR 0049](decisions/0049-long-running-sessions.md)) | Merged ([PR #61](https://github.com/Peerframe/moyyi/pull/61), [PR #65](https://github.com/Peerframe/moyyi/pull/65)); not installed; opt-in, defaults unchanged; offline-tested, not live-task-verified | [CLI](cli.md) |
+| Desktop (Chat interface): budgets up to 200 requests / 3600 s, long-task switches, "本会话始终允许", plan mode with "按计划执行" | Merged with the Chat integration ([PR #60](https://github.com/Peerframe/moyyi/pull/60)); unit-tested; headless renderer check only; native check and installation pending | [Desktop](desktop.md) |
+| CLI ergonomics: `--continue`, per-run usage, checklist display, `/init`, `--output json\|stream-json`, plan mode ([ADR 0054](decisions/0054-plan-mode.md)) | On branch, not merged; client-side; offline-tested | [CLI](cli.md#continue-usage-and-checklists) |
+| Regex search: `search` with `regex: true`, worker-bounded ([ADR 0055](decisions/0055-regex-search.md)) | On branch, not merged; model-visible tool change; offline-tested, not live-task-verified | [fs plugin](../src/plugins/fs/README.md) |
+| Notification hooks in the host module ([ADR 0053](decisions/0053-notification-hooks.md)) | On branch, not merged; observe-only; offline-tested | [CLI](cli.md#notification-hooks) |
+| Prompt templates as `/commands`: `--commands DIR` | On branch, not merged; client-side; offline-tested | [CLI](cli.md#prompt-templates-as-commands) |
+| Nested AGENTS.md from touched directories: `--nested-instructions` ([ADR 0052](decisions/0052-nested-instructions.md)) | On branch, not merged; opt-in; offline-tested, not live-task-verified | [Instructions](instructions.md) |
+| Read-only sub-agents: `--subagents`, `agent` tool ([ADR 0051](decisions/0051-read-only-subagents.md)) | On branch, not merged; opt-in; offline-tested, not live-task-verified | [CLI](cli.md#sub-agents) |
+| MCP tools from owner-configured stdio servers ([ADR 0050](decisions/0050-mcp-client.md)) | Merged ([PR #61](https://github.com/Peerframe/moyyi/pull/61), [PR #65](https://github.com/Peerframe/moyyi/pull/65)); not installed; host-module configuration (CLI, daemon); offline-tested, not live-task-verified | [MCP](mcp.md) |
+| Local daemon: `--daemon` / `--connect` over a private Unix socket ([ADR 0048](decisions/0048-local-daemon.md)) | Merged ([PR #61](https://github.com/Peerframe/moyyi/pull/61), [PR #65](https://github.com/Peerframe/moyyi/pull/65)); not installed; CLI only, desktop unchanged | [Daemon guide](daemon.md) |
+| Repository structure: runtime folders, generated tool catalog | Merged ([PR #61](https://github.com/Peerframe/moyyi/pull/61), [PR #65](https://github.com/Peerframe/moyyi/pull/65)); not installed; no behavior change. `check`, `verify:package`, `desktop:package` and `verify:desktop` passed on macOS arm64; not installed | [Record](tasks/2026-11-05-repository-structure.md) |
 
 ## Boundaries
 

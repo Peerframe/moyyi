@@ -81,9 +81,19 @@ moyyi --host /absolute/private/moyyi-host.mjs -C /absolute/workspace \
 - `--shell-toolchain node` requires `--allow-shell`. It selects the current Node executable and
   its exact startup libraries/aliases through a bounded clean probe. It does not grant an entire
   installation tree, npm/global packages, external dependency caches or arbitrary native addons.
-- `--max-requests N` explicitly changes only the per-turn model request ceiling (1–128), including
+- `--allow-shell-write` is `--allow-shell` with a **writable workspace**: approved commands may
+  run builds, tests or git in the workspace. They stay sandboxed and network-denied, and command
+  changes have no snapshots or undo; keep the project under version control. See
+  [ADR 0049](decisions/0049-long-running-sessions.md).
+- `--max-requests N` explicitly changes only the per-turn model request ceiling (1–500), including
   the final no-tool answer. Other host limits and retry settings remain unchanged. It is not a
   monetary cap or a change to evaluation budgets.
+- `--timeout SECONDS` changes the per-turn time limit (10–86400; default 60).
+- `--auto-compact` summarizes older turns before a turn, and earlier tool steps inside a long
+  turn, whenever the next request needs at least 70% of the model's context window. Each summary
+  uses one request of that turn, never its last one.
+- `--long` is shorthand for `--max-requests 200 --timeout 3600 --auto-compact`; explicit values
+  win. Each request can incur the provider's cost.
 
 To read a specific website, add `--web-origin https://www.rfc-editor.org`; repeat the flag for
 other origins. Paths, credentials, query strings and fragments are rejected. Each fetch asks for
@@ -96,6 +106,93 @@ custom host policy. Configure one authority source; no silent policy replacement
 can accompany CLI grants and still covers document reads. Noninteractive approvals remain denied.
 Capabilities are limited to the selected workspace/origins even if another session is resumed.
 The offline `--demo` rejects these daily capability and budget options.
+
+## Continue, usage and checklists
+
+- `--continue` resumes the most recently active session of the selected workspace (among the 50
+  most recent sessions), or starts a new one when there is none. It cannot be combined with
+  `--session ID`.
+- When a run ends, `usage | ...` shows its model requests and the reported input, output and cached
+  input tokens. Providers that report no usage are counted as such; this is not a bill.
+- When the model updates its checklist with `todo_write`, the CLI prints it as `todo | [x] ...`,
+  `[>]` for the item in progress and `[ ]` for pending ones. The list is the model's claim of
+  progress, not verified completion.
+- `/init` asks the agent to inspect the project and draft or update the root `AGENTS.md`. It is a
+  fixed brief sent as your message; saving the file needs `--allow-write` and its approval.
+
+## Plan mode
+
+`/plan` (or starting with `--plan`) switches the session to plan mode: the agent may read, search,
+use read-only MCP tools and sub-agents, but every change, command or external call is refused
+before any approval prompt, and each of your messages asks for a step-by-step plan. `/execute`
+approves the plan: plan mode ends and the agent is asked to carry it out, still under your grants
+and approvals. `/plan off` ends plan mode without a message. Resuming a session starts in normal
+mode. See [ADR 0054](decisions/0054-plan-mode.md).
+
+## Output for scripts
+
+For one-shot prompts, `--output json` prints one JSON object when the session ends:
+`{sessionId, runId, outcome, exitCode, answer, usage: {requests, input, output, cacheRead,
+unreported}, effects: [{id, tool, state}]}`. `--output stream-json` prints each protocol event
+(`session.ready`, `run.started`, `assistant.delta`, `entry.appended`, `approval.requested`,
+`effect.updated`, `run.finished`, `command.rejected`) as one JSON line as it happens. Human lines
+are not printed in either mode; errors still go to stderr and exit codes are unchanged.
+Approvals in one-shot mode are still denied. Interactive sessions use `text` only.
+
+## Notification hooks
+
+A host module can add `hooks` to run your own commands when an approval is waiting, a tool
+finishes or a run finishes, for example a desktop notification:
+
+```ts
+hooks: [
+  { on: "approval.requested", command: "/usr/bin/osascript",
+    args: ["-e", 'display notification "moyyi needs approval"'] },
+  { on: "run.finished", command: "/usr/local/bin/notify-done" },
+],
+```
+
+Each hook gets the event as one JSON line on stdin. Hooks only notify: they cannot block,
+approve or change a run, their output never reaches the model, and anything they change is outside
+moyyi's journal and undo. Failures and timeouts (default 10 s) appear as host diagnostics. See
+[ADR 0053](decisions/0053-notification-hooks.md).
+
+## Prompt templates as commands
+
+`--commands DIR` (repeatable) loads every `DIR/<name>.md` as a `/<name>` command. `$ARGUMENTS` in
+the file is replaced by the text after the command; without it, the text is appended as
+`Arguments: ...`. An optional leading `---` block may hold a one-line `description:`, shown in
+`/help`. The expanded text is sent as your own message and recorded like typed input; the CLI
+prints its size and source file. A one-shot prompt can be a command (`moyyi ... "/review src"`).
+
+Names match `^[a-z][a-z0-9-]{0,31}$`, cannot replace built-in commands and must be unique; files
+are regular UTF-8 files up to 16 KiB, at most 128 commands. Nothing is discovered from the
+workspace: only directories you name are read. `--connect` clients may use `--commands`; the
+daemon itself does not.
+
+## Nested instructions
+
+`--nested-instructions` also loads `AGENTS.md` from subdirectories this session works in (files
+read, listed, searched or edited there), from the next request on. See
+[instructions](instructions.md) and [ADR 0052](decisions/0052-nested-instructions.md).
+
+## Sub-agents
+
+`--subagents` offers the model an `agent` tool that hands a read-only investigation to a
+sub-agent in its own session (up to 12 requests and 300 s each, 4 at once, 16 per turn). The
+sub-agent can read, list and search but cannot edit, run commands or use the web; only its final
+report returns to the main conversation. `/sessions` lists sub-agent sessions like any other.
+See [ADR 0051](decisions/0051-read-only-subagents.md).
+
+## MCP servers
+
+Configure MCP servers in the host module's `mcp` option; the CLI starts them and prints one line
+per server. See [MCP](mcp.md).
+
+## Share one runtime between terminals
+
+`--daemon` serves the configured runtime over a private local socket; `--connect` attaches more
+terminals to it without their own host or grants. See [daemon](daemon.md).
 
 ## Session controls
 
@@ -150,6 +247,14 @@ exit, even when requests remain: `budget exhausted: model_output_tokens`. Empty 
 incomplete answers similarly fail without an automatic retry. The final reserved request keeps
 the existing `model_requests` exhaustion diagnosis. A complete refusal or an honest partial-work
 report can still complete the response protocol; inspect its content and actual results.
+
+## Always allow in this session
+
+When an approval is displayed, `/always EFFECT_ID` approves it and stops asking for similar
+actions in the same session: any call of the same tool, or for commands the same exact command
+line. Rules live in memory until the session is resumed again or the CLI (or daemon) exits.
+They never override a denial, a missing grant or `--approve-reads` for other tools, and nothing is
+stored. See [ADR 0049](decisions/0049-long-running-sessions.md).
 
 ## Explicit development plugins
 
@@ -231,7 +336,8 @@ effects are not retried automatically and may require manual workspace inspectio
 ## Explicit conversation compaction
 
 `/compact` retains recent turns and summarizes an eligible older prefix with the selected model.
-It is a model call, can incur the configured provider's cost, and is never automatic. `/cancel`
+It is a model call and can incur the configured provider's cost. It is automatic only with
+`--auto-compact` or `--long`, when a request nears the context window. `/cancel`
 stops it. Originals remain available; the CLI labels summary-request audit records separately
 from normal answers. See [long-session behavior and limits](long-sessions.md). The finite offline
 `--demo` script does not generate summaries; `npm run eval:long-sessions` checks the feature with

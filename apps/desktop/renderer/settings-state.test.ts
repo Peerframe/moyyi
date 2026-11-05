@@ -100,17 +100,17 @@ describe("desktop settings credential lifetime", () => {
     const clear = vi.fn();
     await expect(
       saveSettingsDraft(
-        { settings: { ...DEFAULT_DESKTOP_SETTINGS, maxRequests: 9 }, apiKey: "private-input" },
+        { settings: { ...DEFAULT_DESKTOP_SETTINGS, maxRequests: 201 }, apiKey: "private-input" },
         clear,
         configure,
       ),
-    ).rejects.toThrow("1 到 8");
+    ).rejects.toThrow("1 到 200");
     expect(clear).toHaveBeenCalledOnce();
     expect(configure).not.toHaveBeenCalled();
-    for (const timeoutMs of [29_999, 300_001, Number.NaN])
+    for (const timeoutMs of [29_999, 3_600_001, Number.NaN])
       expect(
         validateSettingsDraft({ settings: { ...DEFAULT_DESKTOP_SETTINGS, timeoutMs }, apiKey: "" }),
-      ).toContain("30 到 300");
+      ).toContain("30 到 3600");
     const message = validateSettingsDraft({
       settings: DEFAULT_DESKTOP_SETTINGS,
       apiKey: "private\ninput",

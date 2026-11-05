@@ -3,7 +3,7 @@ import { chmodSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "nod
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import type { ModelRecording } from "../../src/contracts/recording.ts";
-import { loadModelRecordings } from "../../src/runtime/model-recording.ts";
+import { loadModelRecordings } from "../../src/runtime/providers/model-recording.ts";
 import manifest from "./fixtures/manifest.json" with { type: "json" };
 
 export { manifest };

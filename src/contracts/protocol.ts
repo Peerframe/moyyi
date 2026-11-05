@@ -26,6 +26,15 @@ export type ClientCommand =
       readonly limit?: number;
     }
   | { readonly type: "session.compact"; readonly sessionId: SessionId }
+  /**
+   * Plan mode: until set back to `default`, every non-read effect in this session is denied
+   * before approval. Held in runtime memory only; reopening a session starts in `default`.
+   */
+  | {
+      readonly type: "session.mode";
+      readonly sessionId: SessionId;
+      readonly mode: "plan" | "default";
+    }
   | {
       readonly type: "run.start";
       readonly sessionId: SessionId;
@@ -39,6 +48,11 @@ export type ClientCommand =
       /** Must match the digest that was shown; a stale approval is rejected. */
       readonly digest: ActionDigest;
       readonly decision: "approve" | "deny";
+      /**
+       * `session` also stops asking for similar actions in this session (the same tool, or the
+       * same exact shell command) until it is loaded again or the runtime closes. Approve only.
+       */
+      readonly scope?: "once" | "session";
     };
 
 export type RuntimeEvent =

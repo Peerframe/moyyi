@@ -328,23 +328,40 @@ describe("fs plugin", () => {
       256,
     );
   });
-  it("searches a literal query with case controls and no regex or ignore override", async () => {
+  it("searches a literal query by default, with case controls and no ignore override", async () => {
     const files = capability(),
       ctx = context(files),
       tool = await selected("search");
-    await tool.execute(
-      await tool.prepare({ query: "a.*b", caseSensitive: false, maxMatches: 4 }, ctx),
-      ctx,
-    );
+    const literal = await tool.prepare({ query: "a.*b", caseSensitive: false, maxMatches: 4 }, ctx);
+    // Literal searches keep the payload they had before regex existed.
+    expect(literal.payload).not.toHaveProperty("regex");
+    await tool.execute(literal, ctx);
     expect(files.search).toHaveBeenCalledExactlyOnceWith(".", "a.*b", {
       maxMatches: 4,
       caseSensitive: false,
       contextLines: 8,
     });
-    await expect(tool.prepare({ query: "text", regex: true }, ctx)).rejects.toThrow("Unsupported");
+    await expect(tool.prepare({ query: "text", regex: "yes" }, ctx)).rejects.toThrow(
+      "Invalid regex",
+    );
     await expect(tool.prepare({ query: "text", respectIgnore: false }, ctx)).rejects.toThrow(
       "Unsupported",
     );
+  });
+  it("forwards regex searches to the capability", async () => {
+    const files = capability(),
+      ctx = context(files),
+      tool = await selected("search");
+    await tool.execute(
+      await tool.prepare({ query: "^export (function|class) ", regex: true }, ctx),
+      ctx,
+    );
+    expect(files.search).toHaveBeenCalledExactlyOnceWith(".", "^export (function|class) ", {
+      maxMatches: 16,
+      caseSensitive: true,
+      contextLines: 8,
+      regex: true,
+    });
   });
   it.each([0, 20])(
     "forwards explicit search context %i without additional reads",

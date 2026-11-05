@@ -24,6 +24,16 @@ export function chatBudgetLabel(state: DesktopState): string {
   ].join(" · ");
 }
 
+/** Long-task switches as saved; each is off unless stored (ADR 0049, 0051, 0052). */
+export function longTaskLabel(state: DesktopState): string {
+  const on = [
+    state.settings.autoCompact ? "自动压缩上下文" : null,
+    state.settings.subagents ? "只读子 agent" : null,
+    state.settings.nestedInstructions ? "子目录 AGENTS.md" : null,
+  ].filter(Boolean);
+  return on.length ? `已开启 ${on.join("、")}` : "全部关闭";
+}
+
 /** Page actions open the existing complete controls; they never change authority themselves. */
 export function projectChatPages(state: DesktopState): {
   readonly settings: readonly SettingsPage[];
@@ -81,6 +91,11 @@ export function projectChatPages(state: DesktopState): {
                   sub: `设置的时限：${state.settings.timeoutMs / 1000} 秒`,
                 },
                 {
+                  id: "budget.long",
+                  text: `长任务开关：${longTaskLabel(state)}`,
+                  sub: "在模型设置中开关；保存后对新运行生效。",
+                },
+                {
                   id: "budget.output",
                   text:
                     state.budgets.maxOutputTokens === null
@@ -110,6 +125,8 @@ export function projectChatPages(state: DesktopState): {
               lines: [
                 "重开会话会关闭文件修改、命令检查和网页访问权限。",
                 "审批只针对显示的具体操作；停止不会撤销已经完成的修改。",
+                "「本会话始终允许」只在当前会话内对同一工具（命令须完全相同）不再询问，重开会话即失效。",
+                "计划模式下修改、命令和外部调用一律拒绝，不弹出审批；更改权限不会关闭计划模式。",
               ],
             },
             controls(["native.permissions", "工作目录权限"], ["native.web", "网页访问权限"]),
