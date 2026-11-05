@@ -31,7 +31,7 @@ Session commands (`/new`, `/resume`, `/sessions`, `/results`, `/compact`, `/canc
 
 - **Grants and host.** `--connect` rejects `--demo`, `--host`, `-C`, `--allow-*`, `--web-*`,
   `--shell-toolchain`, `--approve-reads`, `--max-requests`, `--timeout`, `--auto-compact`,
-  `--long` and development options. Restart the
+  `--long`, `--subagents` and development options. Restart the
   daemon to change them. The client prints the daemon's grant lines on connect.
 - **Workspace.** The daemon creates sessions only in its own workspace. `/resume` loads any
   recorded session of the store, as in the local CLI, under the daemon's grants.

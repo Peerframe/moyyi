@@ -119,6 +119,7 @@ export interface CliLaunchOptions {
   readonly maxRequests?: number;
   readonly timeoutSeconds?: number;
   readonly autoCompact?: boolean;
+  readonly subagents?: boolean;
 }
 
 export async function configureCliHost(
@@ -176,6 +177,7 @@ export async function configureCliHost(
           },
         }),
     ...(launch?.autoCompact ? { autoCompact: true } : {}),
+    ...(launch?.subagents ? { subagents: true } : {}),
     ...(launch?.allowWrite ? { workspaceWrites: { roots, approval: "ask" as const } } : {}),
     ...(allowShell
       ? {

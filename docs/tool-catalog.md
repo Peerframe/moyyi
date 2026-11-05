@@ -16,6 +16,7 @@ call. Model-experience notes (token cost, prompt-cache effect) stay in each plug
 | [fs](#fs) | `read`, `list`, `search`, `create`, `edit`, `undo` | Always loaded; write tools still need a write grant and policy approval. |
 | [documents](#documents) | `read_document` | Loaded when document reading is enabled. |
 | [shell](#shell-no-process-grant-daily-default) | `shell`, `shell_output`, `shell_stop` | Always loaded; the description states the startup grant. The runtime uses `zsh-sh` on macOS and `sh` elsewhere and lists host-selected executable names. |
+| [subagent](#subagent) | `agent` | Loaded when the host enables sub-agents (`--subagents`). |
 | [mcp](#mcp) | `mcp__docs__search_docs` | Loaded when the host configures MCP servers. Names, descriptions and schemas come from each server (untrusted, bounded); the class comes from the owner's configuration. |
 | [web](#web) | `web_fetch`, `web_search` | Always loaded; fetch and search still need web grants and policy approval. |
 
@@ -542,6 +543,43 @@ Input schema:
 ```
 
 Effect profile: `{"class":"process","reversibility":"none","verification":"none"}`
+
+## subagent
+
+Source: [src/plugins/subagent](../src/plugins/subagent/README.md). Configuration: default.
+
+### `agent`
+
+```text
+Delegate a self-contained, read-only investigation to a sub-agent with a fresh context, e.g. searching a large codebase or reading many files to answer one question. It can read, list and search the workspace and use read-only MCP tools; it cannot edit, run commands, use the web or start sub-agents. Put a complete brief in prompt: the goal, where to look and what to report. Calls in the same response run in parallel. Returns the sub-agent's final report and its session id; it uses its own model requests.
+```
+
+Input schema:
+
+```json
+{
+  "type": "object",
+  "additionalProperties": false,
+  "properties": {
+    "description": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 120
+    },
+    "prompt": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 16000
+    }
+  },
+  "required": [
+    "description",
+    "prompt"
+  ]
+}
+```
+
+Effect profile: `{"class":"read","reversibility":"not_applicable","verification":"not_applicable"}`
 
 ## mcp
 

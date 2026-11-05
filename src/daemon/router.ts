@@ -75,8 +75,10 @@ export class EventRouter {
         return this.#runViewers(event.effect.runId);
       case "approval.requested": {
         const run = this.#effectRun.get(event.effectId);
-        // An approval nobody sees would only wait for the run's deadline; show it to everyone.
-        return run && this.#runSession.has(run) ? this.#runViewers(run) : this.clients;
+        const viewers = run && this.#runSession.has(run) ? this.#runViewers(run) : [];
+        // An approval nobody sees would only wait for the run's deadline, e.g. one from a
+        // sub-agent's child session; show it to everyone instead.
+        return viewers.length ? viewers : this.clients;
       }
       case "run.finished": {
         const recipients = this.#runViewers(event.runId);

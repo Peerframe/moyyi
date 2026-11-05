@@ -107,6 +107,14 @@ can accompany CLI grants and still covers document reads. Noninteractive approva
 Capabilities are limited to the selected workspace/origins even if another session is resumed.
 The offline `--demo` rejects these daily capability and budget options.
 
+## Sub-agents
+
+`--subagents` offers the model an `agent` tool that hands a read-only investigation to a
+sub-agent in its own session (up to 12 requests and 300 s each, 4 at once, 16 per turn). The
+sub-agent can read, list and search but cannot edit, run commands or use the web; only its final
+report returns to the main conversation. `/sessions` lists sub-agent sessions like any other.
+See [ADR 0051](decisions/0051-read-only-subagents.md).
+
 ## MCP servers
 
 Configure MCP servers in the host module's `mcp` option; the CLI starts them and prints one line

@@ -31,6 +31,10 @@ function grantNotices(options: CliOptions): string[] {
     );
   if (options.timeoutSeconds !== undefined)
     lines.push(`budget | At most ${options.timeoutSeconds} s per turn.`);
+  if (options.subagents)
+    lines.push(
+      "agents | Read-only sub-agents: up to 12 requests and 300 s each, 4 at once, 16 per turn.",
+    );
   if (options.autoCompact)
     lines.push(
       "budget | Automatic compaction: older turns and earlier steps are summarized near the context window.",
@@ -58,6 +62,7 @@ async function localRuntime(
       allowShell: options.allowShell,
       allowShellWrite: options.allowShellWrite,
       autoCompact: options.autoCompact,
+      subagents: options.subagents,
       webOrigins: options.webOrigins,
       ...(options.shellToolchain ? { shellToolchain: options.shellToolchain } : {}),
       ...(options.webDns ? { webDns: options.webDns } : {}),

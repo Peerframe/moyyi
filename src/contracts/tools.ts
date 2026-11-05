@@ -12,6 +12,7 @@ import type {
   ToolResultStatus,
 } from "./persisted/index.ts";
 import type { BackgroundProcessAccess, WorkspaceProcesses } from "./processes.ts";
+import type { SubagentAccess } from "./subagents.ts";
 import type { ToolOutputReader } from "./tool-output.ts";
 import type { WebAccess } from "./web.ts";
 
@@ -93,4 +94,6 @@ export interface ToolContext {
   readonly backgroundProcesses?: BackgroundProcessAccess;
   /** Owner-configured MCP servers; only supplied to tools named `mcp__...`. */
   readonly mcp?: McpToolAccess;
+  /** Read-only sub-agents in child sessions; only supplied to the `agent` tool. */
+  readonly subagents?: SubagentAccess;
 }

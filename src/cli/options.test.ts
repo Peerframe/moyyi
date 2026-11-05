@@ -196,3 +196,12 @@ describe("long tasks and writable commands", () => {
     }
   });
 });
+
+describe("sub-agents", () => {
+  it("are off by default and enabled only for a host, never for the demo or a connected client", () => {
+    expect(parseCliOptions(["--host", "h.mjs"], "/tmp").subagents).toBe(false);
+    expect(parseCliOptions(["--host", "h.mjs", "--subagents"], "/tmp").subagents).toBe(true);
+    expect(() => parseCliOptions(["--demo", "--subagents"], "/tmp")).toThrow(/fixed read-only/);
+    expect(() => parseCliOptions(["--connect", "--subagents"], "/tmp")).toThrow(/daemon's host/);
+  });
+});

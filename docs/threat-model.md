@@ -70,6 +70,13 @@ Background commands outlive their call but not their grant: they stay in the san
 any grant change, their own time limit or runtime close, and are reachable only from the
 session that started them.
 
+## Sub-agents
+
+[ADR 0051](decisions/0051-read-only-subagents.md) sub-agents run on a core with only read-class
+tools, so a delegated brief, or a prompt injection it reads, cannot write, run commands, reach
+the web or start further sub-agents. Their reports are model output returned to the main agent,
+not verified results. Request, time, concurrency and per-run limits bound their cost.
+
 ## MCP servers
 
 [ADR 0050](decisions/0050-mcp-client.md) addresses T3 for MCP: a tool's class and approval come

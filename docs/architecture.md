@@ -74,13 +74,14 @@ Imports between them stay inside the runtime layer and are not separate boundary
 | `provider-anthropic` | model provider | merged in phase 5; live acceptance pending |
 | `provider-kimi` (Chat Completions; [ADR 0036](decisions/0036-kimi-chat-provider.md)) | model provider | opt-in K3.1 Pro; connection and task-quality evidence tracked separately |
 | `web` (fetch, search) | tools; runtime capability and base policy | merged in phase 5 |
+| `subagent` (`agent`, read-only child sessions; [ADR 0051](decisions/0051-read-only-subagents.md)) | tool; runtime `SubagentRunner` and `subagents` port | implemented; opt-in; offline-tested, not live-task-verified |
 | `skills` (explicitly activated Agent Skills documents) | context source | implemented; refreshed per request |
 | `mcp` (owner-configured stdio MCP servers; [ADR 0050](decisions/0050-mcp-client.md)) | tools; runtime transport, `mcp` port and `McpPolicy` | implemented; offline-tested, not live-task-verified |
 | `memory` (Hermes Agent–inspired learning) | context source, event observer | later |
 
-Not plugins, because they are clients of the protocol: GUI, automation and scheduling. Sub-agents
-need a decision when they are scheduled: most likely a tool that starts a child session through
-the client protocol.
+Not plugins, because they are clients of the protocol: GUI, automation and scheduling.
+Sub-agents are the `agent` tool: a read-only child session on a second core with only read-class
+tools ([ADR 0051](decisions/0051-read-only-subagents.md)).
 
 ## Extension points
 
