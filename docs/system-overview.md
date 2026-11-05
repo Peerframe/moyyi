@@ -127,6 +127,7 @@ Plan: [post-M6 plan v2](tasks/2026-10-28-post-m6-plan.md). Order is owned by the
 | Delivery two: desktop feature modules | Accepted, merged; not installed. No behavior change | [PR #52](https://github.com/Peerframe/moyyi/pull/52), [record](tasks/2026-10-29-desktop-modules-delivery.md) |
 | Delivery three: settings, Skills, search | Ready for Codex | [Brief](tasks/2026-10-30-delivery-3-settings-skills-search.md) |
 | Delivery four: conditional capabilities | Triggered per item | [Plan](tasks/2026-10-28-post-m6-plan.md) |
+| moyyi Chat interface | In review; mock backend only, offline-tested, not wired to the runtime | [Study and plan](tasks/2026-11-01-moyyi-chat-study.md) |
 | Long-running CLI: `--long`, `--timeout`, `--auto-compact`, `--allow-shell-write`, `/always`, background commands ([ADR 0049](decisions/0049-long-running-sessions.md)) | On branch, not merged; opt-in, defaults unchanged; offline-tested, not live-task-verified | [CLI](cli.md) |
 | MCP tools from owner-configured stdio servers ([ADR 0050](decisions/0050-mcp-client.md)) | On branch, not merged; host-module configuration (CLI, daemon); offline-tested, not live-task-verified | [MCP](mcp.md) |
 | Local daemon: `--daemon` / `--connect` over a private Unix socket ([ADR 0048](decisions/0048-local-daemon.md)) | On branch, not merged; CLI only, desktop unchanged | [Daemon guide](daemon.md) |

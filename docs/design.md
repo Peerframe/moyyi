@@ -1,5 +1,9 @@
 # Desktop design rules
 
+These rules govern `apps/desktop`. The new interface in `apps/chat` follows the moyyi Chat design
+system instead (owner decision D2, 2026-11-01): its tokens and components are copied in
+[apps/chat/design](../apps/chat/design/README.md).
+
 How the moyyi desktop app should look, read and behave. The
 [moyyi-desktop-ui](../.agents/skills/moyyi-desktop-ui/SKILL.md) skill applies these rules to a
 change; [apps/desktop/AGENTS.md](../apps/desktop/AGENTS.md) owns the security rules.

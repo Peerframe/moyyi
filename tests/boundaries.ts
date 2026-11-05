@@ -30,6 +30,8 @@ const allowedLayers: Record<string, readonly string[]> = {
   "desktop:preload": ["desktop:shared", "desktop:contract", "desktop:wire", "desktop:security"],
   "desktop:renderer": ["desktop:shared", "desktop:contract"],
   "desktop:host": ["desktop:shared", "desktop:contract", "desktop:wire", "desktop:security"],
+  // moyyi Chat (apps/chat) is a browser interface over its own ChatPort; it reaches nothing else yet.
+  "app:chat": [],
 };
 
 /** Layers that must stay free of I/O and third-party code outside tests. */
@@ -176,10 +178,11 @@ export function violations(file: string, source: string): string[] {
   if (allowed === undefined) return [`${relative(repo, file)}: unknown layer "${layer}"`];
   const isTest = /\.test\.tsx?$/.test(file);
   const desktop = layer.startsWith("desktop:");
+  const chat = layer === "app:chat";
   const out: string[] = [];
   for (const specifier of scanImports(source)) {
     if (specifier === null) {
-      if ((desktop || pureLayers.has(layer)) && !isTest)
+      if ((desktop || chat || pureLayers.has(layer)) && !isTest)
         out.push(`${relative(repo, file)}: ${layer} module paths must be static literals`);
       continue;
     }
@@ -187,12 +190,16 @@ export function violations(file: string, source: string): string[] {
       const target = layerOf(resolve(dirname(file), specifier));
       if (desktop && (target === null || !target.startsWith("desktop:"))) {
         out.push(`${relative(repo, file)}: desktop must use public package exports (${specifier})`);
+      } else if (chat && target !== layer) {
+        out.push(`${relative(repo, file)}: chat imports only its own files (${specifier})`);
       } else if (
         target !== null &&
         (desktop ? !allowsDesktop(layer, target) : target !== layer && !allows(allowed, target))
       ) {
         out.push(`${relative(repo, file)}: ${layer} may not import ${target} (${specifier})`);
       }
+    } else if (chat && !reactPackageAllowed(specifier, isTest)) {
+      out.push(`${relative(repo, file)}: ${layer} must not import "${specifier}"`);
     } else if (desktop && !desktopPackageAllowed(layer, file, specifier, isTest)) {
       out.push(`${relative(repo, file)}: ${layer} must not import "${specifier}"`);
     } else if (pureLayers.has(layer) && !isTest) {
@@ -204,6 +211,16 @@ export function violations(file: string, source: string): string[] {
   return out;
 }
 
+/** Browser interfaces import React's browser entry points only; tests may also render to a string. */
+function reactPackageAllowed(specifier: string, isTest: boolean): boolean {
+  return (
+    ["react", "react/jsx-runtime", "react/jsx-dev-runtime", "react-dom/client"].includes(
+      specifier,
+    ) ||
+    (isTest && ["vitest", "react-dom/server"].includes(specifier))
+  );
+}
+
 function desktopPackageAllowed(
   layer: string,
   file: string,
@@ -212,14 +229,7 @@ function desktopPackageAllowed(
 ): boolean {
   layer = desktopRole(layer);
   if (isTest && specifier === "vitest") return true;
-  if (layer === "desktop:renderer") {
-    return (
-      ["react", "react/jsx-runtime", "react/jsx-dev-runtime", "react-dom/client"].includes(
-        specifier,
-      ) ||
-      (isTest && specifier === "react-dom/server")
-    );
-  }
+  if (layer === "desktop:renderer") return reactPackageAllowed(specifier, isTest);
   if (layer === "desktop:preload") return specifier === "electron";
   if (layer === "desktop:host") {
     return (
