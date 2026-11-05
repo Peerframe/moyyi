@@ -1,4 +1,4 @@
-node_modules/
+node_modules
 dist/
 artifacts/
 # Generated from package-lock.json only while packaging; never maintain a second lock.

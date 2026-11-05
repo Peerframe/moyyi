@@ -225,13 +225,13 @@ export function press(
       ),
     );
 
-  const plugin = world.plugins.find((p) => p.toggle.id === controlId);
+  const plugin = world.plugins.find((p) => p.toggle?.id === controlId);
   if (plugin) {
     const enabled = !plugin.enabled;
     return summarize({
       ...world,
       plugins: world.plugins.map((p) =>
-        p.id === plugin.id
+        p.id === plugin.id && p.toggle
           ? {
               ...p,
               enabled,

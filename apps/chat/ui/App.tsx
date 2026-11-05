@@ -3,9 +3,13 @@
 // the chat, below 900px the rail becomes chips above the list, below 700px one pane shows at a time
 // and the panel opens as a bottom sheet.
 import { useEffect, useState, useSyncExternalStore } from "react";
-import type { ChatPort, FolderId, Theme } from "../port.ts";
+import type { ChatAction, ChatPort, FolderId, Theme } from "../port.ts";
 import { ChatList } from "./ChatList.tsx";
 import { Conversation } from "./Conversation.tsx";
+import { actionError, type ChatIntegration, supports } from "./integration.ts";
+
+export type { ChatIntegration } from "./integration.ts";
+
 import type { PageActions } from "./Pages.tsx";
 import { PageList, PagePane } from "./Pages.tsx";
 import type { PanelActions, PanelFrame } from "./Panel.tsx";
@@ -17,6 +21,7 @@ export interface AppProps {
   readonly theme: Theme;
   readonly sticker: string;
   readonly initialChat?: string | undefined;
+  readonly integration?: ChatIntegration | undefined;
   /** Opens 设置 or 插件 instead of the chats, e.g. "settings/permissions". */
   readonly initialPage?: string | undefined;
 }
@@ -41,7 +46,7 @@ function useNarrow(): boolean {
   return narrow;
 }
 
-export function App({ port, theme, sticker, initialChat, initialPage }: AppProps) {
+export function App({ port, theme, sticker, initialChat, initialPage, integration }: AppProps) {
   const world = useSyncExternalStore(port.subscribe, port.world, port.world);
   const narrow = useNarrow();
   const start = parsePage(initialPage);
@@ -54,23 +59,45 @@ export function App({ port, theme, sticker, initialChat, initialPage }: AppProps
   /** The last folder of chats, so 设置 and back keeps the list where it was. */
   const [folder, setFolder] = useState<FolderId>("all");
   const [openId, setOpenId] = useState<string | null>(
-    initialChat ?? (world.firstRun ? "moyyi" : null),
+    integration ? integration.activeChatId : (initialChat ?? (world.firstRun ? "moyyi" : null)),
   );
   const [stack, setStack] = useState<readonly PanelFrame[]>([]);
   const [drafts, setDrafts] = useState<Readonly<Record<string, string>>>({});
   const [searchOpen, setSearchOpen] = useState(false);
+  const [error, setError] = useState<string | null>(null);
   const chat = world.chats.find((c) => c.id === openId);
-
-  const open = (chatId: string) => {
-    setOpenId(chatId);
+  const nativeActive = integration?.activeChatId;
+  useEffect(() => {
+    if (nativeActive === undefined) return;
+    setOpenId(nativeActive);
     setStack([]);
     setSearchOpen(false);
-    void port.act({ type: "open", chatId });
+  }, [nativeActive]);
+
+  async function perform(action: ChatAction): Promise<void> {
+    setError(null);
+    try {
+      if (!supports(integration, action.type)) throw new Error("当前版本尚不支持这个操作。");
+      await port.act(action);
+    } catch (cause) {
+      setError(actionError(cause));
+      throw cause;
+    }
+  }
+  const dispatch = (action: ChatAction) => void perform(action).catch(() => undefined);
+  const feedback = error ?? (integration ? world.connection.note : undefined);
+
+  const open = (chatId: string) => {
+    if (!integration || integration.activeChatId === chatId) setOpenId(chatId);
+    setStack([]);
+    setSearchOpen(false);
+    if (integration?.activeChatId === chatId) return;
+    dispatch({ type: "open", chatId });
   };
 
   // biome-ignore lint/correctness/useExhaustiveDependencies: marks the first chat read once
   useEffect(() => {
-    if (openId) void port.act({ type: "open", chatId: openId });
+    if (openId && !integration) dispatch({ type: "open", chatId: openId });
   }, []);
 
   useEffect(() => {
@@ -111,16 +138,16 @@ export function App({ port, theme, sticker, initialChat, initialPage }: AppProps
     push: (frame) => setStack((value) => [...value, frame]),
     back: () => setStack((value) => value.slice(0, -1)),
     close: () => setStack([]),
-    check: (claimId, verdict) => void port.act({ type: "check", claimId, verdict }),
-    answerThread: (messageId, key) => void port.act({ type: "answer-thread", messageId, key }),
-    stop: (jobId) => void port.act({ type: "stop", jobId }),
-    undo: (changeIds) => void port.act({ type: "undo", changeIds }),
+    check: (claimId, verdict) => dispatch({ type: "check", claimId, verdict }),
+    answerThread: (messageId, key) => dispatch({ type: "answer-thread", messageId, key }),
+    stop: (jobId) => dispatch({ type: "stop", jobId }),
+    undo: (changeIds) => dispatch({ type: "undo", changeIds }),
   };
 
   const pageActions: PageActions = {
-    choose: (choiceId, option) => void port.act({ type: "choose", choiceId, option }),
-    press: (controlId) => void port.act({ type: "control", controlId }),
-    saveKey: (providerId, key) => void port.act({ type: "save-key", providerId, key }),
+    choose: (choiceId, option) => dispatch({ type: "choose", choiceId, option }),
+    press: (controlId) => dispatch({ type: "control", controlId }),
+    saveKey: (providerId, key) => dispatch({ type: "save-key", providerId, key }),
   };
 
   const onView = (next: ViewId) => {
@@ -147,6 +174,7 @@ export function App({ port, theme, sticker, initialChat, initialPage }: AppProps
             current={page?.id ?? null}
             onOpen={openPage}
             onView={onView}
+            native={Boolean(integration)}
           />
         ) : null}
         {page ? (
@@ -154,6 +182,7 @@ export function App({ port, theme, sticker, initialChat, initialPage }: AppProps
             world={world}
             page={page}
             actions={pageActions}
+            feedback={feedback}
             onBack={narrow ? () => setPageOf((value) => ({ ...value, [view]: null })) : undefined}
           />
         ) : null}
@@ -175,7 +204,13 @@ export function App({ port, theme, sticker, initialChat, initialPage }: AppProps
           drafts={drafts}
           onView={onView}
           onOpen={open}
+          native={Boolean(integration)}
+          showArchive={supports(integration, "archive")}
           onCompose={() => {
+            if (integration) {
+              integration.onNew();
+              return;
+            }
             open("moyyi");
             requestAnimationFrame(() => document.getElementById("compose-moyyi")?.focus());
           }}
@@ -184,6 +219,7 @@ export function App({ port, theme, sticker, initialChat, initialPage }: AppProps
       {showChat ? (
         chat ? (
           <Conversation
+            key={integration ? chat.id : undefined}
             world={world}
             chat={chat}
             draft={drafts[chat.id] ?? ""}
@@ -199,10 +235,19 @@ export function App({ port, theme, sticker, initialChat, initialPage }: AppProps
             onPanel={(frame) => setStack([frame])}
             onBack={() => setOpenId(null)}
             onOpenChat={open}
-            act={(action) => void port.act(action)}
+            act={perform}
+            integration={integration}
+            feedback={feedback}
           />
         ) : (
-          <EmptyChat sticker={sticker} />
+          <section className="mc-wallpaper ch-conversation ch-empty" aria-label="没选对话">
+            {feedback ? (
+              <p className="ch-integration-error" role="alert">
+                {feedback}
+              </p>
+            ) : null}
+            {integration?.empty ?? <EmptyChat sticker={sticker} />}
+          </section>
         )
       ) : null}
       {chat && stack.length ? (
@@ -230,10 +275,10 @@ export function App({ port, theme, sticker, initialChat, initialPage }: AppProps
 
 function EmptyChat({ sticker }: { readonly sticker: string }) {
   return (
-    <section className="mc-wallpaper ch-conversation ch-empty" aria-label="没选对话">
+    <>
       <img src={sticker} alt="" className="ch-empty-sticker" />
       <span className="ch-empty-title">选一个对话开始</span>
       <span className="ch-sub">或者直接跟 moyyi 说想做什么</span>
-    </section>
+    </>
   );
 }

@@ -28,9 +28,9 @@ const allowedLayers: Record<string, readonly string[]> = {
   "desktop:security": [],
   "desktop:wire": ["desktop:shared", "desktop:contract", "desktop:security"],
   "desktop:preload": ["desktop:shared", "desktop:contract", "desktop:wire", "desktop:security"],
-  "desktop:renderer": ["desktop:shared", "desktop:contract"],
+  "desktop:renderer": ["desktop:shared", "desktop:contract", "app:chat"],
   "desktop:host": ["desktop:shared", "desktop:contract", "desktop:wire", "desktop:security"],
-  // moyyi Chat (apps/chat) is a browser interface over its own ChatPort; it reaches nothing else yet.
+  // moyyi Chat stays browser-only; only desktop renderer composition may consume it.
   "app:chat": [],
 };
 
@@ -188,7 +188,11 @@ export function violations(file: string, source: string): string[] {
     }
     if (specifier.startsWith(".")) {
       const target = layerOf(resolve(dirname(file), specifier));
-      if (desktop && (target === null || !target.startsWith("desktop:"))) {
+      if (
+        desktop &&
+        (target === null || !target.startsWith("desktop:")) &&
+        !(layer === "desktop:renderer" && target === "app:chat")
+      ) {
         out.push(`${relative(repo, file)}: desktop must use public package exports (${specifier})`);
       } else if (chat && target !== layer) {
         out.push(`${relative(repo, file)}: chat imports only its own files (${specifier})`);

@@ -31,6 +31,7 @@ interface Props {
   readonly actions: MessageActions;
   readonly highlighted?: boolean;
   readonly sticker: string;
+  readonly renderText?: ((text: string) => ReactNode) | undefined;
 }
 
 const STICKER_TILT: Record<string, string> = {
@@ -44,6 +45,13 @@ export function MessageView(props: Props) {
   const { message, actions } = props;
   switch (message.kind) {
     case "service":
+      if (message.detail !== undefined)
+        return (
+          <details className={`ch-tool-details${message.tone === "danger" ? " ch-danger" : ""}`}>
+            <summary>{message.text}</summary>
+            <pre>{message.detail}</pre>
+          </details>
+        );
       return (
         <span className={`mc-service${message.tone === "danger" ? " ch-danger" : ""}`}>
           {message.text}
@@ -106,6 +114,7 @@ function FromAI({
   actions,
   highlighted,
   sticker,
+  renderText,
 }: Props & { readonly message: AIMessage }) {
   const member = members[message.from];
   const name = member?.name ?? message.from;
@@ -130,7 +139,7 @@ function FromAI({
     <div className={`mc-line${run.first ? "" : " ch-tight"}`} data-message={message.id}>
       {avatar}
       <div className={`ch-col${highlighted ? " ch-highlight" : ""}`}>
-        <Body message={message} sender={sender} actions={actions} />
+        <Body message={message} sender={sender} actions={actions} renderText={renderText} />
         {"reactions" in message && message.reactions?.length ? (
           <Reactions
             reactions={message.reactions}
@@ -178,10 +187,12 @@ function Body({
   message,
   sender,
   actions,
+  renderText,
 }: {
   readonly message: AIMessage;
   readonly sender: ReactNode;
   readonly actions: MessageActions;
+  readonly renderText?: ((text: string) => ReactNode) | undefined;
 }) {
   switch (message.kind) {
     case "text":
@@ -192,7 +203,7 @@ function Body({
             <span className="ch-forwarded">转发自 {message.forwarded}</span>
           ) : null}
           {message.quote ? <span className="ch-quote">{message.quote}</span> : null}
-          {message.text}
+          {renderText?.(message.text) ?? message.text}
           {message.tag ? (
             <span className={`mc-tag mc-tag-${message.tag.kind} ch-tag-inline`}>
               {message.tag.text}
