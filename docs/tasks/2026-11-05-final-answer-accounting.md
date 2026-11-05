@@ -3,6 +3,11 @@
 - 日期：2026-11-05。上级计划：[post-M6 计划 v2 第 5 节质量门](2026-10-28-post-m6-plan.md#5-质量门)、
   [roadmap 质量线](../roadmap.md#quality-lane)。
 - 执行：Codex。审查与验收：Claude。分支：`codex/final-answer-accounting`。
+- **2026-11-05 进展**：owner 让 Claude 直接编写代码。A、B、C 已实现为默认关闭的选项
+  `RuntimeOptions.finalAccounting`（CLI `--final-accounting`），默认请求一字不变；ADR 0021、0042
+  已加修订。第 6 节的质量门和原题运行尚未进行，需要在 owner 的机器上用私有 host 跑：在 host 模块里设
+  `finalAccounting: true`，执行 `npm run eval:gate -- --host <私有 host 模块> --allow-live`（六题，
+  最多 71 次请求；`--dry-run` 只打印命令）。通过后再讨论是否改为默认开启。
 - 前置：[PR #61](https://github.com/Peerframe/moyyi/pull/61)（runtime 分目录、工具目录）已合并；
   核心循环里"请求阶段和提示文字抽成纯函数"的整理（`src/core/request-plan.ts`）已合并。
   这份简报的改动只落在那个文件、`src/context/evidence-answer.ts` 和它们的测试上。

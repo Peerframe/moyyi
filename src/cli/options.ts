@@ -36,6 +36,7 @@ Options:
       --long             Long tasks: --max-requests 200 --timeout 3600 --auto-compact unless set
       --subagents        Offer read-only sub-agents (agent tool); each uses its own requests
       --nested-instructions  Also load AGENTS.md from subdirectories the session works in
+      --final-accounting Ask the final answer to account for every requirement (experimental)
       --commands DIR     Load prompt templates DIR/<name>.md as /<name> commands (repeatable)
       --dev              Enable development-only plugin loading and reload
       --dev-plugin N=P   Explicit plugin name and local module path (repeatable)
@@ -73,6 +74,7 @@ export interface CliOptions {
   readonly autoCompact: boolean;
   readonly subagents: boolean;
   readonly nestedInstructions: boolean;
+  readonly finalAccounting: boolean;
   readonly commandDirectories: readonly string[];
   readonly dev: boolean;
   readonly development: readonly { name: string; path: string }[];
@@ -103,6 +105,7 @@ export function parseCliOptions(argv: readonly string[], cwd = process.cwd()): C
       long: { type: "boolean" },
       subagents: { type: "boolean" },
       "nested-instructions": { type: "boolean" },
+      "final-accounting": { type: "boolean" },
       commands: { type: "string", multiple: true },
       "shell-toolchain": { type: "string" },
       "web-origin": { type: "string", multiple: true },
@@ -137,6 +140,7 @@ export function parseCliOptions(argv: readonly string[], cwd = process.cwd()): C
       "long",
       "subagents",
       "nested-instructions",
+      "final-accounting",
       "dev",
       "dev-plugin",
     ] as const;
@@ -249,6 +253,7 @@ export function parseCliOptions(argv: readonly string[], cwd = process.cwd()): C
     autoCompact: values["auto-compact"] ?? long,
     subagents: values.subagents ?? false,
     nestedInstructions: values["nested-instructions"] ?? false,
+    finalAccounting: values["final-accounting"] ?? false,
     commandDirectories: (values.commands ?? []).map((path) => resolve(cwd, path)),
     continueLatest: values.continue ?? false,
     planMode: values.plan ?? false,

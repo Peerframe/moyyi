@@ -193,6 +193,11 @@ export interface RuntimeOptions {
    * observe only: they cannot block or change a run, and their output never reaches the model.
    */
   readonly hooks?: readonly HookConfig[];
+  /**
+   * Opt-in final-answer accounting: the answer-only request (and the evidence answer) also asks
+   * the model to account for every user requirement. Off until the quality gate supports it.
+   */
+  readonly finalAccounting?: boolean;
   readonly developmentPlugins?: readonly DevelopmentPlugin[];
   readonly plugins?: readonly PluginEntry[];
   readonly model?: ModelOrigin;
@@ -692,7 +697,7 @@ export async function createRuntime(
       tools: registry.tools,
       store,
       policy,
-      context: new MinimalContextBuilder(),
+      context: new MinimalContextBuilder({ finalAccounting: options.finalAccounting === true }),
       validator: new AjvArgumentValidator(),
       preconditions: options.preconditions ?? new WorkspacePreconditions(),
       files,
@@ -749,6 +754,7 @@ export async function createRuntime(
       ],
       ...(options.limits === undefined ? {} : { limits: options.limits }),
       ...(evidenceAnswer ? { evidenceAnswer } : {}),
+      ...(options.finalAccounting ? { finalAccounting: true } : {}),
       ...(options.autoCompact
         ? {
             autoCompactRatio:

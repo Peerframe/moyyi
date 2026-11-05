@@ -88,3 +88,11 @@ Synthetic checks prove wiring and enforcement, not live model quality. The owner
 separate bounded read-only DeepSeek retest after offline acceptance, within the existing eight
 requests and zero automatic retries. Public release is explicitly excluded; delivery is a branch,
 PR and local candidate installation. Live observations are recorded separately from fixture results.
+
+## Amendment 2026-11-05: opt-in final-answer accounting
+
+With `RuntimeOptions.finalAccounting` (CLI `--final-accounting`), the answer-only request's
+notice ends with one more sentence asking the model to list each requirement the user stated and
+account for it (done with the supporting observation, not done, or unverified), including every
+item of its task list. Earlier notices are unchanged. It is off until the frozen quality gate
+supports it ([brief](../tasks/2026-11-05-final-answer-accounting.md)).

@@ -57,7 +57,27 @@ export function evidenceAnswerNotice(reason: EvidenceAnswerReason): string {
   );
 }
 
-export function requestBudgetNotice(plan: RequestPlan, maxModelRequests: number): string {
+/**
+ * Opt-in final-answer accounting (brief 2026-11-05): appended only to the answer-only request,
+ * so earlier requests and their cached prefixes are unchanged.
+ */
+export const FINAL_ACCOUNTING =
+  " Before answering, list each requirement the user stated and account for it: done, with the " +
+  "observation that shows it; not done; or unverified. If you kept a task list, report every " +
+  "item's final status the same way.";
+
+export function requestBudgetNotice(
+  plan: RequestPlan,
+  maxModelRequests: number,
+  accounting = false,
+): string {
+  const { finalRequest } = plan;
+  return (
+    requestBudgetText(plan, maxModelRequests) + (finalRequest && accounting ? FINAL_ACCOUNTING : "")
+  );
+}
+
+function requestBudgetText(plan: RequestPlan, maxModelRequests: number): string {
   const { remaining, finalRequest } = plan;
   return (
     `Model request budget: attempt ${maxModelRequests - remaining + 1} of ${maxModelRequests}; ` +

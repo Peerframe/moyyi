@@ -98,6 +98,8 @@ export interface CoreDeps {
    * unchanged and the turn proceeds; a storage failure while publishing fails the turn.
    */
   readonly autoCompactRatio?: number;
+  /** Opt-in: ask the answer-only request to account for every user requirement. */
+  readonly finalAccounting?: boolean;
   /** Acknowledge model recording/transport cleanup before the independent answer phase. */
   readonly settleModel?: () => Promise<void>;
   readonly files?: WorkspaceFilesFactory;
@@ -823,7 +825,11 @@ export class AgentCore {
       await this.#append(run, {
         kind: "notice",
         code: "model_request_budget",
-        text: requestBudgetNotice(plan, this.#limits.maxModelRequests),
+        text: requestBudgetNotice(
+          plan,
+          this.#limits.maxModelRequests,
+          this.#deps.finalAccounting === true,
+        ),
       });
       const snapshot = await this.#session(run.sessionId);
       const consumedSteering = snapshot.entries.filter(

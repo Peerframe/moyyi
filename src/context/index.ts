@@ -33,9 +33,16 @@ interface ProjectedEntry {
 
 /** Applies explicit, immutable compactions; never drops history to make a request fit. */
 export class MinimalContextBuilder implements ContextBuilder {
+  readonly #accounting: boolean;
+  constructor(options: { readonly finalAccounting?: boolean } = {}) {
+    this.#accounting = options.finalAccounting === true;
+  }
+
   buildEvidenceAnswer(input: ContextInput): ContextResult {
-    return buildEvidenceAnswer(input, (request) =>
-      budget(request, input.profile.contextWindowTokens),
+    return buildEvidenceAnswer(
+      input,
+      (request) => budget(request, input.profile.contextWindowTokens),
+      this.#accounting,
     );
   }
 

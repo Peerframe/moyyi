@@ -33,6 +33,8 @@ function grantNotices(options: CliOptions): string[] {
     );
   if (options.timeoutSeconds !== undefined)
     lines.push(`budget | At most ${options.timeoutSeconds} s per turn.`);
+  if (options.finalAccounting)
+    lines.push("context | Final answers account for every stated requirement (experimental).");
   if (options.nestedInstructions)
     lines.push("context | Nested AGENTS.md from subdirectories this session works in.");
   if (options.subagents)
@@ -68,6 +70,7 @@ async function localRuntime(
       autoCompact: options.autoCompact,
       subagents: options.subagents,
       nestedInstructions: options.nestedInstructions,
+      finalAccounting: options.finalAccounting,
       webOrigins: options.webOrigins,
       ...(options.shellToolchain ? { shellToolchain: options.shellToolchain } : {}),
       ...(options.webDns ? { webDns: options.webDns } : {}),

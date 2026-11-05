@@ -228,3 +228,15 @@ describe("continue", () => {
     expect(() => parseCliOptions(["--daemon", "--demo", "--continue"], "/tmp")).toThrow();
   });
 });
+
+describe("final-answer accounting", () => {
+  it("is off by default and kept with the daemon", () => {
+    expect(parseCliOptions(["--host", "h.mjs"], "/tmp").finalAccounting).toBe(false);
+    expect(parseCliOptions(["--host", "h.mjs", "--final-accounting"], "/tmp").finalAccounting).toBe(
+      true,
+    );
+    expect(() => parseCliOptions(["--connect", "--final-accounting"], "/tmp")).toThrow(
+      /daemon's host/,
+    );
+  });
+});

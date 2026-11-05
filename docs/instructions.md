@@ -14,6 +14,8 @@ fact checker or a guarantee of correctness; they use the existing request budget
 The scope and validation limits are recorded in
 [ADR 0022](decisions/0022-evidence-guidance-and-focused-reads.md).
 
+With `RuntimeOptions.finalAccounting` (CLI `--final-accounting`, experimental, default off), the
+final notice and the evidence answer also ask the model to account for every stated requirement.
 The runtime also adds a recorded request-budget notice on each attempt. It states the remaining
 requests including the current one and reserves the last for an answer based on existing evidence.
 That final request disables new tool calls; it must distinguish verified findings from unfinished
