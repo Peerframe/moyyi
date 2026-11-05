@@ -1,6 +1,7 @@
 import {
   type ActionHasher,
   type ArgumentValidator,
+  type BackgroundProcessAccessFactory,
   type ClientCommand,
   type Clock,
   type ContentPart,
@@ -103,6 +104,8 @@ export interface CoreDeps {
   readonly web?: WebAccessFactory;
   readonly toolResults?: ToolResultProcessor;
   readonly toolOutputs?: ToolOutputReaderFactory;
+  /** Session-bound background commands; core hands them only to shell_output and shell_stop. */
+  readonly backgroundProcesses?: BackgroundProcessAccessFactory;
   readonly readToolDeadlines?: ReadToolDeadlines;
 }
 
@@ -954,6 +957,9 @@ export class AgentCore {
         ...(this.#deps.writes ? { writes: this.#deps.writes } : {}),
         ...(this.#deps.web ? { web: this.#deps.web } : {}),
         ...(this.#deps.toolOutputs ? { toolOutputs: this.#deps.toolOutputs } : {}),
+        ...(this.#deps.backgroundProcesses
+          ? { backgroundProcesses: this.#deps.backgroundProcesses }
+          : {}),
         ...(this.#deps.readToolDeadlines
           ? { readToolDeadlines: this.#deps.readToolDeadlines }
           : {}),

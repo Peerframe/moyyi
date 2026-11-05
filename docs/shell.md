@@ -96,6 +96,19 @@ unavailable isolation and invalid configuration fail closed. No ordinary-host-sh
 Docker is reserved as an optional backend; this delivery does not expose Docker execution or
 introduce workspace copying/import. It is not required to use the native command tool.
 
+## Background commands
+
+With a process grant, `shell` accepts `background: true` for dev servers, watchers and long
+builds. The call returns a handle (`bg_1`, ...) at once; the command keeps running in the same
+sandbox for up to `timeoutMs` (default 10 minutes, at most 1 hour). `shell_output` returns the
+output produced since the previous read and the state (`running`, `exited`, `stopped`,
+`timeout`, `revoked`, `unknown`); it is a read and needs no approval. `shell_stop` stops the
+command and everything it started, and asks like a command (use `/always` to stop asking in a
+session). At most 4 background commands run at once; each keeps its last 1 MiB of output.
+Handles work only in the session that started them. Background commands stop when a grant
+changes and when the CLI, runtime or daemon exits. Foreground commands may run up to 10 minutes.
+See [ADR 0049](decisions/0049-long-running-sessions.md).
+
 ## Results and stopping
 
 Zero/nonzero exit describes the command's observed result, not whether it fulfilled the user's

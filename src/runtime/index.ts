@@ -71,6 +71,7 @@ import { type SkillSelection, selectSkills } from "./guidance/skills.ts";
 import { historyPage, sessionCatalog, sessionManagementError, sessionResults } from "./history.ts";
 import { type PluginEntry, PluginRegistry, type PluginStatus } from "./plugins.ts";
 import { WorkspacePreconditions } from "./preconditions.ts";
+import { BackgroundProcesses } from "./processes/background.ts";
 import { NodeWorkspaceProcesses } from "./processes/processes.ts";
 import { type AnthropicHttpOptions, anthropicHttpTransport } from "./providers/anthropic-http.ts";
 import { type DeepSeekHttpOptions, deepSeekHttpTransport } from "./providers/deepseek-http.ts";
@@ -426,6 +427,7 @@ export async function createRuntime(
   let closing: Promise<void> | undefined;
   let toolResults: RuntimeToolResults | undefined;
   const sessionApprovals = new SessionApprovals();
+  const backgroundProcesses = workspaceProcesses ? new BackgroundProcesses() : undefined;
   const emit = (event: RuntimeEvent) => {
     toolResults?.observe(event);
     sessionApprovals.observe(event);
@@ -596,7 +598,18 @@ export async function createRuntime(
         })
       : undefined;
     const processes = workspaceProcesses
-      ? new NodeWorkspaceProcesses({ ...workspaceProcesses, protectedPaths: excluded })
+      ? new NodeWorkspaceProcesses({
+          ...workspaceProcesses,
+          protectedPaths: excluded,
+          ...(backgroundProcesses
+            ? {
+                background: {
+                  registry: backgroundProcesses,
+                  epoch: () => policy.revision?.() ?? 0,
+                },
+              }
+            : {}),
+        })
       : undefined;
     const files = new NodeWorkspaceFiles(excluded);
     const documents = documentsEnabled ? new NodeWorkspaceDocuments(files) : undefined;
@@ -618,6 +631,7 @@ export async function createRuntime(
       files,
       toolResults,
       toolOutputs: toolResults,
+      ...(backgroundProcesses ? { backgroundProcesses } : {}),
       readToolDeadlines: readToolDeadlines(
         options.scheduler ?? nodeScheduler,
         options.readToolTimeoutMs,
@@ -966,6 +980,7 @@ export async function createRuntime(
         await Promise.all([...commands]);
         await stopping;
         await core?.close();
+        await backgroundProcesses?.closeAll();
         try {
           await recorder?.flush();
         } finally {

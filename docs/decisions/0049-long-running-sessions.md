@@ -38,6 +38,15 @@ the same approval.
   that session. It never changes `deny`, missing grants, revocation or a stricter plugin rule.
   Rules live only in memory, at most 64 per session, and are dropped when the session is loaded
   again or the runtime (or daemon) stops. Nothing is persisted.
+- **Background commands.** `shell` accepts `background: true` (time limit up to 3600000 ms,
+  default 600000) and returns a handle such as `bg_1` at once. Foreground commands now allow up
+  to 600000 ms (was 120000). A runtime-owned registry keeps each background group in the same
+  OS sandbox, with a 1 MiB output tail, at most 4 running, and handles bound to the starting
+  session. `shell_output` (read class, no approval) returns output since the previous read and
+  the state; `shell_stop` (process class, asks like a command) stops the group. A background
+  command also stops on its own time limit, on any grant change (policy revision), and when the
+  runtime or daemon closes. The core hands the registry only to these two tool names, the same
+  way it scopes `read_tool_output`. Both tools are registered only with a process grant.
 
 ## Consequences
 
@@ -47,6 +56,11 @@ the same approval.
 - Tool-level rules are broad: remembering `edit` allows every edit in the granted workspace for
   that session. Shell rules are exact so a remembered `npm test` never allows a different
   command line. Prefix rules are not supported.
+- A started background command is journaled as a succeeded `process` effect meaning "started";
+  its later exit is visible through `shell_output`, not as an effect update. It keeps running
+  across turns of its session and is not restored after a crash or restart. Linux uses
+  `--die-with-parent`; macOS cleanup after a host SIGKILL is not guaranteed, as for foreground
+  commands.
 - Automatic compaction sends one extra model request when it triggers; its model-visible effect
   is the existing compaction summary. Its effect on answer quality is not measured yet.
 - The daemon passes `scope` through its wire validation; `--connect` cannot set budgets, grants

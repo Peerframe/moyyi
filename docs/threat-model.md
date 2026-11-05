@@ -66,6 +66,9 @@ commands keep OS confinement, network denial and per-command approval but have n
 T1 recovery depends on version control. Session approvals let one owner approval cover later
 calls of the same tool (or the same exact command) in that session; they live in memory, never
 override a denial or revocation, and are not restored on reopen. Model output cannot create one.
+Background commands outlive their call but not their grant: they stay in the sandbox, stop on
+any grant change, their own time limit or runtime close, and are reachable only from the
+session that started them.
 
 ## Remaining implementation and validation
 
