@@ -169,7 +169,7 @@ describe.skipIf(process.platform !== "darwin" && process.platform !== "linux")(
       const t = setup();
       for (const command of ["", " ", "bad\0command", "中".repeat(6_000)])
         await expect(t.prepare(command)).rejects.toThrow(/process request/);
-      for (const timeout of [0, 120_001, NaN, 1.5])
+      for (const timeout of [0, 600_001, NaN, 1.5])
         await expect(t.prepare("true", timeout)).rejects.toThrow(/process request/);
       await expect(t.prepare("true", 10, "bad\0path")).rejects.toThrow(/process request/);
     });

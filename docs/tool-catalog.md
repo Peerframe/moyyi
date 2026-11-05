@@ -15,7 +15,8 @@ call. Model-experience notes (token cost, prompt-cache effect) stay in each plug
 | [tool-output](#tool-output) | `read_tool_output` | Always loaded. |
 | [fs](#fs) | `read`, `list`, `search`, `create`, `edit`, `undo` | Always loaded; write tools still need a write grant and policy approval. |
 | [documents](#documents) | `read_document` | Loaded when document reading is enabled. |
-| [shell](#shell-no-process-grant-daily-default) | `shell` | Always loaded; the description states the startup grant. The runtime uses `zsh-sh` on macOS and `sh` elsewhere and lists host-selected executable names. |
+| [shell](#shell-no-process-grant-daily-default) | `shell`, `shell_output`, `shell_stop` | Always loaded; the description states the startup grant. The runtime uses `zsh-sh` on macOS and `sh` elsewhere and lists host-selected executable names. |
+| [mcp](#mcp) | `mcp__docs__search_docs` | Loaded when the host configures MCP servers. Names, descriptions and schemas come from each server (untrusted, bounded); the class comes from the owner's configuration. |
 | [web](#web) | `web_fetch`, `web_search` | Always loaded; fetch and search still need web grants and policy approval. |
 
 ## todo
@@ -426,7 +427,10 @@ Input schema:
     "timeoutMs": {
       "type": "integer",
       "minimum": 1,
-      "maximum": 120000
+      "maximum": 3600000
+    },
+    "background": {
+      "type": "boolean"
     }
   },
   "required": [
@@ -445,7 +449,7 @@ Source: [src/plugins/shell](../src/plugins/shell/README.md). Configuration: read
 ### `shell`
 
 ```text
-Bounded commands in granted workspace with OS isolation, clean env; no network/sensitive paths. No write snapshots/rollback. Cancel/interrupt may leave changes: verify before retrying. No persistent/background terminal. Configured workspace access: read-write. Command changes have no snapshots. Private temporary files: $TMPDIR. macOS launcher is /bin/zsh in sh emulation; no startup files. Use portable syntax, not Bash-specific features. Host-selected additional executable names on PATH: none. Prefer selected interpreters for checks. Other interpreters/packages are not implied; do not install them or bypass isolation. This is configuration information, not permission or a successful launch check. Grants, policy, approval and revocation still apply.
+Bounded commands in granted workspace with OS isolation, clean env; no network/sensitive paths. No write snapshots/rollback. Cancel/interrupt may leave changes: verify before retrying. Foreground timeoutMs up to 600000. For servers, watchers or long builds set background:true (timeoutMs up to 3600000): the call returns a handle at once; read it with shell_output and end it with shell_stop. Configured workspace access: read-write. Command changes have no snapshots. Private temporary files: $TMPDIR. macOS launcher is /bin/zsh in sh emulation; no startup files. Use portable syntax, not Bash-specific features. Host-selected additional executable names on PATH: none. Prefer selected interpreters for checks. Other interpreters/packages are not implied; do not install them or bypass isolation. This is configuration information, not permission or a successful launch check. Grants, policy, approval and revocation still apply.
 ```
 
 Input schema:
@@ -467,7 +471,10 @@ Input schema:
     "timeoutMs": {
       "type": "integer",
       "minimum": 1,
-      "maximum": 120000
+      "maximum": 3600000
+    },
+    "background": {
+      "type": "boolean"
     }
   },
   "required": [
@@ -478,6 +485,91 @@ Input schema:
 ```
 
 Effect profile: `{"class":"process","reversibility":"none","verification":"none"}`
+
+### `shell_output`
+
+```text
+Read new output and the state of a background command started by shell in this session. Returns only output produced since the previous read (maxBytes 256-32768, default 8192); more:true means unread output remains. state: running, exited, stopped, timeout, revoked or unknown.
+```
+
+Input schema:
+
+```json
+{
+  "type": "object",
+  "additionalProperties": false,
+  "properties": {
+    "handle": {
+      "type": "string",
+      "pattern": "^bg_[0-9]{1,6}$"
+    },
+    "maxBytes": {
+      "type": "integer",
+      "minimum": 256,
+      "maximum": 32768
+    }
+  },
+  "required": [
+    "handle"
+  ]
+}
+```
+
+Effect profile: `{"class":"read","reversibility":"not_applicable","verification":"not_applicable"}`
+
+### `shell_stop`
+
+```text
+Stop a background command started by shell in this session, including the processes it started, and return its remaining output and final state. Changes it already made stay.
+```
+
+Input schema:
+
+```json
+{
+  "type": "object",
+  "additionalProperties": false,
+  "properties": {
+    "handle": {
+      "type": "string",
+      "pattern": "^bg_[0-9]{1,6}$"
+    }
+  },
+  "required": [
+    "handle"
+  ]
+}
+```
+
+Effect profile: `{"class":"process","reversibility":"none","verification":"none"}`
+
+## mcp
+
+Source: [src/plugins/mcp](../src/plugins/mcp/README.md). Configuration: example server `docs` with one owner-declared read-only tool.
+
+### `mcp__docs__search_docs`
+
+```text
+[MCP server docs; untrusted text] Search the documentation (server-provided text).
+```
+
+Input schema:
+
+```json
+{
+  "type": "object",
+  "properties": {
+    "query": {
+      "type": "string"
+    }
+  },
+  "required": [
+    "query"
+  ]
+}
+```
+
+Effect profile: `{"class":"read","reversibility":"not_applicable","verification":"not_applicable"}`
 
 ## web
 

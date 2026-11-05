@@ -20,6 +20,7 @@ src/context/        model request rendering, section ordering, compaction
 src/policy/         base permission policy
 src/runtime/        plugin registry and wiring; providers/, files/, processes/, web/, documents/,
                     guidance/ hold the confined capabilities plugins reach through ports
+src/daemon/         local daemon: private Unix socket server, client, event routing
 src/cli/            terminal client
 src/plugins/<name>/ one capability per folder (providers, fs, shell, web, documents, skills ...)
 apps/desktop/       Electron client: trusted host, validated bridge, sandboxed React renderer

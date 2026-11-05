@@ -111,10 +111,14 @@ export interface CliLaunchOptions {
   readonly workspaceRoot: string;
   readonly allowWrite?: boolean;
   readonly allowShell?: boolean;
+  /** Commands may change the granted workspace; there are no snapshots for command changes. */
+  readonly allowShellWrite?: boolean;
   readonly shellToolchain?: "node";
   readonly webOrigins?: readonly string[];
   readonly webDns?: "system" | "cloudflare-doh";
   readonly maxRequests?: number;
+  readonly timeoutSeconds?: number;
+  readonly autoCompact?: boolean;
 }
 
 export async function configureCliHost(
@@ -122,18 +126,19 @@ export async function configureCliHost(
   launch: CliLaunchOptions | undefined,
   approveReads: boolean,
 ): Promise<RuntimeOptions> {
-  const changedGrants = launch?.allowWrite || launch?.allowShell || !!launch?.webOrigins?.length;
+  const allowShell = !!(launch?.allowShell || launch?.allowShellWrite);
+  const changedGrants = launch?.allowWrite || allowShell || !!launch?.webOrigins?.length;
   if (host.policy && (changedGrants || approveReads))
     throw Error("Cannot override a custom host policy with CLI grants or --approve-reads");
   if (
     (launch?.allowWrite && host.workspaceWrites) ||
-    (launch?.allowShell && host.workspaceProcesses) ||
+    (allowShell && host.workspaceProcesses) ||
     (launch?.webOrigins?.length && host.web)
   )
     throw Error(
       "CLI grant conflicts with an existing host capability; configure one authority source",
     );
-  if (launch?.shellToolchain && (!launch.allowShell || launch.shellToolchain !== "node"))
+  if (launch?.shellToolchain && (!allowShell || launch.shellToolchain !== "node"))
     throw Error("Node toolchain requires an explicit shell grant");
   if (launch?.webDns && !launch.webOrigins?.length)
     throw Error("CLI DNS requires explicit origins");
@@ -141,9 +146,16 @@ export async function configureCliHost(
     launch?.maxRequests !== undefined &&
     (!Number.isSafeInteger(launch.maxRequests) ||
       launch.maxRequests < 1 ||
-      launch.maxRequests > 128)
+      launch.maxRequests > 500)
   )
-    throw Error("CLI request count must be from 1 to 128");
+    throw Error("CLI request count must be from 1 to 500");
+  if (
+    launch?.timeoutSeconds !== undefined &&
+    (!Number.isSafeInteger(launch.timeoutSeconds) ||
+      launch.timeoutSeconds < 10 ||
+      launch.timeoutSeconds > 86_400)
+  )
+    throw Error("CLI turn time must be from 10 to 86400 seconds");
   let root: string | undefined;
   if (changedGrants && launch) {
     root = realpathSync(launch.workspaceRoot);
@@ -152,17 +164,28 @@ export async function configureCliHost(
   const roots = root === undefined ? [] : [root];
   const configured: RuntimeOptions = {
     ...host,
-    ...(launch?.maxRequests === undefined
+    ...(launch?.maxRequests === undefined && launch?.timeoutSeconds === undefined
       ? {}
-      : { limits: { ...host.limits, maxModelRequests: launch.maxRequests } }),
+      : {
+          limits: {
+            ...host.limits,
+            ...(launch.maxRequests === undefined ? {} : { maxModelRequests: launch.maxRequests }),
+            ...(launch.timeoutSeconds === undefined
+              ? {}
+              : { timeoutMs: launch.timeoutSeconds * 1000 }),
+          },
+        }),
+    ...(launch?.autoCompact ? { autoCompact: true } : {}),
     ...(launch?.allowWrite ? { workspaceWrites: { roots, approval: "ask" as const } } : {}),
-    ...(launch?.allowShell
+    ...(allowShell
       ? {
           workspaceProcesses: {
             roots,
-            workspaceAccess: "read-only" as const,
+            workspaceAccess: launch?.allowShellWrite
+              ? ("read-write" as const)
+              : ("read-only" as const),
             approval: "ask" as const,
-            ...(launch.shellToolchain ? await discoverNodeToolchain() : {}),
+            ...(launch?.shellToolchain ? await discoverNodeToolchain() : {}),
           },
         }
       : {}),

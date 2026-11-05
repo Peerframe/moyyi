@@ -3,6 +3,7 @@ import { join, resolve } from "node:path";
 import type { Plugin } from "../src/contracts/index.ts";
 import { documentsPlugin } from "../src/plugins/documents/index.ts";
 import { fsPlugin } from "../src/plugins/fs/index.ts";
+import { createMcpPlugin } from "../src/plugins/mcp/index.ts";
 import { createShellPlugin } from "../src/plugins/shell/index.ts";
 import { todoPlugin } from "../src/plugins/todo/index.ts";
 import { toolOutputPlugin } from "../src/plugins/tool-output/index.ts";
@@ -73,6 +74,32 @@ const manifest: readonly Entry[] = [
           interpreter: "zsh-sh",
           executableNames: [],
         }),
+      },
+    ],
+  },
+  {
+    folder: "mcp",
+    note:
+      "Loaded when the host configures MCP servers. Names, descriptions and schemas come from " +
+      "each server (untrusted, bounded); the class comes from the owner's configuration.",
+    variants: [
+      {
+        label: "example server `docs` with one owner-declared read-only tool",
+        plugin: createMcpPlugin([
+          {
+            name: "mcp__docs__search_docs",
+            server: "docs",
+            remoteName: "search_docs",
+            description:
+              "[MCP server docs; untrusted text] Search the documentation (server-provided text).",
+            inputSchema: {
+              type: "object",
+              properties: { query: { type: "string" } },
+              required: ["query"],
+            },
+            effect: "read",
+          },
+        ]),
       },
     ],
   },

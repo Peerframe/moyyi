@@ -15,8 +15,9 @@ core through five fixed points and can be added or removed without touching anyt
 
 ```
 cli / desktop host ─┐   (future: automation — also a client)
-             ▼
-          runtime ─────────── plugin registry ◄──── src/plugins/<name>/
+             │   cli --connect ──► daemon (private Unix socket, ADR 0048)
+             ▼                        │
+          runtime ◄───────────────────┘ ─────────── plugin registry ◄──── src/plugins/<name>/
              │                                       provider-*, fs, shell,
    ┌─────────┼──────────┬──────────┐                 web, mcp, skills, memory …
    ▼         ▼          ▼          ▼
@@ -37,7 +38,8 @@ cli / desktop host ─┐   (future: automation — also a client)
 | Context | `src/context` | Rendering a model request, section ordering for prompt caching, compaction |
 | Policy | `src/policy` | Base permission policy and approval modes |
 | Runtime | `src/runtime` | Plugin registry, wiring, the client protocol, and the confined capabilities plugins use through ports (layout below) |
-| CLI | `src/cli` | Terminal client |
+| Daemon | `src/daemon` | Local server for one runtime over a private Unix socket, its client and event routing ([ADR 0048](decisions/0048-local-daemon.md)); wire protocol in `src/contracts/wire.ts` |
+| CLI | `src/cli` | Terminal client, in process or connected to the daemon |
 | Desktop client | `apps/desktop` | Sandboxed React renderer, validated local bridge and a trusted host using the public runtime; installed acceptance is tracked separately |
 
 ### Runtime layout
@@ -73,7 +75,7 @@ Imports between them stay inside the runtime layer and are not separate boundary
 | `provider-kimi` (Chat Completions; [ADR 0036](decisions/0036-kimi-chat-provider.md)) | model provider | opt-in K3.1 Pro; connection and task-quality evidence tracked separately |
 | `web` (fetch, search) | tools; runtime capability and base policy | merged in phase 5 |
 | `skills` (explicitly activated Agent Skills documents) | context source | implemented; refreshed per request |
-| `mcp` (bridge to MCP servers) | tools, policy rule | later |
+| `mcp` (owner-configured stdio MCP servers; [ADR 0050](decisions/0050-mcp-client.md)) | tools; runtime transport, `mcp` port and `McpPolicy` | implemented; offline-tested, not live-task-verified |
 | `memory` (Hermes Agent–inspired learning) | context source, event observer | later |
 
 Not plugins, because they are clients of the protocol: GUI, automation and scheduling. Sub-agents

@@ -21,7 +21,8 @@ export default defineConfig({
       "evals/**/*.test.ts",
       "apps/desktop/**/*.test.ts",
     ],
-    // Bound competing filesystem/sandbox workers; retain every test and its original timeout.
+    // Bound competing filesystem/sandbox workers. Keep the 5 s default; a test that is slow by
+    // design states its own timeout and the measured reason next to it.
     maxWorkers: 4,
   },
 });

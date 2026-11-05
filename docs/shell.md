@@ -13,6 +13,8 @@ moyyi --host /absolute/host.mjs -C /absolute/project --allow-shell --shell-toolc
 ```
 
 `--allow-shell` grants commands a **read-only workspace** and keeps command approval at `ask`.
+`--allow-shell-write` grants the same with a **writable workspace**, for builds, tests and git;
+command changes have no snapshots or undo.
 `--shell-toolchain node` is optional and requires `--allow-shell`. It exposes the Node executable
 running moyyi and its exact startup libraries, not all installed developer tools. Add
 `--allow-write` separately for snapshot-backed create/edit/undo; this does not make shell commands
@@ -93,6 +95,19 @@ profile; moyyi never disables AppArmor or changes host sysctls automatically. Un
 unavailable isolation and invalid configuration fail closed. No ordinary-host-shell fallback.
 Docker is reserved as an optional backend; this delivery does not expose Docker execution or
 introduce workspace copying/import. It is not required to use the native command tool.
+
+## Background commands
+
+With a process grant, `shell` accepts `background: true` for dev servers, watchers and long
+builds. The call returns a handle (`bg_1`, ...) at once; the command keeps running in the same
+sandbox for up to `timeoutMs` (default 10 minutes, at most 1 hour). `shell_output` returns the
+output produced since the previous read and the state (`running`, `exited`, `stopped`,
+`timeout`, `revoked`, `unknown`); it is a read and needs no approval. `shell_stop` stops the
+command and everything it started, and asks like a command (use `/always` to stop asking in a
+session). At most 4 background commands run at once; each keeps its last 1 MiB of output.
+Handles work only in the session that started them. Background commands stop when a grant
+changes and when the CLI, runtime or daemon exits. Foreground commands may run up to 10 minutes.
+See [ADR 0049](decisions/0049-long-running-sessions.md).
 
 ## Results and stopping
 
