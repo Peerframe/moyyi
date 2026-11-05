@@ -107,6 +107,24 @@ can accompany CLI grants and still covers document reads. Noninteractive approva
 Capabilities are limited to the selected workspace/origins even if another session is resumed.
 The offline `--demo` rejects these daily capability and budget options.
 
+## Notification hooks
+
+A host module can add `hooks` to run your own commands when an approval is waiting, a tool
+finishes or a run finishes, for example a desktop notification:
+
+```ts
+hooks: [
+  { on: "approval.requested", command: "/usr/bin/osascript",
+    args: ["-e", 'display notification "moyyi needs approval"'] },
+  { on: "run.finished", command: "/usr/local/bin/notify-done" },
+],
+```
+
+Each hook gets the event as one JSON line on stdin. Hooks only notify: they cannot block,
+approve or change a run, their output never reaches the model, and anything they change is outside
+moyyi's journal and undo. Failures and timeouts (default 10 s) appear as host diagnostics. See
+[ADR 0053](decisions/0053-notification-hooks.md).
+
 ## Prompt templates as commands
 
 `--commands DIR` (repeatable) loads every `DIR/<name>.md` as a `/<name>` command. `$ARGUMENTS` in

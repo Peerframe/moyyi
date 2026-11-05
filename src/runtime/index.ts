@@ -74,6 +74,7 @@ import { collectContext } from "./guidance/instructions.ts";
 import { touchedDirectories } from "./guidance/nested.ts";
 import { type SkillSelection, selectSkills } from "./guidance/skills.ts";
 import { historyPage, sessionCatalog, sessionManagementError, sessionResults } from "./history.ts";
+import { type HookConfig, HookRunner, validateHooks } from "./hooks.ts";
 import { connectMcpServers, type McpServerConfig } from "./mcp/index.ts";
 import { type PluginEntry, PluginRegistry, type PluginStatus } from "./plugins.ts";
 import { WorkspacePreconditions } from "./preconditions.ts";
@@ -187,6 +188,11 @@ export interface RuntimeOptions {
    * under the same read grant and limits as the root file (at most 8 files, 32 KiB in total).
    */
   readonly nestedInstructions?: boolean;
+  /**
+   * Owner notification commands for approval requests, finished tools and finished runs. They
+   * observe only: they cannot block or change a run, and their output never reaches the model.
+   */
+  readonly hooks?: readonly HookConfig[];
   readonly developmentPlugins?: readonly DevelopmentPlugin[];
   readonly plugins?: readonly PluginEntry[];
   readonly model?: ModelOrigin;
@@ -452,6 +458,7 @@ export async function createRuntime(
 
   const listeners = new Set<(event: RuntimeEvent) => void>();
   const diagnostics: string[] = [...(mcp?.diagnostics ?? [])];
+  const hooks = options.hooks?.length ? new HookRunner(options.hooks, diagnostics) : undefined;
   const activeRuns = new Set<string>();
   const commands = new Set<Promise<void>>();
   let closed = false;
@@ -461,6 +468,8 @@ export async function createRuntime(
   let toolResults: RuntimeToolResults | undefined;
   const sessionApprovals = new SessionApprovals();
   const backgroundProcesses = workspaceProcesses ? new BackgroundProcesses() : undefined;
+  // Validate hooks before any server or store starts, so a bad entry fails creation cleanly.
+  if (options.hooks?.length) validateHooks(options.hooks);
   const subagentLimits = options.subagents
     ? validateSubagentLimits({
         ...DEFAULT_SUBAGENT_LIMITS,
@@ -474,6 +483,7 @@ export async function createRuntime(
     if (event.type === "run.finished") activeRuns.delete(event.runId);
     // Observers receive an immutable copy, so mutating a displayed approval cannot alter work.
     const copy = freeze(JSON.parse(canonicalizeJson(event))) as RuntimeEvent;
+    hooks?.observe(copy);
     for (const listener of listeners) {
       try {
         const returned: unknown = listener(copy);
@@ -1064,6 +1074,7 @@ export async function createRuntime(
         await subagentCore?.close();
         await backgroundProcesses?.closeAll();
         await mcp?.close();
+        await hooks?.close();
         try {
           await recorder?.flush();
         } finally {

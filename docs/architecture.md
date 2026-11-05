@@ -79,6 +79,10 @@ Imports between them stay inside the runtime layer and are not separate boundary
 | `mcp` (owner-configured stdio MCP servers; [ADR 0050](decisions/0050-mcp-client.md)) | tools; runtime transport, `mcp` port and `McpPolicy` | implemented; offline-tested, not live-task-verified |
 | `memory` (Hermes Agent–inspired learning) | context source, event observer | later |
 
+Runtime-level, not plugins: owner notification hooks (`RuntimeOptions.hooks`, observe-only external
+commands; [ADR 0053](decisions/0053-notification-hooks.md)) and CLI prompt templates (`--commands`,
+client-side text expansion).
+
 Not plugins, because they are clients of the protocol: GUI, automation and scheduling.
 Sub-agents are the `agent` tool: a read-only child session on a second core with only read-class
 tools ([ADR 0051](decisions/0051-read-only-subagents.md)).

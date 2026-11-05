@@ -70,6 +70,13 @@ Background commands outlive their call but not their grant: they stay in the san
 any grant change, their own time limit or runtime close, and are reachable only from the
 session that started them.
 
+## Notification hooks
+
+[ADR 0053](decisions/0053-notification-hooks.md) hooks are owner programs from trusted host code
+that observe events. They receive event data (paths, commands, approval previews) but cannot answer
+approvals or change results; model output cannot add or trigger a hook beyond causing ordinary
+events. Changes a hook makes are outside the journal.
+
 ## Sub-agents
 
 [ADR 0051](decisions/0051-read-only-subagents.md) sub-agents run on a core with only read-class
