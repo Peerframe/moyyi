@@ -20,8 +20,11 @@ The finite `--demo` provider is not a summarizer; use scripted tests for offline
 With `RuntimeOptions.autoCompact` (CLI `--auto-compact` or `--long`), the same compaction runs
 automatically at the start of a turn whose compactable history needs at least 70% (or the
 configured ratio) of the model's context window. It uses one request of that turn, never the
-last one; a summary that does not reduce the context is discarded and the turn continues. It
-does not compact inside a running turn. See [ADR 0049](decisions/0049-long-running-sessions.md).
+last one; a summary that does not reduce the context is discarded and the turn continues.
+Inside a long turn, before each tool-enabled request over the same threshold, it summarizes
+earlier tool steps of that turn instead, keeping the request, any steering and the latest three
+steps verbatim. Original entries remain in history. See
+[ADR 0049](decisions/0049-long-running-sessions.md).
 
 Compact before the source becomes too large. Very short history, an unsafe tool boundary,
 oversized input, a response without summary text, a refusal or an incomplete response, or a summary that cannot reduce

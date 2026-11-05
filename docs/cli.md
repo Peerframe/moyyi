@@ -89,8 +89,9 @@ moyyi --host /absolute/private/moyyi-host.mjs -C /absolute/workspace \
   the final no-tool answer. Other host limits and retry settings remain unchanged. It is not a
   monetary cap or a change to evaluation budgets.
 - `--timeout SECONDS` changes the per-turn time limit (10–86400; default 60).
-- `--auto-compact` summarizes older turns before a turn whose history needs at least 70% of the
-  model's context window. The summary uses one request of that turn, never its last one.
+- `--auto-compact` summarizes older turns before a turn, and earlier tool steps inside a long
+  turn, whenever the next request needs at least 70% of the model's context window. Each summary
+  uses one request of that turn, never its last one.
 - `--long` is shorthand for `--max-requests 200 --timeout 3600 --auto-compact`; explicit values
   win. Each request can incur the provider's cost.
 
@@ -254,7 +255,7 @@ effects are not retried automatically and may require manual workspace inspectio
 
 `/compact` retains recent turns and summarizes an eligible older prefix with the selected model.
 It is a model call and can incur the configured provider's cost. It is automatic only with
-`--auto-compact` or `--long`, before a turn that nears the context window. `/cancel`
+`--auto-compact` or `--long`, when a request nears the context window. `/cancel`
 stops it. Originals remain available; the CLI labels summary-request audit records separately
 from normal answers. See [long-session behavior and limits](long-sessions.md). The finite offline
 `--demo` script does not generate summaries; `npm run eval:long-sessions` checks the feature with

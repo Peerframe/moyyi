@@ -27,8 +27,8 @@ Options:
       --web-dns MODE     system (default) or cloudflare-doh; requires --web-origin
       --max-requests N   Model requests per turn, 1..500; includes the final answer
       --timeout SECONDS  Time per turn, 10..86400 (default 60)
-      --auto-compact     Summarize older turns automatically before a turn that nears the
-                         model's context window (uses one request of that turn)
+      --auto-compact     Summarize older turns, or earlier steps of a long turn, when a request
+                         nears the model's context window (one request per summary)
       --long             Long tasks: --max-requests 200 --timeout 3600 --auto-compact unless set
       --dev              Enable development-only plugin loading and reload
       --dev-plugin N=P   Explicit plugin name and local module path (repeatable)

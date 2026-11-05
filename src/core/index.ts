@@ -90,7 +90,8 @@ export interface CoreDeps {
   readonly evidenceAnswer?: boolean;
   /**
    * Opt-in: before an ordinary run's first request, when the compactable history needs at least
-   * this fraction of the model's context window, summarize older turns first. The summary uses
+   * this fraction of the model's context window, summarize older turns first; before later
+   * tool-enabled requests, summarize earlier steps of the turn the same way. Each summary uses
    * one request of the run's own budget and never its last one. A rejected summary leaves history
    * unchanged and the turn proceeds; a storage failure while publishing fails the turn.
    */
@@ -122,6 +123,8 @@ interface Running {
   done: Promise<void>;
   deadlineExpired: boolean;
   requests: number;
+  /** Request count at the last in-turn step compaction attempt, so it never repeats at once. */
+  stepCompactionAt?: number;
   leased: boolean;
   finishing: boolean;
   steeringRevision: number;
@@ -587,7 +590,22 @@ export class AgentCore {
       : undefined;
   }
 
-  async #compact(run: Running): Promise<RunOutcome> {
+  /**
+   * Before a tool-enabled request of an ordinary run: when the request would need at least the
+   * configured share of the context window, summarize earlier tool steps of this turn first.
+   * Returns an outcome only when the turn must stop.
+   */
+  async #autoCompactSteps(run: Running, remaining: number): Promise<RunOutcome | undefined> {
+    const ratio = this.#deps.autoCompactRatio;
+    if (
+      ratio === undefined ||
+      this.#deps.evidenceAnswer ||
+      !this.#deps.context.planStepCompaction ||
+      // Leave the summary, one more tool-enabled request and the final answer.
+      remaining < 3 ||
+      (run.stepCompactionAt !== undefined && run.requests - run.stepCompactionAt < 3)
+    )
+      return undefined;
     const snapshot = await this.#session(run.sessionId);
     const input: ContextInput = {
       path: pathToHead(snapshot),
@@ -601,10 +619,39 @@ export class AgentCore {
       unsettledEffects: snapshot.effects.filter((effect) => !isTerminal(effect.state)),
     };
     if (run.controller.signal.aborted) return { kind: "cancelled" };
-    const plan = this.#deps.context.planCompaction?.(input);
+    const plan = this.#deps.context.planStepCompaction(input);
+    if (!plan || plan.originalTokens < ratio * this.#deps.profile.contextWindowTokens)
+      return undefined;
+    run.stepCompactionAt = run.requests;
+    const outcome = await this.#compact(run, "steps");
+    return outcome.kind === "cancelled" || outcome.kind === "budget_exhausted"
+      ? outcome
+      : undefined;
+  }
+
+  async #compact(run: Running, mode: "turns" | "steps" = "turns"): Promise<RunOutcome> {
+    const snapshot = await this.#session(run.sessionId);
+    const input: ContextInput = {
+      path: pathToHead(snapshot),
+      profile: this.#deps.profile,
+      tools: this.#deps.tools.map(({ name, description, inputSchema }) => ({
+        name,
+        description,
+        inputSchema,
+      })),
+      sections: await this.#collect(run),
+      unsettledEffects: snapshot.effects.filter((effect) => !isTerminal(effect.state)),
+    };
+    if (run.controller.signal.aborted) return { kind: "cancelled" };
+    const plan =
+      mode === "steps"
+        ? this.#deps.context.planStepCompaction?.(input)
+        : this.#deps.context.planCompaction?.(input);
     if (!plan)
       throw new Error(
-        "No safe older history to compact; latest two user turns and unresolved actions are retained",
+        mode === "steps"
+          ? "No settled earlier steps of this turn to compact"
+          : "No safe older history to compact; latest two user turns and unresolved actions are retained",
       );
     const rendered = await this.#recordRequest(plan.request, "moyyi-compaction-v1");
     if (run.controller.signal.aborted) return { kind: "cancelled" };
@@ -732,6 +779,14 @@ export class AgentCore {
         return { kind: "budget_exhausted", budget: "model_requests" };
       }
       await run.queue;
+      if (!draftReady && !run.investigation?.expired) {
+        const stop = await this.#autoCompactSteps(
+          run,
+          this.#limits.maxModelRequests - run.requests,
+        );
+        if (stop) return stop;
+        if (run.controller.signal.aborted) break;
+      }
       const plan = planRequest({
         maxModelRequests: this.#limits.maxModelRequests,
         requests: run.requests,

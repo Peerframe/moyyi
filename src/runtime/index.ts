@@ -160,8 +160,9 @@ export interface RuntimeOptions {
   /** Opt-in direct evidence answer within the same run/request budget. */
   readonly evidenceAnswer?: boolean;
   /**
-   * Opt-in automatic compaction before a turn; `true` uses 0.7 of the model's context window.
-   * Each automatic summary uses one model request of that turn.
+   * Opt-in automatic compaction of older turns, and of earlier steps inside a long turn, when a
+   * request needs this share of the context window; `true` uses 0.7. Each summary uses one
+   * model request of that turn.
    */
   readonly autoCompact?: boolean | { readonly thresholdRatio: number };
   readonly developmentPlugins?: readonly DevelopmentPlugin[];

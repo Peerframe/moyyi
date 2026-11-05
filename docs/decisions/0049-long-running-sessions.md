@@ -26,7 +26,14 @@ the same approval.
   reduce" check. It uses one request of that run's budget and is skipped when fewer than two
   requests remain. A rejected summary leaves history unchanged and the turn continues; a storage
   failure while publishing fails the turn. Evidence-answer runs never compact automatically.
-  Compaction still happens only between turns; one very long turn can still exceed the window.
+  **Inside a turn**, before each tool-enabled request, the core asks the new optional context
+  port `planStepCompaction` for a range of earlier tool steps of the current turn: it starts
+  right after the turn's user input, keeps the latest 3 assistant steps and any steering
+  verbatim, covers only complete call/result pairs, and is ineligible with unsettled or unknown
+  effects or a range too large to summarize. When the request would need at least the same ratio
+  of the window, the same compaction machinery publishes a step summary (prompt
+  `moyyi-step-compaction-v1`). It needs at least 3 remaining requests and is not retried within
+  3 requests of the previous attempt.
 - **Writable commands.** `--allow-shell-write` grants the existing `read-write` process
   workspace access (the runtime and sandbox already supported it; the CLI did not expose it).
   Commands stay sandboxed, network-denied and approval-gated. Command changes have no snapshots
@@ -69,6 +76,4 @@ the same approval.
 ## Rejected
 
 - Persisting session approvals: reopening must not restore execution authority.
-- Mid-turn automatic compaction: the existing compaction keeps the two latest user turns, so it
-  cannot shrink the turn in progress; a different design is needed.
 - Command prefix rules: a prefix such as `npm` also allows `npm exec` or `npm install`.

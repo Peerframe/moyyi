@@ -33,7 +33,7 @@ function grantNotices(options: CliOptions): string[] {
     lines.push(`budget | At most ${options.timeoutSeconds} s per turn.`);
   if (options.autoCompact)
     lines.push(
-      "budget | Automatic compaction: older turns are summarized before a turn that nears the context window.",
+      "budget | Automatic compaction: older turns and earlier steps are summarized near the context window.",
     );
   return lines;
 }
