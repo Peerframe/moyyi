@@ -10,6 +10,10 @@ set `projectInstructions: false`; custom policies must explicitly implement `bef
 to permit automatic loading. This does not alter the client protocol or grant tool authority.
 See [instructions](instructions.md).
 
+The same commands and events also travel over the local daemon's private Unix socket
+(`src/contracts/wire.ts`, [daemon](daemon.md), [ADR 0048](decisions/0048-local-daemon.md)). That
+transport validates every client frame, accepts text input only and keeps grants with the daemon.
+
 ## Lifecycle
 
 Create a runtime with an explicit model, private data directory and trusted startup plugins or

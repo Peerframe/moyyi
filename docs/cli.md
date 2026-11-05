@@ -97,6 +97,11 @@ can accompany CLI grants and still covers document reads. Noninteractive approva
 Capabilities are limited to the selected workspace/origins even if another session is resumed.
 The offline `--demo` rejects these daily capability and budget options.
 
+## Share one runtime between terminals
+
+`--daemon` serves the configured runtime over a private local socket; `--connect` attaches more
+terminals to it without their own host or grants. See [daemon](daemon.md).
+
 ## Session controls
 
 | Input | Behavior |

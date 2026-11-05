@@ -117,3 +117,38 @@ describe("explicit daily grants", () => {
       expect(() => parseCliOptions(["--demo", ...flags])).toThrow(/fixed read-only/);
   });
 });
+
+describe("daemon and connect modes", () => {
+  it("selects the mode and keeps local CLI behavior by default", () => {
+    expect(parseCliOptions(["--demo"], "/tmp").mode).toBe("local");
+    expect(parseCliOptions(["--daemon", "--host", "h.mjs", "--allow-write"], "/tmp")).toMatchObject(
+      { mode: "daemon", allowWrite: true },
+    );
+    expect(
+      parseCliOptions(["--connect", "--data", "d", "--session", "s1", "-i", "hi"], "/tmp"),
+    ).toMatchObject({ mode: "connect", dataDirectory: "/tmp/d", sessionId: "s1", prompt: "hi" });
+  });
+  it.each([
+    ["--demo"],
+    ["--host", "h.mjs"],
+    ["-C", "elsewhere"],
+    ["--approve-reads"],
+    ["--allow-write"],
+    ["--allow-shell"],
+    ["--web-origin", "https://example.com"],
+    ["--max-requests", "4"],
+    ["--dev"],
+  ])("does not let a connecting client add authority: %j", (...flags) => {
+    expect(() => parseCliOptions(["--connect", ...flags], "/tmp")).toThrow(/daemon's host/);
+  });
+  it.each([["hello"], ["-i"], ["--session", "s1"], ["--dev"]])(
+    "keeps the daemon headless: %j",
+    (...flags) => {
+      expect(() => parseCliOptions(["--daemon", "--demo", ...flags], "/tmp")).toThrow(/--daemon/);
+    },
+  );
+  it("requires a host for the daemon and rejects both modes together", () => {
+    expect(() => parseCliOptions(["--daemon"], "/tmp")).toThrow(/exactly one/);
+    expect(() => parseCliOptions(["--daemon", "--connect", "--demo"], "/tmp")).toThrow(/either/);
+  });
+});
