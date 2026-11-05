@@ -87,6 +87,13 @@ export interface CoreDeps {
   readonly limits?: Partial<RunLimits>;
   /** Experimental fresh-session evidence-only final answer; shares the existing run budget. */
   readonly evidenceAnswer?: boolean;
+  /**
+   * Opt-in: before an ordinary run's first request, when the compactable history needs at least
+   * this fraction of the model's context window, summarize older turns first. The summary uses
+   * one request of the run's own budget and never its last one. A rejected summary leaves history
+   * unchanged and the turn proceeds; a storage failure while publishing fails the turn.
+   */
+  readonly autoCompactRatio?: number;
   /** Acknowledge model recording/transport cleanup before the independent answer phase. */
   readonly settleModel?: () => Promise<void>;
   readonly files?: WorkspaceFilesFactory;
@@ -154,6 +161,16 @@ export class AgentCore {
       throw new Error("Duplicate tool names");
     if (deps.evidenceAnswer !== undefined && typeof deps.evidenceAnswer !== "boolean")
       throw new Error("Evidence answer must be a boolean");
+    if (
+      deps.autoCompactRatio !== undefined &&
+      !(
+        typeof deps.autoCompactRatio === "number" &&
+        deps.autoCompactRatio >= 0.1 &&
+        deps.autoCompactRatio <= 0.95 &&
+        deps.context.planCompaction
+      )
+    )
+      throw new Error("Automatic compaction needs a ratio from 0.1 to 0.95 and a compaction port");
     if (
       deps.evidenceAnswer &&
       (!deps.context.buildEvidenceAnswer || this.#limits.maxModelRequests < 2)
@@ -361,7 +378,10 @@ export class AgentCore {
   async #drive(run: Running): Promise<void> {
     let outcome: RunOutcome;
     try {
-      outcome = run.kind === "compaction" ? await this.#compact(run) : await this.#loop(run);
+      outcome =
+        run.kind === "compaction"
+          ? await this.#compact(run)
+          : ((await this.#autoCompact(run)) ?? (await this.#loop(run)));
     } catch (error) {
       outcome = { kind: "failed", reason: errorMessage(error) };
     }
@@ -534,6 +554,34 @@ export class AgentCore {
     if (response?.signalInterrupted && response.parts.some((part) => part.type === "refusal"))
       return { kind: "failed", reason: response.error?.message ?? "Model stream cancelled" };
     return undefined;
+  }
+
+  /** Returns an outcome only when the turn must stop (cancelled or out of budget). */
+  async #autoCompact(run: Running): Promise<RunOutcome | undefined> {
+    const ratio = this.#deps.autoCompactRatio;
+    // Evidence answers refuse compacted history, so they never compact automatically.
+    if (ratio === undefined || this.#deps.evidenceAnswer) return undefined;
+    // The summary must leave at least one request for the turn itself.
+    if (this.#limits.maxModelRequests - run.requests < 2) return undefined;
+    const snapshot = await this.#session(run.sessionId);
+    const plan = this.#deps.context.planCompaction?.({
+      path: pathToHead(snapshot),
+      profile: this.#deps.profile,
+      tools: this.#deps.tools.map(({ name, description, inputSchema }) => ({
+        name,
+        description,
+        inputSchema,
+      })),
+      sections: await this.#collect(run),
+      unsettledEffects: snapshot.effects.filter((effect) => !isTerminal(effect.state)),
+    });
+    if (run.controller.signal.aborted) return { kind: "cancelled" };
+    if (!plan || plan.originalTokens < ratio * this.#deps.profile.contextWindowTokens)
+      return undefined;
+    const outcome = await this.#compact(run);
+    return outcome.kind === "cancelled" || outcome.kind === "budget_exhausted"
+      ? outcome
+      : undefined;
   }
 
   async #compact(run: Running): Promise<RunOutcome> {

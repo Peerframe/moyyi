@@ -170,14 +170,17 @@ export function parseClientCommand(value: unknown): ClientCommand {
       return { type: kind, runId: id(v.runId, "Run id") as RunId };
     }
     case "approval.respond": {
-      const v = object(value, ["type", "effectId", "digest", "decision"], "Command");
+      const v = object(value, ["type", "effectId", "digest", "decision", "scope"], "Command");
       if (v.decision !== "approve" && v.decision !== "deny")
         throw new WireError("Decision must be approve or deny");
+      if (v.scope !== undefined && v.scope !== "once" && v.scope !== "session")
+        throw new WireError("Scope must be once or session");
       return {
         type: kind,
         effectId: id(v.effectId, "Effect id") as EffectId,
         digest: text(v.digest, WIRE_LIMITS.digestBytes, "Digest") as ActionDigest,
         decision: v.decision,
+        ...(v.scope === undefined ? {} : { scope: v.scope }),
       };
     }
     default:

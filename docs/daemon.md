@@ -30,7 +30,8 @@ Session commands (`/new`, `/resume`, `/sessions`, `/results`, `/compact`, `/canc
 ## What stays fixed
 
 - **Grants and host.** `--connect` rejects `--demo`, `--host`, `-C`, `--allow-*`, `--web-*`,
-  `--shell-toolchain`, `--approve-reads`, `--max-requests` and development options. Restart the
+  `--shell-toolchain`, `--approve-reads`, `--max-requests`, `--timeout`, `--auto-compact`,
+  `--long` and development options. Restart the
   daemon to change them. The client prints the daemon's grant lines on connect.
 - **Workspace.** The daemon creates sessions only in its own workspace. `/resume` loads any
   recorded session of the store, as in the local CLI, under the daemon's grants.
@@ -44,7 +45,8 @@ Session commands (`/new`, `/resume`, `/sessions`, `/results`, `/compact`, `/canc
 - Each client sees the events of the session it created or loaded. Another client that resumes
   the same session sees later entries, effects and approval requests of a run already in progress.
 - Any connected client viewing a run may answer its approval with the displayed effect ID; the
-  approval still has to match the displayed digest.
+  approval still has to match the displayed digest. `/always` rules belong to the session and
+  last until it is loaded again or the daemon stops.
 - Exiting a client, or losing its connection, cancels the runs that client started. Stopping the
   daemon cancels all client runs and removes the socket and token.
 

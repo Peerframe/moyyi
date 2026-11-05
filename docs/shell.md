@@ -13,6 +13,8 @@ moyyi --host /absolute/host.mjs -C /absolute/project --allow-shell --shell-toolc
 ```
 
 `--allow-shell` grants commands a **read-only workspace** and keeps command approval at `ask`.
+`--allow-shell-write` grants the same with a **writable workspace**, for builds, tests and git;
+command changes have no snapshots or undo.
 `--shell-toolchain node` is optional and requires `--allow-shell`. It exposes the Node executable
 running moyyi and its exact startup libraries, not all installed developer tools. Add
 `--allow-write` separately for snapshot-backed create/edit/undo; this does not make shell commands

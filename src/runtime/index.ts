@@ -80,6 +80,7 @@ import {
   RecordingModelClient,
   ReplayModelClient,
 } from "./providers/model-recording.ts";
+import { SessionApprovals } from "./session-approvals.ts";
 import { sessionFacts } from "./session-facts.ts";
 import { RuntimeToolResults, readToolDeadlines } from "./tool-results.ts";
 import { AjvArgumentValidator } from "./validation.ts";
@@ -157,6 +158,11 @@ export interface RuntimeOptions {
   readonly workspaceNavigation?: boolean;
   /** Opt-in direct evidence answer within the same run/request budget. */
   readonly evidenceAnswer?: boolean;
+  /**
+   * Opt-in automatic compaction before a turn; `true` uses 0.7 of the model's context window.
+   * Each automatic summary uses one model request of that turn.
+   */
+  readonly autoCompact?: boolean | { readonly thresholdRatio: number };
   readonly developmentPlugins?: readonly DevelopmentPlugin[];
   readonly plugins?: readonly PluginEntry[];
   readonly model?: ModelOrigin;
@@ -419,8 +425,10 @@ export async function createRuntime(
   let inspecting = false;
   let closing: Promise<void> | undefined;
   let toolResults: RuntimeToolResults | undefined;
+  const sessionApprovals = new SessionApprovals();
   const emit = (event: RuntimeEvent) => {
     toolResults?.observe(event);
+    sessionApprovals.observe(event);
     if (event.type === "run.started") activeRuns.add(event.runId);
     if (event.type === "run.finished") activeRuns.delete(event.runId);
     // Observers receive an immutable copy, so mutating a displayed approval cannot alter work.
@@ -513,7 +521,12 @@ export async function createRuntime(
       ),
     beforeExecute: (tool, profile, action, effectId, args) =>
       stricter(
-        base.beforeExecute(tool, profile, action, effectId, args),
+        sessionApprovals.lift(
+          base.beforeExecute(tool, profile, action, effectId, args),
+          tool,
+          effectId,
+          args,
+        ),
         registry.evaluatePolicy({ tool, profile, args, phase: "execute" }),
       ),
   };
@@ -651,6 +664,12 @@ export async function createRuntime(
       ],
       ...(options.limits === undefined ? {} : { limits: options.limits }),
       ...(evidenceAnswer ? { evidenceAnswer } : {}),
+      ...(options.autoCompact
+        ? {
+            autoCompactRatio:
+              options.autoCompact === true ? 0.7 : options.autoCompact.thresholdRatio,
+          }
+        : {}),
     });
     if (!recovered) {
       await core.recover();
@@ -903,6 +922,30 @@ export async function createRuntime(
           reject(command.type, "Session state could not be read");
           return Promise.resolve();
         }
+      }
+      if (command.type === "session.load") sessionApprovals.forget(command.sessionId);
+      if (command.type === "approval.respond" && command.scope === "session") {
+        if (command.decision !== "approve") {
+          reject(command.type, "Only an approval can be remembered for the session");
+          return Promise.resolve();
+        }
+        const current = core;
+        let rejected = false;
+        const watch = (event: RuntimeEvent) => {
+          if (event.type === "command.rejected" && event.command === "approval.respond")
+            rejected = true;
+        };
+        listeners.add(watch);
+        return track(
+          (async () => {
+            try {
+              await current.send(command);
+            } finally {
+              listeners.delete(watch);
+            }
+            if (!rejected) sessionApprovals.remember(command.effectId);
+          })(),
+        );
       }
       return track(core.send(command));
     },
