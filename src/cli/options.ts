@@ -4,6 +4,8 @@ import { parseArgs } from "node:util";
 import type { SessionId } from "../contracts/index.ts";
 
 export const usage = `Usage: moyyi (--demo | --host FILE) [options] [prompt]
+       moyyi --daemon (--demo | --host FILE) [grant options]
+       moyyi --connect [--data DIR] [--session ID] [-i] [prompt]
 
 Without a prompt, a terminal starts an interactive session; piped input is one prompt.
 --demo is an offline, finite script that reads README.md. It is not a language model.
@@ -19,14 +21,22 @@ Options:
       --approve-reads    Ask before each read/list/search/document execution
       --allow-write      Ask before snapshot-backed writes in this workspace
       --allow-shell      Ask before commands; workspace stays read-only, network denied
+      --allow-shell-write  Like --allow-shell, but commands may change the workspace (no snapshots)
       --shell-toolchain node  Explicitly enable this Node executable and its exact libraries
       --web-origin URL   Allow HTTPS fetches for this exact origin (repeatable; asks)
       --web-dns MODE     system (default) or cloudflare-doh; requires --web-origin
-      --max-requests N   Model requests per turn, 1..128; includes the final answer
+      --max-requests N   Model requests per turn, 1..500; includes the final answer
+      --timeout SECONDS  Time per turn, 10..86400 (default 60)
+      --auto-compact     Summarize older turns, or earlier steps of a long turn, when a request
+                         nears the model's context window (one request per summary)
+      --long             Long tasks: --max-requests 200 --timeout 3600 --auto-compact unless set
       --dev              Enable development-only plugin loading and reload
       --dev-plugin N=P   Explicit plugin name and local module path (repeatable)
+      --daemon           Serve this runtime to local clients until Ctrl-C; grants stay fixed
+      --connect          Use the running daemon for --data instead of a local runtime
 
-Commands: /help /new /resume ID /compact /cancel /exit /approve EFFECT_ID /deny EFFECT_ID
+Commands: /help /new /resume ID /compact /cancel /exit /approve EFFECT_ID /always EFFECT_ID
+          /deny EFFECT_ID
 Compaction: /compact makes one request to the selected model; originals remain in history.
 Development: /reload NAME. Ctrl-C cancels an active run, or exits when idle.
 No workspace configuration, environment credential or plugin is auto-discovered.`;
@@ -34,6 +44,7 @@ No workspace configuration, environment credential or plugin is auto-discovered.
 export interface CliOptions {
   readonly help: boolean;
   readonly version: boolean;
+  readonly mode: "local" | "daemon" | "connect";
   readonly demo: boolean;
   readonly host?: string;
   readonly workspaceRoot: string;
@@ -43,10 +54,13 @@ export interface CliOptions {
   readonly approveReads: boolean;
   readonly allowWrite: boolean;
   readonly allowShell: boolean;
+  readonly allowShellWrite: boolean;
   readonly shellToolchain?: "node";
   readonly webOrigins: readonly string[];
   readonly webDns?: "system" | "cloudflare-doh";
   readonly maxRequests?: number;
+  readonly timeoutSeconds?: number;
+  readonly autoCompact: boolean;
   readonly dev: boolean;
   readonly development: readonly { name: string; path: string }[];
   readonly prompt?: string;
@@ -67,25 +81,67 @@ export function parseCliOptions(argv: readonly string[], cwd = process.cwd()): C
       "approve-reads": { type: "boolean" },
       "allow-write": { type: "boolean" },
       "allow-shell": { type: "boolean" },
+      "allow-shell-write": { type: "boolean" },
+      timeout: { type: "string" },
+      "auto-compact": { type: "boolean" },
+      long: { type: "boolean" },
       "shell-toolchain": { type: "string" },
       "web-origin": { type: "string", multiple: true },
       "web-dns": { type: "string" },
       "max-requests": { type: "string" },
       dev: { type: "boolean" },
       "dev-plugin": { type: "string", multiple: true },
+      daemon: { type: "boolean" },
+      connect: { type: "boolean" },
     },
   });
   const help = values.help ?? false,
     version = values.version ?? false;
-  if (!help && !version && (values.demo ?? false) === (values.host !== undefined))
+  if (values.daemon && values.connect) throw Error("Use either --daemon or --connect");
+  const mode = values.daemon ? "daemon" : values.connect ? "connect" : "local";
+  if (mode === "connect") {
+    // The daemon's host and startup grants are its authority; a client cannot add to them.
+    const fixed = [
+      "demo",
+      "host",
+      "cwd",
+      "approve-reads",
+      "allow-write",
+      "allow-shell",
+      "allow-shell-write",
+      "shell-toolchain",
+      "web-origin",
+      "web-dns",
+      "max-requests",
+      "timeout",
+      "auto-compact",
+      "long",
+      "dev",
+      "dev-plugin",
+    ] as const;
+    if (fixed.some((name) => values[name] !== undefined))
+      throw Error(
+        "--connect uses the daemon's host, workspace and grants; restart the daemon to change them",
+      );
+  } else if (!help && !version && (values.demo ?? false) === (values.host !== undefined))
     throw Error("Select exactly one of --demo or --host FILE");
+  if (
+    mode === "daemon" &&
+    (positionals.length ||
+      values.interactive ||
+      values.session !== undefined ||
+      values.dev ||
+      values["dev-plugin"]?.length)
+  )
+    throw Error("--daemon takes no prompt, session, -i or development plugins");
   if (values.session !== undefined && !/^[A-Za-z0-9_-]{1,512}$/.test(values.session))
     throw Error("Invalid session ID");
   if (values["dev-plugin"]?.length && !values.dev)
     throw Error("--dev-plugin requires --dev and explicit trust in local code");
   const toolchain = values["shell-toolchain"];
-  if (toolchain !== undefined && (toolchain !== "node" || !values["allow-shell"]))
-    throw Error("--shell-toolchain node requires --allow-shell");
+  const shell = !!(values["allow-shell"] || values["allow-shell-write"]);
+  if (toolchain !== undefined && (toolchain !== "node" || !shell))
+    throw Error("--shell-toolchain node requires --allow-shell or --allow-shell-write");
   const webOrigins = [
     ...new Set(
       (values["web-origin"] ?? []).map((value) => {
@@ -110,12 +166,25 @@ export function parseCliOptions(argv: readonly string[], cwd = process.cwd()): C
   const requestText = values["max-requests"];
   if (
     requestText !== undefined &&
-    (!/^[1-9][0-9]{0,2}$/.test(requestText) || Number(requestText) > 128)
+    (!/^[1-9][0-9]{0,2}$/.test(requestText) || Number(requestText) > 500)
   )
-    throw Error("--max-requests must be an integer from 1 to 128");
+    throw Error("--max-requests must be an integer from 1 to 500");
+  const timeoutText = values.timeout;
+  if (
+    timeoutText !== undefined &&
+    (!/^[1-9][0-9]{1,4}$/.test(timeoutText) || Number(timeoutText) > 86_400)
+  )
+    throw Error("--timeout must be an integer number of seconds from 10 to 86400");
+  const long = values.long ?? false;
   if (
     values.demo &&
-    (values["allow-write"] || values["allow-shell"] || webOrigins.length || requestText)
+    (values["allow-write"] ||
+      shell ||
+      webOrigins.length ||
+      requestText ||
+      timeoutText ||
+      values["auto-compact"] ||
+      long)
   )
     throw Error("Daily capability options require --host; --demo is a fixed read-only script");
   const names = new Set<string>();
@@ -134,16 +203,28 @@ export function parseCliOptions(argv: readonly string[], cwd = process.cwd()): C
   return {
     help,
     version,
+    mode,
     demo: values.demo ?? false,
     workspaceRoot: resolve(cwd, values.cwd ?? "."),
     interactive: values.interactive ?? false,
     approveReads: values["approve-reads"] ?? false,
     allowWrite: values["allow-write"] ?? false,
-    allowShell: values["allow-shell"] ?? false,
+    allowShell: shell,
+    allowShellWrite: values["allow-shell-write"] ?? false,
+    autoCompact: values["auto-compact"] ?? long,
     webOrigins,
     ...(toolchain === undefined ? {} : { shellToolchain: toolchain as "node" }),
     ...(dns === undefined ? {} : { webDns: dns as "system" | "cloudflare-doh" }),
-    ...(requestText === undefined ? {} : { maxRequests: Number(requestText) }),
+    ...(requestText !== undefined
+      ? { maxRequests: Number(requestText) }
+      : long
+        ? { maxRequests: 200 }
+        : {}),
+    ...(timeoutText !== undefined
+      ? { timeoutSeconds: Number(timeoutText) }
+      : long
+        ? { timeoutSeconds: 3600 }
+        : {}),
     dev: values.dev ?? false,
     development,
     ...(values.host === undefined ? {} : { host: resolve(cwd, values.host) }),

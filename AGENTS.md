@@ -18,7 +18,9 @@ src/core/           run loop, executor, approvals, budgets, cancellation, recove
 src/store/          SQLite, blob store, migrations
 src/context/        model request rendering, section ordering, compaction
 src/policy/         base permission policy
-src/runtime/        plugin registry, wiring, confined file/process/web/document capabilities
+src/runtime/        plugin registry and wiring; providers/, files/, processes/, web/, documents/,
+                    guidance/ hold the confined capabilities plugins reach through ports
+src/daemon/         local daemon: private Unix socket server, client, event routing
 src/cli/            terminal client
 src/plugins/<name>/ one capability per folder (providers, fs, shell, web, documents, skills ...)
 apps/desktop/       Electron client: trusted host, validated bridge, sandboxed React renderer
@@ -40,6 +42,7 @@ npm run check            # typecheck + lint + unit tests; required before handof
 npm run eval:<suite>     # offline conformance: core, files, documents, deepseek, shell,
                          # long-sessions, anthropic, kimi, web, instructions, runtime, skills, writes
 npm run eval             # public task corpus with the null agent (offline)
+npm run tool-catalog     # regenerate docs/tool-catalog.md after changing any tool text
 npm run eval -- --agent moyyi --source live --allow-live ...   # PAID: real model, see evals/AGENTS.md
 npm run verify:package   # packaged CLI/client acceptance (add --offline for no network)
 npm run desktop:build    # build the desktop app

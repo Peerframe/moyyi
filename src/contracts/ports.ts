@@ -95,6 +95,11 @@ export interface ContextBuilder {
   buildEvidenceAnswer?(input: ContextInput): ContextResult;
   /** Plans an explicit, tool-free summary request without changing history. */
   planCompaction?(input: ContextInput): CompactionPlan | null;
+  /**
+   * Plans a summary of earlier tool steps inside the current turn, keeping the turn's user input
+   * and its latest steps verbatim. Null when no complete, settled range is eligible.
+   */
+  planStepCompaction?(input: ContextInput): CompactionPlan | null;
 }
 
 export interface CompactionPlan {

@@ -759,6 +759,7 @@ describe("desktop M3 explicit grants and recorded effects", () => {
     expect(f.host.getState().openedHistory).toBe(false);
   });
 
+  // Two approved edits, undo and a SQLite reopen exceeded 5 s under full-suite load (2026-11-05).
   it("records deny/stale, two edits and reverse undo, rejects changed snapshots and restores history without replay", async () => {
     const steps: Step[] = [];
     const f = await fixture(steps);
@@ -826,7 +827,7 @@ describe("desktop M3 explicit grants and recorded effects", () => {
     expect(reopened.getState().pendingApproval).toBeNull();
     expect(reopened.getState().permissions).toEqual({ writes: false, checks: false });
     expect(f.requests).toHaveLength(requests);
-  });
+  }, 20_000);
 });
 
 it("runs a separately approved Node check with a read-only workspace and denied network", async () => {

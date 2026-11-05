@@ -13,6 +13,7 @@
 | [tasks/](tasks/) | Dated briefs and delivery records (history) |
 | [openbot-provenance.md](openbot-provenance.md) | Code and designs taken from other projects |
 | Plugin `README.md` | What the plugin does, its configuration, model experience and limits |
+| [tool-catalog.md](tool-catalog.md) | Generated: exact model-visible tool names, descriptions, schemas and effect profiles. Regenerate with `npm run tool-catalog`; never edit by hand |
 
 Each fact has one home; other documents link to it.
 

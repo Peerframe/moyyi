@@ -22,7 +22,10 @@ import {
   deepSeekProfile,
 } from "../../src/plugins/provider-deepseek/index.ts";
 import { createRuntime, type Runtime } from "../../src/runtime/index.ts";
-import { FileRecordingSink, loadModelRecordings } from "../../src/runtime/model-recording.ts";
+import {
+  FileRecordingSink,
+  loadModelRecordings,
+} from "../../src/runtime/providers/model-recording.ts";
 
 export const fixtureText = "# Synthetic project\nThe greeting is: Hello moyyi 世界 🙂.\n";
 export const finalAnswer = "README.md says: Hello moyyi 世界 🙂.";

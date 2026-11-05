@@ -9,6 +9,7 @@ import type {
   WorkspaceProcessesFactory,
   WorkspaceWritesFactory,
 } from "../contracts/execution.ts";
+import type { McpToolAccessFactory } from "../contracts/mcp.ts";
 import type {
   EffectId,
   EffectRecord,
@@ -22,6 +23,7 @@ import type {
   ToolResultPart,
 } from "../contracts/persisted/index.ts";
 import type { PermissionPolicy, PolicyDecision } from "../contracts/ports.ts";
+import type { BackgroundProcessAccessFactory } from "../contracts/processes.ts";
 import { canonicalizeJson } from "../contracts/replay.ts";
 import type { ReadToolDeadlines, ToolOutputReaderFactory } from "../contracts/tool-output.ts";
 import type {
@@ -50,6 +52,8 @@ export interface ExecutionHost {
   readonly writes?: WorkspaceWritesFactory;
   readonly web?: WebAccessFactory;
   readonly toolOutputs?: ToolOutputReaderFactory;
+  readonly backgroundProcesses?: BackgroundProcessAccessFactory;
+  readonly mcp?: McpToolAccessFactory;
   readonly readToolDeadlines?: ReadToolDeadlines;
   readonly processResult?: (result: ToolResultPart) => Promise<{
     readonly result: ToolResultPart;
@@ -308,6 +312,20 @@ async function executeCallBody(call: ToolCallPart, host: ExecutionHost): Promise
       profile.class === "read" &&
       tool.name === "read_tool_output"
         ? { toolOutputs: host.toolOutputs.create(invocationContext, guard) }
+        : {}),
+      // Background handles are reachable only from these two fixed tools, never from others.
+      ...(host.backgroundProcesses &&
+      phase === "execute" &&
+      ((profile.class === "read" && tool.name === "shell_output") ||
+        (profile.class === "process" && tool.name === "shell_stop"))
+        ? { backgroundProcesses: host.backgroundProcesses.create(invocationContext, guard) }
+        : {}),
+      // Owner-configured MCP servers are reachable only from their own `mcp__` tools.
+      ...(host.mcp &&
+      phase === "execute" &&
+      tool.name.startsWith("mcp__") &&
+      (profile.class === "read" || profile.class === "external")
+        ? { mcp: host.mcp.create(invocationContext, guard) }
         : {}),
       ...(host.files && profile.class !== "external"
         ? { files: host.files.create(invocationContext, guard) }

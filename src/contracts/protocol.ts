@@ -39,6 +39,11 @@ export type ClientCommand =
       /** Must match the digest that was shown; a stale approval is rejected. */
       readonly digest: ActionDigest;
       readonly decision: "approve" | "deny";
+      /**
+       * `session` also stops asking for similar actions in this session (the same tool, or the
+       * same exact shell command) until it is loaded again or the runtime closes. Approve only.
+       */
+      readonly scope?: "once" | "session";
     };
 
 export type RuntimeEvent =
