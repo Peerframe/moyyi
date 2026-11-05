@@ -1,6 +1,7 @@
 import {
   type ActionHasher,
   type ArgumentValidator,
+  type BackgroundProcessAccessFactory,
   type ClientCommand,
   type Clock,
   type ContentPart,
@@ -87,6 +88,14 @@ export interface CoreDeps {
   readonly limits?: Partial<RunLimits>;
   /** Experimental fresh-session evidence-only final answer; shares the existing run budget. */
   readonly evidenceAnswer?: boolean;
+  /**
+   * Opt-in: before an ordinary run's first request, when the compactable history needs at least
+   * this fraction of the model's context window, summarize older turns first; before later
+   * tool-enabled requests, summarize earlier steps of the turn the same way. Each summary uses
+   * one request of the run's own budget and never its last one. A rejected summary leaves history
+   * unchanged and the turn proceeds; a storage failure while publishing fails the turn.
+   */
+  readonly autoCompactRatio?: number;
   /** Acknowledge model recording/transport cleanup before the independent answer phase. */
   readonly settleModel?: () => Promise<void>;
   readonly files?: WorkspaceFilesFactory;
@@ -96,6 +105,8 @@ export interface CoreDeps {
   readonly web?: WebAccessFactory;
   readonly toolResults?: ToolResultProcessor;
   readonly toolOutputs?: ToolOutputReaderFactory;
+  /** Session-bound background commands; core hands them only to shell_output and shell_stop. */
+  readonly backgroundProcesses?: BackgroundProcessAccessFactory;
   readonly readToolDeadlines?: ReadToolDeadlines;
 }
 
@@ -112,6 +123,8 @@ interface Running {
   done: Promise<void>;
   deadlineExpired: boolean;
   requests: number;
+  /** Request count at the last in-turn step compaction attempt, so it never repeats at once. */
+  stepCompactionAt?: number;
   leased: boolean;
   finishing: boolean;
   steeringRevision: number;
@@ -154,6 +167,16 @@ export class AgentCore {
       throw new Error("Duplicate tool names");
     if (deps.evidenceAnswer !== undefined && typeof deps.evidenceAnswer !== "boolean")
       throw new Error("Evidence answer must be a boolean");
+    if (
+      deps.autoCompactRatio !== undefined &&
+      !(
+        typeof deps.autoCompactRatio === "number" &&
+        deps.autoCompactRatio >= 0.1 &&
+        deps.autoCompactRatio <= 0.95 &&
+        deps.context.planCompaction
+      )
+    )
+      throw new Error("Automatic compaction needs a ratio from 0.1 to 0.95 and a compaction port");
     if (
       deps.evidenceAnswer &&
       (!deps.context.buildEvidenceAnswer || this.#limits.maxModelRequests < 2)
@@ -361,7 +384,10 @@ export class AgentCore {
   async #drive(run: Running): Promise<void> {
     let outcome: RunOutcome;
     try {
-      outcome = run.kind === "compaction" ? await this.#compact(run) : await this.#loop(run);
+      outcome =
+        run.kind === "compaction"
+          ? await this.#compact(run)
+          : ((await this.#autoCompact(run)) ?? (await this.#loop(run)));
     } catch (error) {
       outcome = { kind: "failed", reason: errorMessage(error) };
     }
@@ -536,7 +562,50 @@ export class AgentCore {
     return undefined;
   }
 
-  async #compact(run: Running): Promise<RunOutcome> {
+  /** Returns an outcome only when the turn must stop (cancelled or out of budget). */
+  async #autoCompact(run: Running): Promise<RunOutcome | undefined> {
+    const ratio = this.#deps.autoCompactRatio;
+    // Evidence answers refuse compacted history, so they never compact automatically.
+    if (ratio === undefined || this.#deps.evidenceAnswer) return undefined;
+    // The summary must leave at least one request for the turn itself.
+    if (this.#limits.maxModelRequests - run.requests < 2) return undefined;
+    const snapshot = await this.#session(run.sessionId);
+    const plan = this.#deps.context.planCompaction?.({
+      path: pathToHead(snapshot),
+      profile: this.#deps.profile,
+      tools: this.#deps.tools.map(({ name, description, inputSchema }) => ({
+        name,
+        description,
+        inputSchema,
+      })),
+      sections: await this.#collect(run),
+      unsettledEffects: snapshot.effects.filter((effect) => !isTerminal(effect.state)),
+    });
+    if (run.controller.signal.aborted) return { kind: "cancelled" };
+    if (!plan || plan.originalTokens < ratio * this.#deps.profile.contextWindowTokens)
+      return undefined;
+    const outcome = await this.#compact(run);
+    return outcome.kind === "cancelled" || outcome.kind === "budget_exhausted"
+      ? outcome
+      : undefined;
+  }
+
+  /**
+   * Before a tool-enabled request of an ordinary run: when the request would need at least the
+   * configured share of the context window, summarize earlier tool steps of this turn first.
+   * Returns an outcome only when the turn must stop.
+   */
+  async #autoCompactSteps(run: Running, remaining: number): Promise<RunOutcome | undefined> {
+    const ratio = this.#deps.autoCompactRatio;
+    if (
+      ratio === undefined ||
+      this.#deps.evidenceAnswer ||
+      !this.#deps.context.planStepCompaction ||
+      // Leave the summary, one more tool-enabled request and the final answer.
+      remaining < 3 ||
+      (run.stepCompactionAt !== undefined && run.requests - run.stepCompactionAt < 3)
+    )
+      return undefined;
     const snapshot = await this.#session(run.sessionId);
     const input: ContextInput = {
       path: pathToHead(snapshot),
@@ -550,10 +619,39 @@ export class AgentCore {
       unsettledEffects: snapshot.effects.filter((effect) => !isTerminal(effect.state)),
     };
     if (run.controller.signal.aborted) return { kind: "cancelled" };
-    const plan = this.#deps.context.planCompaction?.(input);
+    const plan = this.#deps.context.planStepCompaction(input);
+    if (!plan || plan.originalTokens < ratio * this.#deps.profile.contextWindowTokens)
+      return undefined;
+    run.stepCompactionAt = run.requests;
+    const outcome = await this.#compact(run, "steps");
+    return outcome.kind === "cancelled" || outcome.kind === "budget_exhausted"
+      ? outcome
+      : undefined;
+  }
+
+  async #compact(run: Running, mode: "turns" | "steps" = "turns"): Promise<RunOutcome> {
+    const snapshot = await this.#session(run.sessionId);
+    const input: ContextInput = {
+      path: pathToHead(snapshot),
+      profile: this.#deps.profile,
+      tools: this.#deps.tools.map(({ name, description, inputSchema }) => ({
+        name,
+        description,
+        inputSchema,
+      })),
+      sections: await this.#collect(run),
+      unsettledEffects: snapshot.effects.filter((effect) => !isTerminal(effect.state)),
+    };
+    if (run.controller.signal.aborted) return { kind: "cancelled" };
+    const plan =
+      mode === "steps"
+        ? this.#deps.context.planStepCompaction?.(input)
+        : this.#deps.context.planCompaction?.(input);
     if (!plan)
       throw new Error(
-        "No safe older history to compact; latest two user turns and unresolved actions are retained",
+        mode === "steps"
+          ? "No settled earlier steps of this turn to compact"
+          : "No safe older history to compact; latest two user turns and unresolved actions are retained",
       );
     const rendered = await this.#recordRequest(plan.request, "moyyi-compaction-v1");
     if (run.controller.signal.aborted) return { kind: "cancelled" };
@@ -681,6 +779,14 @@ export class AgentCore {
         return { kind: "budget_exhausted", budget: "model_requests" };
       }
       await run.queue;
+      if (!draftReady && !run.investigation?.expired) {
+        const stop = await this.#autoCompactSteps(
+          run,
+          this.#limits.maxModelRequests - run.requests,
+        );
+        if (stop) return stop;
+        if (run.controller.signal.aborted) break;
+      }
       const plan = planRequest({
         maxModelRequests: this.#limits.maxModelRequests,
         requests: run.requests,
@@ -906,6 +1012,9 @@ export class AgentCore {
         ...(this.#deps.writes ? { writes: this.#deps.writes } : {}),
         ...(this.#deps.web ? { web: this.#deps.web } : {}),
         ...(this.#deps.toolOutputs ? { toolOutputs: this.#deps.toolOutputs } : {}),
+        ...(this.#deps.backgroundProcesses
+          ? { backgroundProcesses: this.#deps.backgroundProcesses }
+          : {}),
         ...(this.#deps.readToolDeadlines
           ? { readToolDeadlines: this.#deps.readToolDeadlines }
           : {}),

@@ -59,6 +59,17 @@ process of the same account could already read the store. Client frames are untr
 validated and bounded before the runtime sees them; they cannot change grants, choose another
 workspace for new sessions, or send non-text content. Approvals still require the displayed digest.
 
+## Long-running sessions
+
+[ADR 0049](decisions/0049-long-running-sessions.md) adds opt-in authority conveniences. Writable
+commands keep OS confinement, network denial and per-command approval but have no snapshots, so
+T1 recovery depends on version control. Session approvals let one owner approval cover later
+calls of the same tool (or the same exact command) in that session; they live in memory, never
+override a denial or revocation, and are not restored on reopen. Model output cannot create one.
+Background commands outlive their call but not their grant: they stay in the sandbox, stop on
+any grant change, their own time limit or runtime close, and are reachable only from the
+session that started them.
+
 ## Remaining implementation and validation
 
 - Batch 5 implements read-only path checks and revocable per-invocation file capabilities;

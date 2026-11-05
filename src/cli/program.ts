@@ -13,7 +13,11 @@ function grantNotices(options: CliOptions): string[] {
   const lines: string[] = [];
   if (options.allowWrite)
     lines.push("grants | File writes: approval and snapshots; selected workspace only.");
-  if (options.allowShell)
+  if (options.allowShellWrite)
+    lines.push(
+      "grants | Commands: approval, writable workspace without snapshots, private scratch, no network.",
+    );
+  else if (options.allowShell)
     lines.push("grants | Commands: approval, read-only workspace, private scratch, no network.");
   if (options.shellToolchain)
     lines.push("grants | Toolchain: this Node executable and its exact startup libraries.");
@@ -24,6 +28,12 @@ function grantNotices(options: CliOptions): string[] {
   if (options.maxRequests !== undefined)
     lines.push(
       `budget | At most ${options.maxRequests} model requests per turn, including final answer.`,
+    );
+  if (options.timeoutSeconds !== undefined)
+    lines.push(`budget | At most ${options.timeoutSeconds} s per turn.`);
+  if (options.autoCompact)
+    lines.push(
+      "budget | Automatic compaction: older turns and earlier steps are summarized near the context window.",
     );
   return lines;
 }
@@ -46,10 +56,13 @@ async function localRuntime(
       workspaceRoot,
       allowWrite: options.allowWrite,
       allowShell: options.allowShell,
+      allowShellWrite: options.allowShellWrite,
+      autoCompact: options.autoCompact,
       webOrigins: options.webOrigins,
       ...(options.shellToolchain ? { shellToolchain: options.shellToolchain } : {}),
       ...(options.webDns ? { webDns: options.webDns } : {}),
       ...(options.maxRequests === undefined ? {} : { maxRequests: options.maxRequests }),
+      ...(options.timeoutSeconds === undefined ? {} : { timeoutSeconds: options.timeoutSeconds }),
     },
     ...(options.dev ? { developmentPlugins: development } : {}),
   });

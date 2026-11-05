@@ -10,7 +10,7 @@ import type {
   TextPart,
   ToolResultStatus,
 } from "./persisted/index.ts";
-import type { WorkspaceProcesses } from "./processes.ts";
+import type { BackgroundProcessAccess, WorkspaceProcesses } from "./processes.ts";
 import type { ToolOutputReader } from "./tool-output.ts";
 import type { WebAccess } from "./web.ts";
 
@@ -88,4 +88,6 @@ export interface ToolContext {
   readonly web?: WebAccess;
   /** Session-bound recorded output retrieval; only supplied to read_tool_output execution. */
   readonly toolOutputs?: ToolOutputReader;
+  /** Session-bound background commands; only supplied to shell_output and shell_stop. */
+  readonly backgroundProcesses?: BackgroundProcessAccess;
 }

@@ -13,10 +13,12 @@ import type {
   WorkspaceWriteScope,
 } from "../../contracts/index.ts";
 import { assertUnprotected } from "../preconditions.ts";
+import type { BackgroundProcesses } from "./background.ts";
 import { prepareNativeSandbox } from "./sandbox.ts";
 
 const MAX_COMMAND_BYTES = 16_384;
-const MAX_TIMEOUT_MS = 120_000;
+const MAX_TIMEOUT_MS = 600_000;
+const MAX_BACKGROUND_TIMEOUT_MS = 3_600_000;
 const MAX_OUTPUT_BYTES = 1024 * 1024;
 const TERMINATE_GRACE_MS = 200;
 const STOP_DEADLINE_MS = 1_500;
@@ -30,6 +32,11 @@ export interface WorkspaceProcessOptions {
   /** Explicit trusted tool installations; never taken from model input or PATH. */
   readonly executablePaths?: readonly string[];
   readonly readOnlyPaths?: readonly string[];
+  /**
+   * Runtime-owned registry for approved background commands, and the grant epoch they started
+   * under; a changed epoch stops them. Without it, background requests are refused.
+   */
+  readonly background?: { readonly registry: BackgroundProcesses; readonly epoch: () => number };
 }
 
 /** One executor-approved command, with independent authority and an OS-enforced boundary. */
@@ -56,6 +63,7 @@ export class NodeWorkspaceProcesses implements WorkspaceProcessesFactory {
       protectedPaths: [...(options.protectedPaths ?? [])],
       executablePaths: [...(options.executablePaths ?? [])],
       readOnlyPaths: [...(options.readOnlyPaths ?? [])],
+      ...(options.background ? { background: options.background } : {}),
     };
   }
 
@@ -74,6 +82,8 @@ export class NodeWorkspaceProcesses implements WorkspaceProcessesFactory {
     const prepare = (request: ProcessRequest): PreparedProcess => {
       guard();
       validateRequest(request);
+      if (request.background && (!this.options.background || !context.sessionId))
+        throw Error("Background commands are unavailable in this host");
       const root = this.root(context.workspaceRoot);
       const cwd = resolveDirectory(root.path, request.cwd, this.options.protectedPaths ?? []);
       const backend = availableBackend();
@@ -86,6 +96,7 @@ export class NodeWorkspaceProcesses implements WorkspaceProcessesFactory {
         workspaceAccess: this.options.workspaceAccess ?? "read-write",
         backend,
         directoryIdentity: `${root.dev}:${root.ino}/${cwd.dev}:${cwd.ino}`,
+        ...(request.background ? { background: true } : {}),
       });
     };
     return Object.freeze({
@@ -114,10 +125,12 @@ export class NodeWorkspaceProcesses implements WorkspaceProcessesFactory {
           fresh.cwd !== proposal.cwd ||
           fresh.backend !== proposal.backend ||
           fresh.workspaceAccess !== proposal.workspaceAccess ||
-          fresh.directoryIdentity !== proposal.directoryIdentity
+          fresh.directoryIdentity !== proposal.directoryIdentity ||
+          fresh.background !== proposal.background
         )
           throw Error("Process workspace changed after approval; nothing executed");
         const scratch = await mkdtemp(join(tmpdir(), "moyyi-process-"));
+        let owned = false;
         try {
           await chmod(scratch, 0o700);
           guard();
@@ -140,9 +153,29 @@ export class NodeWorkspaceProcesses implements WorkspaceProcessesFactory {
             plan.backend !== proposal.backend
           )
             throw Error("Process workspace changed while preparing isolation; nothing executed");
+          const background = this.options.background;
+          if (proposal.background && background && context.sessionId) {
+            const epoch = background.epoch();
+            const handle = background.registry.start({
+              plan,
+              proposal,
+              sessionId: context.sessionId,
+              scratch: realpathSync(scratch),
+              authorized: () => background.epoch() === epoch,
+            });
+            // The registry now owns the scratch directory and removes it when the group ends.
+            owned = true;
+            return {
+              termination: "background" as const,
+              exitCode: null,
+              output: "",
+              truncated: false,
+              handle,
+            };
+          }
           return await runGroup(plan, proposal, context, assertAuthorized);
         } finally {
-          await rm(scratch, { recursive: true, force: true });
+          if (!owned) await rm(scratch, { recursive: true, force: true });
         }
       },
     });
@@ -176,7 +209,8 @@ function validateRequest(request: ProcessRequest): void {
     !request.cwd.isWellFormed() ||
     !Number.isSafeInteger(request.timeoutMs) ||
     request.timeoutMs < 1 ||
-    request.timeoutMs > MAX_TIMEOUT_MS
+    request.timeoutMs > (request.background ? MAX_BACKGROUND_TIMEOUT_MS : MAX_TIMEOUT_MS) ||
+    (request.background !== undefined && request.background !== true)
   )
     throw Error("Invalid or oversized process request");
 }
@@ -186,9 +220,12 @@ function parseApproved(value: unknown): PreparedProcess {
     throw Error("Invalid approved process");
   const result = value as PreparedProcess;
   validateRequest(result);
+  const keys = Object.keys(result).sort().join(",");
   if (
-    Object.keys(result).sort().join(",") !==
-      "backend,command,cwd,directoryIdentity,timeoutMs,workspaceAccess,workspaceRoot" ||
+    keys !==
+      (result.background
+        ? "backend,background,command,cwd,directoryIdentity,timeoutMs,workspaceAccess,workspaceRoot"
+        : "backend,command,cwd,directoryIdentity,timeoutMs,workspaceAccess,workspaceRoot") ||
     typeof result.workspaceRoot !== "string" ||
     !["read-only", "read-write"].includes(result.workspaceAccess) ||
     typeof result.directoryIdentity !== "string" ||

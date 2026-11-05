@@ -71,6 +71,7 @@ import { type SkillSelection, selectSkills } from "./guidance/skills.ts";
 import { historyPage, sessionCatalog, sessionManagementError, sessionResults } from "./history.ts";
 import { type PluginEntry, PluginRegistry, type PluginStatus } from "./plugins.ts";
 import { WorkspacePreconditions } from "./preconditions.ts";
+import { BackgroundProcesses } from "./processes/background.ts";
 import { NodeWorkspaceProcesses } from "./processes/processes.ts";
 import { type AnthropicHttpOptions, anthropicHttpTransport } from "./providers/anthropic-http.ts";
 import { type DeepSeekHttpOptions, deepSeekHttpTransport } from "./providers/deepseek-http.ts";
@@ -80,6 +81,7 @@ import {
   RecordingModelClient,
   ReplayModelClient,
 } from "./providers/model-recording.ts";
+import { SessionApprovals } from "./session-approvals.ts";
 import { sessionFacts } from "./session-facts.ts";
 import { RuntimeToolResults, readToolDeadlines } from "./tool-results.ts";
 import { AjvArgumentValidator } from "./validation.ts";
@@ -157,6 +159,12 @@ export interface RuntimeOptions {
   readonly workspaceNavigation?: boolean;
   /** Opt-in direct evidence answer within the same run/request budget. */
   readonly evidenceAnswer?: boolean;
+  /**
+   * Opt-in automatic compaction of older turns, and of earlier steps inside a long turn, when a
+   * request needs this share of the context window; `true` uses 0.7. Each summary uses one
+   * model request of that turn.
+   */
+  readonly autoCompact?: boolean | { readonly thresholdRatio: number };
   readonly developmentPlugins?: readonly DevelopmentPlugin[];
   readonly plugins?: readonly PluginEntry[];
   readonly model?: ModelOrigin;
@@ -419,8 +427,11 @@ export async function createRuntime(
   let inspecting = false;
   let closing: Promise<void> | undefined;
   let toolResults: RuntimeToolResults | undefined;
+  const sessionApprovals = new SessionApprovals();
+  const backgroundProcesses = workspaceProcesses ? new BackgroundProcesses() : undefined;
   const emit = (event: RuntimeEvent) => {
     toolResults?.observe(event);
+    sessionApprovals.observe(event);
     if (event.type === "run.started") activeRuns.add(event.runId);
     if (event.type === "run.finished") activeRuns.delete(event.runId);
     // Observers receive an immutable copy, so mutating a displayed approval cannot alter work.
@@ -513,7 +524,12 @@ export async function createRuntime(
       ),
     beforeExecute: (tool, profile, action, effectId, args) =>
       stricter(
-        base.beforeExecute(tool, profile, action, effectId, args),
+        sessionApprovals.lift(
+          base.beforeExecute(tool, profile, action, effectId, args),
+          tool,
+          effectId,
+          args,
+        ),
         registry.evaluatePolicy({ tool, profile, args, phase: "execute" }),
       ),
   };
@@ -583,7 +599,18 @@ export async function createRuntime(
         })
       : undefined;
     const processes = workspaceProcesses
-      ? new NodeWorkspaceProcesses({ ...workspaceProcesses, protectedPaths: excluded })
+      ? new NodeWorkspaceProcesses({
+          ...workspaceProcesses,
+          protectedPaths: excluded,
+          ...(backgroundProcesses
+            ? {
+                background: {
+                  registry: backgroundProcesses,
+                  epoch: () => policy.revision?.() ?? 0,
+                },
+              }
+            : {}),
+        })
       : undefined;
     const files = new NodeWorkspaceFiles(excluded);
     const documents = documentsEnabled ? new NodeWorkspaceDocuments(files) : undefined;
@@ -605,6 +632,7 @@ export async function createRuntime(
       files,
       toolResults,
       toolOutputs: toolResults,
+      ...(backgroundProcesses ? { backgroundProcesses } : {}),
       readToolDeadlines: readToolDeadlines(
         options.scheduler ?? nodeScheduler,
         options.readToolTimeoutMs,
@@ -651,6 +679,12 @@ export async function createRuntime(
       ],
       ...(options.limits === undefined ? {} : { limits: options.limits }),
       ...(evidenceAnswer ? { evidenceAnswer } : {}),
+      ...(options.autoCompact
+        ? {
+            autoCompactRatio:
+              options.autoCompact === true ? 0.7 : options.autoCompact.thresholdRatio,
+          }
+        : {}),
     });
     if (!recovered) {
       await core.recover();
@@ -904,6 +938,30 @@ export async function createRuntime(
           return Promise.resolve();
         }
       }
+      if (command.type === "session.load") sessionApprovals.forget(command.sessionId);
+      if (command.type === "approval.respond" && command.scope === "session") {
+        if (command.decision !== "approve") {
+          reject(command.type, "Only an approval can be remembered for the session");
+          return Promise.resolve();
+        }
+        const current = core;
+        let rejected = false;
+        const watch = (event: RuntimeEvent) => {
+          if (event.type === "command.rejected" && event.command === "approval.respond")
+            rejected = true;
+        };
+        listeners.add(watch);
+        return track(
+          (async () => {
+            try {
+              await current.send(command);
+            } finally {
+              listeners.delete(watch);
+            }
+            if (!rejected) sessionApprovals.remember(command.effectId);
+          })(),
+        );
+      }
       return track(core.send(command));
     },
     subscribe(listener) {
@@ -923,6 +981,7 @@ export async function createRuntime(
         await Promise.all([...commands]);
         await stopping;
         await core?.close();
+        await backgroundProcesses?.closeAll();
         try {
           await recorder?.flush();
         } finally {
