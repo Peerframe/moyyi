@@ -1,5 +1,6 @@
 import type { WorkspaceDocuments } from "./documents.ts";
 import type { WorkspaceFiles, WorkspaceWrites } from "./files.ts";
+import type { McpToolAccess } from "./mcp.ts";
 import type {
   ActionDigest,
   EffectProfile,
@@ -90,4 +91,6 @@ export interface ToolContext {
   readonly toolOutputs?: ToolOutputReader;
   /** Session-bound background commands; only supplied to shell_output and shell_stop. */
   readonly backgroundProcesses?: BackgroundProcessAccess;
+  /** Owner-configured MCP servers; only supplied to tools named `mcp__...`. */
+  readonly mcp?: McpToolAccess;
 }

@@ -107,6 +107,11 @@ can accompany CLI grants and still covers document reads. Noninteractive approva
 Capabilities are limited to the selected workspace/origins even if another session is resumed.
 The offline `--demo` rejects these daily capability and budget options.
 
+## MCP servers
+
+Configure MCP servers in the host module's `mcp` option; the CLI starts them and prints one line
+per server. See [MCP](mcp.md).
+
 ## Share one runtime between terminals
 
 `--daemon` serves the configured runtime over a private local socket; `--connect` attaches more

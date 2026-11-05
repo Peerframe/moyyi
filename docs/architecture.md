@@ -75,7 +75,7 @@ Imports between them stay inside the runtime layer and are not separate boundary
 | `provider-kimi` (Chat Completions; [ADR 0036](decisions/0036-kimi-chat-provider.md)) | model provider | opt-in K3.1 Pro; connection and task-quality evidence tracked separately |
 | `web` (fetch, search) | tools; runtime capability and base policy | merged in phase 5 |
 | `skills` (explicitly activated Agent Skills documents) | context source | implemented; refreshed per request |
-| `mcp` (bridge to MCP servers) | tools, policy rule | later |
+| `mcp` (owner-configured stdio MCP servers; [ADR 0050](decisions/0050-mcp-client.md)) | tools; runtime transport, `mcp` port and `McpPolicy` | implemented; offline-tested, not live-task-verified |
 | `memory` (Hermes Agent–inspired learning) | context source, event observer | later |
 
 Not plugins, because they are clients of the protocol: GUI, automation and scheduling. Sub-agents

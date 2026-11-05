@@ -15,6 +15,7 @@ import {
   type EntryId,
   type IdSource,
   isTerminal,
+  type McpToolAccessFactory,
   type ModelClient,
   type ModelProfile,
   type ModelRequest,
@@ -107,6 +108,8 @@ export interface CoreDeps {
   readonly toolOutputs?: ToolOutputReaderFactory;
   /** Session-bound background commands; core hands them only to shell_output and shell_stop. */
   readonly backgroundProcesses?: BackgroundProcessAccessFactory;
+  /** Owner-configured MCP servers; core hands them only to `mcp__` tools. */
+  readonly mcp?: McpToolAccessFactory;
   readonly readToolDeadlines?: ReadToolDeadlines;
 }
 
@@ -1015,6 +1018,7 @@ export class AgentCore {
         ...(this.#deps.backgroundProcesses
           ? { backgroundProcesses: this.#deps.backgroundProcesses }
           : {}),
+        ...(this.#deps.mcp ? { mcp: this.#deps.mcp } : {}),
         ...(this.#deps.readToolDeadlines
           ? { readToolDeadlines: this.#deps.readToolDeadlines }
           : {}),

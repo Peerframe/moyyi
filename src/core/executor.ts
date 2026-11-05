@@ -9,6 +9,7 @@ import type {
   WorkspaceProcessesFactory,
   WorkspaceWritesFactory,
 } from "../contracts/execution.ts";
+import type { McpToolAccessFactory } from "../contracts/mcp.ts";
 import type {
   EffectId,
   EffectRecord,
@@ -52,6 +53,7 @@ export interface ExecutionHost {
   readonly web?: WebAccessFactory;
   readonly toolOutputs?: ToolOutputReaderFactory;
   readonly backgroundProcesses?: BackgroundProcessAccessFactory;
+  readonly mcp?: McpToolAccessFactory;
   readonly readToolDeadlines?: ReadToolDeadlines;
   readonly processResult?: (result: ToolResultPart) => Promise<{
     readonly result: ToolResultPart;
@@ -317,6 +319,13 @@ async function executeCallBody(call: ToolCallPart, host: ExecutionHost): Promise
       ((profile.class === "read" && tool.name === "shell_output") ||
         (profile.class === "process" && tool.name === "shell_stop"))
         ? { backgroundProcesses: host.backgroundProcesses.create(invocationContext, guard) }
+        : {}),
+      // Owner-configured MCP servers are reachable only from their own `mcp__` tools.
+      ...(host.mcp &&
+      phase === "execute" &&
+      tool.name.startsWith("mcp__") &&
+      (profile.class === "read" || profile.class === "external")
+        ? { mcp: host.mcp.create(invocationContext, guard) }
         : {}),
       ...(host.files && profile.class !== "external"
         ? { files: host.files.create(invocationContext, guard) }

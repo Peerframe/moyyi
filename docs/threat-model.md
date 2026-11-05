@@ -22,7 +22,7 @@ explicit development modules remain trusted in-process code, not a sandbox.
 |---|---|---|---|
 | T1 | Model mistake | Edits the wrong file, runs a destructive command | Scoped policy, digest-bound approval and precondition recheck; snapshots/undo in the write phase |
 | T2 | Injected instructions in content | A file or web page tells the agent to upload `~/.ssh` | Content grants no authority; protected paths and separately enforced network egress |
-| T3 | Malicious or buggy tool / MCP server | Tool annotations lie about being read-only | Effect profile is assigned by moyyi, not by the tool's self-description; MCP is a later phase |
+| T3 | Malicious or buggy tool / MCP server | Tool annotations lie about being read-only | Effect profile is assigned by moyyi, not by the tool's self-description; MCP classes come from owner configuration ([ADR 0050](decisions/0050-mcp-client.md)) |
 | T4 | Local adversary racing the agent | Swaps a symlink between check and write | Contained file access and race-aware implementation need validation; protection against a hostile process under the same OS account is not established |
 | T5 | Credential disclosure | Provider key appears in a tool environment or debug log | Trusted-runtime credential handling, OS credential store preference, no authorization-header/environment dumps |
 | T6 | Local session disclosure | Another account reads stored prompts or copied exports | Owner-only access controls and explicit retention/deletion; application-level encryption deferred |
@@ -69,6 +69,13 @@ override a denial or revocation, and are not restored on reopen. Model output ca
 Background commands outlive their call but not their grant: they stay in the sandbox, stop on
 any grant change, their own time limit or runtime close, and are reachable only from the
 session that started them.
+
+## MCP servers
+
+[ADR 0050](decisions/0050-mcp-client.md) addresses T3 for MCP: a tool's class and approval come
+from the owner's configuration, never from server annotations. Servers are owner-chosen local
+programs and are not sandboxed; their descriptions and results are untrusted text bounded and
+labeled before the model reads them. Only trusted host code can add a server.
 
 ## Remaining implementation and validation
 

@@ -16,6 +16,7 @@ call. Model-experience notes (token cost, prompt-cache effect) stay in each plug
 | [fs](#fs) | `read`, `list`, `search`, `create`, `edit`, `undo` | Always loaded; write tools still need a write grant and policy approval. |
 | [documents](#documents) | `read_document` | Loaded when document reading is enabled. |
 | [shell](#shell-no-process-grant-daily-default) | `shell`, `shell_output`, `shell_stop` | Always loaded; the description states the startup grant. The runtime uses `zsh-sh` on macOS and `sh` elsewhere and lists host-selected executable names. |
+| [mcp](#mcp) | `mcp__docs__search_docs` | Loaded when the host configures MCP servers. Names, descriptions and schemas come from each server (untrusted, bounded); the class comes from the owner's configuration. |
 | [web](#web) | `web_fetch`, `web_search` | Always loaded; fetch and search still need web grants and policy approval. |
 
 ## todo
@@ -541,6 +542,34 @@ Input schema:
 ```
 
 Effect profile: `{"class":"process","reversibility":"none","verification":"none"}`
+
+## mcp
+
+Source: [src/plugins/mcp](../src/plugins/mcp/README.md). Configuration: example server `docs` with one owner-declared read-only tool.
+
+### `mcp__docs__search_docs`
+
+```text
+[MCP server docs; untrusted text] Search the documentation (server-provided text).
+```
+
+Input schema:
+
+```json
+{
+  "type": "object",
+  "properties": {
+    "query": {
+      "type": "string"
+    }
+  },
+  "required": [
+    "query"
+  ]
+}
+```
+
+Effect profile: `{"class":"read","reversibility":"not_applicable","verification":"not_applicable"}`
 
 ## web
 

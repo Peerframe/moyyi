@@ -90,7 +90,10 @@ async function runDaemon(options: CliOptions): Promise<number> {
     );
     return 1;
   }
-  const notices = grantNotices(options);
+  const notices = [
+    ...grantNotices(options),
+    ...runtime.diagnostics.filter((line) => line.startsWith("mcp | ")).map(terminalText),
+  ];
   let server: Awaited<ReturnType<typeof startDaemonServer>>;
   try {
     server = await startDaemonServer({ runtime, dataDirectory, workspaceRoot, notices });
@@ -311,7 +314,11 @@ export async function main(argv: readonly string[]): Promise<number> {
         write("daemon | Connection closed.\n");
         void session.end();
       });
-    } else for (const line of grantNotices(options)) write(`${line}\n`);
+    } else {
+      for (const line of grantNotices(options)) write(`${line}\n`);
+      for (const line of runtime.diagnostics)
+        if (line.startsWith("mcp | ")) write(`${terminalText(line)}\n`);
+    }
     await session.start();
     if (interactive && options.dev && development.length) {
       watcher = watchDevelopmentPlugins(development, changed, () =>

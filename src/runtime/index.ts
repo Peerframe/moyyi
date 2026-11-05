@@ -28,6 +28,7 @@ import { AgentCore } from "../core/index.ts";
 import { defaultInstructionsPlugin } from "../plugins/default-instructions/index.ts";
 import { documentsPlugin } from "../plugins/documents/index.ts";
 import { fsPlugin } from "../plugins/fs/index.ts";
+import { createMcpPlugin } from "../plugins/mcp/index.ts";
 import { projectInstructionsPlugin } from "../plugins/project-instructions/index.ts";
 import {
   ANTHROPIC_API_PROFILE,
@@ -56,6 +57,7 @@ import { toolOutputPlugin } from "../plugins/tool-output/index.ts";
 import { createWebPlugin } from "../plugins/web/index.ts";
 import { workspaceNavigationPlugin } from "../plugins/workspace-navigation/index.ts";
 import {
+  McpPolicy,
   ReadOnlyPolicy,
   WebPolicy,
   WorkspaceProcessPolicy,
@@ -69,6 +71,7 @@ import { NodeWorkspaceWrites } from "./files/writes.ts";
 import { collectContext } from "./guidance/instructions.ts";
 import { type SkillSelection, selectSkills } from "./guidance/skills.ts";
 import { historyPage, sessionCatalog, sessionManagementError, sessionResults } from "./history.ts";
+import { connectMcpServers, type McpServerConfig } from "./mcp/index.ts";
 import { type PluginEntry, PluginRegistry, type PluginStatus } from "./plugins.ts";
 import { WorkspacePreconditions } from "./preconditions.ts";
 import { BackgroundProcesses } from "./processes/background.ts";
@@ -165,6 +168,11 @@ export interface RuntimeOptions {
    * model request of that turn.
    */
   readonly autoCompact?: boolean | { readonly thresholdRatio: number };
+  /**
+   * Owner-configured MCP servers, from trusted host configuration only. Each server is started
+   * when the runtime is created and stopped when it closes; see docs/mcp.md.
+   */
+  readonly mcp?: { readonly servers: readonly McpServerConfig[] };
   readonly developmentPlugins?: readonly DevelopmentPlugin[];
   readonly plugins?: readonly PluginEntry[];
   readonly model?: ModelOrigin;
@@ -360,7 +368,7 @@ export async function createRuntime(
         approval: workspaceProcesses.approval ?? "ask",
       })
     : filePolicy;
-  const base =
+  let base: PermissionPolicy =
     options.policy ??
     (options.web
       ? new WebPolicy({
@@ -416,10 +424,19 @@ export async function createRuntime(
       throw Error("Development plugin names must be unique and cannot replace startup plugins");
     development.set(entry.name, entry);
   }
+  // Owner-configured MCP servers start last, after every synchronous validation above; their
+  // processes are closed again if anything below fails.
+  const mcp = options.mcp?.servers.length
+    ? await connectMcpServers(options.mcp.servers)
+    : undefined;
+  if (mcp) {
+    base = new McpPolicy(base, mcp.rules);
+    if (mcp.descriptors.length) startup.push({ plugin: createMcpPlugin(mcp.descriptors) });
+  }
   for (const entry of startup) plugins.push(await registry.load(entry));
 
   const listeners = new Set<(event: RuntimeEvent) => void>();
-  const diagnostics: string[] = [];
+  const diagnostics: string[] = [...(mcp?.diagnostics ?? [])];
   const activeRuns = new Set<string>();
   const commands = new Set<Promise<void>>();
   let closed = false;
@@ -633,6 +650,7 @@ export async function createRuntime(
       toolResults,
       toolOutputs: toolResults,
       ...(backgroundProcesses ? { backgroundProcesses } : {}),
+      ...(mcp ? { mcp: mcp.access } : {}),
       readToolDeadlines: readToolDeadlines(
         options.scheduler ?? nodeScheduler,
         options.readToolTimeoutMs,
@@ -704,6 +722,7 @@ export async function createRuntime(
   } catch (error) {
     ownedStore?.close();
     await unload();
+    await mcp?.close();
     throw error;
   }
   const track = (pending: Promise<void>): Promise<void> => {
@@ -982,6 +1001,7 @@ export async function createRuntime(
         await stopping;
         await core?.close();
         await backgroundProcesses?.closeAll();
+        await mcp?.close();
         try {
           await recorder?.flush();
         } finally {

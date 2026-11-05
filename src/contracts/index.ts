@@ -2,6 +2,7 @@ export type * from "./documents.ts";
 export type * from "./execution.ts";
 export type * from "./files.ts";
 export type * from "./history.ts";
+export type * from "./mcp.ts";
 export type * from "./model.ts";
 export * from "./model-conformance.ts";
 export * from "./persisted/index.ts";
