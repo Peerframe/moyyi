@@ -63,24 +63,28 @@ import {
 } from "../policy/index.ts";
 import { SqliteSessionStore } from "../store/index.ts";
 import type { MaterialStore } from "../store/materials.ts";
-import { type AnthropicHttpOptions, anthropicHttpTransport } from "./anthropic-http.ts";
-import { type DeepSeekHttpOptions, deepSeekHttpTransport } from "./deepseek-http.ts";
-import { NodeWorkspaceDocuments } from "./documents.ts";
-import { NodeWorkspaceFiles } from "./files.ts";
+import { NodeWorkspaceDocuments } from "./documents/documents.ts";
+import { NodeWorkspaceFiles } from "./files/files.ts";
+import { NodeWorkspaceWrites } from "./files/writes.ts";
+import { collectContext } from "./guidance/instructions.ts";
+import { type SkillSelection, selectSkills } from "./guidance/skills.ts";
 import { historyPage, sessionCatalog, sessionManagementError, sessionResults } from "./history.ts";
-import { collectContext } from "./instructions.ts";
-import { type KimiHttpOptions, kimiHttpTransport } from "./kimi-http.ts";
-import { FileRecordingSink, RecordingModelClient, ReplayModelClient } from "./model-recording.ts";
 import { type PluginEntry, PluginRegistry, type PluginStatus } from "./plugins.ts";
 import { WorkspacePreconditions } from "./preconditions.ts";
-import { NodeWorkspaceProcesses } from "./processes.ts";
+import { NodeWorkspaceProcesses } from "./processes/processes.ts";
+import { type AnthropicHttpOptions, anthropicHttpTransport } from "./providers/anthropic-http.ts";
+import { type DeepSeekHttpOptions, deepSeekHttpTransport } from "./providers/deepseek-http.ts";
+import { type KimiHttpOptions, kimiHttpTransport } from "./providers/kimi-http.ts";
+import {
+  FileRecordingSink,
+  RecordingModelClient,
+  ReplayModelClient,
+} from "./providers/model-recording.ts";
 import { sessionFacts } from "./session-facts.ts";
-import { type SkillSelection, selectSkills } from "./skills.ts";
 import { RuntimeToolResults, readToolDeadlines } from "./tool-results.ts";
 import { AjvArgumentValidator } from "./validation.ts";
-import { NodeWebAccess, type WebAccessOptions } from "./web.ts";
-import type { WebHttpDependencies } from "./web-http.ts";
-import { NodeWorkspaceWrites } from "./writes.ts";
+import { NodeWebAccess, type WebAccessOptions } from "./web/web.ts";
+import type { WebHttpDependencies } from "./web/web-http.ts";
 
 export {
   type CreateMaterial,
@@ -96,9 +100,9 @@ export {
   type LocalStoreReceipt,
   restoreLocalStore,
 } from "./local-maintenance.ts";
-export { FileRecordingSink, loadModelRecordings } from "./model-recording.ts";
-export { discoverNodeToolchain, type NodeToolchain } from "./node-toolchain.ts";
 export type { PluginEntry, PluginStatus } from "./plugins.ts";
+export { discoverNodeToolchain, type NodeToolchain } from "./processes/node-toolchain.ts";
+export { FileRecordingSink, loadModelRecordings } from "./providers/model-recording.ts";
 // Trusted installed hosts use the same bounded helpers as source checkouts, without reaching
 // into package-private module paths. These exports do not grant a runtime any capabilities.
 export {

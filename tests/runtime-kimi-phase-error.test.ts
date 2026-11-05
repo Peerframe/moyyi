@@ -10,7 +10,7 @@ import {
   kimiProfile,
 } from "../src/plugins/provider-kimi/index.ts";
 import { createRuntime } from "../src/runtime/index.ts";
-import { MemoryRecordingSink } from "../src/runtime/model-recording.ts";
+import { MemoryRecordingSink } from "../src/runtime/providers/model-recording.ts";
 
 it.each(["phase", "user"] as const)(
   "does not start another request when %s cancellation interrupts a known HTTP 429 diagnostic",

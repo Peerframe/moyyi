@@ -39,8 +39,8 @@ write tools were synthetic; phase 2 introduces an explicit runtime write grant. 
 
 | moyyi path | OpenBot source | Revision | Notes |
 |---|---|---|---|
-| `src/runtime/document-worker.ts` | `apps/server-python/src/openbot_server/parser_worker.ts` (`adaptPdf`, `adaptOffice`, input/output bounds and failure cases) | `010439bb9002fabb7e1facd8450ee85edbafa309` | Narrowly adapted parsing methods only; new runtime/plugin/sandbox/FD reader. MIT notice retained. |
-| `src/runtime/fixtures/{encrypted,image-only}.pdf` | `tests/oracles/legacy-server/src/__fixtures__/attachments/` | `010439bb9002fabb7e1facd8450ee85edbafa309` | Fixed synthetic binary inputs, newly exercised against moyyi; old test results are not evidence. |
+| `src/runtime/documents/document-worker.ts` | `apps/server-python/src/openbot_server/parser_worker.ts` (`adaptPdf`, `adaptOffice`, input/output bounds and failure cases) | `010439bb9002fabb7e1facd8450ee85edbafa309` | Narrowly adapted parsing methods only; new runtime/plugin/sandbox/FD reader. MIT notice retained. |
+| `src/runtime/documents/fixtures/{encrypted,image-only}.pdf` | `tests/oracles/legacy-server/src/__fixtures__/attachments/` | `010439bb9002fabb7e1facd8450ee85edbafa309` | Fixed synthetic binary inputs, newly exercised against moyyi; old test results are not evidence. |
 | `apps/desktop/renderer/ApprovalCard.tsx`, `styles.css` | `apps/web/src/components/ApprovalCard.tsx`, `apps/web/src/tokens.css`, `apps/web/src/styles.css` | `010439bb9002fabb7e1facd8450ee85edbafa309` | Narrow view/token adaptation; new authority and session bridge. MIT retained in app. |
 | `apps/desktop/renderer/ArtifactCard.tsx` | `apps/web/src/components/ArtifactCard.tsx`, `apps/web/src/artifact-shell-save.ts` | `010439bb9002fabb7e1facd8450ee85edbafa309` | Narrow presentation/pending/error and identity-only action adaptation. New moyyi receipt/hash checks and local plain-text/reveal actions replace Server downloads. MIT retained; M2 accepted and installed through PR #45. |
 | `apps/desktop/renderer/EffectsPanel.tsx`, `effects-state.ts` | `apps/web/src/components/TaskSteps.tsx` | `010439bb9002fabb7e1facd8450ee85edbafa309` | Narrow folded-list/row adaptation for actual effect history. No upstream fetch, Server/domain types or assumed completed stages. MIT retained; M3 candidate evidence is recorded below. |
@@ -148,7 +148,7 @@ The generated metadata SHA-256 is `0e139b68c5354cb9f0d408fcc4ea09b0308874d7f6431
 The install gate verifies original Node bytes, licenses and both actual PDF resolution paths.
 
 The new seven-format fixtures are independently generated in
-`src/runtime/fixtures/document-fixtures.ts`; only the two specifically listed PDF inputs come from
+`src/runtime/documents/fixtures/document-fixtures.ts`; only the two specifically listed PDF inputs come from
 OpenBot. Neither the OpenBot checkout's unrelated work nor its legacy runtime is imported.
 
 <a id="planned-desktop-reuse-not-yet-ported"></a>
@@ -257,7 +257,7 @@ Every new discovery gets a row here rather than an untracked optional backlog.
 
 | ID / capability | Fixed source and actual scope | Disposition / destination / delivery |
 |---|---|---|
-| C01 Document body parsing | `S/parser_worker.ts`, `S/attachment_processing.py`: bounded seven-format extraction; separate password/OCR/media paths | **Covered**: `src/runtime/document-worker.ts` and documents plugin; retain current pinned parser graph and evidence. Remaining media paths are P12–P14. |
+| C01 Document body parsing | `S/parser_worker.ts`, `S/attachment_processing.py`: bounded seven-format extraction; separate password/OCR/media paths | **Covered**: `src/runtime/documents/document-worker.ts` and documents plugin; retain current pinned parser graph and evidence. Remaining media paths are P12–P14. |
 | C02 Public source text | `S/public_source.py`, `S/work_product_web.py`: bounded public HTTPS text and separately configured search | **Covered** for HTML lessons/fetch/M5; desktop search is P15. Keep current web capability and source records. |
 | C03 Approvals, operation history and results | `W/components/{ApprovalCard,ArtifactCard,TaskSteps,WorkTasksScreen}.tsx` | **Covered** partial view adaptations in desktop renderer, with own policy/receipts; extend only remaining P01–P06 behavior. |
 | C04 Loop and execution guarantees | `P/harness/src/openbot_agent_runtime/{executor,guard,catalog}.py`, `S/work_corrections.py`, `S/work_reconciliation.py`, `S/work_product_result.py` | **Covered by own core**: reuse relevant cancellation, budget, revoke, late-result and unknown-effect cases. Do not add another loop/reviewer or treat model result review as fact certification. |
@@ -341,6 +341,7 @@ with the DSH commit and path in the same change.
 | 2026-10-24 | `22ddee37` | Plugin design lessons only (one seam per capability, owned registrations, reported plugin failures); no code | [ADR 0005](decisions/0005-plugins.md) |
 | 2026-10-27 | `1f81c047` | Provider source check only; no code | [Harness comparison](research/harness-comparison.md#dsh-preview-source-check-2026-10-27) |
 | 2026-10-29 | `f3803c96` | Skill structure and wording ideas for `moyyi-model-experience`, `moyyi-desktop-ui` and `moyyi-check` (from `agent-experience`, `dsh-client-ui-ux`, `dsh-pre-push-checks`), rewritten; AGENTS.md layout | [`.agents/skills`](../.agents/skills/), [AGENTS.md](../AGENTS.md) |
+| 2026-11-05 | `fcc0ad46` | Generated, freshness-checked tool catalog with a completeness guard (design of `scripts/gen-tool-catalog.ts` and `docs/tool-catalog.md`); no code, newly written against moyyi's plugin registry | [tool catalog](tool-catalog.md), [`scripts/tool-catalog.ts`](../scripts/tool-catalog.ts) |
 
 Delivery one adaptations are recorded below. Remaining planned adaptations are listed in the
 [delivery two brief](tasks/2026-10-29-delivery-2-desktop-modules.md).

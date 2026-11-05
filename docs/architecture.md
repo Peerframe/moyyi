@@ -36,9 +36,24 @@ cli / desktop host ─┐   (future: automation — also a client)
 | Store | `src/store` | SQLite, blob store, migrations, durability levels |
 | Context | `src/context` | Rendering a model request, section ordering for prompt caching, compaction |
 | Policy | `src/policy` | Base permission policy and approval modes |
-| Runtime | `src/runtime` | Plugin registry, wiring, the client protocol |
+| Runtime | `src/runtime` | Plugin registry, wiring, the client protocol, and the confined capabilities plugins use through ports (layout below) |
 | CLI | `src/cli` | Terminal client |
 | Desktop client | `apps/desktop` | Sandboxed React renderer, validated local bridge and a trusted host using the public runtime; installed acceptance is tracked separately |
+
+### Runtime layout
+
+Runtime is one layer; its subfolders group the capabilities it owns so each concern has one place.
+Imports between them stay inside the runtime layer and are not separate boundary rules.
+
+| Folder | Owns |
+|---|---|
+| `src/runtime` (root) | `createRuntime` wiring, plugin registry, development reload, CLI host, history, session facts, argument validation, tool-result processing, local maintenance |
+| `providers/` | DeepSeek, Kimi and Anthropic HTTP transports; model request recording and replay |
+| `files/` | Confined workspace reads, navigation and controlled writes |
+| `processes/` | Native process sandbox, Node toolchain discovery, confined command execution |
+| `web/` | Granted fetch and search, DNS-over-HTTPS, search context and source selection |
+| `documents/` | Sandboxed document parser worker, its dependency graph and fixtures |
+| `guidance/` | Fixed-path instruction and Skill document reading for context sources |
 
 ### Plugin inventory
 
