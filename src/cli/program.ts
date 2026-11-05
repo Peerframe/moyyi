@@ -259,6 +259,7 @@ export async function main(argv: readonly string[]): Promise<number> {
     ...(initialPrompt === undefined ? {} : { initialPrompt }),
     developmentPluginNames: development.map((entry) => entry.name),
     commands,
+    continueLatest: options.continueLatest,
   });
   const pending = new Set<string>();
   let reloadTask: Promise<void> | undefined;

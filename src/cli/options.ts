@@ -17,6 +17,7 @@ Options:
   -C, --cwd DIR          Workspace root (default: current directory)
       --data DIR         Private session data directory (default: ~/.moyyi/data)
       --session ID       Resume a stored session
+      --continue         Resume the most recent session of this workspace (or start one)
   -i, --interactive      Keep a terminal session open after an initial prompt
       --approve-reads    Ask before each read/list/search/document execution
       --allow-write      Ask before snapshot-backed writes in this workspace
@@ -38,8 +39,8 @@ Options:
       --daemon           Serve this runtime to local clients until Ctrl-C; grants stay fixed
       --connect          Use the running daemon for --data instead of a local runtime
 
-Commands: /help /new /resume ID /compact /cancel /exit /approve EFFECT_ID /always EFFECT_ID
-          /deny EFFECT_ID
+Commands: /help /new /resume ID /compact /cancel /exit /init /approve EFFECT_ID
+          /always EFFECT_ID /deny EFFECT_ID
 Compaction: /compact makes one request to the selected model; originals remain in history.
 Development: /reload NAME. Ctrl-C cancels an active run, or exits when idle.
 No workspace configuration, environment credential or plugin is auto-discovered.`;
@@ -53,6 +54,7 @@ export interface CliOptions {
   readonly workspaceRoot: string;
   readonly dataDirectory?: string;
   readonly sessionId?: SessionId;
+  readonly continueLatest: boolean;
   readonly interactive: boolean;
   readonly approveReads: boolean;
   readonly allowWrite: boolean;
@@ -83,6 +85,7 @@ export function parseCliOptions(argv: readonly string[], cwd = process.cwd()): C
       host: { type: "string" },
       data: { type: "string" },
       session: { type: "string" },
+      continue: { type: "boolean" },
       interactive: { type: "boolean", short: "i" },
       "approve-reads": { type: "boolean" },
       "allow-write": { type: "boolean" },
@@ -146,6 +149,9 @@ export function parseCliOptions(argv: readonly string[], cwd = process.cwd()): C
       values.commands?.length)
   )
     throw Error("--daemon takes no prompt, session, -i, commands or development plugins");
+  if (values.continue && values.session !== undefined)
+    throw Error("Use either --continue or --session ID");
+  if (mode === "daemon" && values.continue) throw Error("--daemon takes no --continue");
   if (values.session !== undefined && !/^[A-Za-z0-9_-]{1,512}$/.test(values.session))
     throw Error("Invalid session ID");
   if (values["dev-plugin"]?.length && !values.dev)
@@ -228,6 +234,7 @@ export function parseCliOptions(argv: readonly string[], cwd = process.cwd()): C
     subagents: values.subagents ?? false,
     nestedInstructions: values["nested-instructions"] ?? false,
     commandDirectories: (values.commands ?? []).map((path) => resolve(cwd, path)),
+    continueLatest: values.continue ?? false,
     webOrigins,
     ...(toolchain === undefined ? {} : { shellToolchain: toolchain as "node" }),
     ...(dns === undefined ? {} : { webDns: dns as "system" | "cloudflare-doh" }),

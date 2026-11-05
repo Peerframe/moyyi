@@ -217,3 +217,14 @@ describe("nested instructions", () => {
     );
   });
 });
+
+describe("continue", () => {
+  it("resumes the latest session unless a session is named", () => {
+    expect(parseCliOptions(["--demo", "--continue"], "/tmp").continueLatest).toBe(true);
+    expect(parseCliOptions(["--connect", "--continue"], "/tmp").continueLatest).toBe(true);
+    expect(() => parseCliOptions(["--demo", "--continue", "--session", "s1"], "/tmp")).toThrow(
+      /either/,
+    );
+    expect(() => parseCliOptions(["--daemon", "--demo", "--continue"], "/tmp")).toThrow();
+  });
+});

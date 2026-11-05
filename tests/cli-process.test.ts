@@ -147,4 +147,15 @@ export default {model:{provider:'local-fixture',model:'fixture'},plugins:[{plugi
     const bad = run(["--demo", "--data", f.data, "--commands", join(f.root, "missing"), "x"]);
     expect(bad.status).toBe(2);
   });
+  it("continues the latest session of the workspace and reports usage", () => {
+    const f = fixture(),
+      args = ["--demo", "-C", f.workspace, "--data", f.data];
+    const first = run([...args, "Inspect the README"]);
+    const id = /session \| (session_[\w-]+)/.exec(first.stdout)?.[1];
+    expect(first.stdout).toContain("usage | 2 model request(s); token usage not reported.");
+    const second = run([...args, "--continue", "Again"]);
+    expect(second.status).toBe(0);
+    expect(second.stdout).toContain(`session | ${id}`);
+    expect(second.stdout).not.toContain("No earlier session");
+  });
 });

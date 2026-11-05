@@ -128,6 +128,7 @@ Plan: [post-M6 plan v2](tasks/2026-10-28-post-m6-plan.md). Order is owned by the
 | Delivery three: settings, Skills, search | Ready for Codex | [Brief](tasks/2026-10-30-delivery-3-settings-skills-search.md) |
 | Delivery four: conditional capabilities | Triggered per item | [Plan](tasks/2026-10-28-post-m6-plan.md) |
 | Long-running CLI: `--long`, `--timeout`, `--auto-compact`, `--allow-shell-write`, `/always`, background commands ([ADR 0049](decisions/0049-long-running-sessions.md)) | Merged ([PR #61](https://github.com/Peerframe/moyyi/pull/61), [PR #65](https://github.com/Peerframe/moyyi/pull/65)); not installed; opt-in, defaults unchanged; offline-tested, not live-task-verified | [CLI](cli.md) |
+| CLI ergonomics: `--continue`, per-run usage, checklist display, `/init` | On branch, not merged; client-side; offline-tested | [CLI](cli.md#continue-usage-and-checklists) |
 | Notification hooks in the host module ([ADR 0053](decisions/0053-notification-hooks.md)) | On branch, not merged; observe-only; offline-tested | [CLI](cli.md#notification-hooks) |
 | Prompt templates as `/commands`: `--commands DIR` | On branch, not merged; client-side; offline-tested | [CLI](cli.md#prompt-templates-as-commands) |
 | Nested AGENTS.md from touched directories: `--nested-instructions` ([ADR 0052](decisions/0052-nested-instructions.md)) | On branch, not merged; opt-in; offline-tested, not live-task-verified | [Instructions](instructions.md) |

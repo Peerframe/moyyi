@@ -10,12 +10,13 @@ import {
   type RuntimeClient,
   type RuntimeEvent,
   type SessionId,
+  type SessionListPage,
   type ToolCallId,
   type ToolResultPart,
   type TranscriptEntry,
 } from "../contracts/index.ts";
 
-import { type CustomCommand, expandCommand } from "./commands.ts";
+import { type CustomCommand, expandCommand, INIT_PROMPT } from "./commands.ts";
 export interface CliSessionOptions {
   readonly workspaceRoot: string;
   readonly sessionId?: SessionId;
@@ -26,6 +27,8 @@ export interface CliSessionOptions {
   readonly developmentPluginNames?: readonly string[];
   /** Owner prompt templates from explicit `--commands` directories. */
   readonly commands?: ReadonlyMap<string, CustomCommand>;
+  /** Resume the most recently active session of this workspace, or start one. */
+  readonly continueLatest?: boolean;
 }
 export interface CliSession {
   start(): Promise<void>;
@@ -40,6 +43,7 @@ const help = [
   "History: /sessions [PAGE], /results [SESSION_ID [PAGE]]; idle only, no model requests.",
   "Compaction: /compact uses one request to the selected model; originals remain in history.",
   "Approval: /approve EFFECT_ID or /deny EFFECT_ID (only the displayed digest)",
+  "Project guide: /init asks the agent to draft or update AGENTS.md (needs --allow-write to save it)",
   "Always allow: /always EFFECT_ID approves it and stops asking in this session for the same tool, or the same exact shell command",
   "Development: /reload NAME (configured plugins only, between runs)",
   "While running, ordinary input steers the current run. Ctrl-C cancels; when idle it exits.",
@@ -94,6 +98,8 @@ export function createCliSession(
   let sessionId: SessionId | undefined;
   let runId: RunId | undefined;
   let loading = false;
+  let listing: ((page: SessionListPage) => void) | undefined;
+  let usage = { requests: 0, input: 0, output: 0, cacheRead: 0, unknown: 0 };
   let streamLine = false;
   let streamedText = "";
   let unsubscribe = () => {};
@@ -237,6 +243,36 @@ export function createCliSession(
     if (!accepted && !options.interactive) await finish(1, true);
     prompt();
   }
+  /** The model's own checklist; a progress claim, not verified completion. */
+  function showTodos(raw: string) {
+    let todos: unknown;
+    try {
+      todos = (JSON.parse(raw) as { todos?: unknown }).todos;
+    } catch {
+      return;
+    }
+    if (!Array.isArray(todos)) return;
+    const mark = { completed: "[x]", in_progress: "[>]", pending: "[ ]" } as Record<string, string>;
+    for (const item of todos.slice(0, 50) as { content?: unknown; status?: unknown }[])
+      if (typeof item?.content === "string")
+        output("todo", `${mark[String(item.status)] ?? "[?]"} ${item.content}`);
+  }
+  /** Most recently active session of this workspace among the latest 50, if any. */
+  async function latestSession(): Promise<SessionId | undefined> {
+    let received: SessionListPage | undefined;
+    listing = (page) => {
+      received = page;
+    };
+    const accepted = await send({ type: "session.list", offset: 0, limit: 50 });
+    // Replies arrive before the command settles, locally and through the daemon.
+    listing = undefined;
+    if (!accepted || !received) return undefined;
+    const rows = received.sessions.filter(
+      (row) => row.workspaceRoot === options.workspaceRoot && row.lastActivityAt !== null,
+    );
+    rows.sort((a, b) => String(b.lastActivityAt).localeCompare(String(a.lastActivityAt)));
+    return rows[0]?.sessionId;
+  }
   /** A template's text is sent as the owner's own message and recorded like typed input. */
   function runCommand(custom: CustomCommand, args: string): Promise<void> {
     const text = expandCommand(custom, args);
@@ -309,8 +345,20 @@ export function createCliSession(
           );
         output("moyyi", "This output limit is separate from the number of allowed requests.");
       }
+      if (!loading && runId && entry.runId === runId) {
+        usage.requests++;
+        if (body.usage.status === "unknown" || body.usage.outputTokens === null) usage.unknown++;
+        else {
+          usage.input += body.usage.inputTokens ?? 0;
+          usage.output += body.usage.outputTokens ?? 0;
+          usage.cacheRead += body.usage.cacheReadTokens ?? 0;
+        }
+      }
       for (const part of body.content)
-        if (part.type === "tool_call") output("tool call", `${part.name} (${part.callId})`);
+        if (part.type === "tool_call") {
+          output("tool call", `${part.name} (${part.callId})`);
+          if (part.name === "todo_write") showTodos(part.rawArguments);
+        }
     } else if (body.kind === "user_message") {
       if (loading)
         for (const part of body.content)
@@ -334,6 +382,12 @@ export function createCliSession(
         output("session", event.sessionId);
         break;
       case "session.listed": {
+        if (listing) {
+          // A page requested by --continue is used to choose a session, not displayed.
+          listing(event.page);
+          listing = undefined;
+          break;
+        }
         const page = Math.floor(event.page.offset / HISTORY_PAGE_SIZE) + 1;
         output(
           "sessions",
@@ -396,6 +450,7 @@ export function createCliSession(
       case "run.started":
         if (event.sessionId !== sessionId) return;
         runId = event.runId;
+        usage = { requests: 0, input: 0, output: 0, cacheRead: 0, unknown: 0 };
         streamedText = "";
         receiptEffects.clear();
         receiptResults.clear();
@@ -445,6 +500,15 @@ export function createCliSession(
       case "run.finished":
         if (event.runId !== runId) return;
         runId = undefined;
+        if (usage.requests)
+          output(
+            "usage",
+            `${usage.requests} model request(s)${
+              usage.unknown === usage.requests
+                ? "; token usage not reported"
+                : `; ${usage.input} input, ${usage.output} output tokens${usage.cacheRead ? ` (${usage.cacheRead} input tokens from cache)` : ""}${usage.unknown ? `; ${usage.unknown} request(s) without usage` : ""}`
+            }.`,
+          );
         approvals.clear();
         receiptEffects.clear();
         receiptResults.clear();
@@ -502,7 +566,10 @@ export function createCliSession(
             void finish(1, true);
           }
         });
-        await openSession(options.sessionId);
+        const latest = options.continueLatest ? await latestSession() : undefined;
+        if (options.continueLatest && !latest)
+          output("moyyi", "No earlier session in this workspace; starting a new one.");
+        await openSession(options.sessionId ?? latest);
         if (!sessionId) {
           if (!options.interactive) await finish(1, false);
           else prompt();
@@ -577,7 +644,13 @@ export function createCliSession(
           else output("moyyi", "No run is active.");
         } else if ((command === "/approve" || command === "/deny") && args.length === 1)
           await respond(args[0] as EffectId, command === "/approve" ? "approve" : "deny");
-        else if (command === "/always" && args.length === 1)
+        else if (command === "/init" && !args.length) {
+          output(
+            "command",
+            "/init asks the agent to draft AGENTS.md; writing it still needs a write grant.",
+          );
+          return submit(INIT_PROMPT);
+        } else if (command === "/always" && args.length === 1)
           await respond(args[0] as EffectId, "approve", "session");
         else if (command === "/reload" && args.length === 1) {
           const name = args[0] as string;

@@ -107,6 +107,19 @@ can accompany CLI grants and still covers document reads. Noninteractive approva
 Capabilities are limited to the selected workspace/origins even if another session is resumed.
 The offline `--demo` rejects these daily capability and budget options.
 
+## Continue, usage and checklists
+
+- `--continue` resumes the most recently active session of the selected workspace (among the 50
+  most recent sessions), or starts a new one when there is none. It cannot be combined with
+  `--session ID`.
+- When a run ends, `usage | ...` shows its model requests and the reported input, output and cached
+  input tokens. Providers that report no usage are counted as such; this is not a bill.
+- When the model updates its checklist with `todo_write`, the CLI prints it as `todo | [x] ...`,
+  `[>]` for the item in progress and `[ ]` for pending ones. The list is the model's claim of
+  progress, not verified completion.
+- `/init` asks the agent to inspect the project and draft or update the root `AGENTS.md`. It is a
+  fixed brief sent as your message; saving the file needs `--allow-write` and its approval.
+
 ## Notification hooks
 
 A host module can add `hooks` to run your own commands when an approval is waiting, a tool

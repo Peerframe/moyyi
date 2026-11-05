@@ -23,7 +23,16 @@ export const BUILTIN_COMMANDS: ReadonlySet<string> = new Set([
   "always",
   "deny",
   "reload",
+  "init",
 ]);
+
+/** Fixed brief behind `/init`; sent as the owner's message, so writing still needs a grant. */
+export const INIT_PROMPT =
+  "Create or update AGENTS.md at the workspace root: concise guidance for coding agents working in this repository. " +
+  "First inspect the project (README, build and package files, CI configuration, existing AGENTS.md or contributor docs, and the main source and test directories). " +
+  "Cover what the project is, the repository layout, the exact build, test and lint commands, code style and conventions, and rules that are easy to get wrong. " +
+  "Only state facts you verified in the files, keep it under 150 lines, and keep any useful existing content. " +
+  "If you cannot write files, show the proposed file instead and say that it was not saved.";
 
 const NAME = /^[a-z][a-z0-9-]{0,31}$/u;
 const MAX_COMMANDS = 128;
