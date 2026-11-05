@@ -63,9 +63,23 @@ describe("DeepSeek eval host reasoning configuration", () => {
     },
   );
 
-  it("preserves high when no effort is supplied", async () => {
+  it("requires an explicit effort before reading a key or sending", () => {
     const fetch = sendFixture();
-    const { host } = await invoke({ getApiKey: () => "synthetic-test-key", fetch });
+    const getApiKey = vi.fn(() => "synthetic-test-key");
+    expect(() =>
+      deepSeekEvalHost({ getApiKey, fetch } as unknown as DeepSeekEvalHostOptions),
+    ).toThrow("DeepSeek eval hosts must set reasoningEffort explicitly (daily default: low)");
+    expect(getApiKey).not.toHaveBeenCalled();
+    expect(fetch).not.toHaveBeenCalled();
+  });
+
+  it("keeps the original high profile when high is chosen explicitly", async () => {
+    const fetch = sendFixture();
+    const { host } = await invoke({
+      getApiKey: () => "synthetic-test-key",
+      fetch,
+      reasoningEffort: "high",
+    });
     expect(host.reasoningEffort).toBe("high");
     expect(host.apiProfile).toBe("deepseek-responses-text-v2-2026-10-26");
     expect(JSON.parse(String(fetch.mock.calls[0]?.[1]?.body)).reasoning).toEqual({
