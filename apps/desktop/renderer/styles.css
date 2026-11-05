@@ -892,7 +892,7 @@ button[aria-pressed="true"] {
   align-items: center;
   font-size: 13px;
 }
-.settings-fields .settings-switch input {
+.settings-switch > input {
   flex: none;
   width: auto;
   margin: 0;

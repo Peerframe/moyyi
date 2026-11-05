@@ -213,10 +213,12 @@ describe("read-only sub-agents", () => {
     });
     await t.runtime.idle();
     expect(client.maxActive).toBe(2);
-    expect(mainResults(t.events, t.sessionId).map((result) => report(result).report)).toEqual([
-      "alpha report",
-      "beta report",
-    ]);
+    // Each result is recorded when its call finishes, so match results by call, not position.
+    expect(
+      Object.fromEntries(
+        mainResults(t.events, t.sessionId).map((result) => [result.callId, report(result).report]),
+      ),
+    ).toEqual({ m1: "alpha report", m2: "beta report" });
   });
 
   it("reports a sub-agent that runs out of requests as a failed tool result", async () => {
