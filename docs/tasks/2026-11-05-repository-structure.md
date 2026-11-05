@@ -31,7 +31,28 @@
   - "不执行 PDF 里的 JavaScript"等测试需要解析进程真正跑起来，它们在新位置能通过，说明解析进程从新路径正常启动。
 - 离线套件：core 25/25、files 19/19、deepseek 18/18、shell 8/8、long-sessions 4/4、anthropic 5/5、kimi 4/4、web 9/9、instructions 36/36、runtime、skills 31/31、writes 8/8 通过，公开任务集（null agent）通过。`eval:documents` 失败，原始 main 上同样失败，原因同上。
 - `node scripts/tool-catalog.ts --check` 通过。
-- **未运行**：`verify:package`、`desktop:build`、`desktop:package`、`verify:desktop`。桌面端只支持 macOS arm64，打包验收需要在 owner 的 Mac 上跑。这次改动影响打包产物里 `dist/runtime/documents/` 的路径，合并前必须跑 `npm run verify:package -- --offline` 和桌面打包验收。
+
+### owner 的 Mac 上实际运行（2026-11-05）
+
+环境：macOS arm64，Homebrew Node 26.13.0 / npm 11.20.0。在仓库外新克隆的分支上运行，提交 `82018dc`，工作树干净（`dirty: false`）。
+
+- `npm ci --ignore-scripts`，然后运行 `node node_modules/electron/install.js`。
+- `npm run check`：
+  - 功能注册表、工具目录、类型检查、lint 全部通过。
+  - 测试 3110 个通过，2 个失败，都是 5000 ms 超时：`apps/desktop/host/service.test.ts` 里的编辑和撤销用例，以及 `src/runtime/documents/documents.test.ts` 里识别损坏和加密文件的用例。
+  - 这两个文件单独重跑，40/40 通过。属于交付一记录过的"全量并发下偶发超时"，和这次搬迁无关。
+  - 容器里失败的文档解析测试，在 Mac 上全部通过。
+- `npm run verify:package`：`passed: true`。文档隔离（seatbelt）、类型声明、7/7 PTY 场景、卸载检查都通过，没有调用真实模型。
+- `npm run desktop:package`：
+  - ZIP SHA-256 `96feb9a0a851915a1606e78eed52b486c6c0064e1616562291778bcc297dec98`。
+  - runtime tarball SHA-256 `911030ea8967ecfc756eb5e6009136f39d8f4d0231942531c6b93921568c03c1`，共 428 个文件。
+  - 编译 Keychain 帮助程序时，有一条 `SecKeychainOpen` 已弃用的警告，是原有代码，这次没有改动。
+- `npm run verify:desktop`：`passed: true`。
+  - App 包 SHA-256 `ab04a9dcb37a33847df0cb1f64d5ee101fd73e99eaf5707f97c1641ef68dacd5`，内置 Node 26.12.1。
+  - host、材料与报告、导入材料与历史、取消、编辑与恢复、生产设置、网页来源、Kimi 错误、阶段截止、维护、隔离各组全部通过。
+  - 读取凭据 0 次，没有调用真实模型。
+  - 打包后的七种格式 `read_document` 都能读到实际内容，说明 `dist/runtime/documents/` 的新路径可用。
+- 没有做：可见的 GUI 手动检查、付费模型任务。这次没有改动模型可见内容，不需要质量门。
 
 ## 3. 对照结论
 
@@ -76,6 +97,6 @@ Codex、opencode、DSH 和 goose 都让一个后端进程（或守护进程）�
 
 ## 5. 留给 owner 的决定
 
-1. 是否接受第 1 节的搬迁和工具目录，并在 Mac 上跑打包和桌面验收后合并。
+1. 是否接受第 1 节的搬迁和工具目录并合并。Mac 上的打包和桌面验收已经通过（见第 2 节）；合并后是否安装由 owner 另行决定。
 2. 前后端选维持现状、选项 1 还是选项 2。选项 1 或 2 需要另写简报。
 3. 是否把"插件 README 必须有 Model experience 一节"改成自动检查。
