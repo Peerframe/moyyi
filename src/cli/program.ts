@@ -5,6 +5,7 @@ import { connectDaemon, type DaemonConnection, startDaemonServer } from "../daem
 import { createCliRuntime, loadCliHost } from "../runtime/cli-host.ts";
 import { fileDevelopmentPlugin, watchDevelopmentPlugins } from "../runtime/development.ts";
 import type { Runtime } from "../runtime/index.ts";
+import { type CustomCommand, loadCommands } from "./commands.ts";
 import { type CliOptions, defaultDataDirectory, parseCliOptions, usage } from "./options.ts";
 import { createCliSession, terminalText } from "./session.ts";
 
@@ -156,6 +157,15 @@ export async function main(argv: readonly string[]): Promise<number> {
     return 0;
   }
   if (options.mode === "daemon") return runDaemon(options);
+  let commands: ReadonlyMap<string, CustomCommand>;
+  try {
+    commands = loadCommands(options.commandDirectories);
+  } catch (error) {
+    process.stderr.write(
+      `moyyi: ${terminalText(error instanceof Error ? error.message : "Invalid commands directory")}\n`,
+    );
+    return 2;
+  }
   const tty = !!process.stdin.isTTY && !!process.stdout.isTTY;
   const interactive = options.interactive || (options.prompt === undefined && tty);
   if (interactive && !tty) {
@@ -248,6 +258,7 @@ export async function main(argv: readonly string[]): Promise<number> {
     ...(options.sessionId ? { sessionId: options.sessionId } : {}),
     ...(initialPrompt === undefined ? {} : { initialPrompt }),
     developmentPluginNames: development.map((entry) => entry.name),
+    commands,
   });
   const pending = new Set<string>();
   let reloadTask: Promise<void> | undefined;

@@ -126,4 +126,25 @@ export default {model:{provider:'local-fixture',model:'fixture'},plugins:[{plugi
       }
     },
   );
+  it("expands an owner prompt template given as the one-shot prompt", () => {
+    const f = fixture();
+    const commands = join(f.root, "commands");
+    mkdirSync(commands);
+    writeFileSync(join(commands, "inspect.md"), "Inspect the README for $ARGUMENTS.\n");
+    const result = run([
+      "--demo",
+      "-C",
+      f.workspace,
+      "--data",
+      f.data,
+      "--commands",
+      commands,
+      "/inspect typos",
+    ]);
+    expect(result.status).toBe(0);
+    expect(result.stdout).toContain("command | /inspect sends");
+    expect(result.stdout).toContain("Offline scripted demonstration.");
+    const bad = run(["--demo", "--data", f.data, "--commands", join(f.root, "missing"), "x"]);
+    expect(bad.status).toBe(2);
+  });
 });

@@ -24,6 +24,7 @@ moyyi --connect --session SESSION_ID -i
 ```
 
 Use `--data DIR` on both sides when the data directory is not the default `~/.moyyi/data`.
+`--commands DIR` works on the connecting client, since prompt templates are client-side.
 Session commands (`/new`, `/resume`, `/sessions`, `/results`, `/compact`, `/cancel`, `/approve`,
 `/deny`) work as in the local CLI.
 

@@ -15,6 +15,7 @@ import {
   type TranscriptEntry,
 } from "../contracts/index.ts";
 
+import { type CustomCommand, expandCommand } from "./commands.ts";
 export interface CliSessionOptions {
   readonly workspaceRoot: string;
   readonly sessionId?: SessionId;
@@ -23,6 +24,8 @@ export interface CliSessionOptions {
   readonly initialPrompt?: string;
   readonly interactive: boolean;
   readonly developmentPluginNames?: readonly string[];
+  /** Owner prompt templates from explicit `--commands` directories. */
+  readonly commands?: ReadonlyMap<string, CustomCommand>;
 }
 export interface CliSession {
   start(): Promise<void>;
@@ -233,6 +236,15 @@ export function createCliSession(
     );
     if (!accepted && !options.interactive) await finish(1, true);
     prompt();
+  }
+  /** A template's text is sent as the owner's own message and recorded like typed input. */
+  function runCommand(custom: CustomCommand, args: string): Promise<void> {
+    const text = expandCommand(custom, args);
+    output(
+      "command",
+      `/${custom.name} sends ${new TextEncoder().encode(text).byteLength} bytes from ${custom.source}`,
+    );
+    return submit(text);
   }
   async function respond(
     effectId: EffectId,
@@ -496,7 +508,13 @@ export function createCliSession(
           else prompt();
           return;
         }
-        if (options.initialPrompt?.trim()) await submit(options.initialPrompt);
+        const initial = options.initialPrompt?.trim();
+        const initialCommand = initial?.startsWith("/")
+          ? options.commands?.get(initial.slice(1).split(/\s/u, 1)[0] ?? "")
+          : undefined;
+        if (initial && initialCommand)
+          await runCommand(initialCommand, initial.slice(initialCommand.name.length + 1));
+        else if (options.initialPrompt?.trim()) await submit(options.initialPrompt);
         else if (!options.interactive) await finish(0, false);
         else prompt();
       });
@@ -511,8 +529,14 @@ export function createCliSession(
         }
         if (!trimmed.startsWith("/")) return submit(text);
         const [command, ...args] = trimmed.split(/\s+/);
-        if (command === "/help" && !args.length) for (const line of help) output("moyyi", line);
-        else if (command === "/new" && !args.length) await openSession();
+        if (command === "/help" && !args.length) {
+          for (const line of help) output("moyyi", line);
+          for (const custom of options.commands?.values() ?? [])
+            output(
+              "moyyi",
+              `/${custom.name}${custom.description ? `: ${custom.description}` : ""} (your command)`,
+            );
+        } else if (command === "/new" && !args.length) await openSession();
         else if (command === "/resume" && args.length === 1)
           await openSession(args[0] as SessionId);
         else if (command === "/sessions" || command === "/results") {
@@ -562,7 +586,11 @@ export function createCliSession(
           else if (runId) output("moyyi", "Reload is only available between runs.");
           else await send({ type: "plugin.reload", name });
         } else if (command === "/exit" && !args.length) return finish(0, true);
-        else output("moyyi", "Unknown command or invalid arguments. Use /help.");
+        else {
+          const custom = options.commands?.get((command ?? "").slice(1));
+          if (custom) return runCommand(custom, trimmed.slice((command ?? "").length));
+          output("moyyi", "Unknown command or invalid arguments. Use /help.");
+        }
         prompt();
       });
     },

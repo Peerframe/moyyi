@@ -15,6 +15,7 @@ import type {
   TranscriptEntry,
 } from "../contracts/index.ts";
 import type { Runtime } from "../runtime/index.ts";
+import type { CustomCommand } from "./commands.ts";
 import { createCliSession, terminalText } from "./session.ts";
 
 const sessionId = "session_test" as SessionId;
@@ -80,6 +81,7 @@ function setup(
     initialPrompt?: string;
     sessionId?: SessionId;
     developmentPluginNames?: readonly string[];
+    commands?: ReadonlyMap<string, CustomCommand>;
   } = {},
 ) {
   const host = fake();
@@ -961,5 +963,43 @@ describe("terminal text", () => {
     expect(text).toContain("\\u009b");
     expect(text).toContain("\\u202e");
     expect(text.endsWith("\n中文😀")).toBe(true);
+  });
+});
+
+describe("custom slash commands", () => {
+  const review: CustomCommand = {
+    name: "review",
+    description: "Review a path",
+    template: "Review $ARGUMENTS for bugs.",
+    source: "/commands/review.md",
+  };
+  const commands = new Map([["review", review]]);
+  it("sends the expanded template as an ordinary user message and lists it in /help", async () => {
+    const t = setup({ commands });
+    await t.cli.start();
+    await t.cli.line("/help");
+    expect(t.output()).toContain("/review: Review a path (your command)");
+    await t.cli.line("/review src/core");
+    expect(t.sent.at(-1)).toEqual({
+      type: "run.start",
+      sessionId,
+      input: [{ type: "text", text: "Review src/core for bugs." }],
+    });
+    expect(t.output()).toContain("command | /review sends 25 bytes from /commands/review.md");
+  });
+  it("expands a command given as the one-shot prompt", async () => {
+    const t = setup({ commands, interactive: false, initialPrompt: "/review docs" });
+    await t.cli.start();
+    expect(t.sent.at(-1)).toMatchObject({
+      type: "run.start",
+      input: [{ type: "text", text: "Review docs for bugs." }],
+    });
+  });
+  it("keeps unknown commands unknown", async () => {
+    const t = setup({ commands });
+    await t.cli.start();
+    await t.cli.line("/nope x");
+    expect(t.output()).toContain("Unknown command or invalid arguments");
+    expect(t.sent.some((command) => command.type === "run.start")).toBe(false);
   });
 });

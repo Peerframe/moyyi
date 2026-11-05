@@ -107,6 +107,19 @@ can accompany CLI grants and still covers document reads. Noninteractive approva
 Capabilities are limited to the selected workspace/origins even if another session is resumed.
 The offline `--demo` rejects these daily capability and budget options.
 
+## Prompt templates as commands
+
+`--commands DIR` (repeatable) loads every `DIR/<name>.md` as a `/<name>` command. `$ARGUMENTS` in
+the file is replaced by the text after the command; without it, the text is appended as
+`Arguments: ...`. An optional leading `---` block may hold a one-line `description:`, shown in
+`/help`. The expanded text is sent as your own message and recorded like typed input; the CLI
+prints its size and source file. A one-shot prompt can be a command (`moyyi ... "/review src"`).
+
+Names match `^[a-z][a-z0-9-]{0,31}$`, cannot replace built-in commands and must be unique; files
+are regular UTF-8 files up to 16 KiB, at most 128 commands. Nothing is discovered from the
+workspace: only directories you name are read. `--connect` clients may use `--commands`; the
+daemon itself does not.
+
 ## Nested instructions
 
 `--nested-instructions` also loads `AGENTS.md` from subdirectories this session works in (files

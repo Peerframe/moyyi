@@ -32,6 +32,7 @@ Options:
       --long             Long tasks: --max-requests 200 --timeout 3600 --auto-compact unless set
       --subagents        Offer read-only sub-agents (agent tool); each uses its own requests
       --nested-instructions  Also load AGENTS.md from subdirectories the session works in
+      --commands DIR     Load prompt templates DIR/<name>.md as /<name> commands (repeatable)
       --dev              Enable development-only plugin loading and reload
       --dev-plugin N=P   Explicit plugin name and local module path (repeatable)
       --daemon           Serve this runtime to local clients until Ctrl-C; grants stay fixed
@@ -65,6 +66,7 @@ export interface CliOptions {
   readonly autoCompact: boolean;
   readonly subagents: boolean;
   readonly nestedInstructions: boolean;
+  readonly commandDirectories: readonly string[];
   readonly dev: boolean;
   readonly development: readonly { name: string; path: string }[];
   readonly prompt?: string;
@@ -91,6 +93,7 @@ export function parseCliOptions(argv: readonly string[], cwd = process.cwd()): C
       long: { type: "boolean" },
       subagents: { type: "boolean" },
       "nested-instructions": { type: "boolean" },
+      commands: { type: "string", multiple: true },
       "shell-toolchain": { type: "string" },
       "web-origin": { type: "string", multiple: true },
       "web-dns": { type: "string" },
@@ -139,9 +142,10 @@ export function parseCliOptions(argv: readonly string[], cwd = process.cwd()): C
       values.interactive ||
       values.session !== undefined ||
       values.dev ||
-      values["dev-plugin"]?.length)
+      values["dev-plugin"]?.length ||
+      values.commands?.length)
   )
-    throw Error("--daemon takes no prompt, session, -i or development plugins");
+    throw Error("--daemon takes no prompt, session, -i, commands or development plugins");
   if (values.session !== undefined && !/^[A-Za-z0-9_-]{1,512}$/.test(values.session))
     throw Error("Invalid session ID");
   if (values["dev-plugin"]?.length && !values.dev)
@@ -223,6 +227,7 @@ export function parseCliOptions(argv: readonly string[], cwd = process.cwd()): C
     autoCompact: values["auto-compact"] ?? long,
     subagents: values.subagents ?? false,
     nestedInstructions: values["nested-instructions"] ?? false,
+    commandDirectories: (values.commands ?? []).map((path) => resolve(cwd, path)),
     webOrigins,
     ...(toolchain === undefined ? {} : { shellToolchain: toolchain as "node" }),
     ...(dns === undefined ? {} : { webDns: dns as "system" | "cloudflare-doh" }),
