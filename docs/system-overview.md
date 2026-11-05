@@ -49,7 +49,7 @@ commands and limits.
 | Continue longer work | [Long sessions](long-sessions.md): eight turns across reopen and summary kept all ten checked facts | One bounded case |
 | Read websites | M5: per-site and per-request approval, recorded sources, report readback; CLI [web](web.md) revision task passed | First report and revision attempts failed; no search service; no autonomous correction shown |
 | Transform data and documents | Quoted CSV, format-preserving homework edit and roster merge passed | The model checked bytes and counts, not an independent recomputation |
-| Apply guidance and Skills | [Root instructions](instructions.md) and explicitly selected [Skills](skills.md) | Loading guidance does not guarantee following it; nested instructions are not auto-loaded |
+| Apply guidance and Skills | [Root instructions](instructions.md) and explicitly selected [Skills](skills.md) | Loading guidance does not guarantee following it; nested instructions load only with `--nested-instructions` (not yet merged) |
 | Back up, restore, roll back | M4 [maintenance](desktop.md#backup-restore-and-software-rollback-m4-candidate): native backup, rescue restore and software rollback passed | Rollback across the schema 3 upgrade needs the paired backup |
 
 ## Answer quality
@@ -128,6 +128,7 @@ Plan: [post-M6 plan v2](tasks/2026-10-28-post-m6-plan.md). Order is owned by the
 | Delivery three: settings, Skills, search | Ready for Codex | [Brief](tasks/2026-10-30-delivery-3-settings-skills-search.md) |
 | Delivery four: conditional capabilities | Triggered per item | [Plan](tasks/2026-10-28-post-m6-plan.md) |
 | Long-running CLI: `--long`, `--timeout`, `--auto-compact`, `--allow-shell-write`, `/always`, background commands ([ADR 0049](decisions/0049-long-running-sessions.md)) | Merged ([PR #61](https://github.com/Peerframe/moyyi/pull/61), [PR #65](https://github.com/Peerframe/moyyi/pull/65)); not installed; opt-in, defaults unchanged; offline-tested, not live-task-verified | [CLI](cli.md) |
+| Nested AGENTS.md from touched directories: `--nested-instructions` ([ADR 0052](decisions/0052-nested-instructions.md)) | On branch, not merged; opt-in; offline-tested, not live-task-verified | [Instructions](instructions.md) |
 | Read-only sub-agents: `--subagents`, `agent` tool ([ADR 0051](decisions/0051-read-only-subagents.md)) | On branch, not merged; opt-in; offline-tested, not live-task-verified | [CLI](cli.md#sub-agents) |
 | MCP tools from owner-configured stdio servers ([ADR 0050](decisions/0050-mcp-client.md)) | Merged ([PR #61](https://github.com/Peerframe/moyyi/pull/61), [PR #65](https://github.com/Peerframe/moyyi/pull/65)); not installed; host-module configuration (CLI, daemon); offline-tested, not live-task-verified | [MCP](mcp.md) |
 | Local daemon: `--daemon` / `--connect` over a private Unix socket ([ADR 0048](decisions/0048-local-daemon.md)) | Merged ([PR #61](https://github.com/Peerframe/moyyi/pull/61), [PR #65](https://github.com/Peerframe/moyyi/pull/65)); not installed; CLI only, desktop unchanged | [Daemon guide](daemon.md) |

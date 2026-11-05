@@ -98,6 +98,17 @@ export class NodeWorkspaceFiles implements WorkspaceFilesFactory {
     return new ReadScope(context, assertAuthorized, this.excluded).readSkillDocument(name);
   }
 
+  /** `<directory>/AGENTS.md` under the same rules as the root file; null when absent. */
+  readNestedInstructions(
+    context: Pick<ToolContext, "workspaceRoot" | "signal">,
+    directory: string,
+    assertAuthorized: () => void,
+  ): Promise<FileRead | null> {
+    return new ReadScope(context, assertAuthorized, this.excluded).readNestedInstructions(
+      directory,
+    );
+  }
+
   readWorkspaceNavigation(
     context: Pick<ToolContext, "workspaceRoot" | "signal">,
     assertAuthorized: () => void,
@@ -343,6 +354,45 @@ class ReadScope {
       // Auto-discovery never follows an alias, even one the ordinary explicit read tool permits.
       const after = await this.io(() => lstat(resolve(root.path, "AGENTS.md")));
       if (after.isSymbolicLink() || !same(stat, after) || result.path !== "AGENTS.md")
+        throw new FileAccessError("denied", "Project instructions changed during access");
+      if (result.truncated)
+        throw new FileAccessError("unavailable", "Project instructions exceed the 16 KiB limit");
+      return result;
+    });
+  }
+
+  readNestedInstructions(directory: string): Promise<FileRead | null> {
+    const parts = directory.split("/");
+    if (
+      !directory ||
+      directory.length > 1024 ||
+      directory.startsWith("/") ||
+      parts.some((part) => !part || part === "." || part === ".." || part.includes("\0"))
+    )
+      return Promise.reject(new FileAccessError("denied", "Invalid instruction directory"));
+    return this.operation(async (root) => {
+      // Every directory on the way must be a real directory, never an alias.
+      for (let index = 1; index <= parts.length; index++) {
+        const stat = await this.io(() => lstat(resolve(root.path, ...parts.slice(0, index))));
+        if (!stat.isDirectory() || stat.isSymbolicLink())
+          throw new FileAccessError("denied", "Instruction directories must not be aliases");
+      }
+      const path = `${directory}/AGENTS.md`;
+      let before: Stats;
+      try {
+        before = await this.io(() => lstat(resolve(root.path, path)));
+      } catch (error) {
+        if (isMissing(error)) {
+          await this.root();
+          return null;
+        }
+        throw error;
+      }
+      if (!before.isFile() || before.isSymbolicLink() || before.nlink !== 1)
+        throw new FileAccessError("denied", "Project instructions must be a regular unlinked file");
+      const result = await this.readFile(root, path, 16 * 1024);
+      const after = await this.io(() => lstat(resolve(root.path, path)));
+      if (after.isSymbolicLink() || !same(before, after) || result.path !== path)
         throw new FileAccessError("denied", "Project instructions changed during access");
       if (result.truncated)
         throw new FileAccessError("unavailable", "Project instructions exceed the 16 KiB limit");

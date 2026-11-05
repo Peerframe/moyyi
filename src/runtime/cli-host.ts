@@ -120,6 +120,7 @@ export interface CliLaunchOptions {
   readonly timeoutSeconds?: number;
   readonly autoCompact?: boolean;
   readonly subagents?: boolean;
+  readonly nestedInstructions?: boolean;
 }
 
 export async function configureCliHost(
@@ -178,6 +179,7 @@ export async function configureCliHost(
         }),
     ...(launch?.autoCompact ? { autoCompact: true } : {}),
     ...(launch?.subagents ? { subagents: true } : {}),
+    ...(launch?.nestedInstructions ? { nestedInstructions: true } : {}),
     ...(launch?.allowWrite ? { workspaceWrites: { roots, approval: "ask" as const } } : {}),
     ...(allowShell
       ? {

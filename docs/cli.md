@@ -107,6 +107,12 @@ can accompany CLI grants and still covers document reads. Noninteractive approva
 Capabilities are limited to the selected workspace/origins even if another session is resumed.
 The offline `--demo` rejects these daily capability and budget options.
 
+## Nested instructions
+
+`--nested-instructions` also loads `AGENTS.md` from subdirectories this session works in (files
+read, listed, searched or edited there), from the next request on. See
+[instructions](instructions.md) and [ADR 0052](decisions/0052-nested-instructions.md).
+
 ## Sub-agents
 
 `--subagents` offers the model an `agent` tool that hands a read-only investigation to a

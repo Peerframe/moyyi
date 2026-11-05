@@ -31,6 +31,8 @@ function grantNotices(options: CliOptions): string[] {
     );
   if (options.timeoutSeconds !== undefined)
     lines.push(`budget | At most ${options.timeoutSeconds} s per turn.`);
+  if (options.nestedInstructions)
+    lines.push("context | Nested AGENTS.md from subdirectories this session works in.");
   if (options.subagents)
     lines.push(
       "agents | Read-only sub-agents: up to 12 requests and 300 s each, 4 at once, 16 per turn.",
@@ -63,6 +65,7 @@ async function localRuntime(
       allowShellWrite: options.allowShellWrite,
       autoCompact: options.autoCompact,
       subagents: options.subagents,
+      nestedInstructions: options.nestedInstructions,
       webOrigins: options.webOrigins,
       ...(options.shellToolchain ? { shellToolchain: options.shellToolchain } : {}),
       ...(options.webDns ? { webDns: options.webDns } : {}),

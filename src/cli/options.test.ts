@@ -205,3 +205,15 @@ describe("sub-agents", () => {
     expect(() => parseCliOptions(["--connect", "--subagents"], "/tmp")).toThrow(/daemon's host/);
   });
 });
+
+describe("nested instructions", () => {
+  it("are off by default, allowed for local hosts and the demo, and kept with the daemon", () => {
+    expect(parseCliOptions(["--host", "h.mjs"], "/tmp").nestedInstructions).toBe(false);
+    expect(parseCliOptions(["--demo", "--nested-instructions"], "/tmp").nestedInstructions).toBe(
+      true,
+    );
+    expect(() => parseCliOptions(["--connect", "--nested-instructions"], "/tmp")).toThrow(
+      /daemon's host/,
+    );
+  });
+});

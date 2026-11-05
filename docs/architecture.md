@@ -64,7 +64,7 @@ Imports between them stay inside the runtime layer and are not separate boundary
 | `provider-scripted` | model provider | exists (tests and evals) |
 | `provider-deepseek` (Responses subset; [ADR 0007](decisions/0007-first-model-provider.md)) | model provider | implemented; connection/continuation evidence and task-quality gaps are separate in the system overview |
 | `default-instructions` (original working guidance) | context source | implemented; static |
-| `project-instructions` (workspace root AGENTS.md only) | context source | implemented; refreshed per request |
+| `project-instructions` (workspace root AGENTS.md; opt-in nested files from touched directories, [ADR 0052](decisions/0052-nested-instructions.md)) | context source | implemented; refreshed per request |
 | `workspace-navigation` (opt-in bounded file paths) | context source | implemented; refreshed per request; real-model quality unverified |
 | `fs` (read, list, search; create, edit, undo) | tools | read-only merged in batch 5; writes merged in phase 2 |
 | `todo` | read-class planning tool | whole-list task updates in recorded calls; no second context copy |

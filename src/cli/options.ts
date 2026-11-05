@@ -31,6 +31,7 @@ Options:
                          nears the model's context window (one request per summary)
       --long             Long tasks: --max-requests 200 --timeout 3600 --auto-compact unless set
       --subagents        Offer read-only sub-agents (agent tool); each uses its own requests
+      --nested-instructions  Also load AGENTS.md from subdirectories the session works in
       --dev              Enable development-only plugin loading and reload
       --dev-plugin N=P   Explicit plugin name and local module path (repeatable)
       --daemon           Serve this runtime to local clients until Ctrl-C; grants stay fixed
@@ -63,6 +64,7 @@ export interface CliOptions {
   readonly timeoutSeconds?: number;
   readonly autoCompact: boolean;
   readonly subagents: boolean;
+  readonly nestedInstructions: boolean;
   readonly dev: boolean;
   readonly development: readonly { name: string; path: string }[];
   readonly prompt?: string;
@@ -88,6 +90,7 @@ export function parseCliOptions(argv: readonly string[], cwd = process.cwd()): C
       "auto-compact": { type: "boolean" },
       long: { type: "boolean" },
       subagents: { type: "boolean" },
+      "nested-instructions": { type: "boolean" },
       "shell-toolchain": { type: "string" },
       "web-origin": { type: "string", multiple: true },
       "web-dns": { type: "string" },
@@ -120,6 +123,7 @@ export function parseCliOptions(argv: readonly string[], cwd = process.cwd()): C
       "auto-compact",
       "long",
       "subagents",
+      "nested-instructions",
       "dev",
       "dev-plugin",
     ] as const;
@@ -218,6 +222,7 @@ export function parseCliOptions(argv: readonly string[], cwd = process.cwd()): C
     allowShellWrite: values["allow-shell-write"] ?? false,
     autoCompact: values["auto-compact"] ?? long,
     subagents: values.subagents ?? false,
+    nestedInstructions: values["nested-instructions"] ?? false,
     webOrigins,
     ...(toolchain === undefined ? {} : { shellToolchain: toolchain as "node" }),
     ...(dns === undefined ? {} : { webDns: dns as "system" | "cloudflare-doh" }),

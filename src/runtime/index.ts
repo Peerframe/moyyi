@@ -20,11 +20,12 @@ import {
   type RunLimits,
   type RuntimeEvent,
   type Scheduler,
+  type SessionId,
   type SessionManagement,
   type SessionStore,
   type Timestamp,
 } from "../contracts/index.ts";
-import { AgentCore, type CoreDeps } from "../core/index.ts";
+import { AgentCore, type CoreDeps, pathToHead } from "../core/index.ts";
 import { defaultInstructionsPlugin } from "../plugins/default-instructions/index.ts";
 import { documentsPlugin } from "../plugins/documents/index.ts";
 import { fsPlugin } from "../plugins/fs/index.ts";
@@ -70,6 +71,7 @@ import { NodeWorkspaceDocuments } from "./documents/documents.ts";
 import { NodeWorkspaceFiles } from "./files/files.ts";
 import { NodeWorkspaceWrites } from "./files/writes.ts";
 import { collectContext } from "./guidance/instructions.ts";
+import { touchedDirectories } from "./guidance/nested.ts";
 import { type SkillSelection, selectSkills } from "./guidance/skills.ts";
 import { historyPage, sessionCatalog, sessionManagementError, sessionResults } from "./history.ts";
 import { connectMcpServers, type McpServerConfig } from "./mcp/index.ts";
@@ -180,6 +182,11 @@ export interface RuntimeOptions {
    * the default limits. Each sub-agent uses its own model requests.
    */
   readonly subagents?: boolean | Partial<SubagentLimits>;
+  /**
+   * Opt-in: also load AGENTS.md from subdirectories this session's recorded tool calls touched,
+   * under the same read grant and limits as the root file (at most 8 files, 32 KiB in total).
+   */
+  readonly nestedInstructions?: boolean;
   readonly developmentPlugins?: readonly DevelopmentPlugin[];
   readonly plugins?: readonly PluginEntry[];
   readonly model?: ModelOrigin;
@@ -716,6 +723,9 @@ export async function createRuntime(
           options.projectInstructions !== false,
           skills,
           workspaceNavigation,
+          options.nestedInstructions && options.projectInstructions !== false
+            ? await nestedDirectoriesOf(store, sessionId)
+            : undefined,
         )),
       ],
       ...(options.limits === undefined ? {} : { limits: options.limits }),
@@ -1098,4 +1108,12 @@ function validateSubagentLimits(limits: SubagentLimits): SubagentLimits {
       "Sub-agent limits: maxRequests 2..200, timeoutMs 10000..3600000, maxConcurrent 1..8, maxPerRun 1..64",
     );
   return Object.freeze({ ...limits });
+}
+
+async function nestedDirectoriesOf(
+  store: SessionStore | undefined,
+  sessionId: SessionId,
+): Promise<readonly string[]> {
+  const snapshot = await store?.loadSession(sessionId);
+  return snapshot ? touchedDirectories(pathToHead(snapshot)) : [];
 }

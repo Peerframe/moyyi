@@ -33,9 +33,13 @@ Explain any verification that could not be completed.
 The next model request reads the current root file. Editing or deleting it takes effect at the
 next request, including after session restart or compaction. Files in parent/home directories,
 `AGENTS.override.md`, `CLAUDE.md`, Markdown links and imports are not automatically loaded.
-Nested AGENTS.md files are **not automatically loaded**: the default prompt directs the model
-to discover/read applicable ones using ordinary file tools before work in that subtree. This
-is guidance, not a guarantee of model obedience or a path-aware nested loader.
+Nested AGENTS.md files are **not automatically loaded** by default: the default prompt directs
+the model to discover/read applicable ones using ordinary file tools before work in that subtree.
+This is guidance, not a guarantee of model obedience. With `RuntimeOptions.nestedInstructions`
+(CLI `--nested-instructions`), the runtime also loads `AGENTS.md` from subdirectories this
+session's recorded file tool calls touched, from the next request on, under the same read grant,
+alias and 16 KiB rules (at most 8 files, 32 KiB in total). Each applies only to its scope; the
+nearest scope wins. See [ADR 0052](decisions/0052-nested-instructions.md).
 
 Project guidance is subordinate to explicit user instructions and host permissions. The model
 request carries a JSON source block with `path`, `scope`, `sha256` and `text`. Content cannot enable
