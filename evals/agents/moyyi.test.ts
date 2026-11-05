@@ -113,6 +113,34 @@ describe("runtime adapter guardrails", () => {
     }
   });
 
+  it("adds the final-answer accounting text to the answer-only request only when enabled", async () => {
+    const workspace = await mkdtemp(join(tmpdir(), "moyyi-adapter-test-"));
+    const runs = async (finalAccounting: boolean) => {
+      const client = new ScriptedModelClient([final()]);
+      const agent = createMoyyiEvalAgent({
+        source: "synthetic",
+        profile: scriptedProfile,
+        maxModelRequests: 1,
+        createClient: () => client,
+        finalAccounting,
+      });
+      try {
+        // A one-request budget makes the first request the answer-only one.
+        await agent.run(input(workspace, { budget: { timeoutMs: 10000, maxModelRequests: 1 } }));
+      } finally {
+        await agent.close();
+      }
+      return JSON.stringify(client.requests);
+    };
+    try {
+      const marker = "list each requirement the user stated";
+      expect(await runs(true)).toContain(marker);
+      expect(await runs(false)).not.toContain(marker);
+    } finally {
+      await rm(workspace, { recursive: true, force: true });
+    }
+  });
+
   it("rejects history or workspace changes and allows deterministic disposal", async () => {
     const workspace = await mkdtemp(join(tmpdir(), "moyyi-adapter-test-"));
     const client = new ScriptedModelClient([final(), final()]);

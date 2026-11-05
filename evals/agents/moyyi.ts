@@ -32,6 +32,8 @@ export interface MoyyiEvalOptions extends RuntimeEvalHost {
   readonly maxModelRequests: number;
   readonly capabilities?: "read" | "write" | "shell";
   readonly allowLive?: boolean;
+  /** Appends the 2026-11-05 final-answer accounting text to the answer-only request. */
+  readonly finalAccounting?: boolean;
 }
 
 export interface MoyyiEvalAgent extends AgentUnderTest {
@@ -236,6 +238,7 @@ export function createMoyyiEvalAgent(options: MoyyiEvalOptions): MoyyiEvalAgent 
               timeoutMs: Math.max(1, Math.floor(input.budget.timeoutMs)),
               maxRetries: 0,
             },
+            ...(options.finalAccounting ? { finalAccounting: true } : {}),
             ...(capabilities === "read"
               ? {}
               : { workspaceWrites: { roots: [workspace], approval: "allow" } }),

@@ -17,7 +17,7 @@ export const GATE_TASKS = [
   { id: "document-report-seven-formats", maxRequests: 4, documents: true },
 ] as const;
 
-export function gateCommands(host: string): string[][] {
+export function gateCommands(host: string, finalAccounting = false): string[][] {
   return GATE_TASKS.map((task) => [
     "evals/run.ts",
     "--agent",
@@ -34,6 +34,7 @@ export function gateCommands(host: string): string[][] {
     "--max-model-requests",
     String(task.maxRequests),
     ...("documents" in task && task.documents ? ["--include-documents"] : []),
+    ...(finalAccounting ? ["--final-accounting"] : []),
   ]);
 }
 
@@ -43,11 +44,12 @@ if (import.meta.main) {
       host: { type: "string" },
       "allow-live": { type: "boolean", default: false },
       "dry-run": { type: "boolean", default: false },
+      "final-accounting": { type: "boolean", default: false },
     },
   });
   const cap = GATE_TASKS.reduce((total, task) => total + task.maxRequests, 0);
   const host = values.host ? resolve(values.host) : "<private host module>";
-  const commands = gateCommands(host);
+  const commands = gateCommands(host, values["final-accounting"]);
   if (values["dry-run"] || !values.host || !values["allow-live"]) {
     console.log(`Quality gate: ${GATE_TASKS.length} tasks, at most ${cap} paid model requests.`);
     for (const args of commands) console.log(`node ${args.join(" ")}`);
@@ -72,7 +74,10 @@ if (import.meta.main) {
   const dir = join(import.meta.dirname, "..", "evals", "results");
   mkdirSync(dir, { recursive: true });
   const file = join(dir, `${new Date().toISOString().replaceAll(":", "-")}-quality-gate.json`);
-  writeFileSync(file, `${JSON.stringify({ cap, results }, null, 2)}\n`);
-  console.log(`\nQuality gate: ${passed.length}/${results.length} passed. Summary: ${file}`);
+  const finalAccounting = values["final-accounting"];
+  writeFileSync(file, `${JSON.stringify({ cap, finalAccounting, results }, null, 2)}\n`);
+  console.log(
+    `\nQuality gate${finalAccounting ? " (final accounting on)" : ""}: ${passed.length}/${results.length} passed. Summary: ${file}`,
+  );
   process.exit(passed.length === results.length ? 0 : 1);
 }

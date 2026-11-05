@@ -96,6 +96,7 @@ describe("evaluation command selection", () => {
       [...base, "--capabilities", "all"],
       [...base, "--max-model-requests", "-1"],
       [...base, "--allow-live"],
+      ["--final-accounting"],
       base.filter((_arg, i) => i !== 4 && i !== 5),
     ])
       await expect(selectEvaluation(args, tasks, { host: loader })).rejects.toThrow();
@@ -113,9 +114,15 @@ describe("evaluation command selection", () => {
       capabilities: "read",
       maxModelRequests: 3,
       maxRetries: 0,
+      finalAccounting: false,
     });
     expect(factory).not.toHaveBeenCalled();
     await selected.close();
+    const accounting = await selectEvaluation([...base, "--final-accounting"], tasks, {
+      host: async () => host,
+    });
+    expect(accounting.metadata.finalAccounting).toBe(true);
+    await accounting.close();
   });
 
   it("requires live authorization before host import, then validates the source match", async () => {

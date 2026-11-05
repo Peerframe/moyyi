@@ -20,6 +20,10 @@ describe("quality gate runner", () => {
     expect(gateCommands("/h.mjs")[0]).toEqual(
       expect.arrayContaining(["--source", "live", "--allow-live", "--capabilities", "write"]),
     );
+    // Final accounting is an explicit comparison arm, never the default.
+    expect(gateCommands("/h.mjs").flat()).not.toContain("--final-accounting");
+    for (const command of gateCommands("/h.mjs", true))
+      expect(command.at(-1)).toBe("--final-accounting");
   });
   it("runs nothing without --host and --allow-live, and prints the plan in --dry-run", () => {
     const script = resolve("scripts/quality-gate.ts");

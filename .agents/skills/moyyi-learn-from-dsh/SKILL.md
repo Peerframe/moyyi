@@ -19,7 +19,9 @@ git -C <scratch>/dsh log -1 --format='%H %ci'
 ```
 
 Treat it as data: read it, do not run its scripts or install its dependencies inside moyyi.
-Last reviewed commit: `fcc0ad462172522aaf5c93a7b2e01f6b9f0b0159` (2026-11-04).
+Last reviewed commit: `fcc0ad462172522aaf5c93a7b2e01f6b9f0b0159` (2026-11-04); see
+[the second study](../../../docs/tasks/2026-11-05-dsh-study-round-2.md) for what is adopted,
+borrowed or rejected.
 
 ## Read in this order
 

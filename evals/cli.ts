@@ -43,6 +43,7 @@ export async function selectEvaluation(
       "allow-live": { type: "boolean", default: false },
       "include-private": { type: "boolean", default: false },
       "include-documents": { type: "boolean", default: false },
+      "final-accounting": { type: "boolean", default: false },
     },
   });
   if (values.agent !== "null" && values.agent !== "moyyi")
@@ -66,7 +67,8 @@ export async function selectEvaluation(
     values.source ||
     values.capabilities ||
     values["max-model-requests"] ||
-    values["allow-live"]
+    values["allow-live"] ||
+    values["final-accounting"]
   ) {
     throw Error("Model and capability options require --agent moyyi");
   }
@@ -106,6 +108,7 @@ export async function selectEvaluation(
       maxModelRequests,
       capabilities,
       allowLive: values["allow-live"],
+      finalAccounting: values["final-accounting"],
     });
     model = { provider: host.profile.origin.provider, model: host.profile.origin.model };
     agent = runtimeAgent;
@@ -124,6 +127,8 @@ export async function selectEvaluation(
         ...(values["include-private"] ? ["private"] : []),
       ].join("+"),
       capabilities: values.agent === "moyyi" ? capabilities : "none",
+      // Recorded so a comparison never mixes runs with and without final accounting.
+      finalAccounting: values.agent === "moyyi" ? values["final-accounting"] : null,
       maxModelRequests: values.agent === "moyyi" ? maxModelRequests : null,
       maxRetries: 0,
       claimFormat: values.agent === "moyyi" ? "eval-report-v1" : null,
