@@ -6,7 +6,7 @@ import type { RuntimeEvent, SessionId } from "../../src/contracts/index.ts";
 import { kimiFixture, kimiFixtureTransport } from "../../src/plugins/provider-kimi/fixtures.ts";
 import { kimiApiProfile, kimiProfile } from "../../src/plugins/provider-kimi/index.ts";
 import { createRuntime, type Runtime } from "../../src/runtime/index.ts";
-import { MemoryRecordingSink } from "../../src/runtime/model-recording.ts";
+import { MemoryRecordingSink } from "../../src/runtime/providers/model-recording.ts";
 
 export const kimiScenarios = [
   "tools-record-replay",

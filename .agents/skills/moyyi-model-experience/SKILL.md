@@ -37,6 +37,11 @@ part:
 - **Token cost**: fixed per request, per call, or growing with data.
 - **Prompt-cache effect**: append-only, or invalidates from which point.
 
+The exact tool text and schemas are generated into [docs/tool-catalog.md](../../../docs/tool-catalog.md).
+After changing a tool's name, description, schema or effect profile, run `npm run tool-catalog`
+and review the page diff: it is the model-visible change. A new tool plugin must be added to
+`scripts/tool-catalog.ts`, or `npm run check` fails.
+
 ## Evidence
 
 A model-visible change is a behavior change. Unit tests cover the wiring; the delivery's quality

@@ -9,7 +9,7 @@ import {
 import {
   type DeepSeekHttpOptions,
   deepSeekHttpTransport,
-} from "../../src/runtime/deepseek-http.ts";
+} from "../../src/runtime/providers/deepseek-http.ts";
 import type { RuntimeEvalHost } from "./moyyi.ts";
 
 export interface DeepSeekEvalHostOptions extends DeepSeekHttpOptions, DeepSeekOptions {}

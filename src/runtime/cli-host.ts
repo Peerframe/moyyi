@@ -11,7 +11,7 @@ import {
   WorkspaceWritePolicy,
 } from "../policy/index.ts";
 import { createRuntime, type Runtime, type RuntimeOptions } from "./index.ts";
-import { discoverNodeToolchain } from "./node-toolchain.ts";
+import { discoverNodeToolchain } from "./processes/node-toolchain.ts";
 
 /** Explicit trusted host code, like an installed plugin. No discovery or credential fallback. */
 export async function loadCliHost(path: string): Promise<RuntimeOptions> {

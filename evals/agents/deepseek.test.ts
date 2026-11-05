@@ -7,7 +7,7 @@ import {
   deepSeekFixtureSse,
   deepSeekTextFixture,
 } from "../../src/plugins/provider-deepseek/fixtures.ts";
-import { DEEPSEEK_RESPONSES_URL } from "../../src/runtime/deepseek-http.ts";
+import { DEEPSEEK_RESPONSES_URL } from "../../src/runtime/providers/deepseek-http.ts";
 import { type DeepSeekEvalHostOptions, deepSeekEvalHost } from "./deepseek.ts";
 import { createMoyyiEvalAgent } from "./moyyi.ts";
 

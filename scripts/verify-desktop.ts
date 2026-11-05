@@ -14,7 +14,7 @@ import {
 } from "node:fs";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
-import { pdfBytes } from "../src/runtime/fixtures/document-fixtures.ts";
+import { pdfBytes } from "../src/runtime/documents/fixtures/document-fixtures.ts";
 
 // Verifies an existing bundle. Packaging is deliberately a separate operation owned by its caller.
 assert.equal(process.platform, "darwin");
@@ -141,7 +141,7 @@ try {
     "ginkgo.odp",
   ]) {
     copyFileSync(
-      join(repository, "src/runtime/fixtures/documents/standard/eval", name),
+      join(repository, "src/runtime/documents/fixtures/standard/eval", name),
       join(documentsWorkspace, name),
     );
   }
@@ -173,7 +173,7 @@ try {
     "ginkgo.odp",
   ])
     copyFileSync(
-      join(repository, "src/runtime/fixtures/documents/standard/eval", name),
+      join(repository, "src/runtime/documents/fixtures/standard/eval", name),
       join(externalMaterials, name),
     );
   const importedMaterialsAndHistory = JSON.parse(
