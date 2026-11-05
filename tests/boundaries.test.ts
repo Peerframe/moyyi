@@ -113,6 +113,29 @@ describe("layer boundaries", () => {
       expect(violations(file, source), source).toHaveLength(1);
   });
 
+  it("allows only renderer composition to consume the browser-only Chat UI", () => {
+    expect(
+      violations(
+        join(repo, "apps/desktop/renderer/ChatApp.tsx"),
+        'import { App } from "../../chat/ui/App.tsx";',
+      ),
+    ).toEqual([]);
+    for (const file of [
+      "apps/desktop/main.ts",
+      "apps/desktop/preload.ts",
+      "apps/desktop/host/chat.ts",
+    ])
+      expect(
+        violations(
+          join(repo, file),
+          file.includes("/host/") ? 'import "../../chat/port.ts";' : 'import "../chat/port.ts";',
+        ),
+      ).toHaveLength(1);
+    expect(
+      violations(join(repo, "apps/chat/port.ts"), 'import "../desktop/shared.ts";'),
+    ).toHaveLength(1);
+  });
+
   it("keeps shared/wire/security pure and limits the preload bridge", () => {
     const shared = join(repo, "apps/desktop/shared.ts");
     for (const source of [
@@ -237,6 +260,32 @@ describe("layer boundaries", () => {
       violations(
         join(repo, "apps/desktop/features/materials/state.ts"),
         'import "./contract.ts"; import "../../native/state-validation.ts";',
+      ),
+    ).toEqual([]);
+  });
+
+  it("keeps moyyi Chat to React and its own files", () => {
+    const file = join(repo, "apps/chat/ui/App.tsx");
+    expect(layerOf(file)).toBe("app:chat");
+    expect(
+      violations(
+        file,
+        'import { useState } from "react"; import type { ChatPort } from "../port.ts"; import "./x.tsx";',
+      ),
+    ).toEqual([]);
+    for (const source of [
+      'import "node:fs";',
+      'import "electron";',
+      'import "../../desktop/renderer/App.tsx";',
+      'import "../../../src/contracts/index.ts";',
+      'import "react-dom/server";',
+      "const x = import(variable);",
+    ])
+      expect(violations(file, source), source).toHaveLength(1);
+    expect(
+      violations(
+        join(repo, "apps/chat/port.test.ts"),
+        'import "vitest"; import "react-dom/server";',
       ),
     ).toEqual([]);
   });

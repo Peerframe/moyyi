@@ -19,6 +19,7 @@ it("adds a stateful feature and explicit action authority through only its direc
     mkdirSync(join(root, "apps"));
     mkdirSync(join(root, "scripts"));
     cpSync(join(repo, "apps/desktop"), join(root, "apps/desktop"), { recursive: true });
+    cpSync(join(repo, "apps/chat"), join(root, "apps/chat"), { recursive: true });
     for (const file of [
       "package.json",
       "tsconfig.json",
