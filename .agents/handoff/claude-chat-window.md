@@ -9,10 +9,22 @@
   - put working folders inside 项目, because the rail holds only functional places;
   - the rail is "全部 / 自动化 / 更多", with 插件 and 设置 at the bottom;
   - keep 更多 as a hidden slot (端口) until its contents are decided.
-- Canvas: https://claude.ai/artifact/Cfhj4xyxqATonqeGXDaVS2, version 59.
+- Canvas: https://claude.ai/artifact/Cfhj4xyxqATonqeGXDaVS2, version 61.
 - Design system: https://claude.ai/artifact/3yRcxDo7PaDuuQcSy6D8pP, version 22.
 - Branch: claude/chat-settings (from codex/chat-desktop-integration plus origin/main at 3e91c8b; PR #60 is merged). Work in this worktree.
-- Last agent: Claude, 2026-11-06.
+- Last agent: Codex, 2026-11-19.
+
+## Current delivery
+
+- Resumed the clean `claude/chat-settings` worktree at `b052e45`. PRs #59 and #60 are
+  merged. The separate draft #56 has conflicts with main and outstanding live acceptance.
+- The desktop now renders all nine v61 settings pages. Window appearance uses local display
+  preferences, models use the existing configure bridge, and session actions enforce the
+  current host state. Global personal instructions and automatic memory are unavailable.
+- The focused Chat and desktop renderer suite passed (129 tests). Verify the packaged
+  candidate in an isolated profile at 1120 × 800 and 780 × 560, and record the final gates below.
+- Use this section for current status. The dated review and checks below describe earlier checkpoints.
+
 
 ## 2026-11-06: 设置 redesign (canvas first)
 - Owner review:
@@ -124,7 +136,7 @@
   - tokens and README copied to apps/chat/design.
 - Docs: the desktop.md use paragraph and the system-overview row.
 
-## Next
+## Next at the November 5 checkpoint
 - Owner decides what goes in 更多 (asked on 2026-11-05: 暂时没想好).
 - Full `npm run check` on an idle machine (see Collected problems).
 - Native:

@@ -20,6 +20,7 @@ import { inFolder, isFolder, type PageView, Rail, type ViewId } from "./Rail.tsx
 export interface AppProps {
   readonly port: ChatPort;
   readonly theme: Theme;
+  readonly fontSize?: 13 | 15 | 17;
   readonly initialChat?: string | undefined;
   readonly integration?: ChatIntegration | undefined;
   /** Opens a page or a project instead of 全部, e.g. "settings/permissions" or "project/p-lunwen". */
@@ -53,6 +54,7 @@ function useNarrow(): boolean {
 export function App({
   port,
   theme,
+  fontSize = 15,
   initialChat,
   initialPage,
   integration,
@@ -90,11 +92,21 @@ export function App({
     setSearchOpen(false);
   }, [nativeActive]);
 
+  const requestedSettings = integration?.openSettingsRequest;
+  useEffect(() => {
+    if (!requestedSettings) return;
+    setView("settings");
+    setPageOf((previous) => ({ ...previous, settings: requestedSettings.page }));
+  }, [requestedSettings]);
+
+  async function invoke(action: ChatAction): Promise<void> {
+    if (!supports(integration, action.type)) throw new Error("当前版本尚不支持这个操作。");
+    await port.act(action);
+  }
   async function perform(action: ChatAction): Promise<void> {
     setError(null);
     try {
-      if (!supports(integration, action.type)) throw new Error("当前版本尚不支持这个操作。");
-      await port.act(action);
+      await invoke(action);
     } catch (cause) {
       setError(actionError(cause));
       throw cause;
@@ -118,6 +130,7 @@ export function App({
 
   useEffect(() => {
     const onKey = (event: KeyboardEvent) => {
+      if (event.defaultPrevented || document.querySelector("dialog:modal")) return;
       const mod = event.metaKey || event.ctrlKey;
       if (mod && event.key === ",") {
         event.preventDefault();
@@ -127,7 +140,7 @@ export function App({
         setView(folder);
         if (narrow) setOpenId(null);
         requestAnimationFrame(() => document.getElementById("chat-search")?.focus());
-      } else if (mod && event.key.toLowerCase() === "f" && chat) {
+      } else if (mod && event.key.toLowerCase() === "f" && isFolder(view) && chat) {
         event.preventDefault();
         setSearchOpen(true);
       } else if (
@@ -163,10 +176,10 @@ export function App({
   };
 
   const pageActions: PageActions = {
-    choose: (choiceId, option) => dispatch({ type: "choose", choiceId, option }),
-    press: (controlId) => dispatch({ type: "control", controlId }),
-    saveKey: (providerId, key) => dispatch({ type: "save-key", providerId, key }),
-    saveText: (fieldId, text) => dispatch({ type: "save-text", fieldId, text }),
+    choose: (choiceId, option) => invoke({ type: "choose", choiceId, option }),
+    press: (controlId) => invoke({ type: "control", controlId }),
+    saveKey: (providerId, key) => invoke({ type: "save-key", providerId, key }),
+    saveText: (fieldId, text) => invoke({ type: "save-text", fieldId, text }),
   };
 
   const onView = (next: ViewId) => {
@@ -190,10 +203,15 @@ export function App({
     const page = pages.find((p) => p.id === chosen) ?? (narrow ? undefined : pages[0]);
     const openPage = (pageId: string) => setPageOf((value) => ({ ...value, [view]: pageId }));
     return (
-      <div className={`mc mc-${theme} mc-window ch-app`} data-layout={layout}>
+      <div
+        className={`mc mc-${theme} mc-window ch-app`}
+        data-layout={layout}
+        data-font-size={fontSize}
+      >
         {rail}
         {!narrow || !page ? (
           <PageList
+            key={view}
             world={world}
             kind={view}
             pages={pages}
@@ -205,11 +223,12 @@ export function App({
         ) : null}
         {page ? (
           <PagePane
+            key={`${view}/${page.id}`}
             world={world}
             kind={view}
             page={page}
             actions={pageActions}
-            feedback={feedback}
+            feedback={integration?.pageNotice}
             onBack={narrow ? () => setPageOf((value) => ({ ...value, [view]: null })) : undefined}
           />
         ) : narrow || view !== "automations" ? null : (
@@ -232,7 +251,11 @@ export function App({
   const showChat = !narrow || Boolean(chat);
 
   return (
-    <div className={`mc mc-${theme} mc-window ch-app`} data-layout={layout}>
+    <div
+      className={`mc mc-${theme} mc-window ch-app`}
+      data-layout={layout}
+      data-font-size={fontSize}
+    >
       {rail}
       {showList ? (
         <ChatList

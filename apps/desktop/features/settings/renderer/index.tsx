@@ -21,16 +21,21 @@ function HelpButton() {
   );
 }
 function SettingsButton() {
-  const { setSettingsOpen, busy } = useDesktopUI();
+  const { openModelSettings, setSettingsOpen, busy } = useDesktopUI();
 
   return (
-    <button type="button" disabled={busy} onClick={() => setSettingsOpen(true)}>
+    <button
+      type="button"
+      disabled={busy}
+      onClick={openModelSettings ?? (() => setSettingsOpen(true))}
+    >
       模型设置
     </button>
   );
 }
 function Help() {
-  const { setSettingsOpen, helpOpen, setHelpOpen, setMaintenanceOpen } = useDesktopUI();
+  const { setSettingsOpen, helpOpen, setHelpOpen, setMaintenanceOpen, openModelSettings } =
+    useDesktopUI();
 
   return (
     <>
@@ -39,7 +44,8 @@ function Help() {
           onClose={() => setHelpOpen(false)}
           onSettings={() => {
             setHelpOpen(false);
-            setSettingsOpen(true);
+            if (openModelSettings) openModelSettings();
+            else setSettingsOpen(true);
           }}
           onMaintenance={() => {
             setHelpOpen(false);
@@ -73,7 +79,7 @@ function Settings() {
   );
 }
 function ConnectionNotice() {
-  const { state, setSettingsOpen, busy } = useDesktopUI();
+  const { state, openModelSettings, setSettingsOpen, busy } = useDesktopUI();
 
   return (
     <>
@@ -81,7 +87,11 @@ function ConnectionNotice() {
         <div className="error error-banner" role="alert">
           <span>当前模型连接未就绪。已有会话仍可查看，材料仍可选择。</span>
           {state.connection.message ? <p>{state.connection.message}</p> : null}
-          <button type="button" disabled={busy} onClick={() => setSettingsOpen(true)}>
+          <button
+            type="button"
+            disabled={busy}
+            onClick={openModelSettings ?? (() => setSettingsOpen(true))}
+          >
             打开模型设置
           </button>
         </div>
@@ -91,6 +101,7 @@ function ConnectionNotice() {
 }
 declare module "../../../renderer/ui.ts" {
   interface FeatureUI {
+    openModelSettings?: () => void;
     settingsOpen: boolean;
     setSettingsOpen: Dispatch<SetStateAction<boolean>>;
     helpOpen: boolean;

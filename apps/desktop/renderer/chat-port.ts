@@ -7,11 +7,13 @@ import {
   selectSettingsPreset,
 } from "../features/settings/renderer/settings-state.ts";
 import type { DesktopState } from "../shared.ts";
+import { type ChatAppearance, chooseAppearance } from "./chat-appearance.ts";
 import {
   KIMI_EFFORTS,
+  modelFieldId,
   NATIVE_KIMI_EFFORT,
-  NATIVE_MODEL,
   NATIVE_PRESET,
+  nativeControlReason,
   PRESETS,
 } from "./chat-pages.ts";
 import { projectChatWorld } from "./chat-world.ts";
@@ -29,14 +31,27 @@ export const CHAT_ACTIONS = [
 ] as const;
 
 /** Display adapter only. The existing bridge remains the sole authority for every effect. */
-export function createDesktopChatPort(current: () => RendererUI, control: (id: string) => void) {
+export function createDesktopChatPort(
+  current: () => RendererUI,
+  control: (id: string) => void,
+  appearance: { read: () => ChatAppearance; save: (next: ChatAppearance) => void },
+) {
   let world = projectChatWorld(null);
   const listeners = new Set<Parameters<ChatPort["subscribe"]>[0]>();
   async function dispatch(action: ChatAction): Promise<void> {
     const ui = current();
     const state = ui.state;
+    if (action.type === "choose") {
+      const next = chooseAppearance(appearance.read(), action.choiceId, action.option);
+      if (next) {
+        appearance.save(next);
+        return;
+      }
+    }
     if (state?.status !== "ready") throw Error("本地服务还未就绪，请稍后重试。");
     if (action.type === "control") {
+      const reason = nativeControlReason(state, action.controlId, ui.pending);
+      if (reason) throw Error(reason);
       control(action.controlId);
       return;
     }
@@ -89,7 +104,8 @@ export function createDesktopChatPort(current: () => RendererUI, control: (id: s
       // function only inside the configure call.
       let draft: SettingsDraft = newSettingsDraft(state.settings);
       if (action.type === "save-key") {
-        if (action.providerId !== NATIVE_MODEL) throw Error("这个连接已不在设置里，请重新打开。");
+        if (action.providerId !== modelFieldId(state.settings.preset))
+          throw Error("这个连接已不在设置里，请重新打开。");
         draft = { ...draft, apiKey: action.key.trim() };
         if (!draft.apiKey) throw Error("请先粘贴密钥。");
       } else if (action.choiceId === NATIVE_PRESET) {
@@ -100,14 +116,27 @@ export function createDesktopChatPort(current: () => RendererUI, control: (id: s
       } else if (action.choiceId === NATIVE_KIMI_EFFORT) {
         const effort = KIMI_EFFORTS[action.option];
         if (!effort || state.settings.preset === "flash") throw Error("只有 Kimi 能选推理强度。");
+        if (effort === (state.settings.kimiReasoningEffort ?? "low")) return;
         draft = selectKimiReasoningEffort(draft, effort);
       } else throw Error("当前本地版本尚不支持这项操作。");
       const result = await saveSettingsDraft(
         draft,
         () => undefined,
-        (options) => ui.perform(() => ui.bridge.configure(options)),
+        (options) =>
+          ui.perform(
+            () => ui.bridge.configure(options),
+            "设置未能确认应用，请核对当前设置后重试。",
+          ),
       );
-      if (!result) throw Error("设置未能确认应用。请核对模型设置，或处理系统授权后重试。");
+      if (
+        !result ||
+        result.settings.preset !== draft.settings.preset ||
+        (result.settings.kimiReasoningEffort ?? "low") !==
+          (draft.settings.kimiReasoningEffort ?? "low")
+      )
+        throw Error("设置未能确认应用。请核对模型设置，或处理系统授权后重试。");
+      if (action.type === "save-key" && !result.connection.ready)
+        throw Error("设置已保存，钥匙串状态仍未就绪。请核对系统授权。");
       return;
     }
     if (action.type === "mute") {
@@ -144,15 +173,21 @@ export function createDesktopChatPort(current: () => RendererUI, control: (id: s
       try {
         await dispatch(action);
       } catch (cause) {
-        current().setViewError(errorMessage(cause));
+        if (action.type !== "choose" && action.type !== "save-key" && action.type !== "control")
+          current().setViewError(errorMessage(cause));
         throw cause;
       }
     },
   };
   return {
     port,
-    update(state: DesktopState | null, error: string | null, pending: boolean) {
-      world = projectChatWorld(state, { error, pending });
+    update(
+      state: DesktopState | null,
+      error: string | null,
+      pending: boolean,
+      currentAppearance = appearance.read(),
+    ) {
+      world = projectChatWorld(state, { error, pending, appearance: currentAppearance });
       for (const listener of listeners) listener(world);
     },
   };

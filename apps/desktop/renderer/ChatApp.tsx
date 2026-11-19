@@ -1,7 +1,13 @@
 import { useEffect, useLayoutEffect, useRef, useState } from "react";
-import type { Theme } from "../../chat/port.ts";
 import { App as ChatApp } from "../../chat/ui/App.tsx";
 import type { DesktopBridge } from "../shared.ts";
+import {
+  type ChatAppearance,
+  readAppearance,
+  useWindowTheme,
+  writeAppearance,
+} from "./chat-appearance.ts";
+import { nativeControlReason } from "./chat-pages.ts";
 import { PlanModeNotice, planAvailability } from "./chat-plan.tsx";
 import { CHAT_ACTIONS, createDesktopChatPort } from "./chat-port.ts";
 import { RichMessage } from "./RichMessage.tsx";
@@ -78,17 +84,26 @@ export function DesktopChatApp({ bridge }: { bridge: DesktopBridge }) {
   const current = useRef(ui);
   current.current = ui;
   const [panel, setPanel] = useState<ToolPanel | null>(null);
-  const [theme, setTheme] = useState<Theme>(() =>
-    matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light",
-  );
+  const [appearance, setAppearance] = useState(readAppearance);
+  const appearanceRef = useRef(appearance);
+  const theme = useWindowTheme(appearance.theme);
+  const [openSettingsRequest, setOpenSettingsRequest] = useState<{
+    page: string;
+    sequence: number;
+  }>();
+  const openModelSettings = () =>
+    setOpenSettingsRequest((request) => ({
+      page: "models",
+      sequence: (request?.sequence ?? 0) + 1,
+    }));
   const controls = useRef<(id: string) => void>(() => {});
   controls.current = (id) => {
     const live = current.current;
-    if (
-      live.busy &&
-      !["native.artifacts", "native.effects", "native.materials", "native.help"].includes(id)
-    ) {
-      live.setViewError("请先等待当前操作结束，或停止运行。");
+    const reason = live.state
+      ? nativeControlReason(live.state, id, live.pending)
+      : "本地服务尚未就绪。";
+    if (reason) {
+      live.setViewError(reason);
       return;
     }
     live.setViewError(null);
@@ -130,18 +145,20 @@ export function DesktopChatApp({ bridge }: { bridge: DesktopBridge }) {
     createDesktopChatPort(
       () => current.current,
       (id) => controls.current(id),
+      {
+        read: () => appearanceRef.current,
+        save(next: ChatAppearance) {
+          writeAppearance(next);
+          appearanceRef.current = next;
+          setAppearance(next);
+        },
+      },
     ),
   );
   useLayoutEffect(
-    () => adapter.update(ui.state, ui.viewError, ui.pending),
-    [adapter, ui.state, ui.viewError, ui.pending],
+    () => adapter.update(ui.state, ui.viewError, ui.pending, appearance),
+    [adapter, ui.state, ui.viewError, ui.pending, appearance],
   );
-  useEffect(() => {
-    const media = matchMedia("(prefers-color-scheme: dark)");
-    const changed = () => setTheme(media.matches ? "dark" : "light");
-    media.addEventListener("change", changed);
-    return () => media.removeEventListener("change", changed);
-  }, []);
   useEffect(() => {
     document.documentElement.className = `mc-${theme}`;
   }, [theme]);
@@ -272,14 +289,20 @@ export function DesktopChatApp({ bridge }: { bridge: DesktopBridge }) {
     </section>
   );
   return (
-    <RendererContext value={ui as ReadyRendererUI}>
+    <RendererContext value={{ ...ui, state, openModelSettings } satisfies ReadyRendererUI}>
       <div className={`mc mc-${theme} desktop-chat-root${MAC ? " ch-native-mac" : ""}`}>
         <ChatApp
           port={adapter.port}
           theme={theme}
+          fontSize={appearance.size}
           windowControls={MAC}
           integration={{
             activeChatId: state.activeSessionId,
+            openSettingsRequest,
+            pageNotice:
+              state.status === "ready"
+                ? undefined
+                : (state.error ?? "本地服务暂不可用，请重新打开应用。"),
             onNew: newChat,
             canSend,
             busy: ui.busy,

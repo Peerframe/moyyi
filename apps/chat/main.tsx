@@ -47,8 +47,14 @@ function watchTheme(onChange: () => void): () => void {
 }
 if (params.has("play")) port.play(Number(params.get("play")) || 1);
 
+function currentFontSize(): 13 | 15 | 17 {
+  const size = chosen(port.world(), "general.size");
+  return size === "17" ? 17 : size === "13" ? 13 : 15;
+}
+
 function Root() {
   const theme = useSyncExternalStore(watchTheme, currentTheme);
+  const fontSize = useSyncExternalStore(port.subscribe, currentFontSize);
   useEffect(() => {
     document.documentElement.className = `mc-${theme}`;
   }, [theme]);
@@ -57,6 +63,7 @@ function Root() {
       <App
         port={port}
         theme={theme}
+        fontSize={fontSize}
         windowControls={mac}
         initialChat={params.get("chat") ?? undefined}
         initialPage={params.get("page") ?? undefined}

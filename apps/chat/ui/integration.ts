@@ -3,6 +3,8 @@ import type { ChatAction } from "../port.ts";
 
 /** Optional host-owned controls. They never grant authority on their own. */
 export interface ChatIntegration {
+  readonly openSettingsRequest?: { readonly page: string; readonly sequence: number } | undefined;
+  readonly pageNotice?: string | undefined;
   readonly activeChatId: string | null;
   readonly onNew: () => void;
   readonly canSend: boolean;

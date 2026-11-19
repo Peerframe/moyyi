@@ -18,6 +18,7 @@ import type {
   TextField,
 } from "../port.ts";
 import { Icon } from "./icons.tsx";
+import { ActionFeedback, PageOperationScope, usePageOperation } from "./page-operation.tsx";
 import { Avatar } from "./parts.tsx";
 import { FolderStrip, type ViewId } from "./Rail.tsx";
 
@@ -40,10 +41,10 @@ const PAGE_ICON: Record<PageIcon, keyof typeof Icon> = {
 };
 
 export interface PageActions {
-  choose(choiceId: string, option: number): void;
-  press(controlId: string): void;
-  saveKey(providerId: string, key: string): void;
-  saveText(fieldId: string, text: string): void;
+  choose(choiceId: string, option: number): Promise<void>;
+  press(controlId: string): Promise<void>;
+  saveKey(providerId: string, key: string): Promise<void>;
+  saveText(fieldId: string, text: string): Promise<void>;
 }
 
 function PageIconTile({ icon, size = 32 }: { readonly icon: PageIcon; readonly size?: 32 | 48 }) {
@@ -82,7 +83,7 @@ const LIST: Record<PageKind, { title: string; search: string; foot: string }> = 
 const NATIVE_FOOT: Record<PageKind, string> = {
   automations: "本机版本还不能定时运行；这里会列出到点自己开工的事。",
   plugins: "这里列出当前应用已接入的能力。实际操作仍受会话权限与确认限制。",
-  settings: "设置作用于本机应用；当前会话的权限由运行时检查。",
+  settings: "",
 };
 
 /** The list that replaces the chat list: a row per page with its current value as the second line. */
@@ -105,9 +106,12 @@ export function PageList({
 }) {
   const [query, setQuery] = useState("");
   const words = LIST[kind];
-  const needle = query.trim();
+  const foot = native ? NATIVE_FOOT[kind] : words.foot;
+  const needle = query.trim().toLocaleLowerCase();
   const shown = pages.filter(
-    (page) => !needle || page.name.includes(needle) || page.summary.includes(needle),
+    (page) =>
+      !needle ||
+      [page.name, page.summary].some((value) => value.toLocaleLowerCase().includes(needle)),
   );
   return (
     <section className="mc-panel ch-list" aria-label={words.title}>
@@ -146,12 +150,16 @@ export function PageList({
           ),
           <a
             key={page.id}
+            id={`${kind}-row-${page.id}`}
             className="mc-row ch-page-row"
             href={`#${kind}/${page.id}`}
             aria-current={page.id === current ? "true" : undefined}
             onClick={(event) => {
               event.preventDefault();
               onOpen(page.id);
+              requestAnimationFrame(() =>
+                document.getElementById(`${kind}-title-${page.id}`)?.focus(),
+              );
             }}
           >
             <PageIconTile icon={page.icon} />
@@ -167,13 +175,23 @@ export function PageList({
         ])}
         {shown.length === 0 && needle ? (
           <div className="ch-empty-list">
-            <span className="ch-empty-title">没找到“{needle}”</span>
+            <span className="ch-empty-title" role="status">
+              没找到“{query.trim()}”
+            </span>
+            <button
+              type="button"
+              className="mc-key ch-page-key"
+              onClick={() => {
+                setQuery("");
+                document.getElementById(`${kind}-search`)?.focus();
+              }}
+            >
+              清除搜索
+            </button>
           </div>
         ) : null}
       </div>
-      {native || words.foot ? (
-        <p className="ch-page-foot">{native ? NATIVE_FOOT[kind] : words.foot}</p>
-      ) : null}
+      {foot ? <p className="ch-page-foot">{foot}</p> : null}
     </section>
   );
 }
@@ -196,55 +214,66 @@ export function PagePane({
   readonly onBack?: (() => void) | undefined;
 }) {
   const plugin = "enabled" in page ? page : null;
+  const titleId = `${kind}-title-${page.id}`;
+  function back() {
+    onBack?.();
+    requestAnimationFrame(() => document.getElementById(`${kind}-row-${page.id}`)?.focus());
+  }
   return (
-    <section className="mc-panel ch-pane" aria-label={page.name}>
-      {onBack ? (
-        <button type="button" className="mc-panel-back ch-pane-back" onClick={onBack}>
-          <Icon.back />
-          {LIST[kind].title}
-        </button>
-      ) : null}
-      <div className="ch-pane-body">
-        {feedback ? (
-          <p className="ch-integration-error" role="alert">
-            {feedback}
-          </p>
+    <PageOperationScope key={titleId}>
+      <section className="mc-panel ch-pane" aria-label={page.name}>
+        {onBack ? (
+          <button type="button" className="mc-panel-back ch-pane-back" onClick={back}>
+            <Icon.back />
+            {LIST[kind].title}
+          </button>
         ) : null}
-        {plugin ? (
-          <div className="ch-plugin-head">
-            <PageIconTile icon={plugin.icon} size={48} />
-            <span className="ch-grow ch-min ch-pane-titles">
-              <h2 className="ch-pane-title">{plugin.name}</h2>
-              {plugin.sub ? <span className="ch-pane-sub">{plugin.sub}</span> : null}
-            </span>
-            {kind === "automations" ? (
-              <span className={`mc-role${plugin.enabled ? "" : " ch-off"}`}>
-                {plugin.enabled ? "开着" : "已暂停"}
+        <div className="ch-pane-body">
+          {feedback ? (
+            <p className="ch-integration-error" role="alert">
+              {feedback}
+            </p>
+          ) : null}
+          {plugin ? (
+            <div className="ch-plugin-head">
+              <PageIconTile icon={plugin.icon} size={48} />
+              <span className="ch-grow ch-min ch-pane-titles">
+                <h2 id={titleId} className="ch-pane-title" tabIndex={-1}>
+                  {plugin.name}
+                </h2>
+                {plugin.sub ? <span className="ch-pane-sub">{plugin.sub}</span> : null}
               </span>
-            ) : plugin.enabled ? (
-              <span className="mc-role">在用</span>
-            ) : null}
-            {plugin.toggle ? (
-              <ControlButton control={plugin.toggle} onPress={actions.press} />
-            ) : null}
-          </div>
-        ) : (
-          <div className="ch-pane-titles">
-            <h2 className="ch-pane-title">{page.name}</h2>
-            {page.sub ? <p className="ch-pane-sub">{page.sub}</p> : null}
-          </div>
-        )}
-        {page.groups.map((group, index) => (
-          <Group
-            // biome-ignore lint/suspicious/noArrayIndexKey: groups have no id and never reorder
-            key={index}
-            world={world}
-            group={group}
-            actions={actions}
-          />
-        ))}
-      </div>
-    </section>
+              {kind === "automations" ? (
+                <span className={`mc-role${plugin.enabled ? "" : " ch-off"}`}>
+                  {plugin.enabled ? "开着" : "已暂停"}
+                </span>
+              ) : plugin.enabled ? (
+                <span className="mc-role">在用</span>
+              ) : null}
+              {plugin.toggle ? (
+                <ControlButton control={plugin.toggle} onPress={actions.press} />
+              ) : null}
+            </div>
+          ) : (
+            <div className="ch-pane-titles">
+              <h2 id={titleId} className="ch-pane-title" tabIndex={-1}>
+                {page.name}
+              </h2>
+              {page.sub ? <p className="ch-pane-sub">{page.sub}</p> : null}
+            </div>
+          )}
+          {page.groups.map((group, index) => (
+            <Group
+              // biome-ignore lint/suspicious/noArrayIndexKey: groups have no id and never reorder
+              key={index}
+              world={world}
+              group={group}
+              actions={actions}
+            />
+          ))}
+        </div>
+      </section>
+    </PageOperationScope>
   );
 }
 
@@ -287,22 +316,36 @@ function Group({
   );
 }
 
-export function ControlButton({
+function ControlButton({
   control,
   onPress,
+  add = false,
+  sharedReason,
 }: {
+  readonly sharedReason?: string | undefined;
   readonly control: Control;
-  readonly onPress: (controlId: string) => void;
+  readonly onPress: PageActions["press"];
+  readonly add?: boolean;
 }) {
+  const operation = usePageOperation(control.id);
   const tone = control.tone ? ` mc-key-${control.tone}` : "";
   return (
-    <button
-      type="button"
-      className={`mc-key ch-page-key${tone}`}
-      onClick={() => onPress(control.id)}
-    >
-      {control.label}
-    </button>
+    <>
+      <button
+        type="button"
+        className={add ? "ch-add-card" : `mc-key ch-page-key${tone}`}
+        disabled={Boolean(control.disabledReason) || operation.busy}
+        title={control.disabledReason}
+        onClick={() => void operation.run(() => onPress(control.id))}
+      >
+        {add ? <span aria-hidden="true">＋</span> : null}
+        {control.label}
+      </button>
+      <ActionFeedback
+        notice={operation.notice}
+        disabledReason={sharedReason ? undefined : control.disabledReason}
+      />
+    </>
   );
 }
 
@@ -313,28 +356,37 @@ function Segment({
 }: {
   readonly choice: Choice;
   readonly inline: boolean;
-  readonly onChoose: (choiceId: string, option: number) => void;
+  readonly onChoose: PageActions["choose"];
 }) {
+  const operation = usePageOperation(choice.id);
   return (
-    <div
-      className={`mc-seg${inline ? " ch-seg-inline" : ""}`}
-      style={
-        inline
-          ? undefined
-          : { gridTemplateColumns: `repeat(${choice.options.length}, minmax(0, 1fr))` }
-      }
-    >
-      {choice.options.map((option, index) => (
-        <button
-          key={option}
-          type="button"
-          aria-pressed={index === choice.selected}
-          onClick={() => onChoose(choice.id, index)}
-        >
-          {option}
-        </button>
-      ))}
-    </div>
+    <>
+      <fieldset
+        aria-label={choice.label}
+        className={`mc-seg${inline ? " ch-seg-inline" : ""}`}
+        style={
+          inline
+            ? undefined
+            : { gridTemplateColumns: `repeat(${choice.options.length}, minmax(0, 1fr))` }
+        }
+      >
+        {choice.options.map((option, index) => (
+          <button
+            key={option}
+            type="button"
+            aria-pressed={index === choice.selected}
+            disabled={Boolean(choice.disabledReason) || operation.busy}
+            title={choice.disabledReason}
+            onClick={() => {
+              if (index !== choice.selected) void operation.run(() => onChoose(choice.id, index));
+            }}
+          >
+            {option}
+          </button>
+        ))}
+      </fieldset>
+      <ActionFeedback notice={operation.notice} disabledReason={choice.disabledReason} />
+    </>
   );
 }
 
@@ -360,14 +412,17 @@ function Line({
   world,
   line,
   onPress,
+  sharedReason,
 }: {
+  readonly sharedReason?: string | undefined;
   readonly world: ChatWorld;
   readonly line: PageLine;
-  readonly onPress: (controlId: string) => void;
+  readonly onPress: PageActions["press"];
 }) {
-  if (line.link)
-    return (
-      <button type="button" className="ch-line ch-line-link" onClick={() => onPress(line.id)}>
+  const operation = usePageOperation(line.id);
+  if (line.link || line.detail !== undefined) {
+    const heading = (
+      <>
         <span className="ch-grow ch-min ch-line-text">
           <span className="ch-line-main">{line.text}</span>
           {line.sub ? <span className="ch-line-sub">{line.sub}</span> : null}
@@ -375,8 +430,30 @@ function Line({
         <span className="muted ch-line-chevron" aria-hidden="true">
           <Icon.chevron />
         </span>
-      </button>
+      </>
     );
+    if (line.detail !== undefined)
+      return (
+        <details className="ch-disclosure">
+          <summary className="ch-line ch-line-link">{heading}</summary>
+          <p className="ch-line-sub">{line.detail}</p>
+        </details>
+      );
+    return (
+      <>
+        <button
+          type="button"
+          className="ch-line ch-line-link"
+          title={line.disabledReason}
+          disabled={Boolean(line.disabledReason) || operation.busy}
+          onClick={() => void operation.run(() => onPress(line.id))}
+        >
+          {heading}
+        </button>
+        <ActionFeedback notice={operation.notice} disabledReason={line.disabledReason} />
+      </>
+    );
+  }
   return (
     <div className="ch-line">
       {line.icon ? <PageIconTile icon={line.icon} /> : null}
@@ -398,7 +475,12 @@ function Line({
       </span>
       {line.tag ? <span className={`mc-role${line.off ? " ch-off" : ""}`}>{line.tag}</span> : null}
       {line.controls?.map((control) => (
-        <ControlButton key={control.id} control={control} onPress={onPress} />
+        <ControlButton
+          key={control.id}
+          control={control}
+          onPress={onPress}
+          sharedReason={sharedReason}
+        />
       ))}
     </div>
   );
@@ -415,19 +497,21 @@ function KeyField({
   readonly label: string;
   readonly placeholder: string;
   readonly save: Control;
-  readonly onSave: (providerId: string, key: string) => void;
+  readonly onSave: PageActions["saveKey"];
 }) {
-  // The key lives only in this field until it is handed to the keychain, then the field clears.
+  // The write-only credential leaves the field at submission, before validation or IPC can reject.
   const [key, setKey] = useState("");
   const id = `key-${providerId}`;
+  const operation = usePageOperation(save.id);
+  const disabled = Boolean(save.disabledReason) || operation.busy;
   return (
     <form
       className="ch-key-field"
       onSubmit={(event) => {
         event.preventDefault();
-        if (!key.trim()) return;
-        onSave(providerId, key);
+        if (disabled || !key.trim()) return;
         setKey("");
+        void operation.run(() => onSave(providerId, key), "密钥已保存。");
       }}
     >
       <div className="mc-composer ch-grow ch-key-input">
@@ -441,15 +525,25 @@ function KeyField({
           spellCheck={false}
           placeholder={placeholder}
           value={key}
-          onChange={(event) => setKey(event.target.value)}
+          disabled={disabled}
+          onChange={(event) => {
+            setKey(event.target.value);
+            operation.clear();
+          }}
         />
       </div>
       <button
         type="submit"
+        disabled={disabled || !key.trim()}
         className={`mc-key ch-page-key${save.tone ? ` mc-key-${save.tone}` : ""}`}
       >
         {save.label}
       </button>
+      <ActionFeedback
+        notice={operation.notice}
+        disabledReason={save.disabledReason}
+        retry=" 重试时请重新粘贴密钥。"
+      />
     </form>
   );
 }
@@ -459,14 +553,17 @@ function SwitchRow({
   label,
   note,
   on,
+  disabledReason,
   onPress,
 }: {
   readonly id: string;
   readonly label: string;
   readonly note?: string | undefined;
   readonly on: boolean;
-  readonly onPress: (controlId: string) => void;
+  readonly disabledReason?: string | undefined;
+  readonly onPress: PageActions["press"];
 }) {
+  const operation = usePageOperation(id);
   return (
     <div className="ch-line">
       <span className="ch-grow ch-min ch-line-text">
@@ -481,8 +578,11 @@ function SwitchRow({
         className="ch-switch"
         aria-checked={on}
         aria-labelledby={`${id}-label`}
-        onClick={() => onPress(id)}
+        disabled={Boolean(disabledReason) || operation.busy}
+        title={disabledReason}
+        onClick={() => void operation.run(() => onPress(id))}
       />
+      <ActionFeedback notice={operation.notice} disabledReason={disabledReason} />
     </div>
   );
 }
@@ -493,20 +593,19 @@ function TextBlock({
   onSave,
 }: {
   readonly field: TextField;
-  readonly onSave: (fieldId: string, text: string) => void;
+  readonly onSave: PageActions["saveText"];
 }) {
-  const [text, setText] = useState(field.value);
-  const [seen, setSeen] = useState(field.value);
-  if (seen !== field.value) {
-    setSeen(field.value);
-    setText(field.value);
-  }
+  const [draft, setDraft] = useState<string | null>(null);
+  const text = draft ?? field.value;
+  const operation = usePageOperation(field.save.id);
+  const disabled = Boolean(field.save.disabledReason) || operation.busy;
   return (
     <form
       className="ch-text-field"
-      onSubmit={(event) => {
+      onSubmit={async (event) => {
         event.preventDefault();
-        if (text !== field.value) onSave(field.id, text);
+        if (disabled || text === field.value) return;
+        if (await operation.run(() => onSave(field.id, text), "已保存。")) setDraft(null);
       }}
     >
       <div className="mc-composer ch-text-box">
@@ -518,7 +617,12 @@ function TextBlock({
           rows={4}
           maxLength={field.max}
           value={text}
-          onChange={(event) => setText(event.target.value)}
+          disabled={disabled}
+          onChange={(event) => {
+            const value = event.target.value;
+            setDraft(value === field.value ? null : value);
+            operation.clear();
+          }}
         />
       </div>
       <div className="ch-text-foot">
@@ -528,11 +632,12 @@ function TextBlock({
         <button
           type="submit"
           className={`mc-key ch-page-key${field.save.tone ? ` mc-key-${field.save.tone}` : ""}`}
-          disabled={text === field.value}
+          disabled={disabled || text === field.value}
         >
           {field.save.label}
         </button>
       </div>
+      <ActionFeedback notice={operation.notice} disabledReason={field.save.disabledReason} />
     </form>
   );
 }
@@ -563,14 +668,32 @@ function Block({
           ))}
         </Card>
       );
-    case "lines":
+    case "lines": {
+      const controls = block.lines.flatMap((line) => line.controls ?? []);
+      const reason = controls[0]?.disabledReason;
+      const sharedReason =
+        reason &&
+        controls.length > 1 &&
+        controls.every((control) => control.disabledReason === reason)
+          ? reason
+          : undefined;
       return (
-        <Card>
-          {block.lines.map((line) => (
-            <Line key={line.id} world={world} line={line} onPress={actions.press} />
-          ))}
-        </Card>
+        <>
+          <Card>
+            {block.lines.map((line) => (
+              <Line
+                key={line.id}
+                world={world}
+                line={line}
+                onPress={actions.press}
+                sharedReason={sharedReason}
+              />
+            ))}
+          </Card>
+          {sharedReason ? <ActionFeedback notice={null} disabledReason={sharedReason} /> : null}
+        </>
       );
+    }
     case "locks":
       return (
         <div className="ch-card ch-locks">
@@ -597,7 +720,9 @@ function Block({
                     <span
                       className={`ch-dot${provider.connected ? " ch-dot-on" : ""}`}
                       role="img"
-                      aria-label={provider.connected ? "已连上" : "未连上"}
+                      aria-label={
+                        provider.connectionLabel ?? (provider.connected ? "已连上" : "未连上")
+                      }
                     />
                     {provider.tag ? <span className="mc-role">{provider.tag}</span> : null}
                   </span>
@@ -626,6 +751,7 @@ function Block({
           {block.switches.map((entry) => (
             <SwitchRow
               key={entry.id}
+              disabledReason={entry.disabledReason}
               id={entry.id}
               label={entry.label}
               note={entry.note}
@@ -636,18 +762,9 @@ function Block({
         </Card>
       );
     case "text":
-      return <TextBlock field={block.field} onSave={actions.saveText} />;
+      return <TextBlock key={block.field.id} field={block.field} onSave={actions.saveText} />;
     case "add":
-      return (
-        <button
-          type="button"
-          className="ch-add-card"
-          onClick={() => actions.press(block.control.id)}
-        >
-          <span aria-hidden="true">＋</span>
-          {block.control.label}
-        </button>
-      );
+      return <ControlButton add control={block.control} onPress={actions.press} />;
     case "shortcuts":
       return (
         <div className="ch-card">

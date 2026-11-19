@@ -1,5 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
 import type { DesktopBridge } from "../shared.ts";
+import { DEFAULT_APPEARANCE } from "./chat-appearance.ts";
 import { createDesktopChatPort } from "./chat-port.ts";
 import { chatTestState } from "./chat-test-state.ts";
 import type { RendererUI } from "./ui.ts";
@@ -7,7 +8,10 @@ import type { RendererUI } from "./ui.ts";
 function fixture() {
   const state = chatTestState();
   const act = vi.fn(async () => state);
-  const configure = vi.fn(async () => state);
+  const configure = vi.fn<DesktopBridge["configure"]>(async ({ settings }) => ({
+    ...state,
+    settings,
+  }));
   const control = vi.fn();
   const ui = {
     state,
@@ -20,9 +24,10 @@ function fixture() {
     setViewError: vi.fn(),
     perform: vi.fn(async (run) => run()),
   } as unknown as RendererUI;
-  const adapter = createDesktopChatPort(() => ui, control);
+  const appearance = { read: () => DEFAULT_APPEARANCE, save: vi.fn() };
+  const adapter = createDesktopChatPort(() => ui, control, appearance);
   adapter.update(state, null, false);
-  return { ui, act, configure, control, adapter };
+  return { ui, act, configure, control, appearance, adapter };
 }
 
 describe("native Chat action routing", () => {
@@ -113,17 +118,55 @@ describe("native Chat action routing", () => {
       f.adapter.port.act({ type: "choose", choiceId: "native.preset", option: 9 }),
     ).rejects.toThrow("没有这个模型服务");
     const secret = "sk-test-not-a-real-key-0001";
-    await f.adapter.port.act({ type: "save-key", providerId: "native.model", key: ` ${secret} ` });
+    await f.adapter.port.act({
+      type: "save-key",
+      providerId: "native.model.flash",
+      key: ` ${secret} `,
+    });
     expect(f.configure).toHaveBeenLastCalledWith({
       settings: expect.objectContaining({ preset: "flash" }),
       apiKey: secret,
     });
     expect(JSON.stringify(f.adapter.port.world())).not.toContain(secret);
     await expect(
-      f.adapter.port.act({ type: "save-key", providerId: "native.model", key: "has space" }),
+      f.adapter.port.act({ type: "save-key", providerId: "native.model.flash", key: "has space" }),
     ).rejects.toThrow("API Key");
     expect(f.configure).toHaveBeenCalledTimes(1);
     expect(f.act).not.toHaveBeenCalled();
+  });
+
+  it("reports an unconfirmed key even if the host saved the settings", async () => {
+    const f = fixture();
+    f.configure.mockResolvedValue(chatTestState({ connection: { ready: false } }));
+    await expect(
+      f.adapter.port.act({ type: "save-key", providerId: "native.model.flash", key: "test-only" }),
+    ).rejects.toThrow("钥匙串状态仍未就绪");
+  });
+
+  it("keeps stale service keys and history-only grants out of the bridge", async () => {
+    const f = fixture();
+    f.ui.state = chatTestState({
+      settings: { ...chatTestState().settings, preset: "kimi-global" },
+      historyOnly: true,
+    });
+    await expect(
+      f.adapter.port.act({ type: "save-key", providerId: "native.model.flash", key: "test" }),
+    ).rejects.toThrow("连接");
+    await expect(
+      f.adapter.port.act({ type: "control", controlId: "native.permissions" }),
+    ).rejects.toThrow("只能查看历史");
+    expect(f.control).not.toHaveBeenCalled();
+    expect(f.configure).not.toHaveBeenCalled();
+    await f.adapter.port.act({ type: "control", controlId: "native.history" });
+    expect(f.control).toHaveBeenCalledWith("native.history");
+  });
+
+  it("changes window appearance during a run without reconfiguring the host", async () => {
+    const f = fixture();
+    f.ui.state = chatTestState({ run: { id: "run-a", state: "running" } });
+    await f.adapter.port.act({ type: "choose", choiceId: "general.size", option: 2 });
+    expect(f.appearance.save).toHaveBeenCalledWith({ theme: "system", size: 17 });
+    expect(f.configure).not.toHaveBeenCalled();
   });
 
   it("refuses settings changes while a run is going", async () => {

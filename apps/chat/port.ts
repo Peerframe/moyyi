@@ -341,6 +341,7 @@ export type PageIcon =
 /** A button on a page. */
 export interface Control {
   readonly id: string;
+  readonly disabledReason?: string;
   readonly label: string;
   readonly tone?: "primary" | "danger";
 }
@@ -348,6 +349,7 @@ export interface Control {
 /** A segmented choice; with a label it is a row in a card, without one it spans the group. */
 export interface Choice {
   readonly id: string;
+  readonly disabledReason?: string;
   readonly label?: string;
   readonly note?: string;
   readonly options: readonly string[];
@@ -357,6 +359,7 @@ export interface Choice {
 /** One row in a card: a folder, a memory, a scheduled job, a skill, a help topic. */
 export interface PageLine {
   readonly id: string;
+  readonly disabledReason?: string;
   readonly text: string;
   readonly sub?: string;
   readonly mono?: boolean;
@@ -369,6 +372,8 @@ export interface PageLine {
   readonly controls?: readonly Control[];
   /** The whole row opens something (a help topic): drawn with a chevron, pressed as its id. */
   readonly link?: boolean;
+  /** Expandable local help or attribution text. */
+  readonly detail?: string;
 }
 
 export interface Provider {
@@ -377,6 +382,7 @@ export interface Provider {
   readonly name: string;
   readonly status: string;
   readonly connected: boolean;
+  readonly connectionLabel?: string;
   /** A quiet pill after the name ("默认", "搜索用这个"). */
   readonly tag?: string;
   readonly controls: readonly Control[];
@@ -387,6 +393,7 @@ export interface Provider {
 /** An on/off setting: a row with its own switch. Guarantees are locks, never switches. */
 export interface Switch {
   readonly id: string;
+  readonly disabledReason?: string;
   readonly label: string;
   readonly note?: string;
   readonly on: boolean;

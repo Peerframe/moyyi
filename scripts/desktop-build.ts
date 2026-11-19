@@ -57,7 +57,13 @@ await build({
   platform: "browser",
   format: "esm",
   target: "chrome156",
-  define: { "process.env.NODE_ENV": '"production"' },
+  define: {
+    "process.env.NODE_ENV": '"production"',
+    __MOYYI_VERSION__: JSON.stringify(
+      JSON.parse(readFileSync(join(root, "package.json"), "utf8")).version,
+    ),
+    __MOYYI_NOTICES__: JSON.stringify(readFileSync(join(root, "THIRD_PARTY_NOTICES.md"), "utf8")),
+  },
   legalComments: "linked",
   tsconfig: join(root, "tsconfig.desktop.json"),
 });

@@ -34,19 +34,27 @@ it lists that folder's sessions), **自动化** (empty: this version cannot run 
 On macOS the window has no separate title bar: the traffic lights sit in the top of the rail, the
 rail shows the window material, and the rail, list head and chat top drag the window.
 
-设置 is grouped like the canvas boards, keeping only what this version does:
+Open **设置** in the rail or press **⌘,**. The local candidate follows canvas v61.
 
-- **设置**: 通用 (colour follows the system) and 快捷键.
-- **功能 → 模型**: choose the service, Kimi's reasoning strength and save a key to the keychain
-  in place. Each change is saved with `configure`, which reopens the runtime and reloads the open
-  session, so it is refused while a run or import is going. The per-turn limits and long-task
-  switches are still changed in the model settings window behind **调整**.
-- **数据安全**: 权限 (the current session's folder, web access and the approval rules) and 数据
-  (history, materials, reports, sessions, backup and rollback).
-- **获取帮助** opens the usage guide, and **关于 moyyi** shows the version.
-
-个性化 and 记忆 are not shown until those capabilities exist. Mock-only voice, multi-agent and
-scheduling actions are unavailable.
+- **通用** changes the colour scheme and text size together across messages, lists and panels.
+  The Electron profile remembers these display preferences independently of session backups.
+  Choose **跟随系统** to follow macOS appearance changes while the window is open. Decision
+  reminders currently appear inside the conversation.
+- **快捷键** lists the shortcuts available in this client. **模型** selects the service and
+  Kimi reasoning strength and saves a key through the existing Keychain connection. Saving
+  reopens the runtime and resets session grants. A run or import must finish first. A new key
+  belongs to the selected service and clears on submission, service change or leaving the page.
+  The credential status reports local availability. **每一轮 → 调整** opens the existing settings
+  dialog for request limits and long-task options.
+- **个性化** explains how to use project instructions in a workspace's `AGENTS.md`. The global
+  personal-instruction field and the **记忆** switch show their unavailable state. This build
+  has no cross-session personal-instruction store or automatic memory.
+- **权限** shows the current session's folder, web access and approval rules. **数据** opens
+  history, materials, results, session management and backup. Session-scoped actions explain
+  when they require an open or resumable session. Restoring a backup still uses the native
+  confirmation.
+- **获取帮助** has expandable local guidance and a full usage guide. **关于 moyyi** shows the
+  package version and its bundled third-party notices.
 
 Open `Moyyi.app`, choose **新建 → 选择工作目录**, and describe the file or question. Send with
 the button or Command+Enter. The selected directory is the read scope, including supported

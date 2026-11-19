@@ -2,7 +2,7 @@
 // desktop show the same page; change it together with the key handling.
 import type { SettingsPage } from "../port.ts";
 
-export function shortcutsPage(section: string): SettingsPage {
+export function shortcutsPage(section: string, { editLast = true } = {}): SettingsPage {
   return {
     id: "shortcuts",
     name: "快捷键",
@@ -33,7 +33,7 @@ export function shortcutsPage(section: string): SettingsPage {
             shortcuts: [
               { keys: ["⌘", "↩"], what: "发出去" },
               { keys: ["↩"], what: "换行，不会发出去" },
-              { keys: ["↑"], what: "改刚发的那句（输入框空着时）" },
+              ...(editLast ? [{ keys: ["↑"], what: "改刚发的那句（输入框空着时）" }] : []),
             ],
           },
         ],

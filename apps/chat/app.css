@@ -30,6 +30,39 @@ html {
   position: relative;
   overflow: clip;
 }
+/* S23 scales reading text while rail geometry, icons and window breakpoints stay fixed. */
+html:has(.ch-app[data-font-size="13"]) {
+  font-size: 13px;
+}
+html:has(.ch-app[data-font-size="15"]) {
+  font-size: 15px;
+}
+html:has(.ch-app[data-font-size="17"]) {
+  font-size: 17px;
+}
+.ch-app,
+.mc-bubble,
+.mc-row-name,
+.mc-head-name,
+.mc-plan-title,
+.mc-composer input {
+  font-size: 1rem;
+}
+.mc-row-preview,
+.mc-sender,
+.mc-section-h,
+.mc-pinned,
+.mc-plan dl,
+.mc-result-list {
+  font-size: calc(1rem - 2px);
+}
+.mc-file-name,
+.mc-thread-root,
+.mc-quote,
+.mc-claim,
+.mc-transcript {
+  font-size: calc(1rem - 1px);
+}
 .ch-rail {
   flex: 0 0 auto;
   overflow-y: auto;
@@ -84,7 +117,7 @@ html {
 }
 .ch-search input {
   height: 30px;
-  font-size: 13px;
+  font-size: calc(1rem - 2px);
 }
 .ch-rows {
   display: flex;
@@ -431,7 +464,7 @@ html {
   font-size: 14px;
 }
 .ch-steps {
-  font-size: 13px;
+  font-size: calc(1rem - 2px);
 }
 .ch-meta-split {
   justify-content: space-between;
@@ -512,14 +545,14 @@ html {
   align-items: baseline;
 }
 .ch-sub {
-  font-size: 12px;
+  font-size: max(11px, calc(1rem - 3px));
   color: var(--muted);
 }
 .ch-sub-gap {
   margin-top: var(--space-4);
 }
 .ch-caption {
-  font-size: 12px;
+  font-size: max(11px, calc(1rem - 3px));
   color: var(--muted);
   line-height: 1.4;
 }
@@ -546,7 +579,7 @@ html {
   text-align: center;
 }
 .ch-empty-title {
-  font-size: 15px;
+  font-size: 1rem;
   font-weight: 500;
 }
 
@@ -711,7 +744,7 @@ html {
 .mc-panel-head h2 {
   flex: 1 1 auto;
   margin: 0;
-  font-size: 15px;
+  font-size: 1rem;
   font-weight: 600;
 }
 .ch-profile {
@@ -723,14 +756,14 @@ html {
 }
 .ch-profile-name {
   margin-top: var(--space-6);
-  font-size: 17px;
+  font-size: calc(1rem + 2px);
   font-weight: 600;
 }
 .ch-section {
   display: flex;
   flex-direction: column;
   gap: var(--space-6);
-  font-size: 13px;
+  font-size: calc(1rem - 2px);
 }
 .ch-section-h {
   display: flex;
@@ -755,10 +788,10 @@ html {
   padding: var(--space-6) var(--space-4);
 }
 .ch-claim-text {
-  font-size: 14px;
+  font-size: calc(1rem - 1px);
 }
 .ch-info blockquote {
-  font-size: 13px;
+  font-size: calc(1rem - 2px);
 }
 .ch-jobs,
 .ch-undo-list {
@@ -916,7 +949,7 @@ html {
 }
 .ch-list-title {
   margin: 0;
-  font-size: 15px;
+  font-size: 1rem;
   font-weight: 600;
 }
 .ch-list-compose {
@@ -953,7 +986,7 @@ html {
   padding: var(--space-8) var(--space-10);
 }
 .ch-page-row-name {
-  font-size: 14px;
+  font-size: calc(1rem - 1px);
 }
 .ch-one-line {
   -webkit-line-clamp: 1;
@@ -961,7 +994,7 @@ html {
 }
 .ch-page-foot {
   margin: auto var(--space-10) var(--space-4);
-  font-size: 12px;
+  font-size: max(11px, calc(1rem - 3px));
   line-height: 1.5;
   color: var(--muted);
 }
@@ -993,17 +1026,17 @@ html {
 }
 .ch-pane-title {
   margin: 0;
-  font-size: 20px;
+  font-size: calc(1rem + 5px);
   font-weight: 650;
 }
 .ch-pane-sub {
   margin: 0;
-  font-size: 14px;
+  font-size: calc(1rem - 1px);
   line-height: 1.6;
   color: var(--muted);
 }
 .ch-plugin-head .ch-pane-sub {
-  font-size: 13px;
+  font-size: calc(1rem - 2px);
 }
 .ch-plugin-head {
   display: flex;
@@ -1035,11 +1068,11 @@ html {
 }
 .ch-group-title {
   margin: 0;
-  font-size: 15px;
+  font-size: 1rem;
   font-weight: 600;
 }
 .ch-group-caption {
-  font-size: 13px;
+  font-size: calc(1rem - 2px);
   line-height: 1.5;
   color: var(--muted);
 }
@@ -1066,7 +1099,7 @@ html {
   padding: 0 var(--space-4);
 }
 .ch-group-bare .ch-group-title {
-  font-size: 13px;
+  font-size: calc(1rem - 2px);
   font-weight: 600;
   color: var(--muted);
 }
@@ -1155,18 +1188,18 @@ html {
   gap: 2px;
 }
 .ch-line-main {
-  font-size: 14px;
+  font-size: calc(1rem - 1px);
 }
 /* A card with no title: its rows are the titles (自动记忆). */
 .ch-group > .ch-card:only-child .ch-line-main {
-  font-size: 15px;
+  font-size: 1rem;
   font-weight: 600;
 }
 .ch-line-mono {
-  font-size: 13px;
+  font-size: calc(1rem - 2px);
 }
 .ch-line-sub {
-  font-size: 12px;
+  font-size: max(11px, calc(1rem - 3px));
   color: var(--muted);
 }
 /* A help topic: the whole row is the button, with a chevron at the end. */
@@ -1198,7 +1231,7 @@ html {
   gap: var(--space-4);
 }
 .ch-provider-name {
-  font-size: 15px;
+  font-size: 1rem;
   font-weight: 600;
 }
 .ch-off {
@@ -1264,7 +1297,7 @@ html {
   padding-top: 14px;
 }
 .ch-text-foot .ch-line-sub {
-  font-size: 13px;
+  font-size: calc(1rem - 2px);
 }
 .ch-key-field {
   display: flex;
@@ -1306,7 +1339,7 @@ html {
   font-weight: 600;
 }
 .ch-note {
-  font-size: 14px;
+  font-size: calc(1rem - 1px);
   line-height: 1.6;
 }
 .ch-controls {
@@ -1380,4 +1413,48 @@ html {
   padding: 0 var(--space-10) var(--space-4);
   font-size: 12px;
   color: var(--muted);
+}
+
+/* Settings controls keep their outcome beside the operation, including on a narrow pane. */
+.ch-pane fieldset.mc-seg {
+  margin: 0;
+  border: 0;
+  min-inline-size: 0;
+}
+.ch-line:has(> .ch-action-feedback),
+.ch-group-head:has(> .ch-action-feedback),
+.ch-controls:has(> .ch-action-feedback),
+.ch-key-field {
+  flex-wrap: wrap;
+}
+.ch-action-feedback {
+  flex-basis: 100%;
+  overflow-wrap: anywhere;
+}
+.ch-action-feedback[role="alert"] {
+  color: var(--danger);
+}
+.ch-disclosure > summary {
+  list-style: none;
+}
+.ch-disclosure > summary::-webkit-details-marker {
+  display: none;
+}
+.ch-disclosure[open] > summary .ch-line-chevron {
+  transform: rotate(90deg);
+}
+.ch-disclosure > p {
+  margin: var(--space-8) 0 0;
+  white-space: pre-line;
+  overflow-wrap: anywhere;
+  line-height: 1.6;
+}
+.ch-pane :is(.ch-key-input, .ch-text-box):focus-within {
+  outline: 2px solid var(--focus);
+  outline-offset: 2px;
+}
+.ch-pane button:disabled,
+.ch-pane :is(input, textarea):disabled {
+  opacity: 0.6;
+  cursor: default;
 }

@@ -133,6 +133,71 @@ describe("moyyi Chat interface", () => {
     expect(html).toMatch(/type="submit"[^>]*disabled=""[^>]*>保存/);
   });
 
+  it("disables unavailable settings with a visible reason and expands local help as text", () => {
+    const world = xiaowenWorld();
+    const html = renderPage(
+      {
+        ...world,
+        settings: [
+          {
+            id: "sample",
+            section: "功能",
+            name: "设置示例",
+            icon: "help",
+            summary: "",
+            groups: [
+              {
+                blocks: [
+                  {
+                    kind: "switches",
+                    switches: [
+                      {
+                        id: "memory.auto",
+                        label: "自动记忆",
+                        on: false,
+                        disabledReason: "此版本尚未接入自动记忆。",
+                      },
+                    ],
+                  },
+                  {
+                    kind: "text",
+                    field: {
+                      id: "me.instructions",
+                      label: "个人指令",
+                      value: "",
+                      max: 4000,
+                      save: {
+                        id: "me.save",
+                        label: "保存",
+                        disabledReason: "此版本暂不支持保存。",
+                      },
+                    },
+                  },
+                  {
+                    kind: "lines",
+                    lines: [
+                      {
+                        id: "help.keys",
+                        text: "密钥如何保存？",
+                        detail: "在本机保存。<script>unsafe()</script>",
+                      },
+                    ],
+                  },
+                ],
+              },
+            ],
+          },
+        ],
+      },
+      "settings/sample",
+    );
+    expect(html).toMatch(/role="switch"[^>]*aria-checked="false"[^>]*disabled=""/);
+    expect(html).toMatch(/<textarea[^>]*disabled=""/);
+    expect(text(html)).toContain("此版本尚未接入自动记忆。");
+    expect(html).toMatch(/<details[^>]*><summary[^>]*>.*密钥如何保存？.*<\/summary>/);
+    expect(html).toContain("&lt;script&gt;unsafe()&lt;/script&gt;");
+  });
+
   it("lists help topics as rows that open, and keeps 反馈 a button (S30)", () => {
     const html = renderPage(xiaowenWorld(), "settings/help", "light");
     expect(html.match(/class="ch-line ch-line-link"/g)).toHaveLength(7);

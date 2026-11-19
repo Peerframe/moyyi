@@ -1,5 +1,6 @@
 import type { Chat, ChatInfo, ChatWorld, Message, Project } from "../../chat/port.ts";
 import type { DesktopMessage, DesktopSessionSummary, DesktopState } from "../shared.ts";
+import type { ChatAppearance } from "./chat-appearance.ts";
 import { chatBudgetLabel, chatModelLabel, projectChatPages } from "./chat-pages.ts";
 import { permissionLabel } from "./effects-state.ts";
 import { noticeLabel, outcomeLabel, toolStateLabel, workspaceName } from "./view-state.ts";
@@ -7,6 +8,7 @@ import { noticeLabel, outcomeLabel, toolStateLabel, workspaceName } from "./view
 export interface ChatProjectionOptions {
   readonly error?: string | null;
   readonly pending?: boolean;
+  readonly appearance?: ChatAppearance;
 }
 
 function message(entry: DesktopMessage): Message {
@@ -234,7 +236,7 @@ export function projectChatWorld(
     projects: sessionProjects(summaries),
     // Nothing starts on its own in this version; 自动化 says so instead of listing samples.
     automations: [],
-    ...projectChatPages(state),
+    ...projectChatPages(state, options.appearance, options.pending),
   };
 }
 

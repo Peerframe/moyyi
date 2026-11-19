@@ -193,21 +193,25 @@ describe("desktop Chat state projection", () => {
       ]),
     );
     expect(world.plugins.every((plugin) => !plugin.toggle)).toBe(true);
-    // The boards' groups, without 个性化 and 记忆 until those capabilities exist.
+    // The nine boards remain navigable even when a runtime capability is unavailable.
     expect(world.settings.map((page) => `${page.section} ${page.name}`)).toEqual([
       "设置 通用",
       "设置 快捷键",
       "功能 模型",
+      "功能 个性化",
+      "功能 记忆",
       "数据安全 权限",
       "数据安全 数据",
       " 获取帮助",
       " 关于 moyyi",
     ]);
     const text = JSON.stringify(world.settings);
-    expect(text).toContain("DeepSeek Flash · 已连上");
-    expect(text).toContain("还没发请求验证");
+    expect(text).toContain("DeepSeek Flash · 密钥已就绪");
+    expect(text).toContain("保存时不验证远端连接");
     expect(text).not.toContain("刚测过");
-    expect(text).not.toMatch(/后台|预算|"kind":"switches"/);
+    expect(text).not.toMatch(/后台|GB\/T 7714|叫我小文/);
+    expect(text).toContain("此版本尚未接入自动记忆");
+    expect(text).not.toContain("改刚发的那句");
     const models = world.settings.find((page) => page.id === "models");
     const choices = models?.groups.flatMap((g) =>
       g.blocks.flatMap((b) => (b.kind === "choice" ? [b.choice.id] : [])),

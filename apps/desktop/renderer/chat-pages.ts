@@ -1,13 +1,10 @@
-import type { PageBlock, PluginPage, SettingsPage } from "../../chat/port.ts";
+import type { Control, PageBlock, PluginPage, SettingsPage } from "../../chat/port.ts";
 import { shortcutsPage } from "../../chat/ui/shortcuts.ts";
 import type { DesktopSettings, DesktopState } from "../shared.ts";
+import { type ChatAppearance, DEFAULT_APPEARANCE, generalSettingsPage } from "./chat-appearance.ts";
+import { aboutPage, helpPage, memoryPage, personalPage } from "./chat-settings-info.ts";
 import { permissionLabel } from "./effects-state.ts";
 import { presetLabel } from "./view-state.ts";
-
-const controls = (...items: readonly [string, string][]): PageBlock => ({
-  kind: "controls",
-  controls: items.map(([id, label]) => ({ id, label })),
-});
 
 export function chatModelLabel(state: DesktopState): string {
   return state.model
@@ -37,21 +34,43 @@ export function longTaskLabel(state: DesktopState): string {
 }
 
 /** The model card's key field and choices; the port maps them onto `configure`. */
-export const NATIVE_MODEL = "native.model";
+export const modelFieldId = (preset: DesktopSettings["preset"]) => `native.model.${preset}`;
 export const NATIVE_PRESET = "native.preset";
 export const NATIVE_KIMI_EFFORT = "native.kimiEffort";
 export const PRESETS: readonly DesktopSettings["preset"][] = ["flash", "kimi-cn", "kimi-global"];
 export const KIMI_EFFORTS = ["low", "high"] as const;
 
 const GUARANTEE = "这些是 moyyi 的保证，设置里关不掉。";
-const line = (id: string, text: string, sub?: string, ...items: [string, string][]) => ({
-  id,
-  text,
-  ...(sub ? { sub } : {}),
-  ...(items.length ? { controls: items.map(([cid, label]) => ({ id: cid, label })) } : {}),
-});
+/** Keep page controls and their dispatch guard in agreement as the session changes. */
+export function nativeControlReason(
+  state: DesktopState,
+  id: string,
+  pending: boolean,
+): string | undefined {
+  if (state.status !== "ready") return "本地服务尚未就绪。";
+  const needsSession = [
+    "native.history",
+    "native.permissions",
+    "native.web",
+    "native.materials",
+    "native.artifacts",
+    "native.effects",
+  ].includes(id);
+  if (needsSession && !state.activeSessionId) return "先打开一个会话。";
+  if (needsSession && state.historyOnly && id !== "native.history") return "这个会话只能查看历史。";
+  const viewOnly = [
+    "native.materials",
+    "native.artifacts",
+    "native.effects",
+    "native.help",
+  ].includes(id);
+  if (!viewOnly && (pending || state.run || state.importing))
+    return "请先等待当前操作结束，或停止运行。";
+  return undefined;
+}
 
-function modelsPage(state: DesktopState): SettingsPage {
+function modelsPage(state: DesktopState, disabledReason: string | undefined): SettingsPage {
+  const blocked = disabledReason ? { disabledReason } : {};
   const { preset } = state.settings;
   const name = presetLabel(preset);
   const ready = state.connection.ready;
@@ -60,7 +79,7 @@ function modelsPage(state: DesktopState): SettingsPage {
     name: "模型",
     icon: "key",
     section: "功能",
-    summary: `${name} · ${ready ? "已连上" : "还没连上"}`,
+    summary: `${name} · ${ready ? "密钥已就绪" : "连接未就绪"}`,
     sub: "AI 通过这个连接找模型。密钥只进 macOS 钥匙串，不会出现在聊天、记录和 AI 看到的内容里；保存不发模型请求。",
     groups: [
       {
@@ -70,18 +89,24 @@ function modelsPage(state: DesktopState): SettingsPage {
             kind: "providers",
             providers: [
               {
-                id: NATIVE_MODEL,
+                id: modelFieldId(preset),
                 letter: preset === "flash" ? "D" : "K",
                 name,
-                tag: "在用",
+                tag: "已选",
+                connectionLabel: ready ? "本机密钥已就绪" : "连接未就绪",
                 connected: ready,
                 status: ready
-                  ? "密钥在系统钥匙串里 · 还没发请求验证"
+                  ? "密钥在系统钥匙串里 · 保存时不验证远端连接"
                   : (state.connection.message ?? "还没连上：粘贴这家的密钥"),
                 controls: [],
                 keyField: {
                   placeholder: ready ? `换一把 ${name} 的密钥` : `粘贴 ${name} 的密钥`,
-                  save: { id: `${NATIVE_MODEL}.save`, label: "存进钥匙串", tone: "primary" },
+                  save: {
+                    ...blocked,
+                    id: `${modelFieldId(preset)}.save`,
+                    label: "存进钥匙串",
+                    tone: "primary",
+                  },
                 },
               },
             ],
@@ -90,11 +115,13 @@ function modelsPage(state: DesktopState): SettingsPage {
       },
       {
         title: "用哪家",
-        caption: "换了以后新的一轮开始用；每家用自己的密钥，服务地址固定。",
+        caption:
+          "保存服务、密钥或推理强度会重新打开当前会话，权限回到只读。每个服务使用自己的密钥。",
         blocks: [
           {
             kind: "choice",
             choice: {
+              ...blocked,
               id: NATIVE_PRESET,
               options: PRESETS.map(presetLabel),
               selected: PRESETS.indexOf(preset),
@@ -112,6 +139,7 @@ function modelsPage(state: DesktopState): SettingsPage {
                 {
                   kind: "choice" as const,
                   choice: {
+                    ...blocked,
                     id: NATIVE_KIMI_EFFORT,
                     options: ["low（默认）", "high（实验）"],
                     selected: state.settings.kimiReasoningEffort === "high" ? 1 : 0,
@@ -122,17 +150,17 @@ function modelsPage(state: DesktopState): SettingsPage {
           ]),
       {
         title: "每一轮",
-        caption: "上限和长任务开关还在原来的设置窗口里改。",
+        caption: "调整请求上限、时限与长任务选项。",
         blocks: [
           {
             kind: "lines",
             lines: [
-              line(
-                "model.budget",
-                `最多 ${state.settings.maxRequests} 次请求 · ${state.settings.timeoutMs / 1000} 秒`,
-                `长任务：${longTaskLabel(state)}`,
-                ["native.settings", "调整"],
-              ),
+              {
+                id: "model.budget",
+                text: `最多 ${state.settings.maxRequests} 次请求 · ${state.settings.timeoutMs / 1000} 秒`,
+                sub: `长任务：${longTaskLabel(state)}`,
+                controls: [{ id: "native.settings", label: "调整", ...blocked }],
+              },
             ],
           },
         ],
@@ -141,11 +169,28 @@ function modelsPage(state: DesktopState): SettingsPage {
   };
 }
 
-/** Only what this desktop really does; 个性化 and 记忆 wait for their capabilities. */
-export function projectChatPages(state: DesktopState): {
+export function projectChatPages(
+  state: DesktopState,
+  appearance: ChatAppearance = DEFAULT_APPEARANCE,
+  pending = false,
+): {
   readonly settings: readonly SettingsPage[];
   readonly plugins: readonly PluginPage[];
 } {
+  const control = ([id, label]: [string, string]): Control => {
+    const reason = nativeControlReason(state, id, pending);
+    return { id, label, ...(reason ? { disabledReason: reason } : {}) };
+  };
+  const controls = (...items: [string, string][]): PageBlock => ({
+    kind: "controls",
+    controls: items.map(control),
+  });
+  const line = (id: string, text: string, sub: string, ...items: [string, string][]) => ({
+    id,
+    text,
+    sub,
+    controls: items.map(control),
+  });
   const active = Boolean(state.activeSessionId && !state.historyOnly);
   const permission = state.historyOnly
     ? "当前只能查看历史，不能继续任务。"
@@ -153,27 +198,11 @@ export function projectChatPages(state: DesktopState): {
       ? permissionLabel(state.permissions, state.reportTarget, state.webAccess)
       : "选择工作目录后，以只读权限开始。";
   const settings: SettingsPage[] = [
-    {
-      id: "general",
-      name: "通用",
-      icon: "sliders",
-      section: "设置",
-      summary: "颜色跟随系统",
-      sub: "颜色和字号。",
-      groups: [
-        {
-          title: "外观",
-          blocks: [
-            {
-              kind: "lines",
-              lines: [line("general.theme", "颜色：跟随系统", "跟着 macOS 的外观切换深色和浅色")],
-            },
-          ],
-        },
-      ],
-    },
-    shortcutsPage("设置"),
-    modelsPage(state),
+    generalSettingsPage(appearance),
+    shortcutsPage("设置", { editLast: false }),
+    modelsPage(state, nativeControlReason(state, "native.settings", pending)),
+    personalPage,
+    memoryPage,
     {
       id: "permissions",
       name: "权限",
@@ -183,7 +212,7 @@ export function projectChatPages(state: DesktopState): {
       sub: "AI 能碰哪个文件夹，哪些事一定先问你。",
       groups: [
         {
-          title: "当前会话",
+          title: "工作目录",
           caption: "权限只管当前会话；重开会话会回到只读。",
           blocks: [
             {
@@ -228,6 +257,21 @@ export function projectChatPages(state: DesktopState): {
       sub: "你和 AI 说过的、做过的，都在哪，怎么留一份。",
       groups: [
         {
+          title: "放在哪",
+          blocks: [
+            {
+              kind: "lines",
+              lines: [
+                line(
+                  "data.where",
+                  "这台电脑上的 ~/.moyyi",
+                  "会话记录和模型设置存在本机。项目文件仍在你选择的工作目录里。",
+                ),
+              ],
+            },
+          ],
+        },
+        {
           title: "当前会话",
           caption: state.activeSessionId
             ? `已选择 ${state.materials.length} 份材料；当前成果页有 ${state.artifacts.items.length} 项${state.artifacts.hasMore ? "，还有更多" : ""}。`
@@ -247,7 +291,7 @@ export function projectChatPages(state: DesktopState): {
           ],
         },
         {
-          title: "本机数据",
+          title: "管理与备份",
           blocks: [
             {
               kind: "lines",
@@ -266,61 +310,8 @@ export function projectChatPages(state: DesktopState): {
         },
       ],
     },
-    {
-      id: "help",
-      name: "获取帮助",
-      icon: "help",
-      section: "",
-      summary: "怎么用 moyyi",
-      sub: "怎么用 moyyi，数据会去哪。",
-      groups: [
-        {
-          title: "开始使用",
-          blocks: [
-            {
-              kind: "lines",
-              lines: [
-                {
-                  id: "native.help",
-                  text: "看文件夹、写报告、改文件、读网页",
-                  sub: "每种做法怎么开始，读到的内容会发给谁",
-                  link: true,
-                },
-              ],
-            },
-          ],
-        },
-      ],
-    },
-    {
-      id: "about",
-      name: "关于 moyyi",
-      icon: "info",
-      section: "",
-      summary: "版本和用到的项目",
-      sub: "版本和用到的开源项目。",
-      groups: [
-        { blocks: [{ kind: "brand", tagline: "moyyi · 墨一" }] },
-        {
-          title: "版本",
-          blocks: [{ kind: "lines", lines: [line("about.version", "预览版", "本地桌面应用")] }],
-        },
-        {
-          title: "用到的项目",
-          blocks: [
-            {
-              kind: "lines",
-              lines: [
-                line(
-                  "about.projects",
-                  "界面里有一部分来自 OpenBot，做事的方法参考了 DeepSeek Harness；来源和许可记在项目文档里。",
-                ),
-              ],
-            },
-          ],
-        },
-      ],
-    },
+    helpPage,
+    aboutPage,
   ];
   const plugins: PluginPage[] = [
     {
