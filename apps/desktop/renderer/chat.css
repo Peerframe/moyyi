@@ -83,6 +83,17 @@ html:has(.ch-native-mac) #root,
 .ch-native-mac .ch-app.mc-window {
   background: transparent;
 }
+/* The macOS material follows the system even when the user chooses the opposite palette. */
+@media (prefers-color-scheme: light) {
+  .ch-native-mac.mc-dark .ch-app.mc-window {
+    background: color-mix(in srgb, var(--window) 88%, transparent);
+  }
+}
+@media (prefers-color-scheme: dark) {
+  .ch-native-mac.mc-light .ch-app.mc-window {
+    background: color-mix(in srgb, var(--window) 88%, transparent);
+  }
+}
 .ch-native-mac .ch-rail {
   padding-top: var(--space-8);
 }
