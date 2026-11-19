@@ -21,8 +21,16 @@
 - The desktop now renders all nine v61 settings pages. Window appearance uses local display
   preferences, models use the existing configure bridge, and session actions enforce the
   current host state. Global personal instructions and automatic memory are unavailable.
-- The focused Chat and desktop renderer suite passed (129 tests). Verify the packaged
-  candidate in an isolated profile at 1120 × 800 and 780 × 560, and record the final gates below.
+- Implementation `66f998f`, final packaged source `a9e32c1` (the native sidebar tint
+  fixes contrast when the app and system themes differ). The macOS arm64 ZIP is in
+  `artifacts/desktop/Moyyi-local-arm64.zip`, SHA-256
+  `b2b79b5af06394b8a6914e09babb95ae2ffa55c8e285cf23408485e3c3ded3fd`.
+- `npx vitest run apps/chat apps/desktop/renderer tests/chat-design.test.ts` passed 129 tests.
+  Final `npm run check` passed 3368 tests in 192 files on the bundled Node 26.12.1.
+  `npm run desktop:package` and `npm run verify:desktop` passed on that candidate.
+- [Native checks and screenshots](../../docs/tasks/assets/2026-11-19-chat-settings/README.md)
+  cover the nine pages, controls, failure feedback, relaunch and both supported window
+  sizes on isolated data. No real model usage, change to daily installation or owner-store migration.
 - Use this section for current status. The dated review and checks below describe earlier checkpoints.
 
 
