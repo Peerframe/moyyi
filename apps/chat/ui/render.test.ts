@@ -6,20 +6,16 @@ import { firstRunWorld, xiaowenWorld } from "../mock/world.ts";
 import type { ChatWorld } from "../port.ts";
 import { App } from "./App.tsx";
 import { openDecisions, runs } from "./Conversation.tsx";
-import { folderBadge, inFolder } from "./Rail.tsx";
+import { folderBadge, inFolder, MORE, Rail } from "./Rail.tsx";
 
 function render(world: ChatWorld, chat?: string, theme: "dark" | "light" = "dark") {
   const port = createMockPort(world, { schedule: () => undefined });
-  return renderToString(
-    createElement(App, { port, theme, sticker: "sticker.png", initialChat: chat }),
-  );
+  return renderToString(createElement(App, { port, theme, initialChat: chat }));
 }
 
 function renderPage(world: ChatWorld, page: string, theme: "dark" | "light" = "dark") {
   const port = createMockPort(world, { schedule: () => undefined });
-  return renderToString(
-    createElement(App, { port, theme, sticker: "sticker.png", initialPage: page }),
-  );
+  return renderToString(createElement(App, { port, theme, initialPage: page }));
 }
 
 /** Text content only, so assertions read like what the person sees. */
@@ -31,8 +27,8 @@ describe("moyyi Chat interface", () => {
     const seen = text(html);
     for (const words of [
       "全部",
-      "等我的",
-      "在做",
+      "项目",
+      "自动化",
       "插件",
       "设置",
       "等你决定：参考文献用哪种格式",
@@ -63,7 +59,7 @@ describe("moyyi Chat interface", () => {
 
   it("opens on first run with only moyyi and 记忆 (S12)", () => {
     const html = text(render(firstRunWorld()));
-    expect(html).toContain("项目和 AI 会在你交代第一件事之后出现");
+    expect(html).toContain("项目会在你交代第一件事之后出现");
     expect(html).toContain("你好，我是 moyyi。");
     expect(html).toContain("每天早上告诉我要做什么");
     expect(html).not.toContain("毕业论文");
@@ -83,27 +79,130 @@ describe("moyyi Chat interface", () => {
     expect(html).toContain('placeholder="说一件想做的事"');
   });
 
-  it("opens 设置 in place of the chat list, first section by default (S23)", () => {
+  it("opens 设置 in place of the chat list, grouped like the boards, 通用 first (S23)", () => {
     const html = renderPage(xiaowenWorld(), "settings");
-    const seen = text(html);
-    for (const name of [
-      "模型和密钥",
-      "关于我",
-      "权限和确认",
-      "后台和定时",
-      "预算",
-      "记录和数据",
-      "通用",
-      "关于 moyyi",
-    ])
-      expect(seen).toContain(name);
-    expect(seen).toContain("AI 用哪些模型，密钥放在哪");
-    expect(seen).toContain("这里只放管全部 AI 的事。");
-    expect(html).not.toContain('aria-label="对话列表"');
-    expect(html).toContain('type="password"');
-    expect(html).toMatch(
-      /<button[^>]*aria-current="true"[^>]*title="设置 ⌘,"|title="设置 ⌘,"[^>]*aria-current="true"/,
+    const list = text(
+      html.slice(html.indexOf('aria-label="设置"'), html.indexOf('class="mc-panel ch-pane"')),
     );
+    expect(list).toMatch(
+      /设置通用.*快捷键.*功能模型.*个性化.*记忆.*数据安全权限.*数据.*获取帮助.*关于 moyyi/,
+    );
+    expect(list).not.toMatch(/后台|预算/);
+    expect(html).toContain('class="ch-page-list-rule"');
+    const seen = text(html);
+    expect(seen).toContain("颜色、字号和通知。");
+    expect(html).not.toContain("ch-page-foot");
+    expect(html).not.toContain('aria-label="对话列表"');
+    expect(html).toMatch(/title="⌘,"[^>]*aria-current="true"/);
+  });
+
+  it("draws 模型 as connection cards with a dashed card to add one (S23)", () => {
+    const html = renderPage(xiaowenWorld(), "settings/models", "light");
+    const seen = text(html);
+    for (const words of [
+      "DeepSeek · 主力",
+      "默认",
+      "DeepSeek · 备用",
+      "添加模型连接",
+      "新对话默认用",
+      "额度用完的时候",
+      "对话停在原处，不会自己换连接",
+    ])
+      expect(seen).toContain(words);
+    expect(html).toContain('class="ch-group ch-group-bare"');
+    expect(html).toContain('class="ch-add-card"');
+    expect(html).toContain('aria-label="已连上"');
+    expect(html).toContain('type="password"');
+  });
+
+  it("draws 记忆 with its switch, the 导入 action and where each memory came from", () => {
+    const html = renderPage(xiaowenWorld(), "settings/memory");
+    const seen = text(html);
+    expect(seen).toContain("自动记忆");
+    expect(seen).toContain("记的时候不打断你。");
+    expect(seen).toContain("从「毕业论文」记下 · 10月30日");
+    expect(html).toMatch(/role="switch"[^>]*aria-checked="true"/);
+    expect(html).toMatch(/ch-group-head.*导入/);
+  });
+
+  it("writes 个人指令 in place with its count and a save button (S26)", () => {
+    const html = renderPage(xiaowenWorld(), "settings/me", "light");
+    expect(html).toMatch(/<textarea[^>]*maxLength="4000"[^>]*>叫我小文。/);
+    expect(text(html)).toContain("46 / 4000 字 · 只存在这台电脑上");
+    // Nothing to save until it changes.
+    expect(html).toMatch(/type="submit"[^>]*disabled=""[^>]*>保存/);
+  });
+
+  it("disables unavailable settings with a visible reason and expands local help as text", () => {
+    const world = xiaowenWorld();
+    const html = renderPage(
+      {
+        ...world,
+        settings: [
+          {
+            id: "sample",
+            section: "功能",
+            name: "设置示例",
+            icon: "help",
+            summary: "",
+            groups: [
+              {
+                blocks: [
+                  {
+                    kind: "switches",
+                    switches: [
+                      {
+                        id: "memory.auto",
+                        label: "自动记忆",
+                        on: false,
+                        disabledReason: "此版本尚未接入自动记忆。",
+                      },
+                    ],
+                  },
+                  {
+                    kind: "text",
+                    field: {
+                      id: "me.instructions",
+                      label: "个人指令",
+                      value: "",
+                      max: 4000,
+                      save: {
+                        id: "me.save",
+                        label: "保存",
+                        disabledReason: "此版本暂不支持保存。",
+                      },
+                    },
+                  },
+                  {
+                    kind: "lines",
+                    lines: [
+                      {
+                        id: "help.keys",
+                        text: "密钥如何保存？",
+                        detail: "在本机保存。<script>unsafe()</script>",
+                      },
+                    ],
+                  },
+                ],
+              },
+            ],
+          },
+        ],
+      },
+      "settings/sample",
+    );
+    expect(html).toMatch(/role="switch"[^>]*aria-checked="false"[^>]*disabled=""/);
+    expect(html).toMatch(/<textarea[^>]*disabled=""/);
+    expect(text(html)).toContain("此版本尚未接入自动记忆。");
+    expect(html).toMatch(/<details[^>]*><summary[^>]*>.*密钥如何保存？.*<\/summary>/);
+    expect(html).toContain("&lt;script&gt;unsafe()&lt;/script&gt;");
+  });
+
+  it("lists help topics as rows that open, and keeps 反馈 a button (S30)", () => {
+    const html = renderPage(xiaowenWorld(), "settings/help", "light");
+    expect(html.match(/class="ch-line ch-line-link"/g)).toHaveLength(7);
+    expect(text(html)).toContain("复制版本和系统信息");
+    expect(text(html)).toContain("去反馈");
   });
 
   it("shows guarantees as locked lines, never as switches (S25)", () => {
@@ -149,20 +248,40 @@ describe("moyyi Chat interface", () => {
     const world = xiaowenWorld();
     const { chats } = world;
     expect(folderBadge(world, "all")).toEqual({ kind: "decide", count: 3 });
-    expect(folderBadge(world, "running")).toEqual({ kind: "quiet", count: world.jobs.length });
+    expect(folderBadge(world, "project")).toEqual({ kind: "decide", count: 1 });
     expect(folderBadge({ ...world, chats: chats.filter((c) => !c.decisions) }, "all")).toEqual({
       kind: "unread",
       count: 1,
     });
-    expect(chats.filter((c) => inFolder(world, c, "mine")).map((c) => c.id)).toEqual([
-      "lunwen",
-      "moyyi",
-    ]);
-    expect(chats.some((c) => c.archived && inFolder(world, c, "all"))).toBe(false);
-    // 在做: chats with a running job, and AIs that are working.
-    const running = chats.filter((c) => inFolder(world, c, "running")).map((c) => c.id);
-    for (const job of world.jobs) expect(running).toContain(job.chatId);
-    expect(folderBadge({ ...world, jobs: [] }, "running")).toBeNull();
+    expect(chats.some((c) => c.archived && inFolder(c, "all"))).toBe(false);
+    expect(chats.filter((c) => inFolder(c, "project")).every((c) => c.project)).toBe(true);
+  });
+
+  it("keeps the rail to places: 全部, 项目, 自动化, 插件, then 设置 (owner review)", () => {
+    const html = render(xiaowenWorld(), "lunwen");
+    const rail = html.slice(html.indexOf('aria-label="导航"'), html.indexOf("</nav>"));
+    expect(text(rail)).not.toMatch(/等我的|在做|AI|成果|更多/);
+    expect(text(rail)).toMatch(/全部.*项目.*自动化.*插件.*设置/);
+    expect(rail.indexOf("插件")).toBeLessThan(rail.indexOf("ch-rail-bottom"));
+    expect(rail.indexOf("ch-rail-bottom")).toBeLessThan(rail.indexOf("设置"));
+  });
+
+  it("keeps 更多 as a hidden slot under 插件 until something is put in it", () => {
+    expect(MORE).toEqual([]);
+    const world = xiaowenWorld();
+    const rail = (more?: Parameters<typeof Rail>[0]["more"]) =>
+      renderToString(
+        createElement(Rail, {
+          world,
+          view: "all",
+          onView: () => undefined,
+          ...(more ? { more } : {}),
+        }),
+      );
+    expect(rail()).not.toContain("更多");
+    const shown = rail([{ id: "settings", label: "设置", icon: "settings" }]);
+    expect(text(shown)).toMatch(/自动化插件更多设置/);
+    expect(shown).toContain('aria-haspopup="menu" aria-expanded="false"');
   });
 
   it("groups bubbles into runs and finds open decisions", () => {
@@ -172,5 +291,40 @@ describe("moyyi Chat interface", () => {
     const decide = messages.findIndex((m) => m.id === "l-decide");
     expect(grouped[decide]).toEqual({ first: true });
     expect(openDecisions(messages).map((m) => m.id)).toEqual(["l-decide"]);
+  });
+
+  it("lists working folders under 项目, then one project's own chats (S33)", () => {
+    const list = text(renderPage(xiaowenWorld(), "project"));
+    for (const words of [
+      "毕业论文",
+      "~/论文 · 1 个对话",
+      "租房",
+      "~/租房",
+      "读书会资料",
+      "课程作业",
+    ])
+      expect(list).toContain(words);
+    expect(list).not.toContain("核查");
+    const inside = text(renderPage(xiaowenWorld(), "project/p-zuoye"));
+    expect(inside).toContain("~/课程作业");
+    // Archived chats stay listed inside their project.
+    expect(inside).toContain("moyyi：交了，项目归档");
+  });
+
+  it("lists 自动化 and opens one with what, when and its last runs (S34)", () => {
+    const seen = text(renderPage(xiaowenWorld(), "automations/brief"));
+    for (const words of [
+      "早报",
+      "每天 8:00 · 在「moyyi」",
+      "查论文格式",
+      "已暂停 · 每周二 20:00 · 在「读书会资料」",
+      "开着",
+      "暂停",
+      "做什么",
+      "最近几次",
+      "现在跑一次",
+    ])
+      expect(seen).toContain(words);
+    expect(text(renderPage(firstRunWorld(), "automations"))).toContain("还没有自动化");
   });
 });

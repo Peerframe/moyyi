@@ -1,10 +1,11 @@
-// The window (boards S1, S7, S8, S12, S23–S32): folder rail, then either the chat list with the open
-// chat and its side panel, or 设置 / 插件 with the open section. Below 1200px the panel floats over
+// The window (boards S1, S7, S8, S12, S23–S34): rail, then either the chat list (全部, or 项目 and
+// one project's chats) with the open chat and its side panel, or 自动化 / 插件 / 设置 with the open
+// entry. Below 1200px the panel floats over
 // the chat, below 900px the rail becomes chips above the list, below 700px one pane shows at a time
 // and the panel opens as a bottom sheet.
 import { useEffect, useState, useSyncExternalStore } from "react";
 import type { ChatAction, ChatPort, FolderId, Theme } from "../port.ts";
-import { ChatList } from "./ChatList.tsx";
+import { ChatList, chatsOf } from "./ChatList.tsx";
 import { Conversation } from "./Conversation.tsx";
 import { actionError, type ChatIntegration, supports } from "./integration.ts";
 
@@ -14,21 +15,25 @@ import type { PageActions } from "./Pages.tsx";
 import { PageList, PagePane } from "./Pages.tsx";
 import type { PanelActions, PanelFrame } from "./Panel.tsx";
 import { SidePanel } from "./Panel.tsx";
-import { inFolder, isFolder, Rail, type ViewId } from "./Rail.tsx";
+import { inFolder, isFolder, type PageView, Rail, type ViewId } from "./Rail.tsx";
 
 export interface AppProps {
   readonly port: ChatPort;
   readonly theme: Theme;
-  readonly sticker: string;
+  readonly fontSize?: 13 | 15 | 17;
   readonly initialChat?: string | undefined;
   readonly integration?: ChatIntegration | undefined;
-  /** Opens 设置 or 插件 instead of the chats, e.g. "settings/permissions". */
+  /** Opens a page or a project instead of 全部, e.g. "settings/permissions" or "project/p-lunwen". */
   readonly initialPage?: string | undefined;
+  /** The host draws window controls at the top of the rail (macOS traffic lights). */
+  readonly windowControls?: boolean | undefined;
 }
 
 function parsePage(value: string | undefined): { view: ViewId; page: string | null } | null {
   const [view, page = null] = value?.split("/") ?? [];
-  return view === "settings" || view === "plugins" ? { view, page } : null;
+  return view === "project" || view === "automations" || view === "settings" || view === "plugins"
+    ? { view, page }
+    : null;
 }
 
 function useNarrow(): boolean {
@@ -46,18 +51,31 @@ function useNarrow(): boolean {
   return narrow;
 }
 
-export function App({ port, theme, sticker, initialChat, initialPage, integration }: AppProps) {
+export function App({
+  port,
+  theme,
+  fontSize = 15,
+  initialChat,
+  initialPage,
+  integration,
+  windowControls,
+}: AppProps) {
   const world = useSyncExternalStore(port.subscribe, port.world, port.world);
   const narrow = useNarrow();
   const start = parsePage(initialPage);
   const [view, setView] = useState<ViewId>(start?.view ?? "all");
   /** The open section of each page list; null shows only the list on narrow layouts. */
-  const [pageOf, setPageOf] = useState<Readonly<Record<"settings" | "plugins", string | null>>>({
-    settings: start?.view === "settings" ? (start.page ?? null) : null,
-    plugins: start?.view === "plugins" ? (start.page ?? null) : null,
+  const startOf = (of: ViewId) => (start?.view === of ? (start.page ?? null) : null);
+  const [pageOf, setPageOf] = useState<Readonly<Record<PageView, string | null>>>({
+    automations: startOf("automations"),
+    settings: startOf("settings"),
+    plugins: startOf("plugins"),
   });
   /** The last folder of chats, so 设置 and back keeps the list where it was. */
-  const [folder, setFolder] = useState<FolderId>("all");
+  const [folder, setFolder] = useState<FolderId>(start?.view === "project" ? "project" : "all");
+  /** The open project under 项目. */
+  const [projectId, setProjectId] = useState<string | null>(startOf("project"));
+  const project = world.projects.find((p) => p.id === projectId) ?? null;
   const [openId, setOpenId] = useState<string | null>(
     integration ? integration.activeChatId : (initialChat ?? (world.firstRun ? "moyyi" : null)),
   );
@@ -74,11 +92,21 @@ export function App({ port, theme, sticker, initialChat, initialPage, integratio
     setSearchOpen(false);
   }, [nativeActive]);
 
+  const requestedSettings = integration?.openSettingsRequest;
+  useEffect(() => {
+    if (!requestedSettings) return;
+    setView("settings");
+    setPageOf((previous) => ({ ...previous, settings: requestedSettings.page }));
+  }, [requestedSettings]);
+
+  async function invoke(action: ChatAction): Promise<void> {
+    if (!supports(integration, action.type)) throw new Error("当前版本尚不支持这个操作。");
+    await port.act(action);
+  }
   async function perform(action: ChatAction): Promise<void> {
     setError(null);
     try {
-      if (!supports(integration, action.type)) throw new Error("当前版本尚不支持这个操作。");
-      await port.act(action);
+      await invoke(action);
     } catch (cause) {
       setError(actionError(cause));
       throw cause;
@@ -102,6 +130,7 @@ export function App({ port, theme, sticker, initialChat, initialPage, integratio
 
   useEffect(() => {
     const onKey = (event: KeyboardEvent) => {
+      if (event.defaultPrevented || document.querySelector("dialog:modal")) return;
       const mod = event.metaKey || event.ctrlKey;
       if (mod && event.key === ",") {
         event.preventDefault();
@@ -111,7 +140,7 @@ export function App({ port, theme, sticker, initialChat, initialPage, integratio
         setView(folder);
         if (narrow) setOpenId(null);
         requestAnimationFrame(() => document.getElementById("chat-search")?.focus());
-      } else if (mod && event.key.toLowerCase() === "f" && chat) {
+      } else if (mod && event.key.toLowerCase() === "f" && isFolder(view) && chat) {
         event.preventDefault();
         setSearchOpen(true);
       } else if (
@@ -120,7 +149,9 @@ export function App({ port, theme, sticker, initialChat, initialPage, integratio
         (event.key === "ArrowUp" || event.key === "ArrowDown")
       ) {
         event.preventDefault();
-        const list = world.chats.filter((c) => inFolder(world, c, folder));
+        const list = project
+          ? chatsOf(world, project.id)
+          : world.chats.filter((c) => inFolder(c, folder));
         const at = list.findIndex((c) => c.id === openId);
         const next =
           list[at < 0 ? 0 : (at + (event.key === "ArrowDown" ? 1 : list.length - 1)) % list.length];
@@ -145,29 +176,42 @@ export function App({ port, theme, sticker, initialChat, initialPage, integratio
   };
 
   const pageActions: PageActions = {
-    choose: (choiceId, option) => dispatch({ type: "choose", choiceId, option }),
-    press: (controlId) => dispatch({ type: "control", controlId }),
-    saveKey: (providerId, key) => dispatch({ type: "save-key", providerId, key }),
+    choose: (choiceId, option) => invoke({ type: "choose", choiceId, option }),
+    press: (controlId) => invoke({ type: "control", controlId }),
+    saveKey: (providerId, key) => invoke({ type: "save-key", providerId, key }),
+    saveText: (fieldId, text) => invoke({ type: "save-text", fieldId, text }),
   };
 
   const onView = (next: ViewId) => {
     setView(next);
     if (isFolder(next)) setFolder(next);
+    // 项目 again goes back to the projects, like a second tap on a tab.
+    if (next === "project" && view === "project") setProjectId(null);
+    integration?.onView?.(next);
   };
 
   const layout = narrow ? "narrow" : "wide";
+  const rail = narrow ? null : (
+    <Rail world={world} view={view} onView={onView} windowControls={windowControls} />
+  );
 
   if (!isFolder(view)) {
-    const pages = view === "settings" ? world.settings : world.plugins;
+    const pages =
+      view === "settings" ? world.settings : view === "plugins" ? world.plugins : world.automations;
     const chosen = pageOf[view];
     // Wide layouts always show a section; the first one until another is picked.
     const page = pages.find((p) => p.id === chosen) ?? (narrow ? undefined : pages[0]);
     const openPage = (pageId: string) => setPageOf((value) => ({ ...value, [view]: pageId }));
     return (
-      <div className={`mc mc-${theme} mc-window ch-app`} data-layout={layout}>
-        {narrow ? null : <Rail world={world} view={view} onView={onView} />}
+      <div
+        className={`mc mc-${theme} mc-window ch-app`}
+        data-layout={layout}
+        data-font-size={fontSize}
+      >
+        {rail}
         {!narrow || !page ? (
           <PageList
+            key={view}
             world={world}
             kind={view}
             pages={pages}
@@ -179,13 +223,26 @@ export function App({ port, theme, sticker, initialChat, initialPage, integratio
         ) : null}
         {page ? (
           <PagePane
+            key={`${view}/${page.id}`}
             world={world}
+            kind={view}
             page={page}
             actions={pageActions}
-            feedback={feedback}
+            feedback={integration?.pageNotice}
             onBack={narrow ? () => setPageOf((value) => ({ ...value, [view]: null })) : undefined}
           />
-        ) : null}
+        ) : narrow || view !== "automations" ? null : (
+          <section className="mc-panel ch-pane ch-empty" aria-label="没有自动化">
+            <span className="ch-empty-title">
+              {integration ? "本机版本还不能定时运行" : "还没有自动化"}
+            </span>
+            <span className="ch-sub">
+              {integration
+                ? "到点自动开工要等后台运行做好；现在每件事都由你在会话里交代。"
+                : "在任意对话里说 /定时，或者让 moyyi “每天早上做一件事”"}
+            </span>
+          </section>
+        )}
       </div>
     );
   }
@@ -194,12 +251,18 @@ export function App({ port, theme, sticker, initialChat, initialPage, integratio
   const showChat = !narrow || Boolean(chat);
 
   return (
-    <div className={`mc mc-${theme} mc-window ch-app`} data-layout={layout}>
-      {narrow ? null : <Rail world={world} view={view} onView={onView} />}
+    <div
+      className={`mc mc-${theme} mc-window ch-app`}
+      data-layout={layout}
+      data-font-size={fontSize}
+    >
+      {rail}
       {showList ? (
         <ChatList
           world={world}
           folder={view}
+          project={view === "project" ? project : null}
+          onProject={setProjectId}
           openId={openId}
           drafts={drafts}
           onView={onView}
@@ -223,7 +286,6 @@ export function App({ port, theme, sticker, initialChat, initialPage, integratio
             world={world}
             chat={chat}
             draft={drafts[chat.id] ?? ""}
-            sticker={sticker}
             infoOpen={stack[0]?.kind === "info"}
             narrow={narrow}
             searchOpen={searchOpen}
@@ -246,7 +308,7 @@ export function App({ port, theme, sticker, initialChat, initialPage, integratio
                 {feedback}
               </p>
             ) : null}
-            {integration?.empty ?? <EmptyChat sticker={sticker} />}
+            {integration?.empty ?? <EmptyChat />}
           </section>
         )
       ) : null}
@@ -273,10 +335,9 @@ export function App({ port, theme, sticker, initialChat, initialPage, integratio
   );
 }
 
-function EmptyChat({ sticker }: { readonly sticker: string }) {
+function EmptyChat() {
   return (
     <>
-      <img src={sticker} alt="" className="ch-empty-sticker" />
       <span className="ch-empty-title">选一个对话开始</span>
       <span className="ch-sub">或者直接跟 moyyi 说想做什么</span>
     </>

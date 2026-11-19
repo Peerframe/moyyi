@@ -1,25 +1,36 @@
-// The chat list (boards S1, S7, S8): one list, filtered by the folder the rail picked.
+// The chat list (boards S1, S7, S8, S33). 全部 lists every chat by time. 项目 lists the working
+// folders first; opening one lists its own chats, archived ones included. Chats that wait on you
+// carry the 等你决定 prefix and an attention badge wherever they are listed.
 import { useState } from "react";
-import type { Chat, ChatWorld, FolderId } from "../port.ts";
+import type { Chat, ChatWorld, FolderId, Project } from "../port.ts";
 import { Icon } from "./icons.tsx";
 import { Avatar, Badge, ReceiptMark } from "./parts.tsx";
-import { FolderStrip, inFolder, type ViewId, viewLabel } from "./Rail.tsx";
+import { chatsBadge, FolderStrip, inFolder, type ViewId, viewLabel } from "./Rail.tsx";
 
 const EMPTY: Record<FolderId, readonly [string, string]> = {
-  all: ["这里没有对话", "跟 moyyi 说一件想做的事，项目和 AI 会出现在这里"],
-  ai: ["还没有 AI", "交代第一件事之后，moyyi 会拉合适的 AI 进来"],
-  project: ["还没有项目", "计划卡上点开始，才会建项目群"],
-  mine: ["没有等你的事", "有决定要你做时，这里会出现橙色数字"],
-  running: ["没有在做的事", "计划卡上点开始之后，正在做的项目和 AI 会列在这里"],
+  all: ["这里没有对话", "跟 moyyi 说一件想做的事，项目会出现在这里"],
+  project: ["还没有项目", "计划卡上点开始，moyyi 才会在你选的文件夹里开工"],
 };
+/** The desktop app: every session works in one folder, and the folder is its project. */
+const NATIVE_EMPTY: Record<FolderId, readonly [string, string]> = {
+  all: ["还没有会话", "点右上角的笔，选一个文件夹，交代第一件事"],
+  project: ["还没有项目", "点右上角的笔，选一个文件夹，它就成了一个项目"],
+};
+
+/** A project's chats, newest first as the world lists them. */
+export function chatsOf(world: Pick<ChatWorld, "chats">, projectId: string): readonly Chat[] {
+  return world.chats.filter((chat) => chat.project === projectId);
+}
 
 export function ChatList({
   world,
   folder,
+  project,
   openId,
   drafts,
   onView,
   onOpen,
+  onProject,
   onCompose,
   native = false,
   showArchive = true,
@@ -28,6 +39,9 @@ export function ChatList({
   readonly showArchive?: boolean;
   readonly world: ChatWorld;
   readonly folder: FolderId;
+  /** The open project under 项目; null lists the projects themselves. */
+  readonly project: Project | null;
+  readonly onProject: (projectId: string | null) => void;
   readonly openId: string | null;
   readonly drafts: Readonly<Record<string, string>>;
   readonly onView: (view: ViewId) => void;
@@ -38,28 +52,41 @@ export function ChatList({
   const [query, setQuery] = useState("");
   const [archive, setArchive] = useState(false);
   const needle = query.trim();
-  const archived = showArchive ? world.chats.filter((chat) => chat.archived) : [];
-  const chats = world.chats.filter(
-    (chat) =>
-      (archive ? chat.archived : inFolder(world, chat, folder)) &&
-      (!needle || chat.name.includes(needle) || chat.preview.text.includes(needle)),
-  );
+  const projects = folder === "project" && !project;
+  const archived =
+    showArchive && folder === "all" ? world.chats.filter((chat) => chat.archived) : [];
+  const matches = (chat: Chat) =>
+    !needle || chat.name.includes(needle) || chat.preview.text.includes(needle);
+  const chats = projects
+    ? []
+    : (project ? chatsOf(world, project.id) : world.chats).filter(
+        (chat) => (project || (archive ? chat.archived : inFolder(chat, folder))) && matches(chat),
+      );
+  const shownProjects = projects
+    ? world.projects.filter((p) => !needle || p.name.includes(needle) || p.path.includes(needle))
+    : [];
   const [emptyTitle, emptyNote] = needle
-    ? [`没找到“${needle}”`, "试试搜文件名，或者到项目里 /对账"]
-    : native
-      ? [
-          folder === "mine"
-            ? "没有等你确认的操作"
-            : folder === "running"
-              ? "没有正在运行的任务"
-              : "这里没有会话",
-          "选择已有会话，或点击右上角开始新会话",
-        ]
-      : EMPTY[folder];
+    ? [`没找到“${needle}”`, "试试搜文件名"]
+    : project
+      ? ["这个项目还没有对话", "点右上角的笔，在这个文件夹里交代一件事"]
+      : (native ? NATIVE_EMPTY : EMPTY)[folder];
+  const empty = projects ? shownProjects.length === 0 : chats.length === 0;
   return (
-    <section className="mc-panel ch-list" aria-label="对话列表">
+    <section className="mc-panel ch-list" aria-label={project ? project.name : "对话列表"}>
+      {project ? (
+        <button
+          type="button"
+          className="mc-panel-back ch-list-back"
+          onClick={() => onProject(null)}
+        >
+          <Icon.back />
+          项目
+        </button>
+      ) : null}
       <div className="ch-list-head">
-        <h1 className="ch-list-title">{archive ? "归档" : viewLabel(folder)}</h1>
+        <h1 className="ch-list-title">
+          {archive ? "归档" : project ? project.name : viewLabel(folder)}
+        </h1>
         <button
           type="button"
           className="mc-icon-btn ch-list-compose"
@@ -79,7 +106,7 @@ export function ChatList({
         <input
           id="chat-search"
           type="search"
-          placeholder={native ? "搜索会话" : "搜索 AI、项目、结论"}
+          placeholder={projects ? "搜索项目或文件夹" : native ? "搜索会话" : "搜索对话、结论、文件"}
           value={query}
           onChange={(event) => setQuery(event.target.value)}
         />
@@ -93,7 +120,7 @@ export function ChatList({
             </span>
             <span className="mc-row-name">归档</span>
           </button>
-        ) : archived.length && folder === "all" && !needle ? (
+        ) : archived.length && !needle ? (
           <button type="button" className="mc-row ch-archive-row" onClick={() => setArchive(true)}>
             <span className="ch-archive-icon">
               <Icon.folder size={18} />
@@ -102,27 +129,72 @@ export function ChatList({
             <Badge kind="quiet" count={archived.length} />
           </button>
         ) : null}
+        {project ? <span className="mc-mono ch-list-path">{project.path}</span> : null}
+        {shownProjects.map((p) => (
+          <ProjectRow
+            key={p.id}
+            project={p}
+            chats={chatsOf(world, p.id)}
+            onOpen={() => onProject(p.id)}
+          />
+        ))}
         {chats.map((chat) => (
           <ChatRow
             key={chat.id}
             chat={chat}
             draft={drafts[chat.id]}
-            mixed={folder === "all" || folder === "mine" || folder === "running"}
+            mixed={folder === "all"}
             open={chat.id === openId}
             onOpen={() => onOpen(chat.id)}
           />
         ))}
-        {chats.length === 0 && world.connection.state !== "loading" ? (
+        {empty && world.connection.state !== "loading" ? (
           <div className="ch-empty-list">
             <span className="ch-empty-title">{emptyTitle}</span>
             <span className="ch-sub">{emptyNote}</span>
           </div>
         ) : null}
         {world.firstRun && !needle && !native ? (
-          <span className="ch-caption ch-first-run">项目和 AI 会在你交代第一件事之后出现</span>
+          <span className="ch-caption ch-first-run">项目会在你交代第一件事之后出现</span>
         ) : null}
       </div>
     </section>
+  );
+}
+
+function ProjectRow({
+  project,
+  chats,
+  onOpen,
+}: {
+  readonly project: Project;
+  readonly chats: readonly Chat[];
+  readonly onOpen: () => void;
+}) {
+  const badge = chatsBadge(chats.filter((chat) => !chat.archived));
+  return (
+    <a
+      className="mc-row"
+      href={`#project/${project.id}`}
+      onClick={(event) => {
+        event.preventDefault();
+        onOpen();
+      }}
+    >
+      <Avatar avatar={project.avatar} shape="project" size={48} />
+      <span className="mc-row-body">
+        <span className="mc-row-top">
+          <span className="mc-row-name">{project.name}</span>
+          <span className="mc-row-time">{chats[0]?.time ?? ""}</span>
+        </span>
+        <span className="mc-row-bottom">
+          <span className="mc-row-preview ch-one-line">
+            <span className="mc-mono">{project.path}</span> · {chats.length} 个对话
+          </span>
+          {badge ? <Badge kind={badge.kind} count={badge.count} /> : null}
+        </span>
+      </span>
+    </a>
   );
 }
 

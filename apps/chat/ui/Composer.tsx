@@ -23,8 +23,7 @@ const ATTACH = [
   { id: "memory", label: "从记忆里引用", sub: "带着出处引一条记忆", icon: "bookmark" },
 ] as const;
 
-const EMOJI = ["👍", "👎", "❓", "📌", "🦈", "😂", "🙏", "🎉"];
-const STICKERS = ["开始了", "等你", "做完了", "撤回了"] as const;
+const EMOJI = ["👍", "👎", "❓", "📌", "👀", "😂", "🙏", "🎉"];
 
 type Popup = "attach" | "emoji" | "menu" | null;
 interface Grant {
@@ -38,7 +37,6 @@ export interface ComposerProps {
   readonly members: Readonly<Record<string, Member>>;
   readonly draft: string;
   readonly running: { readonly who: string; readonly step: string } | null;
-  readonly sticker: string;
   readonly onDraft: (text: string) => void;
   readonly onSend: (text: string) => Promise<void>;
   readonly integration?: ChatIntegration | undefined;
@@ -319,33 +317,7 @@ export function Composer(props: ComposerProps) {
         />
       ) : null}
       {popup === "emoji" ? (
-        <div
-          className="mc-suggest ch-popup ch-emoji mc-glass"
-          role="dialog"
-          aria-label="表情和贴纸"
-        >
-          <div className="ch-emoji-tabs">
-            {!integration ? <span className="mc-chip">贴纸</span> : null}
-            <span className="mc-chip">表情</span>
-          </div>
-          {!integration ? (
-            <div className="ch-sticker-row">
-              {STICKERS.map((moment) => (
-                <button
-                  key={moment}
-                  type="button"
-                  aria-label={`贴纸：${moment}`}
-                  title={moment}
-                  onClick={() => {
-                    setPopup(null);
-                    void sendText(`[贴纸：${moment}]`, false);
-                  }}
-                >
-                  <img src={props.sticker} alt="" />
-                </button>
-              ))}
-            </div>
-          ) : null}
+        <div className="mc-suggest ch-popup ch-emoji mc-glass" role="dialog" aria-label="表情">
           <div className="ch-emoji-row">
             {EMOJI.map((emoji) => (
               <button
@@ -514,9 +486,9 @@ export function Composer(props: ComposerProps) {
               <button
                 type="button"
                 className="mc-icon-btn"
-                aria-label="表情和贴纸"
+                aria-label="表情"
                 disabled={sending}
-                title="表情和贴纸"
+                title="表情"
                 aria-expanded={popup === "emoji"}
                 onClick={() => setPopup(popup === "emoji" ? null : "emoji")}
               >

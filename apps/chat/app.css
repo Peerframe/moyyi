@@ -4,7 +4,8 @@
 
 html,
 body,
-#root {
+#root,
+.ch-root {
   height: 100%;
   margin: 0;
 }
@@ -29,6 +30,39 @@ html {
   position: relative;
   overflow: clip;
 }
+/* S23 scales reading text while rail geometry, icons and window breakpoints stay fixed. */
+html:has(.ch-app[data-font-size="13"]) {
+  font-size: 13px;
+}
+html:has(.ch-app[data-font-size="15"]) {
+  font-size: 15px;
+}
+html:has(.ch-app[data-font-size="17"]) {
+  font-size: 17px;
+}
+.ch-app,
+.mc-bubble,
+.mc-row-name,
+.mc-head-name,
+.mc-plan-title,
+.mc-composer input {
+  font-size: 1rem;
+}
+.mc-row-preview,
+.mc-sender,
+.mc-section-h,
+.mc-pinned,
+.mc-plan dl,
+.mc-result-list {
+  font-size: calc(1rem - 2px);
+}
+.mc-file-name,
+.mc-thread-root,
+.mc-quote,
+.mc-claim,
+.mc-transcript {
+  font-size: calc(1rem - 1px);
+}
 .ch-rail {
   flex: 0 0 auto;
   overflow-y: auto;
@@ -41,15 +75,30 @@ html {
   text-align: center;
   padding: 2px 0 8px;
 }
-/* 插件 starts the bottom group; a hairline splits state folders from kinds. */
+/* The desktop app's traffic lights sit here; the strip also drags the window (desktop chat.css). */
+.ch-rail-lights {
+  height: 28px;
+  flex: 0 0 auto;
+}
+/* 插件 and 设置 sit at the bottom of the rail. */
 .ch-rail-bottom {
   margin-top: auto;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
 }
-.ch-rail-rule {
-  height: 1px;
-  margin: var(--space-4) var(--space-12);
-  background: var(--line);
-  flex: 0 0 auto;
+/* 更多's menu is the rail's sibling, fixed beside the button, so the rail's glass and scroll leave it alone. */
+.ch-more-menu {
+  position: fixed;
+  z-index: 5;
+  width: 200px;
+  box-shadow:
+    inset 0 0 0 1px var(--line),
+    0 8px 24px color-mix(in srgb, var(--shade) 16%, transparent);
+}
+.ch-more-key {
+  font-size: 12px;
+  color: var(--muted);
 }
 .ch-list {
   width: var(--list-width);
@@ -68,7 +117,7 @@ html {
 }
 .ch-search input {
   height: 30px;
-  font-size: 13px;
+  font-size: calc(1rem - 2px);
 }
 .ch-rows {
   display: flex;
@@ -404,22 +453,6 @@ html {
   font-size: 13px;
   padding: 0 var(--space-10);
 }
-.ch-sticker {
-  width: 120px;
-}
-.ch-sticker img {
-  width: 100%;
-  display: block;
-}
-.ch-tilt-left img {
-  transform: rotate(-6deg);
-}
-.ch-tilt-right img {
-  transform: rotate(6deg);
-}
-.ch-flip img {
-  transform: scaleX(-1);
-}
 .ch-tag-inline {
   margin-left: var(--space-4);
 }
@@ -431,7 +464,7 @@ html {
   font-size: 14px;
 }
 .ch-steps {
-  font-size: 13px;
+  font-size: calc(1rem - 2px);
 }
 .ch-meta-split {
   justify-content: space-between;
@@ -512,14 +545,14 @@ html {
   align-items: baseline;
 }
 .ch-sub {
-  font-size: 12px;
+  font-size: max(11px, calc(1rem - 3px));
   color: var(--muted);
 }
 .ch-sub-gap {
   margin-top: var(--space-4);
 }
 .ch-caption {
-  font-size: 12px;
+  font-size: max(11px, calc(1rem - 3px));
   color: var(--muted);
   line-height: 1.4;
 }
@@ -545,11 +578,8 @@ html {
   gap: var(--space-6);
   text-align: center;
 }
-.ch-empty-sticker {
-  width: 120px;
-}
 .ch-empty-title {
-  font-size: 15px;
+  font-size: 1rem;
   font-weight: 500;
 }
 
@@ -651,20 +681,11 @@ html {
 .ch-emoji {
   gap: var(--space-8);
 }
-.ch-emoji-tabs {
-  display: flex;
-  gap: var(--space-4);
-}
-.ch-sticker-row,
 .ch-emoji-row {
   display: grid;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
+  grid-template-columns: repeat(8, minmax(0, 1fr));
   gap: var(--space-4);
 }
-.ch-emoji-row {
-  grid-template-columns: repeat(8, minmax(0, 1fr));
-}
-.ch-sticker-row button,
 .ch-emoji-row button {
   border: none;
   background: transparent;
@@ -673,11 +694,6 @@ html {
   font-size: 20px;
   padding: var(--space-4);
 }
-.ch-sticker-row img {
-  width: 100%;
-  display: block;
-}
-.ch-sticker-row button:hover,
 .ch-emoji-row button:hover {
   background: var(--hover);
 }
@@ -728,7 +744,7 @@ html {
 .mc-panel-head h2 {
   flex: 1 1 auto;
   margin: 0;
-  font-size: 15px;
+  font-size: 1rem;
   font-weight: 600;
 }
 .ch-profile {
@@ -740,14 +756,14 @@ html {
 }
 .ch-profile-name {
   margin-top: var(--space-6);
-  font-size: 17px;
+  font-size: calc(1rem + 2px);
   font-weight: 600;
 }
 .ch-section {
   display: flex;
   flex-direction: column;
   gap: var(--space-6);
-  font-size: 13px;
+  font-size: calc(1rem - 2px);
 }
 .ch-section-h {
   display: flex;
@@ -772,10 +788,10 @@ html {
   padding: var(--space-6) var(--space-4);
 }
 .ch-claim-text {
-  font-size: 14px;
+  font-size: calc(1rem - 1px);
 }
 .ch-info blockquote {
-  font-size: 13px;
+  font-size: calc(1rem - 2px);
 }
 .ch-jobs,
 .ch-undo-list {
@@ -933,7 +949,7 @@ html {
 }
 .ch-list-title {
   margin: 0;
-  font-size: 15px;
+  font-size: 1rem;
   font-weight: 600;
 }
 .ch-list-compose {
@@ -951,6 +967,14 @@ html {
 .ch-page-list-h {
   padding: var(--space-4) var(--space-10) 0;
 }
+.ch-page-rows .ch-page-list-h {
+  padding-top: var(--space-12);
+}
+.ch-page-list-rule {
+  height: 1px;
+  margin: var(--space-8) var(--space-10);
+  background: var(--line);
+}
 .ch-page-rows {
   display: flex;
   flex-direction: column;
@@ -962,7 +986,7 @@ html {
   padding: var(--space-8) var(--space-10);
 }
 .ch-page-row-name {
-  font-size: 14px;
+  font-size: calc(1rem - 1px);
 }
 .ch-one-line {
   -webkit-line-clamp: 1;
@@ -970,7 +994,7 @@ html {
 }
 .ch-page-foot {
   margin: auto var(--space-10) var(--space-4);
-  font-size: 12px;
+  font-size: max(11px, calc(1rem - 3px));
   line-height: 1.5;
   color: var(--muted);
 }
@@ -990,10 +1014,10 @@ html {
   margin-bottom: var(--space-12);
 }
 .ch-pane-body {
-  max-width: 640px;
+  max-width: 680px;
   display: flex;
   flex-direction: column;
-  gap: 18px;
+  gap: var(--space-16);
 }
 .ch-pane-titles {
   display: flex;
@@ -1002,12 +1026,17 @@ html {
 }
 .ch-pane-title {
   margin: 0;
-  font-size: 18px;
+  font-size: calc(1rem + 5px);
   font-weight: 650;
 }
 .ch-pane-sub {
-  font-size: 13px;
+  margin: 0;
+  font-size: calc(1rem - 1px);
+  line-height: 1.6;
   color: var(--muted);
+}
+.ch-plugin-head .ch-pane-sub {
+  font-size: calc(1rem - 2px);
 }
 .ch-plugin-head {
   display: flex;
@@ -1017,17 +1046,9 @@ html {
 .ch-plugin-head .ch-pane-titles {
   gap: 2px;
 }
-.ch-group {
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-8);
-}
-.ch-group-caption {
-  font-size: 12px;
-  line-height: 1.5;
-  color: var(--muted);
-}
-/* Light theme cards would vanish on white: the hairline keeps them. */
+/* A group is one card: title and caption on top, the action at the top right, rows below.
+   Light theme cards would vanish on white: the hairline keeps them. */
+.ch-group,
 .ch-card {
   background: var(--raised);
   box-shadow: inset 0 0 0 1px var(--line);
@@ -1036,6 +1057,121 @@ html {
   display: flex;
   flex-direction: column;
   gap: var(--space-10);
+}
+.ch-group {
+  gap: 14px;
+}
+.ch-group-head {
+  display: flex;
+  align-items: center;
+  gap: var(--space-12);
+}
+.ch-group-title {
+  margin: 0;
+  font-size: 1rem;
+  font-weight: 600;
+}
+.ch-group-caption {
+  font-size: calc(1rem - 2px);
+  line-height: 1.5;
+  color: var(--muted);
+}
+/* Rows inside a group card sit flat on it. */
+.ch-group:not(.ch-group-bare) > .ch-card {
+  background: none;
+  box-shadow: none;
+  border-radius: 0;
+  padding: 0;
+}
+.ch-group:not(.ch-group-bare) > .ch-group-head + .ch-card,
+.ch-group:not(.ch-group-bare) > .ch-card + .ch-card {
+  border-top: 1px solid var(--line);
+  padding-top: 14px;
+}
+/* Connections are cards of their own, with the dashed card to add one below. */
+.ch-group-bare {
+  background: none;
+  box-shadow: none;
+  padding: 0;
+  gap: var(--space-10);
+}
+.ch-group-bare > .ch-group-head {
+  padding: 0 var(--space-4);
+}
+.ch-group-bare .ch-group-title {
+  font-size: calc(1rem - 2px);
+  font-weight: 600;
+  color: var(--muted);
+}
+.ch-add-card {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-8);
+  min-height: 52px;
+  border: 1px dashed var(--line);
+  border-radius: 14px;
+  background: none;
+  color: var(--text);
+  font: inherit;
+  font-size: 14px;
+  cursor: pointer;
+}
+.ch-add-card:hover {
+  background: var(--hover);
+}
+.ch-provider-top {
+  display: flex;
+  align-items: center;
+  gap: var(--space-8);
+  min-width: 0;
+}
+.ch-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  flex: 0 0 auto;
+  background: var(--muted);
+  opacity: 0.5;
+}
+.ch-dot-on {
+  background: var(--working);
+  opacity: 1;
+}
+.ch-switch {
+  position: relative;
+  flex: 0 0 auto;
+  width: 44px;
+  height: 26px;
+  padding: 0;
+  border: 0;
+  border-radius: 13px;
+  background: var(--line);
+  cursor: pointer;
+  transition: background var(--duration-fast);
+}
+.ch-switch::after {
+  content: "";
+  position: absolute;
+  top: 3px;
+  left: 3px;
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  /* White in both themes until the design system has its own switch tokens. */
+  background: var(--on-out);
+  box-shadow: 0 1px 2px color-mix(in srgb, var(--shade) 30%, transparent);
+  transition: transform var(--duration-fast);
+}
+.ch-switch[aria-checked="true"] {
+  background: var(--accent);
+}
+.ch-switch[aria-checked="true"]::after {
+  transform: translateX(18px);
+}
+.ch-switch:focus-visible {
+  outline: 2px solid var(--focus);
+  outline-offset: 2px;
 }
 .ch-card-rule {
   height: 1px;
@@ -1052,21 +1188,50 @@ html {
   gap: 2px;
 }
 .ch-line-main {
-  font-size: 14px;
+  font-size: calc(1rem - 1px);
+}
+/* A card with no title: its rows are the titles (自动记忆). */
+.ch-group > .ch-card:only-child .ch-line-main {
+  font-size: 1rem;
+  font-weight: 600;
 }
 .ch-line-mono {
-  font-size: 13px;
+  font-size: calc(1rem - 2px);
 }
 .ch-line-sub {
-  font-size: 12px;
+  font-size: max(11px, calc(1rem - 3px));
   color: var(--muted);
+}
+/* A help topic: the whole row is the button, with a chevron at the end. */
+.ch-line-link {
+  width: 100%;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+.ch-line-link:hover {
+  color: var(--accent);
+}
+.ch-line-link:focus-visible {
+  outline: 2px solid var(--focus);
+  outline-offset: 4px;
+  border-radius: 6px;
+}
+.ch-line-chevron {
+  display: inline-flex;
+  flex: 0 0 auto;
 }
 .ch-line-members {
   display: flex;
   gap: var(--space-4);
 }
 .ch-provider-name {
-  font-size: 15px;
+  font-size: 1rem;
   font-weight: 600;
 }
 .ch-off {
@@ -1076,6 +1241,10 @@ html {
   min-height: 32px;
   font-size: 13px;
   flex: 0 0 auto;
+}
+.ch-page-key:disabled {
+  opacity: 0.5;
+  cursor: default;
 }
 /* The design system's segment is a three-column grid; inline ones size to their options. */
 .ch-seg-inline {
@@ -1096,30 +1265,39 @@ html {
   align-items: center;
   gap: var(--space-8);
 }
-.ch-page-chips {
-  align-items: center;
-}
-.ch-meters {
+.ch-text-field {
+  display: flex;
+  flex-direction: column;
   gap: 14px;
+  margin: 0;
 }
-.ch-meter-row {
+.ch-text-box {
+  align-items: flex-start;
+  padding: var(--space-10) 14px;
+  border-radius: 12px;
+}
+.ch-text-box textarea {
+  width: 100%;
+  resize: none;
+  border: 0;
+  background: none;
+  color: inherit;
+  font: inherit;
+  font-size: 14px;
+  line-height: 1.6;
+}
+.ch-text-box textarea:focus {
+  outline: none;
+}
+.ch-text-foot {
   display: flex;
   align-items: center;
   gap: var(--space-12);
+  border-top: 1px solid var(--line);
+  padding-top: 14px;
 }
-.ch-meter-text {
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-6);
-}
-.ch-meter-top {
-  display: flex;
-  justify-content: space-between;
-  font-size: 14px;
-}
-.ch-meter-alert {
-  color: var(--attention);
-  font-weight: 600;
+.ch-text-foot .ch-line-sub {
+  font-size: calc(1rem - 2px);
 }
 .ch-key-field {
   display: flex;
@@ -1141,7 +1319,7 @@ html {
   font-size: 14px;
 }
 .ch-shortcut-keys {
-  width: 84px;
+  width: 96px;
   display: flex;
   gap: var(--space-4);
   flex: 0 0 auto;
@@ -1161,7 +1339,7 @@ html {
   font-weight: 600;
 }
 .ch-note {
-  font-size: 14px;
+  font-size: calc(1rem - 1px);
   line-height: 1.6;
 }
 .ch-controls {
@@ -1223,4 +1401,60 @@ html {
   cursor: pointer;
   font: inherit;
   font-size: 12px;
+}
+
+/* ---- 项目 (S33) ---- */
+
+.ch-list-back {
+  align-self: flex-start;
+  margin: 0 var(--space-4);
+}
+.ch-list-path {
+  padding: 0 var(--space-10) var(--space-4);
+  font-size: 12px;
+  color: var(--muted);
+}
+
+/* Settings controls keep their outcome beside the operation, including on a narrow pane. */
+.ch-pane fieldset.mc-seg {
+  margin: 0;
+  border: 0;
+  min-inline-size: 0;
+}
+.ch-line:has(> .ch-action-feedback),
+.ch-group-head:has(> .ch-action-feedback),
+.ch-controls:has(> .ch-action-feedback),
+.ch-key-field {
+  flex-wrap: wrap;
+}
+.ch-action-feedback {
+  flex-basis: 100%;
+  overflow-wrap: anywhere;
+}
+.ch-action-feedback[role="alert"] {
+  color: var(--danger);
+}
+.ch-disclosure > summary {
+  list-style: none;
+}
+.ch-disclosure > summary::-webkit-details-marker {
+  display: none;
+}
+.ch-disclosure[open] > summary .ch-line-chevron {
+  transform: rotate(90deg);
+}
+.ch-disclosure > p {
+  margin: var(--space-8) 0 0;
+  white-space: pre-line;
+  overflow-wrap: anywhere;
+  line-height: 1.6;
+}
+.ch-pane :is(.ch-key-input, .ch-text-box):focus-within {
+  outline: 2px solid var(--focus);
+  outline-offset: 2px;
+}
+.ch-pane button:disabled,
+.ch-pane :is(input, textarea):disabled {
+  opacity: 0.6;
+  cursor: default;
 }

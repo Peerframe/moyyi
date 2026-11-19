@@ -62,7 +62,7 @@ describe("desktop Chat plan mode", () => {
   it("lists long-task switches, session approvals and plan mode in settings pages", () => {
     const pages = (state: ReturnType<typeof chatTestState>) =>
       JSON.stringify(projectChatWorld(state).settings);
-    expect(pages(chatTestState())).toContain("长任务开关：全部关闭");
+    expect(pages(chatTestState())).toContain("长任务：全部关闭");
     const on = pages(
       chatTestState({
         settings: {
@@ -74,8 +74,8 @@ describe("desktop Chat plan mode", () => {
         },
       }),
     );
-    expect(on).toContain("长任务开关：已开启 自动压缩上下文、子目录 AGENTS.md");
-    expect(on).toContain("每轮 120 次");
+    expect(on).toContain("长任务：已开启 自动压缩上下文、子目录 AGENTS.md");
+    expect(on).toContain("最多 120 次请求 · 1800 秒");
     expect(on).toContain("「本会话始终允许」");
     expect(on).toContain("计划模式下修改、命令和外部调用一律拒绝");
   });

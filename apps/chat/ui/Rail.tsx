@@ -1,97 +1,98 @@
-// Folder rail (boards S1, S7, S8, S12): state folders, a hairline, kinds, then 插件 and 设置 at the
-// bottom. Folders filter one chat list; their badge counts open decisions if any, otherwise chats
-// with unread messages (muted chats never count). 在做 counts running jobs and can wait.
+// Rail (boards S1, S7, S8, S12, S33, S34): only places, never states. 全部 lists every chat by
+// time, 项目 lists the working folders, 自动化 the jobs that start on their own and 插件 what the
+// AIs can do; 设置 sits alone at the bottom. 更多 is a slot under 插件 for places used less often;
+// it stays hidden until something is put in it. What waits on you or is running shows as a badge, the row's prefix and the
+// avatar's dot. The rail is frosted glass over the window material; in the desktop app the system
+// draws the traffic lights in its top strip, which also drags the window.
 // Below 900px the rail becomes a strip of chips above whichever list is showing.
+import { useEffect, useRef, useState } from "react";
 import type { Chat, ChatWorld, FolderId } from "../port.ts";
 import { Icon } from "./icons.tsx";
 import { Badge } from "./parts.tsx";
 
-/** What the rail opens: a folder of chats, or one of the two pages that replace the list. */
-export type ViewId = FolderId | "plugins" | "settings";
+/** What the rail opens: chats, or one of the pages that replace the list. */
+export type ViewId = FolderId | "automations" | "plugins" | "settings";
+export type PageView = Exclude<ViewId, FolderId>;
 
-interface RailItem<Id extends ViewId> {
+export interface RailItem<Id extends ViewId = ViewId> {
   readonly id: Id;
   readonly label: string;
   readonly icon: keyof typeof Icon;
   readonly title?: string;
 }
 
-export const STATE_FOLDERS: readonly RailItem<FolderId>[] = [
+export const FOLDERS: readonly RailItem<FolderId>[] = [
   { id: "all", label: "全部", icon: "all" },
-  { id: "mine", label: "等我的", icon: "clock" },
-  { id: "running", label: "在做", icon: "running" },
-];
-export const KIND_FOLDERS: readonly RailItem<FolderId>[] = [
-  { id: "ai", label: "AI", icon: "ai" },
   { id: "project", label: "项目", icon: "project" },
 ];
-const TOOLS: readonly RailItem<"plugins" | "settings">[] = [
-  { id: "plugins", label: "插件", icon: "plugins", title: "插件" },
-  { id: "settings", label: "设置", icon: "settings", title: "设置 ⌘," },
+/** Places that open a page instead of chats. */
+const PLACES: readonly RailItem<"automations" | "plugins">[] = [
+  { id: "automations", label: "自动化", icon: "automation" },
+  { id: "plugins", label: "插件", icon: "plugins" },
 ];
-export const FOLDERS = [...STATE_FOLDERS, ...KIND_FOLDERS];
+/** At the bottom of the rail. */
+const SETTINGS: RailItem<"settings"> = {
+  id: "settings",
+  label: "设置",
+  icon: "settings",
+  title: "⌘,",
+};
+/**
+ * What 更多 opens. Empty for now: the owner has not decided what goes here (2026-11-05), and a
+ * button that opens nothing is not shown.
+ */
+export const MORE: readonly RailItem[] = [];
+const ITEMS: readonly RailItem[] = [...FOLDERS, ...PLACES, ...MORE, SETTINGS];
 
 export function viewLabel(view: ViewId): string {
-  return [...FOLDERS, ...TOOLS].find((item) => item.id === view)?.label ?? "";
+  return ITEMS.find((item) => item.id === view)?.label ?? "";
 }
 
 export function isFolder(view: ViewId): view is FolderId {
-  return view !== "plugins" && view !== "settings";
+  return FOLDERS.some((folder) => folder.id === view);
 }
 
-/** A chat is running when one of its jobs is, or when it is an AI that is working. */
-function running(world: Pick<ChatWorld, "jobs">, chat: Chat): boolean {
-  return chat.presence === "working" || world.jobs.some((job) => job.chatId === chat.id);
-}
-
-export function inFolder(world: Pick<ChatWorld, "jobs">, chat: Chat, folder: FolderId): boolean {
+/** 全部 holds every chat; 项目 holds the chats that work in a folder. */
+export function inFolder(chat: Chat, folder: FolderId): boolean {
   if (chat.archived) return false;
-  switch (folder) {
-    case "all":
-      return true;
-    case "mine":
-      return chat.decisions > 0;
-    case "running":
-      return running(world, chat);
-    case "ai":
-      return chat.kind === "ai" || chat.kind === "moyyi";
-    case "project":
-      return chat.kind === "project";
-  }
+  return folder === "all" || chat.project !== undefined;
 }
 
-export function folderBadge(
-  world: Pick<ChatWorld, "jobs" | "chats">,
-  folder: FolderId,
-): { kind: "decide" | "unread" | "quiet"; count: number } | null {
-  if (folder === "running") {
-    const count = world.jobs.filter((job) => !job.stopping).length;
-    return count ? { kind: "quiet", count } : null;
-  }
-  const inside = world.chats.filter((chat) => inFolder(world, chat, folder));
-  const decisions = inside.reduce((sum, chat) => sum + chat.decisions, 0);
+/** Open decisions if any (attention), otherwise chats with unread messages. */
+export function chatsBadge(
+  chats: readonly Chat[],
+): { kind: "decide" | "unread"; count: number } | null {
+  const decisions = chats.reduce((sum, chat) => sum + chat.decisions, 0);
   if (decisions) return { kind: "decide", count: decisions };
-  const unread = inside.filter((chat) => chat.unread > 0 && !chat.muted).length;
+  const unread = chats.filter((chat) => chat.unread > 0 && !chat.muted).length;
   return unread ? { kind: "unread", count: unread } : null;
 }
 
-export function Rail({
-  world,
-  view,
-  onView,
-}: {
+export function folderBadge(world: Pick<ChatWorld, "chats">, folder: FolderId) {
+  return chatsBadge(world.chats.filter((chat) => inFolder(chat, folder)));
+}
+
+interface RailProps {
   readonly world: ChatWorld;
   readonly view: ViewId;
   readonly onView: (view: ViewId) => void;
-}) {
-  const item = ({ id, label, icon, title }: RailItem<ViewId>, bottom = false) => {
+  /** The host draws window controls in the rail's top strip (macOS traffic lights). */
+  readonly windowControls?: boolean | undefined;
+  /** What 更多 opens; 更多 is hidden while this is empty. */
+  readonly more?: readonly RailItem[];
+}
+
+export function Rail({ world, view, onView, windowControls, more = MORE }: RailProps) {
+  /** The 更多 button while its menu is open. */
+  const [open, setOpen] = useState<HTMLButtonElement | null>(null);
+  const item = ({ id, label, icon, title }: RailItem) => {
     const ItemIcon = Icon[icon];
     const badge = isFolder(id) ? folderBadge(world, id) : null;
     return (
       <button
         key={id}
         type="button"
-        className={`mc-rail-item${bottom ? " ch-rail-bottom" : ""}`}
+        className="mc-rail-item"
         title={title}
         aria-current={view === id ? "true" : undefined}
         onClick={() => onView(id)}
@@ -103,17 +104,111 @@ export function Rail({
     );
   };
   return (
-    <nav className="mc-rail ch-rail" aria-label="文件夹">
-      <span className="ch-wordmark">moyyi</span>
-      {STATE_FOLDERS.map((folder) => item(folder))}
-      <span className="ch-rail-rule" aria-hidden="true" />
-      {KIND_FOLDERS.map((folder) => item(folder))}
-      {TOOLS.map((tool, index) => item(tool, index === 0))}
-    </nav>
+    <>
+      <nav className="mc-rail ch-rail" aria-label="导航">
+        {windowControls ? (
+          <span className="ch-rail-lights" aria-hidden="true" />
+        ) : (
+          <span className="ch-wordmark">moyyi</span>
+        )}
+        {FOLDERS.map((folder) => item(folder))}
+        {PLACES.map((place) => item(place))}
+        {more.length ? (
+          <button
+            type="button"
+            className="mc-rail-item"
+            aria-haspopup="menu"
+            aria-expanded={open !== null}
+            aria-current={more.some((entry) => entry.id === view) ? "true" : undefined}
+            onClick={(event) => setOpen((now) => (now ? null : event.currentTarget))}
+          >
+            <Icon.more size={20} />
+            <span>更多</span>
+          </button>
+        ) : null}
+        <div className="ch-rail-bottom">{item(SETTINGS)}</div>
+      </nav>
+      {open ? (
+        <MoreMenu
+          anchor={open}
+          items={more}
+          onPick={(id) => {
+            setOpen(null);
+            onView(id);
+          }}
+          onClose={() => setOpen(null)}
+        />
+      ) : null}
+    </>
   );
 }
 
-/** Below 900px: the same items as chips; 插件 and 设置 end the strip. */
+/**
+ * 更多's menu, beside the rail. Esc or a click outside closes it and hands focus back to 更多.
+ * The rail's glass blur makes it the containing block of anything fixed inside it, and its scroll
+ * would clip the menu, so the menu is the rail's sibling, fixed beside the button.
+ */
+function MoreMenu({
+  anchor,
+  items,
+  onPick,
+  onClose,
+}: {
+  readonly anchor: HTMLButtonElement;
+  readonly items: readonly RailItem[];
+  readonly onPick: (id: ViewId) => void;
+  readonly onClose: () => void;
+}) {
+  const ref = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    ref.current?.querySelector("button")?.focus();
+    const onKey = (event: KeyboardEvent) => {
+      if (event.key !== "Escape") return;
+      event.preventDefault();
+      onClose();
+      anchor.focus();
+    };
+    const onDown = (event: PointerEvent) => {
+      const target = event.target as Node;
+      if (!ref.current?.contains(target) && !anchor.contains(target)) onClose();
+    };
+    window.addEventListener("keydown", onKey);
+    window.addEventListener("pointerdown", onDown);
+    return () => {
+      window.removeEventListener("keydown", onKey);
+      window.removeEventListener("pointerdown", onDown);
+    };
+  }, [anchor, onClose]);
+  const box = anchor.getBoundingClientRect();
+  return (
+    <div
+      ref={ref}
+      className="mc-attach ch-more-menu"
+      role="menu"
+      aria-label="更多"
+      style={{ left: box.right + 8, top: box.top }}
+    >
+      {items.map(({ id, label, icon, title }) => {
+        const ItemIcon = Icon[icon];
+        return (
+          <button
+            key={id}
+            type="button"
+            className="mc-attach-item"
+            role="menuitem"
+            onClick={() => onPick(id)}
+          >
+            <ItemIcon size={18} />
+            <span className="mc-attach-text ch-grow">{label}</span>
+            {title ? <span className="ch-more-key">{title}</span> : null}
+          </button>
+        );
+      })}
+    </div>
+  );
+}
+
+/** Below 900px: the same places as chips (更多's among them), with 设置 at the end. */
 export function FolderStrip({
   world,
   view,
@@ -124,8 +219,8 @@ export function FolderStrip({
   readonly onView: (view: ViewId) => void;
 }) {
   return (
-    <nav className="ch-strip" aria-label="文件夹">
-      {[...FOLDERS, ...TOOLS].map((item) => {
+    <nav className="ch-strip" aria-label="导航">
+      {ITEMS.map((item) => {
         const badge = isFolder(item.id) ? folderBadge(world, item.id) : null;
         return (
           <button

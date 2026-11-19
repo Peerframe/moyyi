@@ -170,7 +170,12 @@ describe("desktop Chat state projection", () => {
     const ids = world.settings.flatMap((page) =>
       page.groups.flatMap((group) =>
         group.blocks.flatMap((block) =>
-          block.kind === "controls" ? block.controls.map((control) => control.id) : [],
+          block.kind === "lines"
+            ? block.lines.flatMap((line) => [
+                ...(line.link ? [line.id] : []),
+                ...(line.controls ?? []).map((control) => control.id),
+              ])
+            : [],
         ),
       ),
     );
@@ -181,26 +186,78 @@ describe("desktop Chat state projection", () => {
         "native.web",
         "native.materials",
         "native.artifacts",
-        "native.effects",
         "native.history",
         "native.maintenance",
         "native.sessions",
-        "native.new",
+        "native.help",
       ]),
     );
     expect(world.plugins.every((plugin) => !plugin.toggle)).toBe(true);
-    expect(world.settings.map((page) => page.id)).toEqual([
-      "models",
-      "budget",
-      "permissions",
-      "records",
-      "about",
+    // The nine boards remain navigable even when a runtime capability is unavailable.
+    expect(world.settings.map((page) => `${page.section} ${page.name}`)).toEqual([
+      "设置 通用",
+      "设置 快捷键",
+      "功能 模型",
+      "功能 个性化",
+      "功能 记忆",
+      "数据安全 权限",
+      "数据安全 数据",
+      " 获取帮助",
+      " 关于 moyyi",
     ]);
     const text = JSON.stringify(world.settings);
-    expect(text).toContain("deepseek-v4-flash");
-    expect(text).toContain("本机配置已就绪");
+    expect(text).toContain("DeepSeek Flash · 密钥已就绪");
+    expect(text).toContain("保存时不验证远端连接");
     expect(text).not.toContain("刚测过");
-    expect(text).not.toContain('"kind":"meters"');
-    expect(text).not.toContain('"keyField"');
+    expect(text).not.toMatch(/后台|GB\/T 7714|叫我小文/);
+    expect(text).toContain("此版本尚未接入自动记忆");
+    expect(text).not.toContain("改刚发的那句");
+    const models = world.settings.find((page) => page.id === "models");
+    const choices = models?.groups.flatMap((g) =>
+      g.blocks.flatMap((b) => (b.kind === "choice" ? [b.choice.id] : [])),
+    );
+    // Kimi's strength only shows for Kimi.
+    expect(choices).toEqual(["native.preset"]);
+    const kimi = projectChatWorld(
+      snapshot({ settings: { ...snapshot().settings, preset: "kimi-cn" } }),
+    ).settings.find((page) => page.id === "models");
+    expect(JSON.stringify(kimi)).toContain("native.kimiEffort");
+  });
+
+  it("lists one project per working folder and nothing under 自动化", () => {
+    const base = snapshot();
+    const world = projectChatWorld(
+      snapshot({
+        sessions: {
+          ...base.sessions,
+          items: [
+            ...base.sessions.items,
+            {
+              sessionId: "session-b",
+              workspaceRoot: "/projects/other",
+              lastActivityAt: "2026-11-03T01:00:00.000Z",
+              promptPreview: null,
+            },
+            {
+              sessionId: "session-c",
+              workspaceRoot: "/projects/actual-project",
+              lastActivityAt: "2026-11-02T01:00:00.000Z",
+              promptPreview: null,
+            },
+          ],
+        },
+      }),
+    );
+    expect(world.projects.map((p) => [p.id, p.name, p.avatar.text])).toEqual([
+      ["/projects/actual-project", "actual-project", "a"],
+      ["/projects/other", "other", "o"],
+    ]);
+    expect(world.chats.map((chat) => chat.project)).toEqual([
+      "/projects/actual-project",
+      "/projects/other",
+      "/projects/actual-project",
+    ]);
+    expect(world.automations).toEqual([]);
+    expect(projectChatWorld(null).projects).toEqual([]);
   });
 });

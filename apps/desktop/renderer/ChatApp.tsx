@@ -1,7 +1,13 @@
 import { useEffect, useLayoutEffect, useRef, useState } from "react";
-import type { Theme } from "../../chat/port.ts";
 import { App as ChatApp } from "../../chat/ui/App.tsx";
 import type { DesktopBridge } from "../shared.ts";
+import {
+  type ChatAppearance,
+  readAppearance,
+  useWindowTheme,
+  writeAppearance,
+} from "./chat-appearance.ts";
+import { nativeControlReason } from "./chat-pages.ts";
 import { PlanModeNotice, planAvailability } from "./chat-plan.tsx";
 import { CHAT_ACTIONS, createDesktopChatPort } from "./chat-port.ts";
 import { RichMessage } from "./RichMessage.tsx";
@@ -69,25 +75,44 @@ function Tools({
   );
 }
 
+/** macOS draws the traffic lights in the rail and the sidebar material behind the window. */
+const MAC = typeof navigator !== "undefined" && navigator.userAgent.includes("Macintosh");
+
 /** The new view shares the existing controller/feature graph and validated native bridge. */
 export function DesktopChatApp({ bridge }: { bridge: DesktopBridge }) {
   const ui = useRenderer(bridge);
   const current = useRef(ui);
   current.current = ui;
   const [panel, setPanel] = useState<ToolPanel | null>(null);
-  const [theme, setTheme] = useState<Theme>(() =>
-    matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light",
-  );
+  const [appearance, setAppearance] = useState(readAppearance);
+  const appearanceRef = useRef(appearance);
+  const theme = useWindowTheme(appearance.theme);
+  const [openSettingsRequest, setOpenSettingsRequest] = useState<{
+    page: string;
+    sequence: number;
+  }>();
+  const openModelSettings = () =>
+    setOpenSettingsRequest((request) => ({
+      page: "models",
+      sequence: (request?.sequence ?? 0) + 1,
+    }));
   const controls = useRef<(id: string) => void>(() => {});
   controls.current = (id) => {
     const live = current.current;
-    if (live.busy && !["native.artifacts", "native.effects", "native.materials"].includes(id)) {
-      live.setViewError("请先等待当前操作结束，或停止运行。");
+    const reason = live.state
+      ? nativeControlReason(live.state, id, live.pending)
+      : "本地服务尚未就绪。";
+    if (reason) {
+      live.setViewError(reason);
       return;
     }
     live.setViewError(null);
     if (id === "native.settings") {
       live.setSettingsOpen(true);
+      return;
+    }
+    if (id === "native.help") {
+      live.setHelpOpen(true);
       return;
     }
     if (id === "native.maintenance") {
@@ -120,18 +145,20 @@ export function DesktopChatApp({ bridge }: { bridge: DesktopBridge }) {
     createDesktopChatPort(
       () => current.current,
       (id) => controls.current(id),
+      {
+        read: () => appearanceRef.current,
+        save(next: ChatAppearance) {
+          writeAppearance(next);
+          appearanceRef.current = next;
+          setAppearance(next);
+        },
+      },
     ),
   );
   useLayoutEffect(
-    () => adapter.update(ui.state, ui.viewError, ui.pending),
-    [adapter, ui.state, ui.viewError, ui.pending],
+    () => adapter.update(ui.state, ui.viewError, ui.pending, appearance),
+    [adapter, ui.state, ui.viewError, ui.pending, appearance],
   );
-  useEffect(() => {
-    const media = matchMedia("(prefers-color-scheme: dark)");
-    const changed = () => setTheme(media.matches ? "dark" : "light");
-    media.addEventListener("change", changed);
-    return () => media.removeEventListener("change", changed);
-  }, []);
   useEffect(() => {
     document.documentElement.className = `mc-${theme}`;
   }, [theme]);
@@ -170,27 +197,25 @@ export function DesktopChatApp({ bridge }: { bridge: DesktopBridge }) {
     if (state.activeSessionId)
       void ui.perform(() => bridge.selectDocuments({ sessionId: state.activeSessionId as string }));
   };
+  // Session tools that have no place in the chat yet open the existing complete dialogs.
+  const tool = (id: string, label: string, disabled = ui.busy) => (
+    <button
+      key={id}
+      type="button"
+      className="ch-native-tool"
+      disabled={disabled}
+      onClick={() => command(id)}
+    >
+      {label}
+    </button>
+  );
   const header = (
-    <div className="ch-native-toolbar">
+    <nav className="mc-glass ch-native-tools" aria-label="会话工具">
+      {tool("native.materials", state.materials.length ? `材料 ${state.materials.length}` : "材料")}
+      {tool("native.permissions", "权限")}
       <button
         type="button"
-        className="mc-btn"
-        disabled={ui.busy}
-        onClick={() => command("native.materials")}
-      >
-        材料 {state.materials.length || ""}
-      </button>
-      <button
-        type="button"
-        className="mc-btn"
-        disabled={ui.busy}
-        onClick={() => command("native.permissions")}
-      >
-        会话权限
-      </button>
-      <button
-        type="button"
-        className="mc-btn"
+        className="ch-native-tool"
         aria-pressed={state.planMode}
         title="开启后只读调查并给出计划；批准计划前不会修改文件、运行命令或访问外部"
         disabled={!plan.canChange}
@@ -198,21 +223,10 @@ export function DesktopChatApp({ bridge }: { bridge: DesktopBridge }) {
       >
         计划模式
       </button>
-      <button type="button" className="mc-btn" onClick={() => command("native.artifacts")}>
-        成果与记录
-      </button>
-      <button
-        type="button"
-        className="mc-btn"
-        disabled={ui.busy}
-        onClick={() => command("native.history")}
-      >
-        完整历史
-      </button>
-      <button type="button" className="mc-btn" onClick={() => command("native.sessions")}>
-        管理会话
-      </button>
-    </div>
+      {tool("native.effects", "操作记录", false)}
+      {tool("native.history", "完整历史")}
+      {tool("native.sessions", "会话和回收站", false)}
+    </nav>
   );
   const beforeComposer = (
     <div className="desktop-tools ch-native-notices">
@@ -247,32 +261,48 @@ export function DesktopChatApp({ bridge }: { bridge: DesktopBridge }) {
     </div>
   );
   const empty = (
-    <section className="mc-wallpaper ch-conversation ch-empty">
-      <img src="./character.png" alt="" className="ch-empty-sticker" />
-      <h1 className="ch-empty-title">从你的工作目录开始</h1>
-      <p className="ch-sub">打开已有会话，或选择一个目录开始只读任务。</p>
-      <div className="ch-native-toolbar">
-        <button type="button" className="mc-btn" disabled={ui.busy} onClick={newChat}>
-          选择工作目录
+    <section
+      className="mc-wallpaper ch-conversation ch-empty ch-native-empty"
+      aria-label="没选会话"
+    >
+      <span className="mc-av mc-av-ai ch-native-empty-mark" aria-hidden="true">
+        m
+      </span>
+      <h1 className="ch-empty-title">选一个会话，或交代一件新事</h1>
+      <p className="ch-sub">moyyi 在你选的文件夹里做事。新会话从只读开始，权限由你在会话里决定。</p>
+      <div className="ch-native-empty-keys">
+        <button
+          type="button"
+          className="mc-key mc-key-primary"
+          disabled={ui.busy}
+          onClick={newChat}
+        >
+          选文件夹，开始新会话
         </button>
-        <button type="button" className="mc-btn" onClick={() => command("native.sessions")}>
-          全部会话与回收站
+        <button type="button" className="mc-key" onClick={() => command("native.sessions")}>
+          会话和回收站
         </button>
       </div>
-      <div className="desktop-tools">
+      <div className="desktop-tools ch-native-empty-notice">
         <FeatureSlot name="connection-notice" />
       </div>
     </section>
   );
   return (
-    <RendererContext value={ui as ReadyRendererUI}>
-      <div className={`mc mc-${theme} desktop-chat-root`}>
+    <RendererContext value={{ ...ui, state, openModelSettings } satisfies ReadyRendererUI}>
+      <div className={`mc mc-${theme} desktop-chat-root${MAC ? " ch-native-mac" : ""}`}>
         <ChatApp
           port={adapter.port}
           theme={theme}
-          sticker="./character.png"
+          fontSize={appearance.size}
+          windowControls={MAC}
           integration={{
             activeChatId: state.activeSessionId,
+            openSettingsRequest,
+            pageNotice:
+              state.status === "ready"
+                ? undefined
+                : (state.error ?? "本地服务暂不可用，请重新打开应用。"),
             onNew: newChat,
             canSend,
             busy: ui.busy,

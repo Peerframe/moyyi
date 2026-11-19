@@ -1,0 +1,181 @@
+# Handoff: Chat window and rail after the 2026-11-05 owner review
+- Brief: none. Owner review on 2026-11-05 of the installed Chat app (PR #60):
+  - remove the shark girl;
+  - make the rail translucent;
+  - drop the separate title-bar strip (traffic lights go in the rail, as in Telegram for macOS);
+  - the 等我的 folder is wrong ("这个等我的不好，你需要思考我们的界面需要什么");
+  - drop the AI folder, because the model is chosen in 设置;
+  - drop 成果;
+  - put working folders inside 项目, because the rail holds only functional places;
+  - the rail is "全部 / 自动化 / 更多", with 插件 and 设置 at the bottom;
+  - keep 更多 as a hidden slot (端口) until its contents are decided.
+- Canvas: https://claude.ai/artifact/Cfhj4xyxqATonqeGXDaVS2, version 61.
+- Design system: https://claude.ai/artifact/3yRcxDo7PaDuuQcSy6D8pP, version 22.
+- Branch: claude/chat-settings (from codex/chat-desktop-integration plus origin/main at 3e91c8b; PR #60 is merged). Work in this worktree.
+- Last agent: Codex, 2026-11-19.
+
+## Current delivery
+
+- Resumed the clean `claude/chat-settings` worktree at `b052e45`. PRs #59 and #60 are
+  merged. The separate draft #56 has conflicts with main and outstanding live acceptance.
+- The desktop now renders all nine v61 settings pages. Window appearance uses local display
+  preferences, models use the existing configure bridge, and session actions enforce the
+  current host state. Global personal instructions and automatic memory are unavailable.
+- Implementation `66f998f`, final packaged source `a9e32c1` (the native sidebar tint
+  fixes contrast when the app and system themes differ). The macOS arm64 ZIP is in
+  `artifacts/desktop/Moyyi-local-arm64.zip`, SHA-256
+  `b2b79b5af06394b8a6914e09babb95ae2ffa55c8e285cf23408485e3c3ded3fd`.
+- `npx vitest run apps/chat apps/desktop/renderer tests/chat-design.test.ts` passed 129 tests.
+  Final `npm run check` passed 3368 tests in 192 files on the bundled Node 26.12.1.
+  `npm run desktop:package` and `npm run verify:desktop` passed on that candidate.
+- [Native checks and screenshots](../../docs/tasks/assets/2026-11-19-chat-settings/README.md)
+  cover the nine pages, controls, failure feedback, relaunch and both supported window
+  sizes on isolated data. No real model usage, change to daily installation or owner-store migration.
+- Use this section for current status. The dated review and checks below describe earlier checkpoints.
+
+
+## 2026-11-06: 设置 redesign (canvas first)
+- Owner review:
+  - 插件 moves up with the places, and 设置 sits alone at the bottom;
+  - learn from WorkBuddy's settings and memory, combined with the DSH desktop look;
+  - keep settings in place (not a modal);
+  - automatic memory that says nothing when it records;
+  - no 智能体 page: AIs are sub-agents, and plugins can add them later;
+  - include main's 11-05 work and delivery 3 (PR #56, draft, unmerged);
+  - 后台 and 预算 were unreal and are dropped;
+  - "设置不能太复杂";
+  - keep 快捷键 as its own page;
+  - groups 设置 / 功能 / 数据安全;
+  - add 获取帮助;
+  - draw it on the canvas first.
+- Research: DSH bundle docs (`/Applications/DeepSeek Harness.app`, app.asar):
+  - settings sections are 账号与余额, 通用, 模型, 内置插件, Agent 预设, 插件市场;
+  - sub-agent, search, agent-loop and terminal options sit on 插件 › 内置插件 pages;
+  - compaction is on by default (`auto: true`), with manual `/compact`;
+  - 意见反馈 opens an external questionnaire.
+  - WorkBuddy's bundle has no settings strings, so only the owner's screenshot was used.
+- Canvas v61 (generator `scratchpad/settings3.py`, rail `scratchpad/rail.py`). The list is:
+  - 设置: 通用, 快捷键;
+  - 功能: 模型, 个性化, 记忆;
+  - 数据安全: 权限, 数据;
+  - then a rule, 获取帮助 and 关于 moyyi.
+- Boards: S23 通用, S24 快捷键, S25 模型, S26 个性化, S27 记忆, S28 权限, S29 数据, S30 获取帮助, S35 关于. Every rail is now 全部 / 项目 / 自动化 / 插件 | 设置.
+- v60 tried a WorkBuddy-style 通用 and 个性化. The owner asked to revert it, so v61 is the v59 boards again. The v60 generator is kept as `scratchpad/settings3-v60.py`.
+- Code now follows v61:
+  - mock: the nine pages (`apps/chat/mock/pages.ts`). 个人指令 is a text block with a count and 保存 (`save-text` action). Help topics are link rows with a chevron.
+  - 快捷键 is one shared page, `apps/chat/ui/shortcuts.ts`, used by both the mock and the desktop.
+  - Removed with 后台 and 预算: the number, meter and chip blocks, `set-number` and the 看全部快捷键 button.
+  - desktop (`apps/desktop/renderer/chat-pages.ts`) shows only real pages: 通用, 快捷键, 模型, 权限, 数据, 获取帮助, 关于.
+    - 模型 saves the service, Kimi strength and key in place, through `configure` (`chat-port.ts`). These changes are refused during a run or import.
+    - Per-turn limits and long-task switches are still in the old dialog, behind 调整.
+    - 获取帮助 opens the usage guide.
+    - 个性化 and 记忆 wait for their capabilities.
+  - Every `configure` reopens the runtime and reloads the session.
+  - Checks: `npm run check` (3362 tests) and `desktop:build` pass. The chat build was screenshotted against each board. The desktop app has not been opened: a second instance on the owner's store is not allowed.
+- Collected:
+  - the switch knob uses `--on-out` until the design system has a switch (design system v22 still lacks it);
+  - the chat preview with `?chrome=mac` does not fill the height (preview-only: desktop's chat.css sizes `desktop-chat-root`).
+- Proposed separately, needs a brief and eval evidence:
+  - automatic compaction on by default;
+  - nested AGENTS.md on by default;
+  - larger per-run defaults, with a continue card in the chat instead of settings numbers;
+  - the sub-agent switch moving to 插件 › 子智能体;
+  - search connection moving to 插件 › 网页.
+- Open for the owner:
+  - where 反馈问题 goes (moyyi has no feedback channel);
+  - memory needs its own capability brief (none exists);
+  - whether AI private chats stay in 全部.
+
+## Decisions taken
+- **Rail.** The rail holds places only, from top to bottom:
+  - 全部: every chat, by time.
+  - 项目: the working folders. Opening one lists that project's chats, archived ones included, under a ← 项目 back button.
+  - 自动化: jobs that start on their own.
+  - 更多: a reserved slot. `MORE` in `Rail.tsx` is empty, so the button is not drawn. Once items are added, it opens a menu beside the rail.
+  - 插件 and 设置 sit at the bottom.
+- **Removed places.**
+  - No AI folder.
+  - No 成果. Results stay in their chat.
+  - No 等我的 or 在做. These are states of a chat: the badge, the 等你决定： prefix, and the working dot.
+- **自动化.**
+  - Each job belongs to one chat and shows what it does, when it runs, its recent runs, 暂停 / 继续, 现在跑一次 and 删掉.
+  - Jobs moved out of 设置 › 后台 (formerly 后台和定时).
+  - In the desktop app the list is empty, with an honest note that the local version cannot run schedules.
+- **Desktop.** `chat-world.ts` gives every session `project = workspaceRoot` and builds one project per working folder. The artifact controls added for 成果 are removed again.
+- **Window (macOS).**
+  - `titleBarStyle: hidden`.
+  - Traffic lights at {20, 27}, inside the rail's 34px top strip.
+  - `vibrancy: sidebar` with a transparent page ground.
+  - Glass rail.
+  - Drag regions: the rail, list head, chat top and page titles.
+- **Character.** The shark girl, stickers and character.png are removed until the art is finished.
+
+## Done
+- App changes:
+  - port: `FolderId` is all | project; adds `projects` and `automations`; Result* types removed;
+  - mock: `PROJECTS`, `automationPages()` and the automate actions;
+  - Rail with a hidden 更多 slot;
+  - ChatList: project list and drill-down;
+  - Pages: the 自动化 kind;
+  - App routing;
+  - icons;
+  - desktop chat-world and ChatApp.
+- Tests: rail order, the hidden 更多 slot, projects, automations, the 后台 page, and desktop projects.
+- 更多 menu, checked in headless Chrome over CDP while it was visible (`scratchpad/more.mjs`):
+  - opens beside the rail, inside the viewport;
+  - focuses its first item;
+  - Esc returns focus to 更多;
+  - a click outside closes it;
+  - picking an item opens it.
+  - Fix found by this check: the rail's backdrop-filter made it the menu's containing block and clipped the menu. The menu is now the rail's sibling. A react-dom portal is not allowed in app:chat.
+- Canvas v54 and v55:
+  - every rail is 全部 / 项目 / 自动化 | 插件 / 设置;
+  - the 项目 badge matches the row rule (1);
+  - S33 is now 项目 (project list, drill-down, empty);
+  - new S34 自动化;
+  - S26 is 后台 without 定时的事;
+  - S6 shows an empty 自动化 instead of an empty 成果;
+  - S8's list title, S13's caption and the notes are updated.
+- Design system v22:
+  - README rules: places, 项目 and 自动化, 后台, results stay in their chat, rail icons;
+  - FolderRail README and preview;
+  - ResultMessage README;
+  - `rail-label` sample;
+  - tokens and README copied to apps/chat/design.
+- Docs: the desktop.md use paragraph and the system-overview row.
+
+## Next at the November 5 checkpoint
+- Owner decides what goes in 更多 (asked on 2026-11-05: 暂时没想好).
+- Full `npm run check` on an idle machine (see Collected problems).
+- Native:
+  - package with Node 26 (`/opt/homebrew/bin`);
+  - run `verify:desktop`;
+  - back up `~/.moyyi` and the old app;
+  - quit the installed app gracefully and replace it;
+  - launch it;
+  - check the window at normal and narrow widths, then tune `TRAFFIC_LIGHTS`.
+  - Never run a second instance on the owner's store.
+- Canvas S24 comment: settings should fit an agent better. Not started.
+
+## Collected problems
+- The mock's 全部 still holds AI private chats (核查, 研读, 写作, 翻译). With no AI folder, it is unclear whether those chats should stay as contacts. Raise this with the owner.
+- 对账 wording remains on S5, S13, S21 and S22, in the DS result keys, and in the chat's result key and `/对账`. It is the claim-check action, not a removed place; whether to keep or rename it is a separate decision.
+- `npm run check` on 2026-11-05 ran while the load average was about 11:
+  - 18 tests in untouched store/runtime/desktop-host files timed out; one assertion was the react-dom import, which is now fixed.
+  - Rerun alone, 19 of those 20 files pass.
+  - `src/runtime/documents.test.ts` ("rejects unsupported, corrupt, empty and encrypted containers distinctly") still takes about 5005 ms against its 5000 ms limit.
+  - `src/runtime` is unchanged on this branch. Recheck it on an idle machine.
+
+## Commands run
+- `npx tsc --noEmit -p .`: clean.
+- `npx biome check apps/chat`: clean.
+- `npm run check` (Node 26): 3142 passed, 19 failed. One failure was the boundary violation, now fixed. The other 18 were load timeouts; see Collected problems.
+- After the fixes:
+  - `npx tsc --noEmit -p .`: clean.
+  - `npx biome check apps tests docs`: clean.
+  - `npx vitest run tests/boundaries.test.ts apps/chat apps/desktop tests/chat-design.test.ts tests/desktop-feature-extension.test.ts`: 320 passed. This set includes the desktop host tests that had timed out.
+  - `npm run chat:build` and `npm run desktop:build`: passed.
+- Headless Chrome screenshots of the app (全部, 项目, drill-down, 自动化, 设置) and of boards S6, S26, S33 and S34.
+
+## Paid usage ledger
+- None.

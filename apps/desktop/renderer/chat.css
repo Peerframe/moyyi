@@ -14,30 +14,112 @@ body,
 .desktop-boot {
   padding: var(--space-24);
 }
-.ch-native-toolbar {
-  display: flex;
-  align-items: center;
-  gap: var(--space-8);
+/* Session tools: one glass capsule under the header, quiet until pointed at. */
+.ch-native-tools {
+  align-self: flex-end;
+  display: inline-flex;
   flex-wrap: wrap;
-  padding: var(--space-8) var(--space-12);
-  background: var(--panel);
-  color: var(--text);
+  gap: var(--space-2);
+  padding: var(--space-4);
+  border-radius: var(--radius-chip);
 }
-.ch-native-toolbar button {
+.ch-native-tool {
   font: inherit;
   font-size: 12px;
+  line-height: 1.3;
   cursor: pointer;
-  color: var(--on-key);
-  background: var(--key);
-  border: 1px solid var(--line);
+  color: var(--muted);
+  background: transparent;
+  border: none;
   border-radius: var(--radius-chip);
-  padding: var(--space-4) var(--space-8);
+  padding: var(--space-4) var(--space-10);
 }
-.ch-native-toolbar button:disabled {
-  opacity: 0.5;
+.ch-native-tool:hover:not(:disabled) {
+  color: var(--text);
+  background: color-mix(in srgb, var(--hover) 72%, transparent);
+}
+.ch-native-tool:disabled {
+  opacity: 0.45;
   cursor: default;
 }
-.ch-native-toolbar button[aria-pressed="true"] {
+.ch-native-empty {
+  padding: var(--space-32);
+}
+.ch-native-empty-mark {
+  width: 56px;
+  height: 56px;
+  font-size: 22px;
+  margin-bottom: var(--space-8);
+}
+.ch-native-empty h1 {
+  margin: 0;
+}
+.ch-native-empty .ch-sub {
+  margin: 0;
+  max-width: 380px;
+  line-height: 1.5;
+}
+.ch-native-empty-keys {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: var(--space-8);
+  margin-top: var(--space-12);
+}
+.ch-native-empty-notice:not(:has(*)) {
+  display: none;
+}
+.ch-native-empty-notice {
+  max-width: 480px;
+  margin-top: var(--space-16);
+}
+
+/* macOS (main.ts): no title bar, the traffic lights sit in the rail's top strip, and the
+   window ground is the system sidebar material. Everything but the panels lets it through. */
+html:has(.ch-native-mac),
+html:has(.ch-native-mac) body,
+html:has(.ch-native-mac) #root,
+.desktop-chat-root.ch-native-mac,
+.ch-native-mac .ch-app.mc-window {
+  background: transparent;
+}
+/* The macOS material follows the system even when the user chooses the opposite palette. */
+@media (prefers-color-scheme: light) {
+  .ch-native-mac.mc-dark .ch-app.mc-window {
+    background: color-mix(in srgb, var(--window) 88%, transparent);
+  }
+}
+@media (prefers-color-scheme: dark) {
+  .ch-native-mac.mc-light .ch-app.mc-window {
+    background: color-mix(in srgb, var(--window) 88%, transparent);
+  }
+}
+.ch-native-mac .ch-rail {
+  padding-top: var(--space-8);
+}
+.ch-native-mac .ch-rail-lights {
+  height: 34px;
+}
+/* The rail, the list title and the strip above the chat move the window, like a title bar. */
+.ch-native-mac :is(.ch-rail, .ch-list-head, .mc-chat-top, .ch-pane-titles, .ch-plugin-head) {
+  -webkit-app-region: drag;
+  app-region: drag;
+}
+.ch-native-mac
+  :is(button, a, input, textarea, select, dialog, [role="dialog"], .mc-pinned, .ch-search-bar) {
+  -webkit-app-region: no-drag;
+  app-region: no-drag;
+}
+/* The rail carries the traffic lights, so it stays down to the narrowest window. */
+@media (max-width: 899px) {
+  .ch-native-mac .ch-rail {
+    display: flex;
+  }
+  .ch-native-mac .ch-strip {
+    display: none;
+  }
+}
+.ch-native-tool[aria-pressed="true"] {
   color: var(--accent);
   background: var(--selected);
   border-color: var(--accent);
@@ -67,7 +149,7 @@ body,
   --surface: var(--panel);
   color: var(--text);
   font-family: var(--font-sans);
-  font-size: 14px;
+  font-size: calc(1rem - 1px);
   line-height: 1.5;
 }
 .desktop-tools .settings-dialog {
@@ -82,6 +164,9 @@ body,
 }
 .ch-native-rich .rich-message {
   white-space: normal;
+}
+.ch-native-rich .rich-message table {
+  font-size: calc(1rem - 2px);
 }
 .ch-native-rich .rich-message code {
   background: var(--hover);
@@ -145,13 +230,4 @@ body,
   color: var(--danger);
   background: var(--panel);
   white-space: pre-wrap;
-}
-@media (max-width: 900px) {
-  .ch-native-toolbar {
-    gap: 4px;
-    padding: 4px 8px;
-  }
-  .ch-native-toolbar button {
-    font-size: 11px;
-  }
 }

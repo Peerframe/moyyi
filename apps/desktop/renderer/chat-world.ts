@@ -1,5 +1,6 @@
-import type { Chat, ChatInfo, ChatWorld, Message } from "../../chat/port.ts";
+import type { Chat, ChatInfo, ChatWorld, Message, Project } from "../../chat/port.ts";
 import type { DesktopMessage, DesktopSessionSummary, DesktopState } from "../shared.ts";
+import type { ChatAppearance } from "./chat-appearance.ts";
 import { chatBudgetLabel, chatModelLabel, projectChatPages } from "./chat-pages.ts";
 import { permissionLabel } from "./effects-state.ts";
 import { noticeLabel, outcomeLabel, toolStateLabel, workspaceName } from "./view-state.ts";
@@ -7,6 +8,7 @@ import { noticeLabel, outcomeLabel, toolStateLabel, workspaceName } from "./view
 export interface ChatProjectionOptions {
   readonly error?: string | null;
   readonly pending?: boolean;
+  readonly appearance?: ChatAppearance;
 }
 
 function message(entry: DesktopMessage): Message {
@@ -136,6 +138,8 @@ export function projectChatWorld(
       info: {},
       changes: {},
       threads: {},
+      projects: [],
+      automations: [],
       settings: [],
       plugins: [],
     };
@@ -165,6 +169,7 @@ export function projectChatWorld(
             ? runLabel(state)
             : (last?.text ?? summary.promptPreview ?? "尚无消息"),
       },
+      ...(summary.workspaceRoot ? { project: summary.workspaceRoot } : {}),
       decisions: active && !state.historyOnly && state.pendingApproval ? 1 : 0,
       unread: 0,
       ...(metadata ? { pinned: metadata.pinned, muted: metadata.muted } : {}),
@@ -228,6 +233,18 @@ export function projectChatWorld(
     ),
     changes: {},
     threads: {},
-    ...projectChatPages(state),
+    projects: sessionProjects(summaries),
+    // Nothing starts on its own in this version; 自动化 says so instead of listing samples.
+    automations: [],
+    ...projectChatPages(state, options.appearance, options.pending),
   };
+}
+
+/** 项目: one per working folder, in the order its newest session is listed. */
+function sessionProjects(summaries: readonly DesktopSessionSummary[]): readonly Project[] {
+  const roots = [...new Set(summaries.map((summary) => summary.workspaceRoot).filter(Boolean))];
+  return roots.map((root) => {
+    const name = workspaceName(root);
+    return { id: root, name, avatar: { text: [...name][0] ?? "?", tone: "key" }, path: root };
+  });
 }

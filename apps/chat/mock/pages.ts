@@ -1,6 +1,14 @@
-// 设置 and 插件 as the mock backend holds them (boards S23–S32). Wording is the canvas wording; the
-// runtime will build the same pages from its own settings, grants and plugin registry.
-import type { Choice, Control, PageGroup, PluginPage, SettingsPage } from "../port.ts";
+// 设置, 自动化 and 插件 as the mock backend holds them (boards S23–S32, S34, S35). Wording is the canvas
+// wording; the runtime will build the same pages from its own settings, schedules and plugins.
+import type {
+  AutomationPage,
+  Choice,
+  Control,
+  PageGroup,
+  PluginPage,
+  SettingsPage,
+} from "../port.ts";
+import { shortcutsPage } from "../ui/shortcuts.ts";
 
 const GUARANTEE = "这些是 moyyi 的保证，设置里关不掉。";
 
@@ -27,385 +35,21 @@ const locks = (lines: readonly string[], caption?: string, title = "一直是这
   blocks: [{ kind: "locks", lines }],
 });
 
-function models(): SettingsPage {
-  return {
-    id: "models",
-    name: "模型和密钥",
-    icon: "key",
-    summary: "DeepSeek 已连上 · 新对话用 Flash",
-    sub: "AI 用哪些模型，密钥放在哪",
-    groups: [
-      {
-        title: "已连上",
-        blocks: [
-          {
-            kind: "providers",
-            providers: [
-              {
-                id: "deepseek",
-                letter: "D",
-                name: "DeepSeek",
-                status: "已连上 · 密钥在系统钥匙串里 · 6 个对话在用",
-                connected: true,
-                controls: [
-                  control("deepseek.test", "测一下"),
-                  control("deepseek.rekey", "换密钥"),
-                  control("deepseek.disconnect", "断开", "danger"),
-                ],
-              },
-            ],
-          },
-        ],
-      },
-      {
-        title: "还可以连",
-        caption: "密钥只进系统钥匙串。它不会出现在聊天、记录和 AI 看到的内容里，也不会被同步。",
-        blocks: [
-          {
-            kind: "providers",
-            providers: [
-              {
-                id: "kimi",
-                letter: "K",
-                name: "Kimi",
-                status: "没连上",
-                connected: false,
-                controls: [],
-                keyField: {
-                  placeholder: "粘贴 Kimi 的密钥",
-                  save: control("kimi.save", "存进钥匙串", "primary"),
-                },
-              },
-              {
-                id: "anthropic",
-                letter: "A",
-                name: "Anthropic",
-                status: "没连上",
-                connected: false,
-                controls: [control("anthropic.connect", "连上")],
-              },
-            ],
-          },
-        ],
-      },
-      {
-        title: "新对话默认用",
-        caption: "已经在跑的对话不变。某个 AI 或项目要换模型，去它的资料里换。",
-        blocks: [
-          {
-            kind: "choice",
-            choice: choice("models.default", ["DeepSeek Flash", "DeepSeek Pro", "每次问我"], 0),
-          },
-        ],
-      },
-    ],
-  };
-}
-
-function aboutMe(): SettingsPage {
-  return {
-    id: "me",
-    name: "关于我",
-    icon: "me",
-    summary: "每个 AI 都知道的称呼、语言和规矩",
-    sub: "每个 AI 开工前都会读到这些",
-    groups: [
-      {
-        title: "怎么回你",
-        blocks: [
-          {
-            kind: "choices",
-            choices: [
-              choice("me.language", ["中文", "English", "跟着我"], 2, "用什么语言"),
-              choice("me.order", ["先说结论", "先讲过程"], 0, "先说什么"),
-            ],
-          },
-        ],
-      },
-      {
-        title: "所有 AI 都要守的",
-        caption: "只给某个 AI 的，在它资料里的「你教过它的」加。",
-        blocks: [
-          {
-            kind: "chips",
-            chips: ["不确定就直说", "改文件前说清改哪几处", "金额写到元", "日期写成 11月4日"],
-            add: control("me.rules.add", "加一条"),
-          },
-        ],
-      },
-      {
-        title: "记忆记下的你",
-        caption: "每条都写着从哪个对话来。删掉后不会再给 AI 看；以前的记录不变。",
-        blocks: [
-          {
-            kind: "lines",
-            lines: [
-              {
-                id: "memory.cite",
-                text: "论文引用用 GB/T 7714",
-                sub: "从「毕业论文」记下 · 10月30日",
-                controls: [control("memory.cite.delete", "删掉")],
-              },
-              {
-                id: "memory.rent",
-                text: "房租每月 15 号交",
-                sub: "从「租房」记下 · 10月28日",
-                controls: [control("memory.rent.delete", "删掉")],
-              },
-            ],
-          },
-        ],
-      },
-      locks(["这些内容原样放进每次发给模型的内容里，在「AI 看到什么」里查得到"]),
-    ],
-  };
-}
-
-function permissions(): SettingsPage {
-  return {
-    id: "permissions",
-    name: "权限和确认",
-    icon: "shield",
-    summary: "改文件、跑命令前先问你",
-    sub: "AI 动手之前，什么时候要先问你",
-    groups: [
-      {
-        title: "先问你的时候",
-        caption:
-          "计划卡里一起问：开始前把要改的、要跑的都列出来，你点一次开始。计划外的事还会再问。",
-        blocks: [
-          {
-            kind: "choices",
-            choices: [
-              choice("ask.files", ["每次问", "计划卡里一起问"], 1, "改文件"),
-              choice("ask.commands", ["每次问", "计划卡里一起问"], 0, "跑命令"),
-              choice("ask.web", ["每次问", "不用问", "不许"], 0, "打开网页"),
-            ],
-          },
-        ],
-      },
-      {
-        title: "给过的文件夹",
-        caption:
-          "文件夹在聊天里给：回形针 → 整个文件夹。这里能看全部，也能收回；收回会在那个群里留一条消息。",
-        blocks: [
-          {
-            kind: "lines",
-            lines: [
-              {
-                id: "folder.lunwen",
-                text: "~/论文",
-                mono: true,
-                icon: "folder",
-                sub: "给了「毕业论文」 · 10月30日",
-                tag: "可以改",
-                controls: [control("folder.lunwen.revoke", "收回")],
-              },
-              {
-                id: "folder.zufang",
-                text: "~/租房",
-                mono: true,
-                icon: "folder",
-                sub: "给了「租房」 · 10月28日",
-                tag: "只看",
-                controls: [control("folder.zufang.revoke", "收回")],
-              },
-            ],
-          },
-        ],
-      },
-      locks(
-        [
-          "删文件、发东西出去，每次都问你",
-          "动没给过的文件夹之前，先问你",
-          "每一处改动都留一条消息，能撤回",
-          "任何一件事你都能随时停下",
-        ],
-        GUARANTEE,
-        "这几条一直开着",
-      ),
-    ],
-  };
-}
-
-function background(): SettingsPage {
-  const timed = (id: string, when: string, what: string, where: string) => ({
-    id,
-    text: `${when} · ${what}`,
-    sub: `在「${where}」里做`,
-    controls: [control(`${id}.pause`, "暂停")],
-  });
-  return {
-    id: "background",
-    name: "后台和定时",
-    icon: "timer",
-    summary: "同时做 3 件 · 2 件定时",
-    sub: "你不看着的时候，AI 怎么做事",
-    groups: [
-      {
-        title: "同时做几件事",
-        caption: "多出来的排队，在文件夹栏的「在做」里看得到。",
-        blocks: [{ kind: "choice", choice: choice("jobs.parallel", ["1 件", "3 件", "5 件"], 1) }],
-      },
-      {
-        title: "做到要你决定的地方",
-        caption: "选哪个都一样：要你决定的那一步，不会替你决定。",
-        blocks: [
-          {
-            kind: "choice",
-            choice: choice("jobs.atDecision", ["停下等你", "先做不用决定的部分"], 1),
-          },
-        ],
-      },
-      {
-        title: "定时的事",
-        caption: "在任意对话里说 /定时 加一件。到点在那个对话里开工，照常先给计划卡。",
-        blocks: [
-          {
-            kind: "lines",
-            lines: [
-              timed("timer.brief", "每天 8:00", "早报：今天要做什么", "moyyi"),
-              timed("timer.format", "每周一 9:00", "查一遍论文格式", "毕业论文"),
-            ],
-          },
-        ],
-      },
-      {
-        title: "关机或断网以后",
-        blocks: [
-          { kind: "choice", choice: choice("jobs.resume", ["回来自动接着做", "先问我"], 1) },
-        ],
-      },
-      locks(["从记录里接着做，做完的改动不会再做一遍"], GUARANTEE),
-    ],
-  };
-}
-
-function budget(): SettingsPage {
-  return {
-    id: "budget",
-    name: "预算",
-    icon: "gauge",
-    summary: "新项目默认每周 40 次",
-    sub: "AI 每次找模型都算一次。新项目给多少，用完了怎么办",
-    groups: [
-      {
-        title: "新项目默认每周",
-        caption: "计划卡上会写这个数，你点开始之前都能改。",
-        blocks: [
-          { kind: "choice", choice: choice("budget.default", ["20 次", "40 次", "每次问我"], 1) },
-        ],
-      },
-      {
-        title: "这周用了多少",
-        caption: "要给某个项目加，在它的资料里加，或者在群里说 /预算。",
-        blocks: [
-          {
-            kind: "meters",
-            meters: [
-              {
-                id: "lunwen",
-                avatar: { text: "论", tone: "accent" },
-                shape: "project",
-                name: "毕业论文",
-                used: 31,
-                total: 40,
-              },
-              {
-                id: "zufang",
-                avatar: { text: "租", tone: "key" },
-                shape: "project",
-                name: "租房",
-                used: 12,
-                total: 40,
-              },
-              {
-                id: "fanyi",
-                avatar: { text: "译", tone: "quiet" },
-                shape: "ai",
-                name: "翻译",
-                used: 40,
-                total: 40,
-                alert: "用完了 · 已暂停",
-              },
-            ],
-          },
-        ],
-      },
-      locks(
-        ["停下来等你，不会自己追加", "停下时说清做到哪一步、留下了什么"],
-        GUARANTEE,
-        "用完的时候",
-      ),
-    ],
-  };
-}
-
-function records(): SettingsPage {
-  return {
-    id: "records",
-    name: "记录和数据",
-    icon: "db",
-    summary: "全在这台电脑上 · 可以导出",
-    sub: "你和 AI 说过的、做过的，都在哪",
-    groups: [
-      {
-        title: "放在哪",
-        caption: "没有云端副本。记录、文件改动的留底和贴纸都只在这里。",
-        blocks: [
-          {
-            kind: "lines",
-            lines: [
-              {
-                id: "records.where",
-                text: "全在这台电脑上",
-                sub: "~/Library/Application Support/moyyi · 2.1 GB",
-                controls: [control("records.reveal", "在 Finder 里看")],
-              },
-            ],
-          },
-        ],
-      },
-      {
-        title: "AI 看到过什么",
-        blocks: [
-          {
-            kind: "note",
-            text: "每次发给模型的内容都原样记下了。在一条消息的菜单里点“AI 看到什么”，能看到它当时收到的全部内容。",
-          },
-        ],
-      },
-      {
-        title: "导出",
-        caption: "只导出一个对话：在它的资料里导出。",
-        blocks: [
-          {
-            kind: "lines",
-            lines: [
-              {
-                id: "records.export",
-                text: "全部对话、改动和出处，导出成一个文件夹",
-                controls: [control("records.export", "导出全部", "primary")],
-              },
-            ],
-          },
-        ],
-      },
-      locks(["你说过的话：收回了也留在记录里", "每一处改动和它的留底"], GUARANTEE, "不会被删的"),
-    ],
-  };
-}
+const SETTINGS = "设置";
+const FEATURES = "功能";
+const SAFETY = "数据安全";
 
 function general(): SettingsPage {
   return {
     id: "general",
     name: "通用",
     icon: "sliders",
+    section: SETTINGS,
     summary: "深色 · 字号 15 · 只提醒决定",
-    sub: "颜色、字号、通知和快捷键",
+    sub: "颜色、字号和通知。",
     groups: [
       {
-        title: "看起来",
+        title: "外观",
         blocks: [
           {
             kind: "choices",
@@ -444,21 +88,374 @@ function general(): SettingsPage {
           },
         ],
       },
+      locks(["等你决定的事，静音和免打扰时也会叫你"], GUARANTEE),
+    ],
+  };
+}
+
+function models(): SettingsPage {
+  return {
+    id: "models",
+    name: "模型",
+    icon: "key",
+    section: FEATURES,
+    summary: "2 个连接 · 新对话用 Flash",
+    sub: "AI 通过这些连接找模型。同一家可以连好几个，比如两把 DeepSeek 密钥；密钥只进系统钥匙串，不会出现在聊天、记录和 AI 看到的内容里。",
+    groups: [
       {
-        title: "快捷键",
+        title: "连接",
         blocks: [
           {
-            kind: "shortcuts",
-            shortcuts: [
-              { keys: ["⌘", "K"], what: "跳到任意聊天" },
-              { keys: ["⌘", ","], what: "打开设置" },
-              { keys: ["⌘", "F"], what: "在这个对话里找" },
+            kind: "providers",
+            providers: [
+              {
+                id: "deepseek-main",
+                letter: "D",
+                name: "DeepSeek · 主力",
+                tag: "默认",
+                status: "密钥在系统钥匙串里 · 6 个对话在用",
+                connected: true,
+                controls: [
+                  control("deepseek-main.test", "测一下"),
+                  control("deepseek-main.edit", "编辑"),
+                  control("deepseek-main.remove", "删掉", "danger"),
+                ],
+              },
+              {
+                id: "deepseek-spare",
+                letter: "D",
+                name: "DeepSeek · 备用",
+                status: "密钥在系统钥匙串里",
+                connected: true,
+                controls: [
+                  control("deepseek-spare.test", "测一下"),
+                  control("deepseek-spare.edit", "编辑"),
+                  control("deepseek-spare.remove", "删掉", "danger"),
+                ],
+              },
+              {
+                id: "kimi",
+                letter: "K",
+                name: "Kimi",
+                status: "没连上",
+                connected: false,
+                controls: [control("kimi.remove", "删掉", "danger")],
+                keyField: {
+                  placeholder: "粘贴 Kimi 的密钥",
+                  save: control("kimi.save", "存进钥匙串", "primary"),
+                },
+              },
             ],
-            more: control("shortcuts.all", "看全部快捷键"),
+          },
+          { kind: "add", control: control("models.add", "添加模型连接") },
+        ],
+      },
+      {
+        title: "新对话默认用",
+        caption: "用默认连接。已经在跑的对话不变，对话里随时能换连接。",
+        blocks: [
+          {
+            kind: "choice",
+            choice: choice("models.default", ["DeepSeek Flash", "DeepSeek Pro", "每次问我"], 0),
           },
         ],
       },
-      locks(["等你决定的事，静音和免打扰时也会叫你"], GUARANTEE),
+      locks(
+        ["对话停在原处，不会自己换连接", "你换一个连接，在同一个对话里接着做"],
+        GUARANTEE,
+        "额度用完的时候",
+      ),
+    ],
+  };
+}
+
+function personal(): SettingsPage {
+  return {
+    id: "me",
+    name: "个性化",
+    icon: "me",
+    section: FEATURES,
+    summary: "每个对话都带上的个人指令",
+    sub: "每个 AI 开工前都会读到这些。怎么称呼你、怎么回你、守哪些规矩，写在一起就行。",
+    groups: [
+      {
+        title: "个人指令",
+        caption: "每个对话都带上。只给某个 AI 的，在它资料里的「你教过它的」加。",
+        blocks: [
+          {
+            kind: "text",
+            field: {
+              id: "me.instructions",
+              label: "个人指令",
+              value:
+                "叫我小文。\n不确定就直说，别猜。\n改文件前说清改哪几处。\n金额写到元，日期写成 11月4日。",
+              max: 4000,
+              note: "只存在这台电脑上",
+              save: control("me.instructions.save", "保存", "primary"),
+            },
+          },
+        ],
+      },
+      locks(["原样放进每次发给模型的内容里，在「AI 看到什么」里查得到"], GUARANTEE),
+    ],
+  };
+}
+
+function memory(): SettingsPage {
+  return {
+    id: "memory",
+    name: "记忆",
+    icon: "memory",
+    section: FEATURES,
+    summary: "自动记忆开着 · 记下 2 条",
+    sub: "AI 从对话里记下你的偏好和习惯，对话越多越懂你。记忆只在这台电脑上。",
+    groups: [
+      {
+        blocks: [
+          {
+            kind: "switches",
+            switches: [
+              {
+                id: "memory.auto",
+                label: "自动记忆",
+                note: "从对话里记下你的偏好和习惯，以后的对话直接用上。记的时候不打断你。",
+                on: true,
+              },
+            ],
+          },
+        ],
+      },
+      {
+        title: "记下的",
+        caption:
+          "每条都写着从哪个对话来。改了以后 AI 按新的用；删掉后不会再给 AI 看，以前的记录不变。",
+        action: control("memory.import", "导入"),
+        blocks: [
+          {
+            kind: "lines",
+            lines: [
+              {
+                id: "memory.cite",
+                text: "论文引用用 GB/T 7714",
+                sub: "从「毕业论文」记下 · 10月30日",
+                controls: [
+                  control("memory.cite.edit", "改"),
+                  control("memory.cite.delete", "删掉"),
+                ],
+              },
+              {
+                id: "memory.rent",
+                text: "房租每月 15 号交",
+                sub: "从「租房」记下 · 10月28日",
+                controls: [
+                  control("memory.rent.edit", "改"),
+                  control("memory.rent.delete", "删掉"),
+                ],
+              },
+            ],
+          },
+        ],
+      },
+      locks(["记忆原样放进每次发给模型的内容里，在「AI 看到什么」里查得到"], GUARANTEE),
+    ],
+  };
+}
+
+function permissions(): SettingsPage {
+  return {
+    id: "permissions",
+    name: "权限",
+    icon: "shield",
+    section: SAFETY,
+    summary: "给过 2 个文件夹 · 改动先问你",
+    sub: "AI 能碰哪些文件夹，哪些事一定先问你。",
+    groups: [
+      {
+        title: "给过的文件夹",
+        caption: "文件夹在聊天里给：回形针 → 整个文件夹。收回会在那个群里留一条消息。",
+        blocks: [
+          {
+            kind: "lines",
+            lines: [
+              {
+                id: "folder.lunwen",
+                text: "~/论文",
+                mono: true,
+                icon: "folder",
+                sub: "给了「毕业论文」 · 10月30日",
+                tag: "可以改",
+                controls: [control("folder.lunwen.revoke", "收回")],
+              },
+              {
+                id: "folder.zufang",
+                text: "~/租房",
+                mono: true,
+                icon: "folder",
+                sub: "给了「租房」 · 10月28日",
+                tag: "只看",
+                controls: [control("folder.zufang.revoke", "收回")],
+              },
+            ],
+          },
+        ],
+      },
+      locks(
+        [
+          "改文件、跑命令之前，先给你看要做什么",
+          "删文件、发东西出去，每次都问你",
+          "动没给过的文件夹之前，先问你",
+          "每一处改动都留一条消息，能撤回",
+          "任何一件事你都能随时停下",
+        ],
+        GUARANTEE,
+        "一直会先问你",
+      ),
+    ],
+  };
+}
+
+function data(): SettingsPage {
+  return {
+    id: "data",
+    name: "数据",
+    icon: "db",
+    section: SAFETY,
+    summary: "全在这台电脑上 · 可以备份和导出",
+    sub: "你和 AI 说过的、做过的，都在哪，怎么留一份。",
+    groups: [
+      {
+        title: "放在哪",
+        blocks: [
+          {
+            kind: "lines",
+            lines: [
+              {
+                id: "data.where",
+                text: "全在这台电脑上",
+                sub: "~/.moyyi · 2.1 GB · 没有云端副本",
+                controls: [control("data.where.reveal", "在 Finder 里看")],
+              },
+              {
+                id: "data.seen",
+                text: "AI 看到过什么",
+                sub: "每次发给模型的内容都原样记下了。在消息菜单里点「AI 看到什么」就能看。",
+              },
+            ],
+          },
+        ],
+      },
+      {
+        title: "备份和恢复",
+        blocks: [
+          {
+            kind: "lines",
+            lines: [
+              {
+                id: "data.backup",
+                text: "创建备份",
+                sub: "对话记录和设置存成一个文件夹；不含钥匙串里的密钥",
+                controls: [control("data.backup.create", "创建备份", "primary")],
+              },
+              {
+                id: "data.restore",
+                text: "从备份恢复",
+                sub: "先把现在的记录另存一份，再换成备份里的",
+                controls: [control("data.restore.choose", "选择备份")],
+              },
+            ],
+          },
+        ],
+      },
+      {
+        title: "导出",
+        blocks: [
+          {
+            kind: "lines",
+            lines: [
+              {
+                id: "data.export",
+                text: "全部对话、改动和出处，导出成一个文件夹",
+                sub: "只导出一个对话：在它的资料里导出",
+                controls: [control("data.export.all", "导出全部")],
+              },
+            ],
+          },
+        ],
+      },
+      locks(["你说过的话：收回了也留在记录里", "每一处改动和它的留底"], GUARANTEE, "不会被删的"),
+    ],
+  };
+}
+
+const topic = (id: string, text: string, sub?: string) => ({
+  id,
+  text,
+  ...(sub ? { sub } : {}),
+  link: true,
+});
+
+function help(): SettingsPage {
+  return {
+    id: "help",
+    name: "获取帮助",
+    icon: "help",
+    section: "",
+    summary: "怎么用、常见问题、反馈",
+    sub: "怎么用 moyyi，遇到问题去哪找。",
+    groups: [
+      {
+        title: "开始使用",
+        blocks: [
+          {
+            kind: "lines",
+            lines: [
+              topic(
+                "help.folder",
+                "让 AI 看懂一个文件夹",
+                "选工作目录，说想知道什么；它读了哪些文件都列给你",
+              ),
+              topic("help.report", "根据文档写一份报告", "选好材料和报告放在哪，看过预览再让它写"),
+              topic("help.change", "让 AI 改文件、跑检查", "每次动手前先给你看，改错了能撤回"),
+              topic("help.web", "读网页、核对来源", "给出确切网址；每次打开都先问你"),
+            ],
+          },
+        ],
+      },
+      {
+        title: "常见问题",
+        blocks: [
+          {
+            kind: "lines",
+            lines: [
+              topic("help.stopped", "为什么做到一半停了？"),
+              topic("help.undo", "改错了怎么撤回？"),
+              topic("help.keys", "密钥放在哪，会不会发出去？"),
+            ],
+          },
+        ],
+      },
+      {
+        title: "还没解决",
+        blocks: [
+          {
+            kind: "lines",
+            lines: [
+              {
+                id: "help.info",
+                text: "复制版本和系统信息",
+                sub: "只有版本号和系统版本，不含对话和文件",
+                controls: [control("help.info.copy", "复制")],
+              },
+              {
+                id: "help.feedback",
+                text: "反馈问题",
+                sub: "说说哪里不对，附上刚才复制的信息",
+                controls: [control("help.feedback.open", "去反馈")],
+              },
+            ],
+          },
+        ],
+      },
     ],
   };
 }
@@ -468,7 +465,9 @@ function about(): SettingsPage {
     id: "about",
     name: "关于 moyyi",
     icon: "info",
-    summary: "版本和更新",
+    section: "",
+    summary: "版本和开源许可",
+    sub: "版本和用到的开源项目。",
     groups: [
       { blocks: [{ kind: "brand", tagline: "AI 是联系人，项目是群，你是每个群的群主。" }] },
       {
@@ -476,14 +475,7 @@ function about(): SettingsPage {
         blocks: [
           {
             kind: "lines",
-            lines: [
-              {
-                id: "about.version",
-                text: "预览版",
-                sub: "已是最新 · 上次检查 今天 8:00",
-                controls: [control("about.update", "检查更新")],
-              },
-            ],
+            lines: [{ id: "about.version", text: "预览版", sub: "本机安装 · 数据在 ~/.moyyi" }],
           },
         ],
       },
@@ -491,14 +483,13 @@ function about(): SettingsPage {
         title: "用到的项目",
         blocks: [
           {
-            kind: "note",
-            text: "界面里有一部分来自 OpenBot，做事的方法参考了 DeepSeek Harness。每一处来源和许可都写在开源许可里。",
-          },
-          {
-            kind: "controls",
-            controls: [
-              control("about.licenses", "开源许可"),
-              control("about.feedback", "反馈问题"),
+            kind: "lines",
+            lines: [
+              {
+                id: "about.projects",
+                text: "界面里有一部分来自 OpenBot，做事的方法参考了 DeepSeek Harness。每一处来源和许可都写在开源许可里。",
+                controls: [control("about.licenses", "开源许可")],
+              },
             ],
           },
         ],
@@ -509,13 +500,14 @@ function about(): SettingsPage {
 
 export function settingsPages(): readonly SettingsPage[] {
   return [
-    models(),
-    aboutMe(),
-    permissions(),
-    background(),
-    budget(),
-    records(),
     general(),
+    shortcutsPage(SETTINGS),
+    models(),
+    personal(),
+    memory(),
+    permissions(),
+    data(),
+    help(),
     about(),
   ];
 }
@@ -528,6 +520,153 @@ function plugin(
 }
 
 const capability = (id: string, text: string, sub: string) => ({ id, text, sub });
+
+function automation(
+  page: Omit<AutomationPage, "enabled" | "toggle" | "icon" | "groups">,
+  enabled: boolean,
+  groups: readonly PageGroup[],
+): AutomationPage {
+  return {
+    ...page,
+    icon: "timer",
+    enabled,
+    toggle: control(
+      `automation.${page.id}.toggle`,
+      enabled ? "暂停" : "继续",
+      enabled ? undefined : "primary",
+    ),
+    groups: [
+      ...groups,
+      {
+        blocks: [
+          {
+            kind: "controls",
+            controls: [
+              control(`automation.${page.id}.run`, "现在跑一次"),
+              control(`automation.${page.id}.delete`, "删掉", "danger"),
+            ],
+          },
+        ],
+      },
+      locks(
+        ["到点照常先给计划卡；要你决定的那一步不会替你决定", "开工和结果都留在它的对话里"],
+        GUARANTEE,
+      ),
+    ],
+  };
+}
+
+/** 自动化 (S34): jobs that start on their own, each in the chat it belongs to. */
+export function automationPages(): readonly AutomationPage[] {
+  return [
+    automation(
+      {
+        id: "brief",
+        name: "早报",
+        summary: "每天 8:00 · 在「moyyi」",
+        sub: "每天 8:00 在「moyyi」里开工",
+      },
+      true,
+      [
+        {
+          title: "做什么",
+          caption: "你在 10月28日 说的：“每天早上告诉我要做什么”。",
+          blocks: [
+            { kind: "note", text: "看一遍各项目等你决定的事和今天到期的事，写成一条早报发给你。" },
+          ],
+        },
+        {
+          title: "什么时候",
+          blocks: [
+            {
+              kind: "choice",
+              choice: choice("automation.brief.when", ["每天", "工作日", "每周一"], 0),
+            },
+          ],
+        },
+        {
+          title: "最近几次",
+          blocks: [
+            {
+              kind: "lines",
+              lines: [
+                { id: "brief.run.today", text: "今天 8:00", sub: "发了早报 · 3 件事想问你" },
+                { id: "brief.run.yesterday", text: "昨天 8:00", sub: "发了早报 · 1 件等你决定" },
+              ],
+            },
+          ],
+        },
+      ],
+    ),
+    automation(
+      {
+        id: "format",
+        name: "查论文格式",
+        summary: "每周一 9:00 · 在「毕业论文」",
+        sub: "每周一 9:00 在「毕业论文」里开工",
+      },
+      true,
+      [
+        {
+          title: "做什么",
+          blocks: [{ kind: "note", text: "按学校模板查一遍 5 章的格式，只列出问题，不改文件。" }],
+        },
+        {
+          title: "什么时候",
+          blocks: [
+            {
+              kind: "choice",
+              choice: choice("automation.format.when", ["每天", "工作日", "每周一"], 2),
+            },
+          ],
+        },
+        {
+          title: "最近几次",
+          blocks: [
+            {
+              kind: "lines",
+              lines: [
+                { id: "format.run.last", text: "10月28日 9:00", sub: "找出 12 处 · 你让写作改了" },
+              ],
+            },
+          ],
+        },
+      ],
+    ),
+    automation(
+      {
+        id: "excerpt",
+        name: "读书会摘录",
+        summary: "已暂停 · 每周二 20:00 · 在「读书会资料」",
+        sub: "每周二 20:00 在「读书会资料」里开工",
+      },
+      false,
+      [
+        {
+          title: "做什么",
+          blocks: [{ kind: "note", text: "把这周读到的章节整理成摘录，每段对上原书页码。" }],
+        },
+        {
+          title: "什么时候",
+          blocks: [
+            { kind: "choice", choice: choice("automation.excerpt.when", ["每周二", "每周五"], 0) },
+          ],
+        },
+        {
+          title: "最近几次",
+          blocks: [
+            {
+              kind: "lines",
+              lines: [
+                { id: "excerpt.run.last", text: "周二 20:00", sub: "整理了 13 段 · 都对过页码" },
+              ],
+            },
+          ],
+        },
+      ],
+    ),
+  ];
+}
 
 export function pluginPages(): readonly PluginPage[] {
   return [

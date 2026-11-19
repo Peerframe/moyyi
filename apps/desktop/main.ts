@@ -6,6 +6,7 @@ import { parseDesktopCommand } from "./host/validation.ts";
 import { stateChannel } from "./native/channels.ts";
 import type { NativeContext } from "./native/context.ts";
 import { nativeFeatures } from "./native/feature-registry.ts";
+import { windowChrome } from "./native/window-chrome.ts";
 import { isTrustedSender } from "./security.ts";
 
 app.setName("moyyi");
@@ -63,7 +64,7 @@ else {
         minWidth: 780,
         minHeight: 560,
         title: "moyyi",
-        backgroundColor: "#ffffff",
+        ...windowChrome(process.platform),
         webPreferences: {
           preload: join(directory, "preload.cjs"),
           contextIsolation: true,

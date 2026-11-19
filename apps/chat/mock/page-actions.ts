@@ -1,4 +1,4 @@
-// What the mock backend does when a settings or plugin control is used. Pure functions over the
+// What the mock backend does when a settings, automation or plugin control is used. Pure functions over the
 // world, so the port only commits their result and tests can call them directly.
 import type {
   ChatWorld,
@@ -30,6 +30,7 @@ function mapPages(world: ChatWorld, change: (page: Page) => Page): ChatWorld {
   return {
     ...world,
     settings: world.settings.map((page) => change(page) as SettingsPage),
+    automations: world.automations.map((page) => change(page) as PluginPage),
     plugins: world.plugins.map((page) => change(page) as PluginPage),
   };
 }
@@ -44,14 +45,65 @@ const mapLines = (page: Page, change: (line: PageLine) => PageLine | null): Page
     return lines.length ? { ...block, lines } : null;
   });
 
-const mapProviders = (page: Page, change: (provider: Provider) => Provider): Page =>
+const mapProviders = (page: Page, change: (provider: Provider) => Provider | null): Page =>
   mapBlocks(page, (block) =>
-    block.kind === "providers" ? { ...block, providers: block.providers.map(change) } : block,
+    block.kind === "providers"
+      ? {
+          ...block,
+          providers: block.providers.flatMap((provider) => {
+            const next = change(provider);
+            return next ? [next] : [];
+          }),
+        }
+      : block,
   );
+
+/** Flips the switch with this id anywhere on the pages; false if there is none. */
+function flip(world: ChatWorld, id: string): ChatWorld | null {
+  let found = false;
+  const next = mapPages(world, (page) =>
+    mapBlocks(page, (block) =>
+      block.kind === "switches"
+        ? {
+            ...block,
+            switches: block.switches.map((entry) => {
+              if (entry.id !== id) return entry;
+              found = true;
+              return { ...entry, on: !entry.on };
+            }),
+          }
+        : block,
+    ),
+  );
+  return found ? next : null;
+}
+
+/** Whether a switch is on anywhere on the pages. */
+export function switchedOn(world: ChatWorld, id: string): boolean | undefined {
+  for (const page of [...world.settings, ...world.automations, ...world.plugins])
+    for (const group of page.groups)
+      for (const block of group.blocks)
+        if (block.kind === "switches") {
+          const found = block.switches.find((entry) => entry.id === id);
+          if (found) return found.on;
+        }
+  return undefined;
+}
+
+/** The text field saved as written, cut to its limit. */
+export function saveText(world: ChatWorld, fieldId: string, text: string): ChatWorld {
+  return mapPages(world, (page) =>
+    mapBlocks(page, (block) =>
+      block.kind === "text" && block.field.id === fieldId
+        ? { ...block, field: { ...block.field, value: text.slice(0, block.field.max) } }
+        : block,
+    ),
+  );
+}
 
 /** The option chosen for a choice anywhere on the pages, or undefined if there is none. */
 export function chosen(world: ChatWorld, choiceId: string): string | undefined {
-  for (const page of [...world.settings, ...world.plugins])
+  for (const page of [...world.settings, ...world.automations, ...world.plugins])
     for (const group of page.groups)
       for (const block of group.blocks) {
         const choices =
@@ -75,22 +127,17 @@ function summarize(world: ChatWorld): ChatWorld {
       const connected = page("models")
         ?.groups.flatMap((g) => g.blocks)
         .flatMap((b) => (b.kind === "providers" ? b.providers : []))
-        .filter((p) => p.connected)
-        .map((p) => p.name);
+        .filter((p) => p.connected).length;
       const model = chosen(world, "models.default");
-      const who = connected?.length ? `${connected.join("、")} 已连上` : "还没连上模型";
+      const who = connected ? `${connected} 个连接` : "还没连上模型";
+      // The default model is named without its maker.
       return model === "每次问我"
         ? `${who} · 新对话每次问你`
         : `${who} · 新对话用 ${model?.replace("DeepSeek ", "")}`;
     })(),
-    background: (() => {
-      const timers = linesOf(page("background")).filter((l) => l.id.startsWith("timer.") && !l.off);
-      return `同时做 ${chosen(world, "jobs.parallel")} · ${timers.length} 件定时`;
-    })(),
-    budget:
-      chosen(world, "budget.default") === "每次问我"
-        ? "新项目每次问你给多少"
-        : `新项目默认每周 ${chosen(world, "budget.default")}`,
+    memory: `自动记忆${switchedOn(world, "memory.auto") ? "开着" : "关着"} · 记下 ${
+      linesOf(page("memory")).length
+    } 条`,
     general: `${chosen(world, "general.theme")} · 字号 ${chosen(world, "general.size")} · ${chosen(world, "notify.messages")}`,
   };
   const skills = linesOf(world.plugins.find((p) => p.id === "skills")).filter(
@@ -131,13 +178,64 @@ export function choose(world: ChatWorld, choiceId: string, option: number): Chat
 const relabel = (controls: readonly Control[] | undefined, id: string, label: string) =>
   controls?.map((control) => (control.id === id ? { ...control, label } : control));
 
-const CONNECTED = "已连上 · 密钥在系统钥匙串里";
+const CONNECTED = "密钥在系统钥匙串里";
 function connectedControls(id: string): readonly Control[] {
   return [
     { id: `${id}.test`, label: "测一下" },
-    { id: `${id}.rekey`, label: "换密钥" },
-    { id: `${id}.disconnect`, label: "断开", tone: "danger" },
+    { id: `${id}.edit`, label: "编辑" },
+    { id: `${id}.remove`, label: "删掉", tone: "danger" },
   ];
+}
+
+/** The chat each sample automation starts its work in. */
+const AUTOMATION_CHAT: Record<string, string> = {
+  brief: "moyyi",
+  format: "lunwen",
+  excerpt: "dushu",
+};
+
+function automate(
+  world: ChatWorld,
+  id: string,
+  verb: string,
+  ids: { next: (prefix: string) => string },
+): ChatWorld {
+  const found = world.automations.find((a) => a.id === id);
+  if (!found) return world;
+  if (verb === "delete")
+    return { ...world, automations: world.automations.filter((a) => a !== found) };
+  if (verb === "run") {
+    const chatId = AUTOMATION_CHAT[id];
+    if (!chatId) return world;
+    const notice: Message = {
+      id: ids.next("s"),
+      kind: "service",
+      text: `你让「${found.name}」现在跑一次 · 计划卡马上到`,
+    };
+    return {
+      ...world,
+      messages: { ...world.messages, [chatId]: [...(world.messages[chatId] ?? []), notice] },
+    };
+  }
+  const toggle = found.toggle;
+  if (verb !== "toggle" || !toggle) return world;
+  const enabled = !found.enabled;
+  const when = found.summary.replace(/^已暂停 · /, "");
+  return {
+    ...world,
+    automations: world.automations.map((a) =>
+      a === found
+        ? {
+            ...a,
+            enabled,
+            summary: enabled ? when : `已暂停 · ${when}`,
+            toggle: enabled
+              ? { id: toggle.id, label: "暂停" }
+              : { id: toggle.id, label: "继续", tone: "primary" },
+          }
+        : a,
+    ),
+  };
 }
 
 /** Folder grants: revoking one also leaves a line in the chat it was given in. */
@@ -151,6 +249,8 @@ export function press(
   controlId: string,
   ids: { next: (prefix: string) => string },
 ): ChatWorld {
+  const flipped = flip(world, controlId);
+  if (flipped) return summarize(flipped);
   const [scope = "", item = "", verb = ""] = controlId.split(".");
   const lineId = `${scope}.${item}`;
 
@@ -190,24 +290,41 @@ export function press(
   }
 
   if (scope === "memory" && verb === "delete")
-    return mapPages(world, (page) => mapLines(page, (line) => (line.id === lineId ? null : line)));
+    return summarize(
+      mapPages(world, (page) => mapLines(page, (line) => (line.id === lineId ? null : line))),
+    );
 
-  if (scope === "timer" && verb === "pause")
+  if (controlId === "models.add") {
+    const id = ids.next("conn");
     return summarize(
       mapPages(world, (page) =>
-        mapLines(page, (line) => {
-          if (line.id !== lineId) return line;
-          const paused = !line.off;
-          const sub = (line.sub ?? "").replace(/^已暂停 · /, "");
-          return {
-            ...line,
-            off: paused,
-            sub: paused ? `已暂停 · ${sub}` : sub,
-            controls: relabel(line.controls, controlId, paused ? "继续" : "暂停") ?? [],
-          };
-        }),
+        mapBlocks(page, (block) =>
+          block.kind === "providers" && page.id === "models"
+            ? {
+                ...block,
+                providers: [
+                  ...block.providers,
+                  {
+                    id,
+                    letter: "D",
+                    name: "DeepSeek · 新连接",
+                    status: "没连上",
+                    connected: false,
+                    controls: [{ id: `${id}.remove`, label: "删掉", tone: "danger" }],
+                    keyField: {
+                      placeholder: "粘贴 DeepSeek 的密钥",
+                      save: { id: `${id}.save`, label: "存进钥匙串", tone: "primary" },
+                    },
+                  },
+                ],
+              }
+            : block,
+        ),
       ),
     );
+  }
+
+  if (scope === "automation") return automate(world, item, verb, ids);
 
   if (scope === "skill" && verb === "toggle")
     return summarize(
@@ -246,8 +363,9 @@ export function press(
   }
 
   // Provider controls: the id's first part names the provider.
-  const provider = (id: string, change: (p: Provider) => Provider) =>
+  const provider = (id: string, change: (p: Provider) => Provider | null) =>
     summarize(mapPages(world, (page) => mapProviders(page, (p) => (p.id === id ? change(p) : p))));
+  if (item === "remove") return provider(scope, () => null);
   if (item === "disconnect")
     return provider(scope, (p) => ({
       ...p,
@@ -255,7 +373,7 @@ export function press(
       status: "没连上",
       controls: [{ id: `${p.id}.connect`, label: "连上" }],
     }));
-  if (item === "connect" || item === "rekey")
+  if (item === "connect" || item === "edit")
     return provider(scope, (p) => ({
       ...p,
       keyField: {
@@ -266,7 +384,7 @@ export function press(
   if (item === "test")
     return provider(scope, (p) => ({ ...p, status: `${CONNECTED} · 刚测过，能用` }));
 
-  // Everything else (reveal, export, update, licenses, feedback, quiet hours, add a rule) is a
+  // Everything else (reveal, backup, export, help topics, licenses, feedback, quiet hours) is a
   // host action outside the mock; it changes nothing here.
   return world;
 }

@@ -3,6 +3,8 @@ import type { ChatAction } from "../port.ts";
 
 /** Optional host-owned controls. They never grant authority on their own. */
 export interface ChatIntegration {
+  readonly openSettingsRequest?: { readonly page: string; readonly sequence: number } | undefined;
+  readonly pageNotice?: string | undefined;
   readonly activeChatId: string | null;
   readonly onNew: () => void;
   readonly canSend: boolean;
@@ -14,6 +16,8 @@ export interface ChatIntegration {
   /** The host's safe rich-text renderer for assistant message bodies. */
   readonly renderText?: (text: string) => ReactNode;
   readonly supportedActions: readonly ChatAction["type"][];
+  /** The rail changed what fills the list, e.g. "results", so the host can load its data. */
+  readonly onView?: (view: string) => void;
 }
 
 export function supports(

@@ -57,7 +57,13 @@ await build({
   platform: "browser",
   format: "esm",
   target: "chrome156",
-  define: { "process.env.NODE_ENV": '"production"' },
+  define: {
+    "process.env.NODE_ENV": '"production"',
+    __MOYYI_VERSION__: JSON.stringify(
+      JSON.parse(readFileSync(join(root, "package.json"), "utf8")).version,
+    ),
+    __MOYYI_NOTICES__: JSON.stringify(readFileSync(join(root, "THIRD_PARTY_NOTICES.md"), "utf8")),
+  },
   legalComments: "linked",
   tsconfig: join(root, "tsconfig.desktop.json"),
 });
@@ -69,7 +75,6 @@ writeFileSync(
 );
 cpSync(join(chat, "design/bundle.css"), join(output, "bundle.css"));
 cpSync(join(chat, "app.css"), join(output, "chat.css"));
-cpSync(join(chat, "assets/character.png"), join(output, "character.png"));
 // Existing feature controls keep their styles within an explicit scope. Their global button,
 // body and layout rules must never restyle the approved Chat interface.
 writeFileSync(
